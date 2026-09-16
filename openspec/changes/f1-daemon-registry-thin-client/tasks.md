@@ -107,15 +107,15 @@ Runtime harness: N/A.
 - [x] 4.3 Verify: `npm run build && node --test "dist/test/shared/thread-record.test.js"`.
 
 #### PR-05 — `shared/protocol-apply.ts` (SEAM, D-05)
-Branch `f1/05-protocol-apply` → `main`. Depends: PR-04. Size: ≈390 lines, no exception (near-budget; one cohesive state-machine module, not splittable per design).
+Branch `f1/05-protocol-apply` → `main`. Depends: PR-04. Size: ≈390 lines estimated; real authored diff 609 lines (56% over estimate, 209 over the 400-line cap) — one cohesive state-machine module, not splittable per design (confirmed at apply time: a test/implementation split across two PRs would fail `test/twins.test.ts` on the first PR's own merge to `main`). Granted a one-time, PR-05-scoped size exception at apply time (Director-authorized, distinct from DN-06's AS-IS-only exception; see `apply-progress.md` "Orchestrator decision on the budget overage").
 Scope: `src/shared/protocol-apply.ts`, `test/shared/protocol-apply.test.ts`.
 Requirements: `durable-inbox › A null addressee anchor fails closed (D-05)` (PT-17); underlies `durable-inbox › Forged sender never overrides the verified identity` (PT-16) and `durable-inbox › Seven-step admission pipeline` step 6-7 (consumed by PR-22a).
 Runtime harness: N/A — unit test over `applyEnvelope`/`isAddressee`/`classifyRejection`.
 
-- [ ] 5.1 RED: write `test/shared/protocol-apply.test.ts` covering REQUEST/ACK/REPLY/RESOLVED/NOTED transitions (adapted from `telegram-agent-bus/test/protocol.test.ts`, read-only reference, apply-side slice of 897 lines) and the D-05 scenario "Unanchored transition is rejected, not authorized".
-- [ ] 5.2 GREEN: implement `src/shared/protocol-apply.ts` (SEAM from `telegram-agent-bus/src/protocol.ts:1-333`, read-only source; changes: `ThreadRecord` from PR-04, REPLY branch no longer touches `first_surfaced_at`, `isAddressee`/`classifyRejection` fail closed with reason `unanchored`, `isDuplicateEid` unused).
-- [ ] 5.3 Verify: `npm run build && node --test "dist/test/shared/protocol-apply.test.js"`.
-- [ ] 5.4 Docs: update the file-name cell(s) of PT-16, PT-17 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 5.1 RED: write `test/shared/protocol-apply.test.ts` covering REQUEST/ACK/REPLY/RESOLVED/NOTED transitions (adapted from `telegram-agent-bus/test/protocol.test.ts`, read-only reference, apply-side slice of 897 lines) and the D-05 scenario "Unanchored transition is rejected, not authorized".
+- [x] 5.2 GREEN: implement `src/shared/protocol-apply.ts` (SEAM from `telegram-agent-bus/src/protocol.ts:1-333`, read-only source; changes: `ThreadRecord` from PR-04, REPLY branch no longer touches `first_surfaced_at`, `isAddressee`/`classifyRejection` fail closed with reason `unanchored`, `isDuplicateEid` unused).
+- [x] 5.3 Verify: `npm run build && node --test "dist/test/shared/protocol-apply.test.js"`.
+- [x] 5.4 Docs: update the file-name cell(s) of PT-16, PT-17 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 #### PR-06 — `shared/protocol-select.ts` + `shared/fence.ts` (SEAM, D-15)
 Branch `f1/06-protocol-select-fence` → `main`. Depends: PR-05. Size: ≈315 lines, no exception.
