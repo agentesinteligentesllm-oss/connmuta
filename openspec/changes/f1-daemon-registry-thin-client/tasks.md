@@ -91,10 +91,10 @@ Scope: `src/shared/secrets.ts`, `test/shared/secrets.test.ts`.
 Requirements: underlies `send-path › Validation pipeline and secret backstop` (PT-15) and `secret-store › No token in errors, logs or stacks` (PT-08, redaction consumes this regex).
 Runtime harness: N/A — unit test over the exported regex/functions.
 
-- [ ] 3.1 RED: write `test/shared/secrets.test.ts` (adapted from `telegram-agent-bus/test/secrets.test.ts`, read-only reference, 133 lines) asserting `TELEGRAM_BOT_TOKEN_RE` is exported and matches a fixture token shape, and the secret-backstop predicate rejects a PEM block / `.env`-style assignment / bot-token shape / configured marker.
-- [ ] 3.2 GREEN: implement `src/shared/secrets.ts` (SEAM from `telegram-agent-bus/src/secrets.ts`, read-only source, 86 lines; change: `export` the regex so the validator and the redactor share one definition).
-- [ ] 3.3 Verify: `npm run build && node --test "dist/test/shared/secrets.test.js"`.
-- [ ] 3.4 Docs: update the file-name cell(s) of PT-08, PT-15 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 3.1 RED: write `test/shared/secrets.test.ts` (adapted from `telegram-agent-bus/test/secrets.test.ts`, read-only reference, 133 lines) asserting `TELEGRAM_BOT_TOKEN_RE` is exported and matches a fixture token shape, and the secret-backstop predicate rejects a PEM block / `.env`-style assignment / bot-token shape / configured marker.
+- [x] 3.2 GREEN: implement `src/shared/secrets.ts` (SEAM from `telegram-agent-bus/src/secrets.ts`, read-only source, 86 lines; change: `export` the regex so the validator and the redactor share one definition).
+- [x] 3.3 Verify: `npm run build && node --test "dist/test/shared/secrets.test.js"`.
+- [x] 3.4 Docs: update the file-name cell(s) of PT-08, PT-15 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 #### PR-04 — `shared/thread-record.ts` (SEAM)
 Branch `f1/04-thread-record` → `main`. Depends: PR-03. Size: ≈190 lines, no exception.
