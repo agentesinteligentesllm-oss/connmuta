@@ -22,5 +22,11 @@
     "v1Path": "src/secrets.ts",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/shared/thread-record.ts",
+    "v1Path": "src/state.ts:15-87",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
