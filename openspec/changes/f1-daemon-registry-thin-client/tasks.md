@@ -66,9 +66,9 @@ Scope: `src/shared/constants.ts`, `test/shared/constants.test.ts`.
 Requirements: W1/W8 sentinel agreement (design §15 mapping "W8 `shared/constants`"); D-03 `NODE_FLOOR`; D-09 `PRODUCT_NAME` as the single rename constant (B-11); every design §3 value named with its reasoning (named-constant rule, CONSTITUTION §5).
 Runtime harness: N/A — unit test over exported constants.
 
-- [ ] 1b.1 RED: write `test/shared/constants.test.ts` asserting `PROTOCOL_SENTINEL === "AGENTBUS/2"`, `SUPPORTED_PROTOCOL_SENTINELS` contains both `/1` and `/2` sentinels and the emitted one (W8), `NODE_FLOOR === "24.15.0"` (D-03), the `PRODUCT_NAME` derivations, and every derived value in design §3 as an expression over its base (values marked "tuning" pin the invariant, never the number).
-- [ ] 1b.2 GREEN: implement `src/shared/constants.ts` (SEAM from `v1:src/config.ts:26-166` with the design §12 provenance header and the v1 body SHA-256; `HTTP_*` codes stay for `shared/ipc-contract.ts` in PR-29 and `TELEGRAM_BOT_TOKEN_RE` for `shared/secrets.ts` in PR-03) — 1b.1 passes.
-- [ ] 1b.3 Verify: `npm run build && node --test "dist/test/shared/constants.test.js"`, then the full `npm test`.
+- [x] 1b.1 RED: write `test/shared/constants.test.ts` asserting `PROTOCOL_SENTINEL === "AGENTBUS/2"`, `SUPPORTED_PROTOCOL_SENTINELS` contains both `/1` and `/2` sentinels and the emitted one (W8), `NODE_FLOOR === "24.15.0"` (D-03), the `PRODUCT_NAME` derivations, and every derived value in design §3 as an expression over its base (values marked "tuning" pin the invariant, never the number).
+- [x] 1b.2 GREEN: implement `src/shared/constants.ts` (SEAM from `v1:src/config.ts:26-166` with the design §12 provenance header and the v1 body SHA-256; `HTTP_*` codes stay for `shared/ipc-contract.ts` in PR-29 and `TELEGRAM_BOT_TOKEN_RE` for `shared/secrets.ts` in PR-03) — 1b.1 passes.
+- [x] 1b.3 Verify: `npm run build && node --test "dist/test/shared/constants.test.js"`, then the full `npm test`.
 
 ### Unit 2 — Shared vendored modules
 
