@@ -4,6 +4,28 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-16 — Session 4: F1 apply, PR-02 merged (stopped at the PR-02 → PR-03 boundary)
+
+**Closed**
+
+- Handoff followed as written: `main` clean and up to date; SDD preflight re-collected in canonical order (Automatic · hybrid · auto-chain); `gentle-ai sdd-status`: `nextRecommended: apply`, 11/210, no blockers; ledger `acquire` for PR-02 with `--max-changed-lines 1500` → `proceed` (settle obligation: name the PR-01 evidence revision as remediated).
+- Pre-launch verification against the real files: both repos `core.autocrlf=true`, v2 `.gitattributes` `eol=lf`, v1 none → the provenance hash must normalize CRLF→LF; reference v1 body hashes computed from the `bf8f365` blobs (`envelope.ts` `e4aba6ec…2663`, `envelope.test.ts` `db6cda68…db7f`); v1 already emits `AGENTBUS/2` and accepts `/1`+`/2` (identical to v2 constants); `zod` same major (^4.4.3 vs 4.6.5); the v1 twin imports `deliveredText` from a fake whose SEAM is PR-18 → split into `test/fakes/delivered-text.ts` (orchestrator decision, ratified).
+- `sdd-apply` (sonnet) on PR-02 under Strict TDD: RED (`expected the provenance fixture to be non-empty`) → GREEN; both hashes matched the references on the first attempt; the scanner surfaced PR-01b's pre-existing `constants.ts` provenance header, which entered the registry as its third entry (SEAM; hash reproducible as v1 `config.ts:26-166` LF-joined, no trailing newline).
+- Kairo's review before the audit: a header carrying `Provenance:` that failed to parse was silently skipped (a bypass) → now fails the scan, RED reproduced with a probe file made visible through `git add -N`; dead blank-skip loop removed; parser unit test retitled. Bodies confirmed byte-identical to the v1 blobs by textual `diff`, not only by hash.
+- Three work-unit commits, each green alone (`36bc4d1` test(security), `b1a13dd` feat(shared), `119868e` docs(sdd)); authored diff 215 lines (< 400), 1,003 vendored body lines excluded (DN-06). Clean detached worktree (`npm ci --ignore-scripts`): 89/89, `test:static` 8/8, LF-only. Fresh-context phase-contract validator: PASS, no findings (it recomputed all three hashes independently).
+- Debate `bus-v2-f1-pr-02-001`: PROPOSAL sent; the broker watchdog closed it `ESCALATED` on a turn timeout before Alpha's AUDIT entered the channel (Alpha's verdict, relayed out of band by the Director: `APPROVE`). The Director chose to re-run in-band: `bus-v2-f1-pr-02-002` (1 round, CONSENSUS, `APPROVE`, objections `[]`) — hashes, registry, `deliveredText` split, hardening and the RED-fidelity deviation ratified.
+- PR #3 (`f1/02-envelope-provenance` → `main`) opened under `agentesinteligentesllm-oss` after the consensus; CI green on the PR (run `35141361427`: Node 24.15 37 s / Node 26 45 s) → merged by Kairo under DN-08 (`2083d7a`, branch deleted); CI green on `main` after the merge (run `35141490997`).
+- Native attempt ledger: PR-02 attempt settled `passed` with `--remediates-evidence-revision sha256:0afec921…` (evidence revision `sha256:97acc439…` = SHA-256 of the manifest `PR-02 f1/02-envelope-provenance tip 119868e merged 2083d7a; clean worktree verify-02: node --test 89/89, test:static 8/8; CI run 35141361427 pass (node 24.15, 26); tribunal bus-v2-f1-pr-02-002 CONSENSUS`) → `state: complete`, no maintainer decision required.
+- Documentation refresh (this handoff, LOG, tribunal rows + record for `-001`/`-002`, 00-INDEX status, AGENTS.md status, README status, `openspec/config.yaml` context, `state.yaml`) and closure audit `bus-v2-session-4-closure-001` (1 round, CONSENSUS, `APPROVE`, no objections).
+
+**Opened**
+
+- PR-03 (`shared/secrets.ts`, SEAM, ≈230 lines) — next session; see HANDOFF.
+- GitHub Actions warns that `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 (forced to Node 24 by the runner) — bump to the current majors in a later CI PR, audited.
+- Stale `dist/` remains a footgun under `npm test` (carried from session 3).
+
+**How it knows**: tribunal envelopes read through the Arena bridge (`bus-v2-f1-pr-02-002`, `bus-v2-session-4-closure-001`; `bridge_read` on `-001` returned `state: ESCALATED`, no pending message); `gentle-ai sdd-status` / `sdd-attempt acquire|settle` output; GitHub API (`gh pr view 3`, runs `35141361427`, `35141490997`); clean-worktree `node --test` runs; Engram observations #3182 (pre-launch decisions), #3184 (PR-02 implemented), #3126 (apply-progress twin).
+
 ## 2026-09-16 — Session 3: F1 apply, PR-01a and PR-01b merged (stopped at the PR-01b → PR-02 boundary)
 
 **Closed**

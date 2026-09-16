@@ -53,13 +53,13 @@ phases:
   apply:
     status: in_progress
     started_at: "2026-09-16"
-    completed_slices: PR-01a (#1 1369886), PR-01b (#2 5798bab) -- 11/210 tasks, CI green on both merges
-    tribunal_debate: bus-v2-f1-pr-01-001
+    completed_slices: PR-01a (#1 1369886), PR-01b (#2 5798bab), PR-02 (#3 2083d7a) -- 17/210 tasks, CI green on every merge
+    tribunal_debate: bus-v2-f1-pr-01-001, bus-v2-f1-pr-02-002 (bus-v2-f1-pr-02-001 ESCALATED by the broker watchdog on a turn timeout, re-run in-band)
     tribunal_state: consensus
     apply_progress: apply-progress.md (engram sdd/f1-daemon-registry-thin-client/apply-progress)
-    attempt_ledger: PR-01 attempt passed; objective reset by the Director on 2026-09-16 (next_action begin)
+    attempt_ledger: PR-01 attempt passed; objective reset by the Director on 2026-09-16; PR-02 attempt settled passed (state complete) on 2026-09-16
   verify:
     status: pending
   archive:
     status: pending
-next_recommended: apply (new session; start at PR-02; see docs/08-sessions/HANDOFF.md)
+next_recommended: apply (new session; start at PR-03; see docs/08-sessions/HANDOFF.md)

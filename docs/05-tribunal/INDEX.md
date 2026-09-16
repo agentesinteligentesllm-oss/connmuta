@@ -21,6 +21,9 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-pr-01-001` | 2026-09-16 ~05:35Z → ~05:55Z | Kairo (proposer, writer), Alpha (auditor); Director (merge authority) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (first code slice of F1) | PR-01 re-sliced into PR-01a/PR-01b (45 slices); THREAT-MODEL §4 scope-cell convention; real PT-22 deny-list deferred to B-16 / PR-42 |
 | `bus-v2-session-3-closure-001` | 2026-09-16 ~06:55Z → ~07:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE_WITH_CHANGES`, 2 objections accepted and fixed before the commit | none | — |
 | `bus-v2-session-3-addendum-001` | 2026-09-16 ~07:20Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` | none (records DN-08 and the branch-protection change) | branch protection on `main` closed |
+| `bus-v2-f1-pr-02-001` | 2026-09-16 ~17:05Z → watchdog close | Kairo (proposer, writer), Alpha (auditor) | 1 (PROPOSAL only) | `ESCALATED` — closed by the broker watchdog on a turn timeout before Alpha's `AUDIT` reached the channel; Alpha's out-of-band verdict (relayed by the Director) was `APPROVE`; no disagreement | none | re-run as `bus-v2-f1-pr-02-002` by the Director's decision |
+| `bus-v2-f1-pr-02-002` | 2026-09-16 ~19:25Z → ~19:30Z | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (second code slice of F1) | `deliveredText` helper split (`test/fakes/delivered-text.ts`, PR-18 must import it); `constants.ts` joins the provenance registry; RED-fidelity deviation on task 2.1 recorded |
+| `bus-v2-session-4-closure-001` | 2026-09-16 ~19:55Z → ~20:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -238,6 +241,49 @@ refresh (00-INDEX, AGENTS.md, README, CHECKLIST B-16) and the `sdd-init` re-run 
 
 Outcome: CONSENSUS after one AUDIT round (`APPROVE_WITH_CHANGES`, objections 1–2 accepted with
 evidence); session 3 closed at the PR-01b → PR-02 boundary.
+
+## `bus-v2-f1-pr-02-001` and `bus-v2-f1-pr-02-002` — record
+
+Audit of the second F1 code slice before it opened on GitHub (DN-05): branch
+`f1/02-envelope-provenance` (commits `36bc4d1`, `b1a13dd`, `119868e`), the provenance mechanism
+(`test/security/provenance.test.ts` + `test/fixtures/v1-provenance.json`) and the whole-file AS-IS
+copies of `v1:src/envelope.ts` and `v1:test/envelope.test.ts` under DN-06 `size:exception`.
+
+`bus-v2-f1-pr-02-001` received the PROPOSAL but the broker watchdog closed it as `ESCALATED` on a
+turn timeout before Alpha's `AUDIT` entered the channel; Alpha's verdict reached Kairo only out of
+band (relayed by the Director): `APPROVE`, no objections. Rather than merge on an escalated record,
+the Director chose to re-run the debate in-band as `bus-v2-f1-pr-02-002` with the same proposal and
+an explicit reference to the first id; nothing changed on the branch between the two.
+
+| Question | Alpha's ruling (`-002`) |
+|---|---|
+| (1) Headers and hashes: `src/shared/envelope.ts:1-5` (`e4aba6ec…2663`), `test/shared/envelope.test.ts:1-5` (`db6cda68…db7f`); hash rule = CRLF→LF, strip leading provenance header, strip leading import block | Ratified: all recomputed independently against `telegram-agent-bus@bf8f365`, byte-for-byte |
+| (2) Registry with three entries, including PR-01b's pre-existing `src/shared/constants.ts` SEAM header (`4ce5e514…` = v1 `config.ts:26-166`, LF-joined) | Ratified: the registry equals every headered file (design §12); `constants.ts` untouched |
+| (3) `test/fakes/delivered-text.ts` split from `v1:test/fakes/telegram.ts:43-49` so the twin stays a whole-file AS-IS copy before PR-18's SEAM fake exists; no provenance header; PR-18 must import it | Ratified: byte-identical extract; `test/twins.test.ts` walks `src/**` only |
+| (4) Kairo's hardening: a header carrying `Provenance:` that fails to parse fails the scan (was silently skipped); dead blank-skip loop removed; parser unit test retitled | Ratified |
+| (5) RED-fidelity deviation on task 2.1 (vendored files already staged; only the non-vacuity guard fired) plus a second genuine RED for the malformed-header assertion | Ratified as an honestly documented process deviation, not a correctness gap |
+| (6) Budget and gates: 215 authored lines; 1,003 vendored body lines excluded; clean detached worktree 89/89 and static 8/8; data hygiene clean | Ratified |
+
+Outcome: CONSENSUS in one round (`-002`). PR #3 opened after the audit under
+`agentesinteligentesllm-oss`; CI (`windows-latest` × Node 24.15/26) green on the PR (run
+`35141361427`) and on `main` after the merge (`2083d7a`, run `35141490997`); merged by Kairo under
+DN-08. Lesson recorded in the handoff: a watchdog escalation is not a verdict — re-run the debate
+in-band so the record shows the real outcome.
+
+## `bus-v2-session-4-closure-001` — record
+
+Audit of everything written in session 4 before the docs commit on `main`: the merged PR #3, the
+handoff for PR-03, the log, the tribunal rows/record for `bus-v2-f1-pr-02-001`/`-002` and the
+live-status refresh (00-INDEX, AGENTS.md, README, `openspec/config.yaml`, `state.yaml`).
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Handoff self-sufficient for PR-03 | Yes: verified v1 sizes, SEAM change, fixture-entry requirement, THREAT-MODEL cells, ledger sizing; the watchdog-timeout rule (re-run under `-002`, never merge on a timeout escalation) ratified as critical |
+| (2) Tribunal fidelity | Rows and record faithful to the `-001` timeout, the out-of-band verdict and the in-band `-002` consensus, with the six rulings and both CI runs |
+| (3) LOG accuracy | Accurate, newest first, traceable "how it knows" |
+| (4) Live-status sweep | Clean and synchronized across the five files; `gentle-ai sdd-status` 17/210, no blockers |
+
+Outcome: CONSENSUS in one round; session 4 closed at the PR-02 → PR-03 boundary.
 
 ## Reserved: `bus-v2-referee-001`
 

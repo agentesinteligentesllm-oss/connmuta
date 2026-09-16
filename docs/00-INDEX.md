@@ -7,7 +7,7 @@ This file is the **single entry point** of the repository (landing decision D10:
 documents claiming to be the entry point; v2 has one). If a document is not listed here, it is not
 part of the F0 landing.
 
-**Status: F0 closed; F1 `apply` in progress — PR-01a and PR-01b merged to `main` (scaffold, CI, static gates, `shared/constants.ts`; 11/210 tasks, 45 slices); next slice PR-02.**
+**Status: F0 closed; F1 `apply` in progress — PR-01a, PR-01b and PR-02 merged to `main` (scaffold, CI, static gates, `shared/constants.ts`, provenance mechanism, `shared/envelope.ts` AS-IS; 17/210 tasks, 45 slices); next slice PR-03.**
 Live position: [`08-sessions/HANDOFF.md`](./08-sessions/HANDOFF.md). Source of the architecture below: Arena debate
 `bus-v2-landing-architecture-001`, consensus after two rounds ([`05-tribunal/INDEX.md`](./05-tribunal/INDEX.md)).
 
