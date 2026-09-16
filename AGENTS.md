@@ -93,8 +93,7 @@ to D11 in the tribunal record; SDD preflight (Automatic · hybrid · auto-chain)
 (`stacked-to-main`, DN-06); license Apache-2.0 (DN-04).
 
 Pending the Director: trademark screening of the product name (B-11), the B-16 remainder
-(SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright-holder line), macOS scope (B-12), branch
-protection on `main`. Full board:
+(SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright-holder line), macOS scope (B-12). Full board:
 [`docs/00-INDEX.md`](./docs/00-INDEX.md#pending-director-decisions).
 
 Open spikes for F0: B-05 (gentle-ai installer study), B-07 (bot-to-bot group visibility for
@@ -116,7 +115,7 @@ rendering per host).
   break them. This checkout's `.git/config` carries a local `credential.helper` that fetches the
   `agentesinteligentesllm-oss` token at call time; `gh` commands run with
   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`. Never run `gh auth switch`.
-- Remote `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main` (pushed). Branch protection pending the Director (00-INDEX pending board, row 5).
+- Remote `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main` (pushed). Branch protection: force-push and deletion blocked (DN-08); no PR or status-check requirement.
 
 ## 6. Working with the v1 repository
 

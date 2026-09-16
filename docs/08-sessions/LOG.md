@@ -20,6 +20,8 @@
 - Director note DN-07: this project lives only under `agentesinteligentesllm-oss`; other agents on the machine use another account on an unrelated project. Kairo had switched the machine-global `gh` account twice (403 recovery, then restore); replaced by a repo-local `credential.helper` + per-command `GH_TOKEN`, global account left as the other agents had it.
 - Documentation refresh (this handoff, LOG, tribunal row + record + DN-07, 00-INDEX status and rows 3/5/6, AGENTS.md status/§4/§5, README status, CHECKLIST B-16, config.yaml, state.yaml) and closure audit `bus-v2-session-3-closure-001` (1 round, `APPROVE_WITH_CHANGES`: two stale remnants — `config.yaml` "PR-01b open", `state.yaml` "start at PR-01" — fixed before the commit).
 
+- Addendum after closure (Director, DN-08 — full authorization renewed): branch protection on `main` applied (force-push and deletion blocked, nothing else); handoff steps 6–7 now merge after CONSENSUS + green CI and reset the ledger under DN-08 without a Director question; audited in `bus-v2-session-3-addendum-001`.
+
 **Opened**
 
 - PR-02 (`shared/envelope.ts`, `size:exception` AS-IS hash-pinned) — next session; acquire the ledger with `--max-changed-lines` sized to what the ledger measures.

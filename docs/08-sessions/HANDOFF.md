@@ -15,9 +15,9 @@
 | Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) is **45 slices** (PR-01 was re-sliced at apply time into PR-01a/PR-01b — forecast note and header row `PR budget` say what counts toward 400); design and specs unchanged | Engram twins under `sdd/f1-daemon-registry-thin-client/*` (project key `telegram_bus_agent`) |
 | SDD preflight | Automatic · hybrid · auto-chain; `chain_strategy: stacked-to-main` (DN-06); re-collect per session with `AskUserQuestion` **in the canonical option order** (Interactive, Automatic / OpenSpec, Engram, Both / Ask me, Single PR, Auto) — a reordered menu is refused by the runtime | [`openspec/config.yaml`](../../openspec/config.yaml) `session:` |
 | Strict TDD | `openspec/config.yaml` `strict_tdd: true` (re-run of `sdd-init` on 2026-09-16 against the real `npm test`) — forward `STRICT TDD MODE IS ACTIVE. Test runner: npm test` to every `sdd-apply` | `openspec/config.yaml` `testing:` |
-| Tribunal | 9 debates closed in CONSENSUS (…, `bus-v2-f1-pr-01-001`, `bus-v2-session-3-closure-001`); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
+| Tribunal | 10 debates closed in CONSENSUS (…, `bus-v2-f1-pr-01-001`, `bus-v2-session-3-closure-001`, `bus-v2-session-3-addendum-001`); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
 | Native attempt ledger | Objective reset by the Director on 2026-09-16 (`next_action: begin`, `decision_required: false`); the PR-01 attempt is recorded `passed` with `changed_lines: 2676` because the ledger counts generated `npm-shrinkwrap.json` and every tracked change | `gentle-ai sdd-attempt status --cwd <repo> --change f1-daemon-registry-thin-client` |
-| Repository | `origin` = `agentesinteligentesllm-oss/connmuta`, `main` at `5798bab` + this session's docs commit. **Branch protection not configured** (Director) | `git remote -v` |
+| Repository | `origin` = `agentesinteligentesllm-oss/connmuta`, `main` at the session-3 docs commits. Branch protection on `main`: force-push and deletion blocked (DN-08); no PR or status-check requirement, so session-close docs commits stay direct | `gh api repos/agentesinteligentesllm-oss/connmuta/branches/main/protection` |
 | Code on `main` | `package.json`, `tsconfig.base.json` + project references, CI, `src/shared/{constants,version}.ts`, twins, `test/twins.test.ts`, `test/security/{pack,repo-scan}.test.ts` — 14 tests, `test:static` 6 | PR #1, PR #2 |
 
 ## Next session — exact start
@@ -48,10 +48,11 @@
    ../telegram_bus_agent-worktrees/verify-NN <branch>` → `npm ci --ignore-scripts && npm run build &&
    node --test "dist/test/**/*.test.js"` — this caught a self-matching scanner in session 3),
    runs the fresh-context phase-contract validator (sonnet, read-only), then opens debate
-   `bus-v2-f1-pr-02-001` with Alpha. `gh pr create` only after CONSENSUS; merge after the
-   Director's word; retarget/reopen the stacked PR if its CI did not trigger.
+   `bus-v2-f1-pr-02-001` with Alpha. `gh pr create` only after CONSENSUS; merge once CI is green
+   (DN-08: Kairo's discretion — report what was merged); reopen the PR if its CI did not trigger.
 7. `gentle-ai sdd-attempt settle …` (passed/failed) after the PR merges; if `blocked:
-   maintainer_decision`, ask the Director for the reset — never reset unilaterally.
+   maintainer_decision`, run the reset with the proven reason and `--actor "Kairo (DN-08)"`, and
+   report it in the LOG.
 8. Stop at a PR boundary. Rewrite this file, append to [`LOG.md`](./LOG.md), record the debate(s) in
    the tribunal index, `mem_session_summary`, commit docs on `main`, push.
 
@@ -71,7 +72,6 @@
 
 | Id | Point | Owner |
 |---|---|---|
-| — | Branch protection on `main` | Director |
 | B-16 / D-10 | `LICENSE` shipped with `private: true` (DN-06 assumption, unvetoed so far); SECURITY/CONTRIBUTING/CHANGELOG and the copyright-holder line open; a **real tenant deny-list** for PT-22 must live outside the tree (CI secret) — decide at PR-42 | Director |
 | B-11 | Trademark screening; `PRODUCT_NAME` is the single rename constant (`src/shared/constants.ts:14`) | Director |
 | — | `npm test` runs whatever is in a stale `dist/` (a deleted or renamed test keeps running until `dist/` is removed); consider a `clean` step in a later PR, audited | Kairo → Alpha |
