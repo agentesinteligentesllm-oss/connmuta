@@ -198,3 +198,150 @@ Measured with `git diff HEAD --numstat` (staged + unstaged vs. the branch point 
 ## Next
 
 Tribunal audit of PR-02 (`bus-v2-f1-pr-02-001`), then PR-03 (`shared/secrets.ts`, SEAM).
+
+---
+
+# Apply Progress: F1 — PR-03 (`shared/secrets.ts`, SEAM)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branch | `f1/03-secrets` → `main` (stacked on PR-02) |
+| Mode | Strict TDD |
+| Status | Implemented and verified; tasks 3.1–3.4 marked `[x]`; tribunal audit pending before the PR opens |
+
+## Scope
+
+`src/shared/secrets.ts` (SEAM from `v1:src/secrets.ts` @ `bf8f365`), `test/shared/secrets.test.ts`
+(adapted from `v1:test/secrets.test.ts` @ `bf8f365`), `test/fixtures/v1-provenance.json` (one SEAM
+entry appended), `docs/02-architecture/THREAT-MODEL.md` (PT-08, PT-15 scope cells).
+
+## TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 3.1 | `test/shared/secrets.test.ts` | Unit | N/A (new) | ✅ Written | ✅ Passed | ✅ 14 tests (4 secret-shape rules × table-driven cases, clean payload, marker on/off, no-echo, ADR-05a regression, multi-assignment scan, regex export) | ➖ None needed |
+| 3.2 | `src/shared/secrets.ts` | Unit (via 3.1) | N/A (new) | ✅ (3.1's RED covered it) | ✅ Passed | ➖ Single vendored module, one seam change (`export`) | ➖ SEAM, no further refactor — matches v1 body except the one named change |
+| 3.3 | (verification, no new test) | — | — | — | ✅ 103/103 full suite, 8/8 static suite | — | — |
+| 3.4 | `docs/02-architecture/THREAT-MODEL.md` | N/A (docs) | N/A | — | — | — | — |
+
+## RED evidence (task 3.1, genuine failure captured before GREEN)
+
+With `test/shared/secrets.test.ts` written and `src/shared/secrets.ts` not yet created,
+`npm run build` failed for the intended reason (missing module, not a syntax or type error):
+
+```
+test/shared/secrets.test.ts:4:73 - error TS2307: Cannot find module '../../src/shared/secrets.js' or
+its corresponding type declarations.
+
+4 import { checkForSecrets, TELEGRAM_BOT_TOKEN_RE, type SecretRule } from "../../src/shared/secrets.js";
+                                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found 1 error in test/shared/secrets.test.ts:4
+```
+
+After implementing `src/shared/secrets.ts`, GREEN: `node --test "dist/test/shared/secrets.test.js"`
+→ **14/14 pass**.
+
+## Hash computation and reference cross-check
+
+Computed the v1 body SHA-256 with the same `vendoredBody()` algorithm `provenance.test.ts` uses
+(normalize `\r\n`→`\n`; strip a leading `Provenance:`-bearing header block, none present on the raw
+v1 file; strip the leading contiguous import/blank-line block, none present — `src/secrets.ts` has
+no imports, so the body starts at line 1) against the frozen `bf8f365` blob fetched with
+`git show bf8f365:src/secrets.ts`:
+
+| File | Body first line | Body lines (incl. trailing split element) | Computed hash |
+|---|---|---|---|
+| `v1:src/secrets.ts` | `/** PEM-formatted private-key block...` | 87 | `742bf4338505295b15f37d994e66e6d268d4fcba0fb5cc64c7458a80f2790bf6` |
+| `v1:test/secrets.test.ts` | `// --- Table-driven reject cases...` | 134 | `510c409b8c73e5afdc6795b4c5419e2555eaa001b0a7c0840606eceaedaa5f8b` (reference only — the test twin carries no provenance header, so this hash is not asserted by `provenance.test.ts`) |
+
+`742bf433...` is the value recorded in `src/shared/secrets.ts`'s header as `v1 body sha256`. Because
+this is a SEAM (the one change is `export` on `TELEGRAM_BOT_TOKEN_RE`), `provenance.test.ts` asserts
+the vendored body's hash is **unequal** to this reference — confirmed by the passing
+`vendored files match the provenance registry and their pinned body hashes` test — and that
+`Changes:` is not the literal `"none."`.
+
+## Real diff size
+
+Measured with `git diff HEAD --numstat` (staged + unstaged vs. the branch point on `main`):
+
+| File | + | − |
+|---|---|---|
+| `src/shared/secrets.ts` | 94 | 0 |
+| `test/shared/secrets.test.ts` | 146 | 0 |
+| `test/fixtures/v1-provenance.json` | 6 | 0 |
+| `docs/02-architecture/THREAT-MODEL.md` | 2 | 2 |
+| `openspec/changes/f1-daemon-registry-thin-client/tasks.md` | 4 | 4 |
+
+- **Authored, budget-counted total**: `secrets.ts` (94) + `secrets.test.ts` (146) +
+  `v1-provenance.json` (6) + `THREAT-MODEL.md` docs cells (2+2=4) = **250 lines**. This PR's SEAM
+  body is **not** a `size:exception` slice (DN-06 only exempts whole-file AS-IS copies; PR-03 is a
+  SEAM by the one-line `export` change) — the entire 94-line `secrets.ts` file counts toward the
+  budget, per the tasks header's "SEAM bodies are NOT size-exception" rule. 250 lines is within the
+  400-line hard cap and ≈20 lines (≈9%) over the tasks.md ≈230-line estimate for this slice; the
+  overage is the `TELEGRAM_BOT_TOKEN_RE` export test plus its digit-count doc comment (see
+  "Corrections" below) and the fuller table-driven test adaptation from v1's 133-line original. No
+  re-slice was needed — well under budget, no stop-and-report trigger.
+- **SDD bookkeeping** (not review load, per the tasks header's counting rule): `tasks.md` 4+4.
+
+## Corrections applied this round
+
+1. **Fixture token digit count changed from the v1 original**: v1's own test fixture token (a
+   10-digit bot id followed by a 35-char auth string — not reproduced verbatim here, since embedding
+   the literal shape in a tracked doc would itself retrip the scan this note describes) is exactly
+   the shape `test/security/repo-scan.test.ts`'s own `TOKEN_SHAPE_RE` (`\b\d{8,10}:[A-Za-z0-9_-]{35}\b`, PT-22)
+   is built to catch — confirmed by running the full suite with the v1 literal in place: `npm test`
+   failed `repository scan over tracked files is clean (PT-22)` with
+   `unexpected token-shape or deny-list hit(s): [{"path":"test/shared/secrets.test.ts",
+   "tokenShape":true,"denyList":false}]`. Since this v2 repository's own CI secret scan runs over
+   every tracked file (not just v1's original scope), a vendored fixture that happens to fall inside
+   the realistic 8–10 digit Telegram bot-id range trips it. Changed the fixture's digit run to 7
+   digits (`1234567:AAHk3x9pQ7vLz2mR8sT1uV6wX0yZaBcDeFg`) — still matches `shared/secrets.ts`'s own
+   `TELEGRAM_BOT_TOKEN_RE` (`\d+:...`, unbounded digit count), still exercises the
+   `telegram_bot_token_shape` rejection branch, but falls outside repo-scan's stricter 8–10 digit
+   window and is unambiguously synthetic (sequential digits, not id-shaped). RED reproduced
+   genuinely (the failure above), GREEN restored after the substitution — full suite back to
+   103/103, static suite 8/8. Documented as a design note in the test file itself.
+2. **DRY duplication observed, not fixed (orchestrator instruction)**: `test/security/repo-scan.test.ts:13`
+   keeps its own `TOKEN_SHAPE_RE = /\b\d{8,10}:[A-Za-z0-9_-]{35}\b/`, a stricter variant of
+   `shared/secrets.ts`'s new `export const TELEGRAM_BOT_TOKEN_RE = /\d+:[A-Za-z0-9_-]{35}/` — two
+   regex literals expressing the same Telegram bot-token shape with different digit-count bounds and
+   different `\b` usage. The correction above (item 1) actually depends on this divergence: PT-22's
+   stricter shape is what pushed the realistic-looking v1 fixture into a false positive against the
+   repo-wide scan, while the shared regex (used for actual send-path/redaction detection) stayed
+   permissive by design (any digit count). Left `repo-scan.test.ts` unmodified per instruction — not
+   refactored to import from `shared/secrets.ts` — flagging the duplication for tribunal review: a
+   future PR could import `TELEGRAM_BOT_TOKEN_RE` there and narrow it locally with an additional
+   digit-count check, or leave the two intentionally decoupled (PT-22 is a repo-hygiene scan, not a
+   product-behavior assertion, so some argue it should stay independent of product code by design).
+
+## Data hygiene check (AGENTS.md §3)
+
+Grepped `src/shared/secrets.ts` and `test/shared/secrets.test.ts` for `@`-prefixed usernames,
+8–10-digit numeric ids, and `-100…` chat ids. The only `@`-matches are TSDoc `{@link ...}` cross-
+references (`{@link SENSITIVE_ENV_KEY_RE}`, `{@link checkForSecrets}`), not Telegram usernames; zero
+8–10-digit numeric runs (the fixture token's digit run was deliberately narrowed to 7, see
+"Corrections" item 1); zero `-100…` chat-id-shaped strings. `npm run test:static` (PT-22 repo-scan)
+passed with both new files staged and scanned.
+
+## Verification (run in order, from clean)
+
+| Command | Result |
+|---|---|
+| `rm -rf dist && npm run build` | exit 0, no errors |
+| `node --test "dist/test/shared/secrets.test.js"` | **14/14 pass** (0 fail) |
+| `node --test "dist/test/security/provenance.test.js" "dist/test/twins.test.js"` | **3/3 pass** (0 fail) — SEAM hash-inequality and non-`"none."` `Changes:` both hold; twin coverage holds |
+| `npm test` (from clean) | **103/103 pass** (0 fail) — up from 89 before this PR |
+| `npm run test:static` (from clean) | **8/8 pass** (0 fail) — same count as PR-02 (no new static-only assertion added by this PR) |
+| `git status --short` (after) | only `src/shared/secrets.ts`, `test/shared/secrets.test.ts`, `test/fixtures/v1-provenance.json` (staged), `docs/02-architecture/THREAT-MODEL.md` + `tasks.md` (unstaged) changed; nothing under `dist/`, `node_modules/`, or the v1 checkout; no commit made |
+
+Note on staging: as in PR-02, the three new/modified files carrying a provenance-relevant identity
+(`secrets.ts`, `secrets.test.ts`, `v1-provenance.json`) were `git add`-staged (not committed) so
+`git ls-files -z` — the mechanism both `provenance.test.ts` and `repo-scan.test.ts` use to enumerate
+scanned files — could see them during verification. `tasks.md` and `THREAT-MODEL.md` were left
+unstaged. Kairo reviews the full working-tree diff and creates the work-unit commit(s).
+
+## Next
+
+Tribunal audit of PR-03 (`bus-v2-f1-pr-03-001`), then PR-04 (`shared/thread-record.ts`, SEAM).
