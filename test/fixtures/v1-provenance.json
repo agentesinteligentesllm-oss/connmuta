@@ -1,0 +1,20 @@
+[
+  {
+    "v2Path": "src/shared/constants.ts",
+    "v1Path": "src/config.ts:26-166",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/shared/envelope.ts",
+    "v1Path": "src/envelope.ts",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
+  },
+  {
+    "v2Path": "test/shared/envelope.test.ts",
+    "v1Path": "test/envelope.test.ts",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
+  }
+]
