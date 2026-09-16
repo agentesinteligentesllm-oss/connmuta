@@ -27,6 +27,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-pr-03-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (third code slice of F1) | doc-hygiene defect class flagged: a fixture-token narrative must describe the shape, never quote it verbatim, or it retrips PT-22 on the doc file itself; PT-22/`shared/secrets.ts` regex duplication left orthogonal, ratified |
 | `bus-v2-session-5-closure-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-session-5-handoff-audit-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 2 | `CONSENSUS` — round 1 `APPROVE_WITH_CHANGES` (4 objections), round 2 `APPROVE`, objections `[]` | none | Director-requested dedicated clarity/ambiguity/completeness audit of `HANDOFF.md`; 3 objections accepted and fixed as cited; 1 accepted in substance with its cited SHA-256 rejected as unverifiable (a model cannot compute a hash by reasoning) and replaced with Kairo's independently-computed value |
+| `bus-v2-f1-pr-04-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (fourth code slice of F1) | `sdd-apply` self-check defect class flagged: a shell `head -c -1` cross-check silently strips a real trailing newline when hashing a line-range slice of a larger source file, producing a false "orchestrator value is wrong" claim; caught by Kairo before commit, independently re-verified 4 ways |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -323,6 +324,26 @@ refresh (AGENTS.md, README.md, 00-INDEX, `openspec/config.yaml`, `state.yaml`).
 | (d) Fidelity to `bus-v2-f1-pr-03-001` | Faithful; no unratified addition or extrapolation |
 
 Outcome: CONSENSUS in one round; session 5 closed at the PR-03 → PR-04 boundary.
+
+## `bus-v2-f1-pr-04-001` — record
+
+Audit of the fourth F1 code slice before it opened on GitHub (DN-05): branch `f1/04-thread-record`
+(commits `3c1753c` feat, `1b80e51` docs(sdd)), the SEAM vendor of `ThreadRecord`/`HistoryEntry` from
+`v1:src/state.ts:15-87` (`first_surfaced_at` removed per design §12/PR-12), and a hash-verification
+defect in the `sdd-apply` subagent's own self-check that Kairo caught and corrected before commit.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Provenance: `src/shared/thread-record.ts:1-6` sha256 `bd177372…d6160`, recomputed independently against `telegram-agent-bus@bf8f365` (no header/imports to strip in this line-range slice; hash covers the full 73-line body incl. the real trailing newline before v1 line 88) | Ratified: exact match; the only functional delta from v1 is `first_surfaced_at` removed (`src/shared/thread-record.ts:22-74` vs. v1 `state.ts:29-87`) |
+| (2) Budget: 169 authored lines against the 400-line cap; SEAM body not `size:exception` under DN-06 | Ratified: no exception requested or needed |
+| (3) `sdd-apply` self-check defect: its own cross-check (`sed -n '15,87p' \| head -c -1 \| sha256sum`) unconditionally strips the last byte before hashing; since v1 line 87 is followed by line 88 (not EOF), that byte is a real, load-bearing newline, not an extraction artifact — the subagent's recomputation (`629db3c9…8838`) was wrong, and it had wrongly overwritten the orchestrator-supplied correct value on that mistaken basis. Kairo caught this, re-verified the original value 4 independent ways (node crypto, sha256sum, openssl, a separate fresh-context read-only validator agent), and corrected the file and the `apply-progress.md` narrative before commit | Ratified: correct fix; flagged as a defect class for future hash cross-checks over line-range slices — never blind-strip a trailing byte, re-derive with the exact target algorithm (split by line, array-slice by index, join with the same separator) instead |
+| (4) Strict TDD: RED is a genuine `tsc` `TS2307` "Cannot find module" (apply-progress.md RED evidence section); type-only module, no triangulation possible per `strict-tdd.md`'s structural exception, 5 shape/round-trip tests substituted | Ratified: sound application of the type-only exception |
+| (5) Verification: clean detached worktree (`npm ci --ignore-scripts`) after the hash fix — full suite 108/108, static 8/8; independent fresh-context phase-contract validator (separate agent, no implementation context): 7/7 checks PASS, including its own independent recomputation of the hash | Ratified |
+
+Outcome: CONSENSUS in one round. PR #5 (`f1/04-thread-record` → `main`) opened after the audit under
+`agentesinteligentesllm-oss`; CI (`windows-latest` × Node 24.15/26) green (run `35156561623`); merged
+by Kairo under DN-08 (`f0097f0`, branch deleted). Native attempt ledger settled `passed`,
+`state: complete`.
 
 ## `bus-v2-session-5-handoff-audit-001` — record
 

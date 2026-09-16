@@ -4,6 +4,77 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-16 — Session 6: F1 apply, PR-04 merged (stopped at the PR-04 → PR-05 boundary)
+
+**Closed**
+
+- Handoff followed as written: `main` clean and up to date; SDD preflight collected on the first try
+  with the canonical `AskUserQuestion` marker text/order (Automatic · Both/hybrid · Auto/auto-chain);
+  `gentle-ai sdd-status`: `nextRecommended: apply`, 21/210, no blockers; ledger `acquire` for PR-04
+  with `--max-changed-lines 400` → `proceed`. Independently recomputed the v1 body SHA-256 for
+  `state.ts:15-87` before delegating (`bd177372…d6160`, 3 tools agreeing), matching what the prior
+  session's handoff had already pinned.
+- `sdd-apply` (sonnet) on PR-04 under Strict TDD: RED (`TS2307` missing module) → GREEN; vendored
+  `src/shared/thread-record.ts` from `v1:src/state.ts:15-87` @ `bf8f365` with the sole documented
+  change (`first_surfaced_at` removed, per-client state moves to `client_surfaced`, PR-12); type-only
+  module, 5 shape/round-trip tests substituted for triangulation per `strict-tdd.md`'s structural
+  exception.
+- **Real defect found in the apply agent's own self-verification, not in its implementation.**
+  `sdd-apply` independently re-derived the pinned `v1 body sha256` the launch prompt supplied
+  (per the standing verification-before-completion rule), got a different value, and concluded the
+  orchestrator's value was wrong — overwriting it in `thread-record.ts`'s header and in
+  `apply-progress.md`'s narrative with the (actually incorrect) recomputed value. Kairo re-verified
+  both after the task notification: the subagent's cross-check shell one-liner
+  (`sed -n '15,87p' | head -c -1 | sha256sum`) unconditionally strips the last byte before hashing;
+  since `v1:src/state.ts` is 602 lines and line 87 (the slice's last line) is followed by line 88, not
+  EOF, that byte is a real, load-bearing newline in the source — not an extraction artifact — and
+  `head -c -1` was silently deleting it. Confirmed the orchestrator's original value was correct with
+  three independent tools (node `crypto`, `sha256sum`, `openssl`) plus a fourth, separate fresh-context
+  read-only validator agent that reproduced the same conclusion on its own. Fixed the header and the
+  `apply-progress.md` narrative to record the true root cause before committing anything. Flagged as a
+  defect class for every future `sdd-apply` launch: never let a shell cross-check blind-strip a
+  trailing byte when re-deriving a line-range SEAM hash; re-derive with the exact target algorithm
+  instead, and don't trust a subagent's "I recomputed it and it doesn't match" claim without checking
+  its own method first.
+- Director authorization requested and granted before the first commit (AGENTS.md §3: "Never commit
+  without the Director's authorization" — asked explicitly via `AskUserQuestion` since this was a
+  fresh session boundary, not inherited from a prior session's standing consent).
+- Two work-unit commits (`3c1753c` feat(shared), `1b80e51` docs(sdd)); authored diff 169 lines (< 400),
+  no `size:exception` (SEAM body not exempt under DN-06). Clean detached worktree
+  (`npm ci --ignore-scripts`): 108/108 full suite, `test:static` 8/8, both green after the hash fix.
+  Independent fresh-context phase-contract validator (separate Explore agent, sonnet, no implementation
+  context): 7/7 checks PASS, including its own independent recomputation of the hash — cross-validating
+  Kairo's fix a fourth way.
+- Debate `bus-v2-f1-pr-04-001` (1 round, CONSENSUS, `APPROVE`, objections `[]`): provenance, budget,
+  the hash-defect root cause, Strict TDD genuineness, and verification all ratified.
+- PR #5 (`f1/04-thread-record` → `main`) opened under `agentesinteligentesllm-oss` after the consensus;
+  CI green on the PR (run `35156561623`: both Node 24.15 and 26 matrices pass) → merged by Kairo under
+  DN-08 (`f0097f0`, branch deleted, fast-forward).
+- Native attempt ledger: PR-04 attempt settled `passed` (evidence revision `sha256:309c126b…bfc36` =
+  SHA-256 of the manifest `PR-04 f1/04-thread-record tip 1b80e51 merged f0097f0; clean worktree
+  verify-04: node --test 108/108, test:static 8/8; CI run 35156561623 pass (node 24.15, 26); tribunal
+  bus-v2-f1-pr-04-001 CONSENSUS`) → `state: complete`, no maintainer decision required.
+- Documentation refresh (this handoff, LOG, tribunal row + record for `-001`, 00-INDEX status,
+  AGENTS.md status, README status, `openspec/config.yaml` context, `state.yaml`).
+- Pre-verified PR-05's v1 SEAM fact ahead of the next session (`v1:src/protocol.ts:1-333` sha256
+  `e8b6f8a4…2ffcbe`, 327-line body after stripping a 6-line import block, cross-checked 3 ways) — same
+  practice the prior session applied to PR-04, aimed directly at preventing a repeat of this session's
+  hash defect.
+
+**Opened**
+
+- PR-05 (`shared/protocol-apply.ts`, SEAM, D-05, ≈390 lines, near-budget) — next session; see HANDOFF.
+  Largest non-exception slice in the whole 45-PR plan; real risk of exceeding the 400-line cap.
+- GitHub Actions warns that `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 (forced
+  to Node 24 by the runner) — bump to the current majors in a later CI PR, audited (carried).
+- Stale `dist/` remains a footgun under `npm test` (carried from session 3).
+
+**How it knows**: tribunal envelope read through the Arena bridge (`bus-v2-f1-pr-04-001`); `gentle-ai
+sdd-status` / `sdd-attempt acquire|settle` output; GitHub API (`gh pr view 5`, run `35156561623`);
+clean-worktree `node --test` runs (after the hash fix); independent SHA-256 recomputation of the v1
+body hash by Kairo via three separate tools; independent confirmation by a fourth, separate
+fresh-context validator agent.
+
 ## 2026-09-16 — Session 5: F1 apply, PR-03 merged (stopped at the PR-03 → PR-04 boundary)
 
 **Closed**
