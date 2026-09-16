@@ -1,0 +1,79 @@
+schema: spec-driven
+
+context: |
+  Conmuta (working name, B-11 pending trademark clearance): a project-scoped
+  Telegram agent bus. Status F0 landing -- 45 Markdown docs, zero source code.
+  Ratified stack for F1 onward (ADR-0028..0031): Node.js >= 24 LTS,
+  TypeScript -> ESM, node:test, @modelcontextprotocol/sdk + zod, node:sqlite
+  ledger, @clack/prompts, @napi-rs/keyring. Wire: emit AGENTBUS/2, accept
+  /1 and /2, no wire change (CONSTITUTION.md rule W1). First SDD change:
+  f1-daemon-registry-thin-client (WORK-PLAN.md).
+
+strict_tdd: false
+
+testing:
+  status: planned
+  test_runner: node:test
+  projects: []
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+  coverage: false
+  quality_tools:
+    linter: false
+    type_checker: false
+    formatter: false
+  planned_test_command: "npm test"       # tsc && node --test "dist/**/*.test.js"
+  planned_build_command: "npm run build" # tsc
+  note: >
+    Zero in-scope projects are discovered (no package.json, no src/ tree yet)
+    -- sdd-init's Strict TDD decision gate therefore fails closed to
+    `strict_tdd: false` at the workspace level. This is a detection-time
+    state, not a policy override: CONSTITUTION.md sections 5-6,
+    GOVERNANCE.md section 6 and ADR-0031 already ratify Strict TDD Mode (red
+    before green; every src file has a test counterpart under test/) as
+    binding project policy starting at F1. `rules.apply` below carries that
+    binding policy forward for sdd-apply. Re-run sdd-init once F1's
+    package.json and a real `npm test` exist so `strict_tdd` flips to true
+    against an actual workspace-level command.
+
+session:
+  execution_mode: auto
+  artifact_store: hybrid
+  delivery_strategy: auto-chain
+  review_budget_lines: 400
+  planned_first_change: f1-daemon-registry-thin-client
+
+rules:
+  proposal:
+    - State the wire policy explicitly: emit AGENTBUS/2, accept /1 and /2, no wire change (CONSTITUTION.md section 4, rule W1)
+    - State explicitly whether the change touches any of the five invariants in CONSTITUTION.md section 2, and name which
+  specs:
+    - Use Given/When/Then for every scenario
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Cite the ADR the design implements, or amend it via a new ADR (CONSTITUTION.md section 9, GOVERNANCE.md section 4)
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Every numeric constant is a named constant with its reasoning next to it (named-constant rule, CONSTITUTION.md section 5)
+    - Include the 400-line Review Workload Forecast (review_budget_lines: 400); recommend chained PRs when at risk
+  apply:
+    guidelines:
+      - Follow the conventions F1 establishes in src/ and test/ once they exist
+    tdd: true
+    strict_tdd_policy: >
+      Strict TDD is binding project policy (CONSTITUTION.md section 6,
+      GOVERNANCE.md section 6): red before green, every src file has a test
+      counterpart under test/ with the same base name. This policy overrides
+      the detection-time `strict_tdd: false` above, which only reflects that
+      no test runner exists yet in this documentation-only tree.
+    test_command: "npm test"
+  verify:
+    test_command: "npm test"
+    build_command: "npm run build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

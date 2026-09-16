@@ -1,0 +1,35 @@
+change: f1-daemon-registry-thin-client
+artifact_store: hybrid
+execution_mode: auto
+delivery_strategy: auto-chain
+review_budget_lines: 400
+phases:
+  explore:
+    status: done
+    artifact: exploration.md
+    engram_topic: sdd/f1-daemon-registry-thin-client/explore
+    completed_at: "2026-09-16"
+  research:
+    status: unselected
+    note: Director declined the research lane on 2026-09-16; evidence lives in exploration.md
+  propose:
+    status: done
+    artifact: proposal.md
+    engram_topic: sdd/f1-daemon-registry-thin-client/proposal
+    completed_at: "2026-09-16"
+    tribunal_debate: bus-v2-f1-proposal-001
+    tribunal_state: consensus
+    tribunal_rulings: Option A spawn; per-session token; single change; needs_action as VIEW
+  spec:
+    status: pending
+  design:
+    status: pending
+  tasks:
+    status: pending
+  apply:
+    status: pending
+  verify:
+    status: pending
+  archive:
+    status: pending
+next_recommended: spec+design (tribunal consensus reached 2026-09-16; run in parallel in a fresh session)
