@@ -1,0 +1,35 @@
+{
+  "name": "conmuta",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "conmuta": "dist/src/cli/main.js"
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "files": [
+    "dist/src/**",
+    "npm-shrinkwrap.json",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "tsc -b && node --test \"dist/test/**/*.test.js\"",
+    "test:static": "tsc -b && node --test \"dist/test/security/*.test.js\"",
+    "test:wrong-room": "tsc -b && node --test \"dist/test/security/*wrong-room*\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "4.6.5",
+    "@napi-rs/keyring": "2.1.0"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "@types/node": "24.13.5"
+  }
+}
