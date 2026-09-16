@@ -1,0 +1,17 @@
+# secrets and local state
+.mcp.json
+.claude/settings.json
+*.token
+.conmuta/
+.env
+
+# build and deps
+node_modules/
+dist/
+
+# local tooling caches
+.atl/
+.codegraph/
+
+# session dumps
+*.txt
