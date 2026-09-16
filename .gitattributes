@@ -1,0 +1,5 @@
+# Normalize line endings across Windows and macOS contributors (ADR-0031: byte-identical installs).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
