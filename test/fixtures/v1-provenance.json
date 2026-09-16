@@ -16,5 +16,11 @@
     "v1Path": "test/envelope.test.ts",
     "commit": "bf8f365",
     "verdict": "AS-IS"
+  },
+  {
+    "v2Path": "src/shared/secrets.ts",
+    "v1Path": "src/secrets.ts",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
