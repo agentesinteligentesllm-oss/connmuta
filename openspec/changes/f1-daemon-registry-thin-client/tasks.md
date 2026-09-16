@@ -7,7 +7,7 @@
 | Delivery strategy | `auto-chain`. DN-06 exception: `size:exception` applies **only** to PR slices that vendor **whole** v1 files AS-IS (1:1 at `bf8f365`, import block and header excluded), with the v1 body SHA-256 carried in the provenance header and re-verified by `test/security/provenance.test.ts`. A module assembled from line ranges of v1 files is a SEAM by construction (tribunal `bus-v2-f1-tasks-001` items 1–2). Every SEAM or new-code PR stays ≤ 400 changed lines (additions + deletions, authored text only) |
 | Chain strategy | `stacked-to-main`. Each PR targets `main` in sequence; PR N+1 branches from PR N's branch and is retargeted to `main` after PR N merges; no tracker branch. Remote `origin` = `agentesinteligentesllm-oss/connmuta`, default branch `main` |
 | TDD rule | Strict TDD (CONSTITUTION §5–6, GOVERNANCE §6, ADR-0031). Red before green. Every `src/**/*.ts` has a `test/**/<same>.test.ts` twin (`test/twins.test.ts` enforces it). In every PR below, the RED task precedes the GREEN task that creates the `src` file it tests |
-| PR budget | 400 changed lines per PR (review policy from SDD preflight), except `size:exception (AS-IS hash-pinned)` slices |
+| PR budget | 400 changed lines per PR (review policy from SDD preflight), except `size:exception (AS-IS hash-pinned)` slices. Counted: authored additions + deletions. Not counted: generated files (`npm-shrinkwrap.json`) and SDD bookkeeping (`tasks.md` checkbox flips, `apply-progress.md`) — they travel in the same PR but are not review load (session 3, `bus-v2-f1-pr-01-001`) |
 | Rollback (default, all PRs) | Revert the PR (`git revert`); no data migration inside F1 except the ledger's own `PRAGMA user_version = 1` (introduced in PR-11, still pre-production at that point) |
 | Verify (base commands) | Build: `npm run build` (`tsc -b`). Full suite: `npm test` (`tsc -b && node --test "dist/test/**/*.test.js"`). Static suite: `npm run test:static`. Wrong-room named CI step: `npm run test:wrong-room`. Focused: `node --test "dist/test/<glob>"` after `npm run build` — the glob is named per PR below |
 | Proposal deliverable 11 amendment (D-15) | Fence is applied **by the daemon at the IPC response boundary**, not by the client (tribunal ruling `bus-v2-f1-design-001` item 2; design.md D-15). One fencing/origin-labelling site; the client only forwards fenced text. Implemented in PR-06 (`shared/fence.ts`) and consumed in PR-23/PR-25 (`daemon/serve/fetch.ts`, `daemon/serve/thread.ts`) |
@@ -21,7 +21,7 @@
 | Estimated changed lines | ≈13,000 authored lines in the tree (design §20 total, cross-checked in this phase against real `telegram-agent-bus@bf8f365` line counts — see reconciliation below) |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | 44 PR slices, PR-01 → PR-42 with PR-07a/PR-07b and PR-22a/PR-22b, in design §20's unit order |
+| Suggested split | 45 PR slices, PR-01a → PR-42 with PR-01a/PR-01b, PR-07a/PR-07b and PR-22a/PR-22b, in design §20's unit order |
 | Delivery strategy | `auto-chain` |
 | Chain strategy | `stacked-to-main` |
 
@@ -31,11 +31,12 @@ Chained PRs recommended: Yes
 400-line budget risk: High
 ```
 
-- Total PR slices: 44.
+- Total PR slices: 45 (44 at the tasks gate; PR-01 was re-sliced into PR-01a/PR-01b at apply time on real diff evidence — see the apply-time re-slice note below).
 - Slices carrying `size:exception (AS-IS hash-pinned)`: 2 — PR-02 (`shared/envelope.ts` + twin, ≈1,030 vendored body lines) and PR-20 (`daemon/transport/*.ts` + twins, ≈732 vendored body lines). Combined vendored-body total excluded from the 400-line check: ≈1,760 lines. `tool-schemas.ts`, `tool-output.ts` and `test/security/predicates.ts` are range extracts of v1 files, therefore SEAM with full review (tribunal `bus-v2-f1-tasks-001` items 1–2).
-- Non-exception authored total: ≈13,000 − 1,760 ≈ 11,240 lines across the remaining 42 PR slices (≈270 lines/PR average).
+- Non-exception authored total: ≈13,000 − 1,760 ≈ 11,240 lines across the remaining 43 PR slices (≈260 lines/PR average).
 - Largest non-exception slice: **PR-05** (`shared/protocol-apply.ts` + D-05 twin, ≈390 lines — one cohesive state-machine module; `sdd-apply` watches its real diff size). The seven-step admission pipeline (PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5) is pre-split into **PR-22a** (`daemon/admission.ts`, ≈250) and **PR-22b** (`daemon/poller.ts`, ≈145) so the highest-risk code gets its own review (tribunal `bus-v2-f1-tasks-001` item 4). PR-07b (`shared/tool-output.ts` + twin, ≈385) is the next largest; if its twin pushes it over 400, the twin ships as PR-07c.
 - **Arithmetic reconciliation against design §20**: design's own total is "≈13,000 authored lines over ≈38–40 chained PRs". This plan lands at **44** PR slices for the same ≈13,000 lines — 4 to 6 more than design's range — because, besides the PR-07a/b and PR-22a/b splits ruled in `bus-v2-f1-tasks-001`, two vendor points design flagged only qualitatively (§19 Risks: "vendored modules split at natural seams... telegram.ts seam split") needed a concrete split at the tasks phase: (a) `daemon/telegram.ts` (428 real v1 lines, SEAM, no exception — see PR-18/PR-19) is delivered incrementally across two PRs at an internal function-group seam (client + request plumbing, then error classification + redaction wiring) to stay under budget, without changing the fixed single-file target design.md §2.1 names; (b) `daemon/serve/status.ts` + `daemon/serve/thread.ts` (162 + 164 real v1 lines) are delivered as two independent PRs (PR-24/PR-25) instead of one, since combined with ledger-read adaptation and tests they exceed 400 authored lines. No unit required an artificial cut below a cohesive slice; every split follows an existing file boundary or, for `telegram.ts` only, a function-group boundary inside the one file design names.
+- **Apply-time re-slice (session 3, `bus-v2-f1-pr-01-001`)**: the real authored diff of PR-01 as planned was ≈790 lines against its ≈350 estimate — the named-constant rule (one reasoned doc comment per constant, ≈45 constants → 319 lines) plus Strict TDD twins doubled it, and DN-06's `size:exception` does not apply to new code. The slice was cut at the module boundary into PR-01a (scaffold + CI + static gates) and PR-01b (`shared/constants.ts` + twin); no other slice changed. Planning lesson for the remaining slices: estimates that count v1 lines under-count SEAM modules whose doc comments must be re-authored; `sdd-apply` measures the real diff before opening each PR and re-slices at a file boundary when it exceeds 400.
 - Real v1 line counts pulled from the frozen `telegram-agent-bus@bf8f365` checkout in this phase (read-only): `envelope.ts` 331, `secrets.ts` 86, `config.ts` 267, `protocol.ts` 477, `state.ts` 602, `telegram.ts` 428, `transport/{types,direct,group,dual}.ts` 111+67+97+62=337, `tools/fetch.ts` 931, `tools/send.ts` 660, `tools/status.ts` 162, `tools/thread.ts` 164, `index.ts` 292; test twins `envelope.test.ts` 699, `protocol.test.ts` 897, `security.test.ts` 273, `fakes/telegram.ts` 154, `transport/{direct,group,dual}.test.ts` 113+104+178=395, `secrets.test.ts` 133, `tools/fetch.test.ts` 2116, `tools/send.test.ts` 1572, `tools/status.test.ts` 398, `tools/thread.test.ts` 236, `index.test.ts` 332, `state.test.ts` 645, `telegram.test.ts` 367, `config.test.ts` 233. These confirm design §3/§12/§20's rough figures within the expected range and drove the PR-05, PR-18/19, PR-24/25 slicing decisions above.
 
 ## PR Slices
@@ -44,25 +45,35 @@ Each PR below follows design §20's unit order exactly: scaffold+constants+CI �
 
 ### Unit 1 — Scaffold, constants, CI
 
-#### PR-01 — scaffold + constants + CI
-Branch `f1/01-scaffold-constants-ci` → `main`. Depends: none (first PR). Size: ≈350 lines, no exception.
-Scope: `package.json`, `tsconfig.json`, `src/shared/tsconfig.json`, `src/client/tsconfig.json`, `src/daemon/tsconfig.json`, `src/cli/tsconfig.json`, `npm-shrinkwrap.json`, `.github/workflows/ci.yml`, `src/shared/constants.ts`, `src/shared/version.ts`, `test/shared/constants.test.ts`, `test/twins.test.ts`, `test/security/pack.test.ts`, `test/security/repo-scan.test.ts`, `test/fixtures/repo-scan-negative.txt`.
+#### PR-01a — scaffold + CI + static gates
+Branch `f1/01a-scaffold-ci-gates` → `main`. Depends: none (first PR). Size: ≈360 lines, no exception. Re-sliced from the planned PR-01 at apply time (see the forecast's apply-time re-slice note).
+Scope: `package.json`, `tsconfig.base.json`, `tsconfig.json`, `src/shared/tsconfig.json`, `src/client/tsconfig.json`, `src/daemon/tsconfig.json`, `src/cli/tsconfig.json`, `npm-shrinkwrap.json`, `.github/workflows/ci.yml`, `src/shared/version.ts`, `test/shared/version.test.ts`, `test/twins.test.ts`, `test/security/pack.test.ts`, `test/security/repo-scan.test.ts`, `test/fixtures/repo-scan-negative.txt`, `.gitignore` (one negation line: the `*.txt` rule from THREAT-MODEL T12 would otherwise swallow the seeded fixture and make PT-22 vacuous in CI).
 Requirements: scaffolding for every capability; static gates `daemon-lifecycle › Static bundle assertions and packaging conformance` (PT-21 half) and repo-scan (PT-22) pinned early per design §20 unit 1.
 Runtime harness: N/A — build-only checks (no daemon/client process exists yet).
 
-- [ ] 1.1 RED: write `test/shared/constants.test.ts` asserting `PROTOCOL_SENTINEL === "AGENTBUS/2"`, `SUPPORTED_PROTOCOL_SENTINELS` contains both `/1` and `/2` sentinels (W8), and `NODE_FLOOR === "24.15.0"` (D-03).
-- [ ] 1.2 Scaffold `package.json` (`name: conmuta`, `private: true`, `type: module`, `bin.conmuta = dist/src/cli/main.js`, `engines.node: >=24.15.0`, `files` whitelist, `scripts` with no lifecycle hook), the four `tsconfig.json` project-reference files per design §2.2's compile-unit boundary, `npm-shrinkwrap.json`, and `.github/workflows/ci.yml` (`windows-latest` × Node `24.15`/`26`).
-- [ ] 1.3 GREEN: implement `src/shared/constants.ts` (every value named with its reasoning per design §3) and `src/shared/version.ts` — 1.1 passes.
-- [ ] 1.4 RED: write `test/twins.test.ts` enumerating `src/**/*.ts` and failing when any file has no `test/**/<same>.test.ts` twin.
-- [ ] 1.5 RED: write `test/security/pack.test.ts` (PT-21: `npm pack --dry-run` whitelist matches `files`, no `preinstall`/`install`/`postinstall`/`prepare` script) and `test/security/repo-scan.test.ts` (PT-22: token-shape regex + tenant deny-list scan over the repository; seeded `test/fixtures/repo-scan-negative.txt` must fail the scan so it is non-vacuous).
-- [ ] 1.6 GREEN: wire `build`/`test`/`test:wrong-room`/`test:static` npm scripts so 1.1, 1.4, 1.5 pass under `npm test`.
-- [ ] 1.7 Verify: `npm run build && npm test`. Note two pending Director items surfaced by this PR: B-11 (`PRODUCT_NAME` is the single rename constant; trademark screening still open) and B-16/D-10 (this scaffold follows Kairo's DN-06 assumption — `LICENSE` ships now with `private: true` until F6 — open to Director veto).
-- [ ] 1.8 Docs: update the file-name cell(s) of PT-21, PT-22 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 1a.1 RED: write `test/shared/version.test.ts` asserting `SERVER_VERSION` equals `package.json` `version` (the v1 pattern `v1:src/config.ts:44-52` / `test/index.test.ts`; this twin is required by the rule 1a.4 introduces and was missing from the planned scope).
+- [x] 1a.2 Scaffold `package.json` (`name: conmuta`, `private: true`, `type: module`, `bin.conmuta = dist/src/cli/main.js`, `engines.node: >=24.15.0`, `files` whitelist, `scripts` with no lifecycle hook, exact dependency pins), `tsconfig.base.json` plus the root and four unit `tsconfig.json` files per design §2.2's compile-unit boundary (`extends` the base; a unit enters the root `references` when its first `.ts` file lands, because an empty composite project is `TS18003`; build info under `dist/.tsbuildinfo/` so it is never packed), `npm-shrinkwrap.json`, and `.github/workflows/ci.yml` (`windows-latest` × Node `24.15`/`26`).
+- [x] 1a.3 GREEN: implement `src/shared/version.ts` (`SERVER_VERSION` literal; the shared unit stays free of `node:fs`) — 1a.1 passes.
+- [x] 1a.4 RED: write `test/twins.test.ts` enumerating `src/**/*.ts` and failing when any file has no `test/**/<same>.test.ts` twin (non-vacuous: at least one source file must be found).
+- [x] 1a.5 RED: write `test/security/pack.test.ts` (PT-21: `npm pack --dry-run` whitelist matches `files`, no `preinstall`/`install`/`postinstall`/`prepare` script, `npm-shrinkwrap.json` present, no `.tsbuildinfo` packed) and `test/security/repo-scan.test.ts` (PT-22: token-shape regex + tenant deny-list scan over tracked files; seeded `test/fixtures/repo-scan-negative.txt` must fail the scan so it is non-vacuous; `npm-shrinkwrap.json` excluded as generated).
+- [x] 1a.6 GREEN: wire `build`/`test`/`test:wrong-room`/`test:static` npm scripts so 1a.1, 1a.4, 1a.5 pass under `npm test` (`test:wrong-room` matches by glob so the step is green until PR-41 lands its file).
+- [x] 1a.7 Verify: `npm run build && npm test`. Note two pending Director items surfaced by this PR: B-11 (`PRODUCT_NAME` is the single rename constant; trademark screening still open) and B-16/D-10 (this scaffold follows Kairo's DN-06 assumption — `LICENSE` ships now with `private: true` until F6 — open to Director veto).
+- [x] 1a.8 Docs: update the file-name cell(s) of PT-21, PT-22 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+#### PR-01b — `shared/constants.ts` (SEAM)
+Branch `f1/01b-shared-constants` → `main`. Depends: PR-01a. Size: ≈380 lines, no exception.
+Scope: `src/shared/constants.ts`, `test/shared/constants.test.ts`.
+Requirements: W1/W8 sentinel agreement (design §15 mapping "W8 `shared/constants`"); D-03 `NODE_FLOOR`; D-09 `PRODUCT_NAME` as the single rename constant (B-11); every design §3 value named with its reasoning (named-constant rule, CONSTITUTION §5).
+Runtime harness: N/A — unit test over exported constants.
+
+- [ ] 1b.1 RED: write `test/shared/constants.test.ts` asserting `PROTOCOL_SENTINEL === "AGENTBUS/2"`, `SUPPORTED_PROTOCOL_SENTINELS` contains both `/1` and `/2` sentinels and the emitted one (W8), `NODE_FLOOR === "24.15.0"` (D-03), the `PRODUCT_NAME` derivations, and every derived value in design §3 as an expression over its base (values marked "tuning" pin the invariant, never the number).
+- [ ] 1b.2 GREEN: implement `src/shared/constants.ts` (SEAM from `v1:src/config.ts:26-166` with the design §12 provenance header and the v1 body SHA-256; `HTTP_*` codes stay for `shared/ipc-contract.ts` in PR-29 and `TELEGRAM_BOT_TOKEN_RE` for `shared/secrets.ts` in PR-03) — 1b.1 passes.
+- [ ] 1b.3 Verify: `npm run build && node --test "dist/test/shared/constants.test.js"`, then the full `npm test`.
 
 ### Unit 2 — Shared vendored modules
 
 #### PR-02 — provenance mechanism + `envelope.ts` (size:exception, AS-IS hash-pinned)
-Branch `f1/02-envelope-provenance` → `main`. Depends: PR-01. Size: ≈110 new authored lines + 331 (`envelope.ts`) + 699 (test twin) AS-IS vendored body, excluded.
+Branch `f1/02-envelope-provenance` → `main`. Depends: PR-01b. Size: ≈110 new authored lines + 331 (`envelope.ts`) + 699 (test twin) AS-IS vendored body, excluded.
 Scope: `test/security/provenance.test.ts`, `test/fixtures/v1-provenance.json`, `src/shared/envelope.ts`, `test/shared/envelope.test.ts`.
 Requirements: wire policy W1 (`envelope.ts` verbatim); D-08 vendoring mechanism.
 Runtime harness: N/A — pure hash comparison over source text.
@@ -584,14 +595,14 @@ Mirrors `proposal.md` "Success criteria" verbatim, with the closing PR(s) for ea
 - [ ] Static assertions are green and non-vacuous over both built bundles (PT-27 with the D-01 clauses, PT-28, PT-07) — PR-39, PR-40.
 - [ ] The `DAEMON_DOWN` path makes zero network calls and sends no `Authorization` header (PT-26 a/b) — PR-33.
 - [ ] A v1 `~/.agentbus` fixture (placeholders only) migrates with `.bak-pre-v2-*` siblings, a synthesized registry, a secret-store entry and imported threads; the originals are unchanged — PR-38.
-- [ ] F1 pinning tests green: PT-02..PT-06, PT-08, PT-09 (win-x64), PT-10..PT-20 (PT-19 on Windows), PT-24..PT-28, PT-31, PT-33 (429 half); PT-21 pinned early against the scaffold — PT-21/PT-22 → PR-01; PT-02 → PR-07a/PR-27; PT-03/04/16/31 → PR-22a; PT-05/06 → PR-08; PT-07 → PR-34/PR-40; PT-08 → PR-19; PT-09/19 → PR-14; PT-10 → PR-12; PT-11 → PR-12/PR-23; PT-12 → PR-15; PT-13 → PR-06; PT-14 → PR-23; PT-15 → PR-03/PR-26; PT-17 → PR-05; PT-18 → PR-09; PT-20 → PR-13; PT-24 → PR-30; PT-25 → PR-27; PT-26 → PR-33; PT-27 → PR-32/PR-40; PT-28 → PR-40; PT-33 → PR-22b/PR-28.
-- [ ] Every `src` file has a `test` twin; `npm test` and `npm run build` pass; no v1 production identifier in the tree (PT-22 deny-list) — enforced by `test/twins.test.ts` and `test/security/repo-scan.test.ts` (PR-01), checked cumulatively in every later PR.
-- [ ] A re-run of `sdd-init` flips `openspec/config.yaml` `strict_tdd` to `true` against the real `npm test` — not itself a PR deliverable; an orchestrator/Director action after PR-42 merges, against the real `npm test` script fixed in PR-01.
+- [ ] F1 pinning tests green: PT-02..PT-06, PT-08, PT-09 (win-x64), PT-10..PT-20 (PT-19 on Windows), PT-24..PT-28, PT-31, PT-33 (429 half); PT-21 pinned early against the scaffold — PT-21/PT-22 → PR-01a; PT-02 → PR-07a/PR-27; PT-03/04/16/31 → PR-22a; PT-05/06 → PR-08; PT-07 → PR-34/PR-40; PT-08 → PR-19; PT-09/19 → PR-14; PT-10 → PR-12; PT-11 → PR-12/PR-23; PT-12 → PR-15; PT-13 → PR-06; PT-14 → PR-23; PT-15 → PR-03/PR-26; PT-17 → PR-05; PT-18 → PR-09; PT-20 → PR-13; PT-24 → PR-30; PT-25 → PR-27; PT-26 → PR-33; PT-27 → PR-32/PR-40; PT-28 → PR-40; PT-33 → PR-22b/PR-28.
+- [ ] Every `src` file has a `test` twin; `npm test` and `npm run build` pass; no v1 production identifier in the tree (PT-22 deny-list) — enforced by `test/twins.test.ts` and `test/security/repo-scan.test.ts` (PR-01a), checked cumulatively in every later PR.
+- [ ] A re-run of `sdd-init` flips `openspec/config.yaml` `strict_tdd` to `true` against the real `npm test` — not itself a PR deliverable; an orchestrator/Director action after PR-42 merges, against the real `npm test` script fixed in PR-01a.
 
 ## Pending Director Decisions Carried Into Tasks
 
-- **B-11** (trademark screening): `PRODUCT_NAME` is the single rename constant (PR-01, `src/shared/constants.ts`); no task blocks on the outcome.
-- **B-16 / D-10 vs DN-04**: PR-01 ships `package.json` with `private: true` and `LICENSE` present, per Kairo's DN-06 assumption ("D-10 is superseded by DN-04") — open to Director veto; tribunal ruling `bus-v2-f1-design-001` item 6 raised no objection but the Director's confirmation is still the authorizing act.
+- **B-11** (trademark screening): `PRODUCT_NAME` is the single rename constant (PR-01b, `src/shared/constants.ts`); no task blocks on the outcome.
+- **B-16 / D-10 vs DN-04**: PR-01a ships `package.json` with `private: true` and `LICENSE` present, per Kairo's DN-06 assumption ("D-10 is superseded by DN-04") — open to Director veto; tribunal ruling `bus-v2-f1-design-001` item 6 raised no objection but the Director's confirmation is still the authorizing act.
 - **Provenance header format**: resolved — the v1 body SHA-256 travels in the header (design §12 as amended; tribunal `bus-v2-f1-design-001` item 5, `bus-v2-f1-tasks-001`; DN-06). No Director action needed.
 - **T22 bytes-per-hour exfiltration ceiling and the origin-label organisation marker** (THREAT-MODEL §7): explicitly out of F1 design scope, no backlog id yet — no task added; documented as still-open in PR-42.
 - **macOS half of PT-09/PT-19**: out of scope (B-12, F6) — no task added.
