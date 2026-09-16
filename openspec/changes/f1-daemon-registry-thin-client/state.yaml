@@ -21,15 +21,38 @@ phases:
     tribunal_state: consensus
     tribunal_rulings: Option A spawn; per-session token; single change; needs_action as VIEW
   spec:
-    status: pending
+    status: done
+    artifact: specs/*/spec.md + specs/README.md
+    engram_topic: sdd/f1-daemon-registry-thin-client/spec (index) + sdd/f1-daemon-registry-thin-client/spec/{capability}
+    first_run_completed_at: "2026-09-16"
+    completed_at: "2026-09-16"
+    note: first run gated ok (44 req / 72 scenarios); one corrective re-run reconciled it with design D-14/D-16/D-17/D-19/D-20/D-21/D-24/D-29 per bus-v2-f1-design-001 ask 4 -> 47 req / 85 scenarios; 22/22 ADR rows, 28/28 PT
+    tribunal_debate: bus-v2-f1-design-001 (audited together with the design)
   design:
-    status: pending
+    status: done
+    artifact: design.md
+    engram_topic: sdd/f1-daemon-registry-thin-client/design
+    completed_at: "2026-09-16"
+    gate: native ok; fresh-context validator PASS WITH WARNINGS (0 blockers; spec-side items routed to the spec re-run)
+    tribunal_debate: bus-v2-f1-design-001
+    tribunal_state: consensus
+    tribunal_rulings: D-11..D-30 ratified; D-15 fence daemon-side accepted; D-29 in scope; hash-pinned AS-IS size:exception technically sound (Director acceptance pending); D-10 superseded by DN-04
   tasks:
-    status: pending
+    status: done
+    artifact: tasks.md
+    engram_topic: sdd/f1-daemon-registry-thin-client/tasks
+    completed_at: "2026-09-16"
+    gate: native ok; guard lines Decision needed before apply: No / Chained PRs recommended: Yes / 400-line budget risk: High
+    tribunal_debate: bus-v2-f1-tasks-001
+    tribunal_state: consensus
+    tribunal_rulings: size:exception only for whole-file AS-IS (PR-02, PR-20); PR-07 -> 07a/07b(+07c); PR-22 -> 22a/22b; THREAT-MODEL §4 cell updated in each PR that pins a PT; PR-05 watched
+    forecast: 44 PR slices, ~13,000 authored lines, 2 exception slices (~1,760 vendored body lines excluded), 207 tasks
+    delivery_strategy: auto-chain (DN-06: exception-ok scoped to hash-pinned whole-file AS-IS)
+    chain_strategy: stacked-to-main
   apply:
     status: pending
   verify:
     status: pending
   archive:
     status: pending
-next_recommended: spec+design (tribunal consensus reached 2026-09-16; run in parallel in a fresh session)
+next_recommended: apply (new session; start at PR-01; see docs/08-sessions/HANDOFF.md)
