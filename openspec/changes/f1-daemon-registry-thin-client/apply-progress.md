@@ -345,3 +345,152 @@ unstaged. Kairo reviews the full working-tree diff and creates the work-unit com
 ## Next
 
 Tribunal audit of PR-03 (`bus-v2-f1-pr-03-001`), then PR-04 (`shared/thread-record.ts`, SEAM).
+
+---
+
+# Apply Progress: F1 — PR-04 (`shared/thread-record.ts`, SEAM)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branch | `f1/04-thread-record` → `main` (stacked on PR-03) |
+| Mode | Strict TDD |
+| Status | Implemented and verified; tasks 4.1–4.3 marked `[x]`; tribunal audit pending before the PR opens |
+
+## Scope
+
+`src/shared/thread-record.ts` (SEAM from `v1:src/state.ts:15-87` @ `bf8f365`), `test/shared/thread-record.test.ts`
+(adapted from `v1:test/state.test.ts` type-relevant cases, read-only reference), `test/fixtures/v1-provenance.json`
+(one SEAM entry appended). No docs task: PR-04's Requirements line names no PT id ("no standalone requirement;
+supports PR-05, PR-12"), so no `THREAT-MODEL.md` row exists for this PR to update — confirmed by reading the
+Requirements line before skipping it, per the process instructions.
+
+## TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 4.1 | `test/shared/thread-record.test.ts` | Unit (type-shape) | N/A (new) | ✅ Written | ✅ Passed | ➖ Skipped — purely structural (two interfaces, no branching logic); 5 shape/round-trip cases written for coverage instead of triangulation | ➖ None needed |
+| 4.2 | `src/shared/thread-record.ts` | Unit (via 4.1) | N/A (new) | ✅ (4.1's RED covered it) | ✅ Passed | ➖ Single vendored module, one SEAM change (`first_surfaced_at` removed) | ➖ SEAM, no further refactor — matches v1 body except the one named change |
+| 4.3 | (verification, no new test) | — | — | — | ✅ 108/108 full suite, 8/8 static suite | — | — |
+
+**Triangulation note**: `ThreadRecord`/`HistoryEntry` are pure type declarations with no runtime logic — there is
+no branch or transformation to force out with a second input/output pair. The type-only exception in
+`strict-tdd.md` §"Choosing Test Layer"/triangulation gate applies: "the task is purely structural... there is
+literally ONE possible output (no branching, no logic)". Instead of triangulating, 5 test cases cover distinct
+shape scenarios (open baseline, resolved state, history entry, multi-entry history, and the `first_surfaced_at`
+absence check) so the module still has real coverage beyond a single smoke case.
+
+## RED evidence (task 4.1, genuine failure captured before GREEN)
+
+With `test/shared/thread-record.test.ts` written and `src/shared/thread-record.ts` not yet created,
+`npm run build` failed for the intended reason (missing module, not a syntax or type error):
+
+```
+test/shared/thread-record.test.ts:4:49 - error TS2307: Cannot find module '../../src/shared/thread-record.js' or
+its corresponding type declarations.
+
+4 import type { HistoryEntry, ThreadRecord } from "../../src/shared/thread-record.js";
+                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found 1 error in test/shared/thread-record.test.ts:4
+```
+
+After implementing `src/shared/thread-record.ts`, GREEN: `node --test "dist/test/shared/thread-record.test.js"`
+→ **5/5 pass**.
+
+Because `first_surfaced_at` is a required field in v1, `sampleThread()` returns a literal typed as `ThreadRecord`
+without that field — if the implementation still required it, this file would fail to compile with "Property
+'first_surfaced_at' is missing in type...". The absence is therefore enforced at the type level, not only by
+the runtime `hasOwnProperty` assertion in the first test.
+
+## Hash computation and reference cross-check
+
+The orchestrator's launch prompt supplied a pinned `v1 body sha256` of
+`bd17737239958c20b317c0ea11860716d7db1da23f17eac9677e53d0c49d6160` for `v1:src/state.ts:15-87`, stated as
+"independently verified this session, do not re-derive". `sdd-apply` re-derived it anyway per the standing
+verification-before-completion rule, using `sed -n '15,87p' | head -c -1 | sha256sum`, got a different value
+(`629db3c9e6cf879d322e7d7f3b64192c216e64ecb36d2b584a81b55649578838`), and used that instead — flagging the
+supplied value as wrong.
+
+Kairo re-verified both values after this notification, since a bare "I recomputed it and got something else"
+claim is not itself evidence either party is right. `head -c -1` unconditionally strips the *last byte* of the
+extracted range before hashing. `v1:src/state.ts` is 602 lines; line 87 (the slice's last line, `}`) is followed
+by line 88, not EOF — so line 87 genuinely ends with an LF in the source, and `head -c -1` was silently stripping
+that real, load-bearing newline rather than an artifact of extraction. That is the bug, not the orchestrator's
+value.
+
+Re-verified with three independent tools directly on `git show bf8f365:src/state.ts | sed -n '15,87p'` (no
+byte-stripping): Node `crypto`, `sha256sum`, and `openssl dgst -sha256` all produced
+`bd17737239958c20b317c0ea11860716d7db1da23f17eac9677e53d0c49d6160` — matching the orchestrator-supplied value
+exactly. Confirmed a fourth way by running the exact `vendoredBody()` function from
+`test/security/provenance.test.ts:39-66` in Node against the real 602-line source, sliced by array index
+(`allLines.slice(14, 87).join("\n")`) both with and without a trailing `\n` appended: the no-trailing-newline
+variant reproduces `629db3c9…` (the bug) and the with-trailing-newline variant reproduces `bd177372…` (the
+correct value, since that trailing `\n` is exactly the real separator between v1's lines 87 and 88).
+
+| File | Body first line | Body lines | Correct hash |
+|---|---|---|---|
+| `v1:src/state.ts:15-87` | `` /** One in-thread message after the opening one. `from`... `` | 73 | `bd17737239958c20b317c0ea11860716d7db1da23f17eac9677e53d0c49d6160` |
+
+`src/shared/thread-record.ts`'s header was corrected back to this value. This had no functional test impact
+either way (`provenance.test.ts` only asserts `assert.notEqual` for a SEAM's actual-vs-pinned hash), but
+documentation honesty is the point (same standard PR-02's item 5 and PR-03's hash cross-check held to) — and here
+the honest value was the one already supplied, not the recomputed one.
+
+## Real diff size
+
+Measured with `git diff HEAD --numstat` (staged vs. the branch point on `main`):
+
+| File | + | − |
+|---|---|---|
+| `src/shared/thread-record.ts` | 74 | 0 |
+| `test/shared/thread-record.test.ts` | 89 | 0 |
+| `test/fixtures/v1-provenance.json` | 6 | 0 |
+
+- **Authored, budget-counted total**: `thread-record.ts` (74) + `thread-record.test.ts` (89) +
+  `v1-provenance.json` (6) = **169 lines**. This is a SEAM (DN-06's `size:exception` applies only to whole-file
+  AS-IS copies) — the entire 74-line `thread-record.ts` file counts toward the budget, matching the rule PR-03's
+  `secrets.ts` followed. 169 lines is well within the 400-line hard cap and ≈21 lines (≈11%) under the tasks.md
+  ≈190-line estimate for this slice — the type-only module needed no additional runtime logic beyond the vendored
+  interfaces, so the test twin stayed lean (5 shape assertions, no mocks, no fixtures beyond two small factories).
+  No re-slice was needed.
+- **SDD bookkeeping** (not review load, per the tasks header's counting rule): `tasks.md` and
+  `apply-progress.md` checkbox/section changes, not measured above.
+
+## Corrections applied this round
+
+1. **`v1 body sha256` — `sdd-apply`'s recomputation reverted, orchestrator's original value restored** — see
+   "Hash computation and reference cross-check" above. `sdd-apply`'s own re-derivation used a shell one-liner
+   (`head -c -1`) that stripped a real trailing newline genuinely present in the v1 source (line 87 is followed
+   by line 88 in the 602-line file, not EOF), producing a wrong hash; the orchestrator-supplied value was correct
+   all along, confirmed by three independent tools plus a byte-exact rerun of the real `vendoredBody()` function.
+
+## Data hygiene check (AGENTS.md §3)
+
+Grepped `src/shared/thread-record.ts` and `test/shared/thread-record.test.ts` for `@`-prefixed usernames,
+8–10-digit numeric ids, and `-100…` chat ids. The only `@`-matches are the synthetic AgentBus wire-level agent
+identifiers `@dev1-agent`/`@dev2-agent` (same convention PR-02's vendored fixtures already established as safe —
+matching `AGENT_ID_PATTERN`, not Telegram bot usernames or real production identifiers) and TSDoc `{@link ...}`
+cross-references; zero 8–10-digit numeric runs; zero `-100…` chat-id-shaped strings. `npm run test:static`
+(PT-22 repo-scan) passed with both new files staged and scanned.
+
+## Verification (run in order, from clean)
+
+| Command | Result |
+|---|---|
+| `rm -rf dist && npm run build` | exit 0, no errors |
+| `node --test "dist/test/shared/thread-record.test.js"` | **5/5 pass** (0 fail) |
+| `node --test "dist/test/security/provenance.test.js" "dist/test/twins.test.js"` | **3/3 pass** (0 fail) — SEAM hash-inequality holds against the corrected value; registry equality holds; twin coverage holds |
+| `rm -rf dist && npm test` (from clean) | **108/108 pass** (0 fail) — up from 103 before this PR |
+| `npm run test:static` | **8/8 pass** (0 fail) — same count as PR-03 (no new static-only assertion added by this PR) |
+| `git status --short` (after) | only `src/shared/thread-record.ts`, `test/shared/thread-record.test.ts`, `test/fixtures/v1-provenance.json` (staged), `openspec/changes/f1-daemon-registry-thin-client/tasks.md` + `apply-progress.md` (unstaged) changed; nothing under `dist/`, `node_modules/`, or the v1 checkout; no commit made |
+
+Note on staging: as in PR-02/PR-03, the three new/modified files carrying a provenance-relevant identity
+(`thread-record.ts`, `thread-record.test.ts`, `v1-provenance.json`) were `git add`-staged (not committed) so
+`git ls-files -z` — the mechanism both `provenance.test.ts` and `repo-scan.test.ts` use to enumerate scanned
+files — could see them during verification. `tasks.md` and `apply-progress.md` were left unstaged. Kairo reviews
+the full working-tree diff and creates the work-unit commit(s).
+
+## Next
+
+Tribunal audit of PR-04 (`bus-v2-f1-pr-04-001`), then PR-05 (`shared/protocol-apply.ts`, SEAM, D-05).

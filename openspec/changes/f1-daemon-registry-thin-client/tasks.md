@@ -102,9 +102,9 @@ Scope: `src/shared/thread-record.ts`, `test/shared/thread-record.test.ts`.
 Requirements: underlies `durable-inbox` thread persistence (no standalone requirement; supports PR-05, PR-12).
 Runtime harness: N/A.
 
-- [ ] 4.1 RED: write `test/shared/thread-record.test.ts` asserting the `ThreadRecord` shape (adapted from `telegram-agent-bus/test/state.test.ts` type-relevant cases, read-only reference) with `first_surfaced_at` removed (per-client state moved to `client_surfaced`, PR-12).
-- [ ] 4.2 GREEN: implement `src/shared/thread-record.ts` (SEAM from `telegram-agent-bus/src/state.ts:15-87`, read-only source).
-- [ ] 4.3 Verify: `npm run build && node --test "dist/test/shared/thread-record.test.js"`.
+- [x] 4.1 RED: write `test/shared/thread-record.test.ts` asserting the `ThreadRecord` shape (adapted from `telegram-agent-bus/test/state.test.ts` type-relevant cases, read-only reference) with `first_surfaced_at` removed (per-client state moved to `client_surfaced`, PR-12).
+- [x] 4.2 GREEN: implement `src/shared/thread-record.ts` (SEAM from `telegram-agent-bus/src/state.ts:15-87`, read-only source).
+- [x] 4.3 Verify: `npm run build && node --test "dist/test/shared/thread-record.test.js"`.
 
 #### PR-05 — `shared/protocol-apply.ts` (SEAM, D-05)
 Branch `f1/05-protocol-apply` → `main`. Depends: PR-04. Size: ≈390 lines, no exception (near-budget; one cohesive state-machine module, not splittable per design).
