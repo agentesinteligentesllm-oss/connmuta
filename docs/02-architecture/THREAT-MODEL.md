@@ -141,8 +141,8 @@ Proposed identifiers. The F1 SDD spec assigns real file names; Strict TDD applie
 | PT-18 | Loading a registry with one `bot_id` in two active bindings fails validation; the daemon activates neither. | daemon unit | none — new (D2) | F1 |
 | PT-19 | On Windows, `icacls` on the fallback file and the daemon home lists only the current user; on POSIX the mode is `0600`; the test runs on both platforms. | installer integration | none — v1 claimed but never implemented (research:T09) | F1, F6 |
 | PT-20 | Every send, receive and reject appends exactly one audit row; rows for rejected or foreign messages have an empty body column; no row matches the token regex. | daemon unit | none — new | F1 |
-| PT-21 | `npm pack --dry-run` lists exactly the whitelist; `package.json` has no `preinstall`, `install`, `postinstall` or `prepare` script; `npm-shrinkwrap.json` is present. | CI | none — new (D9) | F6 |
-| PT-22 | CI scans the repository with the bot-token regex and a deny-list of tenant identifiers; a seeded fixture fails the scan. | CI | none — new (B-16) | F0, F6 |
+| PT-21 | `npm pack --dry-run` lists exactly the whitelist; `package.json` has no `preinstall`, `install`, `postinstall` or `prepare` script; `npm-shrinkwrap.json` is present. | CI · `test/security/pack.test.ts` | none — new (D9) | F6 |
+| PT-22 | CI scans the repository with the bot-token regex and a deny-list of tenant identifiers; a seeded fixture fails the scan. | CI · `test/security/repo-scan.test.ts` | none — new (B-16) | F0, F6 |
 | PT-23 | The (cap+1)-th COUNTER → `ROUNDS_EXHAUSTED`; a participant outside the roster is rejected; an inline patch body (non-pointer) is rejected. | daemon unit | none — new (D7) | F5 |
 | PT-24 | An IPC request without a bearer, or with a bearer from a previous boot, is answered `401` and produces no side effect. | daemon unit | none — new | F1 |
 | PT-25 | `migrate_to_chat_id` surfaces `GroupMigratedError` with the new id; the binding is unchanged and no `sendMessage` targets the new id. | daemon unit | v1:src/telegram.ts:140-160 and its test | F1 |
