@@ -17,6 +17,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-session-1-closure-001` | 2026-09-16 ~02:15Z → ~02:25Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-f1-design-001` | 2026-09-16 ~02:55Z → ~03:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (design elaborates 0028–0031; decisions D-11..D-30 in `design.md` §18) | B-13, B-15, B-18 designed; B-16 (D-10 vs DN-04) and the AS-IS `size:exception` policy raised to the Director |
 | `bus-v2-f1-tasks-001` | 2026-09-16 ~03:40Z → ~03:50Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (task breakdown of the F1 change) | `size:exception` narrowed to whole-file AS-IS copies (PR-02, PR-20); PR-07 and PR-22 re-sliced; THREAT-MODEL §4 updated per PR |
+| `bus-v2-session-2-closure-001` | 2026-09-16 ~04:10Z → ~04:20Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -174,6 +175,24 @@ header (design §12; PR-02), as ruled in `bus-v2-f1-design-001` item 5 and DN-06
 
 Outcome: CONSENSUS in one round; re-slices (1), (2), (4), (5) and the cleanup (6) applied to
 `tasks.md` before the session closed: 44 PR slices, 2 with `size:exception`, 207 tasks.
+
+## `bus-v2-session-2-closure-001` — record
+
+Audit of everything written in session 2 before the `apply` session uses it: the three commits
+(`aa19a66` specs + design, `0bdaf3e` tasks + state, `8657450` tribunal records, DN-05, DN-06, log,
+handoff), the re-sliced `tasks.md`, and the documentation refresh (00-INDEX status line, ADR-0031
+row, pending board rows 3 and 5–7, AGENTS.md status and remote, README status, CHECKLIST B-13/B-15).
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Handoff self-sufficient for `sdd-apply` at PR-01 | Yes: launch inputs fixed without ambiguity (stacked-to-main, DN-06 exception scope, Strict TDD forwarding, attempt ledger, Alpha audit before `gh pr create`); no row repeats a decision; the Engram project-key note prevents a split memory |
+| (2) Tribunal records and DN-05/DN-06 | Faithful to the rulings of `bus-v2-f1-design-001` and `bus-v2-f1-tasks-001`, including the exclusion of range extracts from `size:exception` and the per-PR THREAT-MODEL §4 rule; the credential mention in DN-05 is conceptual — no token or secret in the tree or the diffs |
+| (3) `tasks.md` after the re-slice | 44 slices, 2 exceptions; forecast arithmetic (≈13,000 / ≈1,760 excluded / ≈11,240 over 42 / ≈270 per PR) and the dependency chain (PR-07a → PR-07b → PR-08; PR-22a → PR-22b → PR-23) exact and consistent |
+| (4) Documentation refresh | Complete, coherent and precise; the tree is free of stale statements for the start of `apply` |
+| (5) Commit hygiene | Three reviewable units, conventional messages, no AI attribution, pushed under DN-04 authority — no objection |
+| (6) Anything to fix in this session | Nothing pending; the documentation-refresh commit closes the session |
+
+Outcome: CONSENSUS; session 2 closed at the F1 `tasks` → `apply` boundary.
 
 ## Reserved: `bus-v2-referee-001`
 

@@ -15,13 +15,14 @@
 - Director notes DN-05 (repository `agentesinteligentesllm-oss/connmuta` shared; `main` pushed; audit-everything-with-Alpha instruction) and DN-06 (`stacked-to-main`; `size:exception` only for hash-pinned AS-IS PRs).
 - `sdd-tasks` (sonnet): 42 slices; debate `bus-v2-f1-tasks-001` (1 round, CONSENSUS) narrowed the exception to whole-file AS-IS copies (PR-02, PR-20), re-sliced PR-07 → 07a/07b and PR-22 → 22a/22b, and set the per-PR THREAT-MODEL §4 update rule → **44 PR slices, 207 tasks**, forecast `Decision needed before apply: No / Chained PRs recommended: Yes / 400-line budget risk: High`.
 - Writer amendment: the v1 body SHA-256 travels in the provenance header (design §12, tasks PR-02).
+- Documentation refresh (00-INDEX status and pending board rows 3, 5–7; AGENTS.md; README; CHECKLIST B-13/B-15) and closure audit `bus-v2-session-2-closure-001` (1 round, CONSENSUS).
 
 **Opened**
 
 - `apply` from PR-01 (next session; see HANDOFF). Branch protection on `main` pending the Director's rules.
 - Engram project-key drift (`connmuta` auto-detected after the remote was added; canonical key stays `telegram_bus_agent`, passed explicitly).
 
-**How it knows**: tribunal envelopes read through the Arena bridge (`bus-v2-f1-design-001`, `bus-v2-f1-tasks-001`); `gentle-ai sdd-status` (`nextRecommended: apply`, 207 tasks); `gentle-ai sdd-task-result` ok for spec, design, spec re-run and tasks; files on disk; Engram observations #3076 (state), #3081 (GitHub auth, pinned), #3084–#3093 (specs), #3095 (design), #3102 (DN-06), #3103 (tasks).
+**How it knows**: tribunal envelopes read through the Arena bridge (`bus-v2-f1-design-001`, `bus-v2-f1-tasks-001`, `bus-v2-session-2-closure-001`); `gentle-ai sdd-status` (`nextRecommended: apply`, 207 tasks); `gentle-ai sdd-task-result` ok for spec, design, spec re-run and tasks; files on disk; Engram observations #3076 (state), #3081 (GitHub auth, pinned), #3084–#3093 (specs), #3095 (design), #3102 (DN-06), #3103 (tasks).
 
 ## 2026-09-15/16 — Session 1: landing (F0) and F1 planning through proposal
 

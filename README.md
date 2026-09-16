@@ -15,7 +15,7 @@ automatically.
 
 ## Status
 
-**F0 — landing. No code yet.**
+**F0 closed; F1 planned (specs, design, tasks audited). No code yet — `apply` starts at PR-01 of [`openspec/changes/f1-daemon-registry-thin-client/tasks.md`](./openspec/changes/f1-daemon-registry-thin-client/tasks.md).**
 
 This repository currently holds the constitution, the architecture landed by the tribunal in debate
 `bus-v2-landing-architecture-001` (consensus after two rounds), the decision records, the backlog and

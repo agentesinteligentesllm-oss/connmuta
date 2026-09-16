@@ -7,7 +7,7 @@ This file is the **single entry point** of the repository (landing decision D10:
 documents claiming to be the entry point; v2 has one). If a document is not listed here, it is not
 part of the F0 landing.
 
-**Status: F0 closed; F1 planning in progress (proposal approved, spec and design next). No code yet.**
+**Status: F0 closed; F1 planning closed (proposal, specs, design and tasks audited by the tribunal); `apply` starts at PR-01. No code yet.**
 Live position: [`08-sessions/HANDOFF.md`](./08-sessions/HANDOFF.md). Source of the architecture below: Arena debate
 `bus-v2-landing-architecture-001`, consensus after two rounds ([`05-tribunal/INDEX.md`](./05-tribunal/INDEX.md)).
 
@@ -101,7 +101,7 @@ Director; debate `bus-v2-landing-architecture-001`):
 | [`0028-project-scoped-bijective-binding.md`](./03-adr/0028-project-scoped-bijective-binding.md) | One bot per (human, project); bijective bot ↔ group ↔ project; registry invariant "one bot_id in at most one active binding" | — |
 | [`0029-per-user-daemon-and-thin-clients.md`](./03-adr/0029-per-user-daemon-and-thin-clients.md) | Daemon per OS user as sole `getUpdates` consumer; host-agnostic thin stdio clients; authenticated loopback IPC | v1 ADR-03 |
 | [`0030-sqlite-ledger-and-json-registry.md`](./03-adr/0030-sqlite-ledger-and-json-registry.md) | `node:sqlite` ledger (WAL) + human-editable JSON registry; OS keychain for secrets | v1 ADR-02 in part |
-| [`0031-npm-distribution-and-license.md`](./03-adr/0031-npm-distribution-and-license.md) | npm publish with compiled `dist`, shrinkwrap, files whitelist, never `npx`; Node >= 24; license pending Director | — |
+| [`0031-npm-distribution-and-license.md`](./03-adr/0031-npm-distribution-and-license.md) | npm publish with compiled `dist`, shrinkwrap, files whitelist, never `npx`; Node >= 24; license Apache-2.0 (DN-04) | — |
 
 ### `05-tribunal/` — debate record
 
@@ -147,11 +147,13 @@ Nothing on this board is decided by the tribunal; each row waits for the Directo
 |---|----------|--------------------------------|---------|----------------|
 | 1 | **Final product name** | **Decided: "Conmuta"** (Director note DN-02, 2026-09-16, [tribunal index](./05-tribunal/INDEX.md#director-notes)). npm `conmuta` and `@conmuta/*` verified free on 2026-09-15. Still pending: IMPI/EUIPO screening against "Conmuta Soluciones Tecnológicas S.L." (class 42) and the reservation of npm scope, GitHub org and domain (outward-facing actions, need the Director's go); fallback "Emisario" only if screening fails | B-11 | npm scope, GitHub org, domain, ADR-0031 |
 | 2 | **License** | **Decided: Apache-2.0** (Director, 2026-09-16, DN-04); `LICENSE` holds the verbatim text. Still open in B-16: SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright-holder line for `package.json` | B-16 | npm publish (F6) |
-| 3 | **SDD preflight** — pace, artifact store, PR strategy | **Decided 2026-09-16** (Director, native preflight): pace Automatic, artifacts Both (hybrid: openspec in repo + Engram), PR strategy Auto (chained PRs when over the 400-line budget). Recorded in `openspec/config.yaml` `session:` | — | Nothing; `sdd-init` has run and the F1 change is open |
+| 3 | **SDD preflight** — pace, artifact store, PR strategy | **Decided 2026-09-16** (Director, native preflight): pace Automatic, artifacts Both (hybrid: openspec in repo + Engram), PR strategy Auto (chained PRs when over the 400-line budget). Recorded in `openspec/config.yaml` `session:`. Delivery refined 2026-09-16 (DN-06): chain strategy `stacked-to-main`; `size:exception` only for whole-file AS-IS vendored PRs hash-pinned in the provenance header | — | Nothing; F1 planning is closed and `apply` is next |
 | 4 | **macOS scope** | Windows first; macOS supported only after a real smoke test (installer + daemon + LaunchAgent + one IDE) | B-12 | Claiming dual-platform support at F6 |
+| 5 | **Branch protection on `main`** | Repository `agentesinteligentesllm-oss/connmuta` shared and `main` pushed (DN-05). Kairo's position: protect against force-push and deletion; a PR-only rule would also block the direct documentation commits made at every session close, so the Director chooses whether F1's 44 PRs are the only path to `main` | — | Nothing technical; review discipline |
+| 6 | **`LICENSE` in the package before F6 (D-10 vs DN-04)** | Kairo's assumption (DN-06, open to veto): D-10 is superseded by DN-04 — `LICENSE` ships from PR-01 and `package.json` stays `private: true` until F6 | B-16 | PR-01 `files` whitelist |
+| 7 | **Two residual threat-model items without a backlog id** | Bytes-per-hour exfiltration ceiling (T22) and an organisation marker in the origin label (THREAT-MODEL §7): left out of F1 by design; the Director assigns backlog ids or drops them | — | Nothing in F1; documented as open in PR-42 |
 
-The four new ADRs (0028–0031) carry the status `accepted` (tribunal consensus, confirmed by the Director on 2026-09-16, DN-04)
-until the Director confirms them.
+The four new ADRs (0028–0031) carry the status `accepted` (tribunal consensus, confirmed by the Director on 2026-09-16, DN-04).
 
 ## Precedence on conflict
 

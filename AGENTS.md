@@ -9,7 +9,7 @@ project (decision D5 of the landing debate, phase F2) is a different document, p
 template. v1's equivalent of that end-user document is `docs/AGENT-GUIDE-using-the-bus.md` in the
 `telegram-agent-bus` repository.
 
-**Status.** F0 — landing. No code yet. Only documentation exists.
+**Status.** F1 planning closed (specs, design and tasks under `openspec/changes/f1-daemon-registry-thin-client/`, audited). `apply` starts at PR-01. No code yet.
 
 ## 1. Reading order
 
@@ -110,7 +110,7 @@ rendering per host).
   code on open).
 - `.gitignore` also excludes `*.token`, `.conmuta/`, `.env`, `node_modules/`, `dist/`, session dumps
   (`*.txt`) and local caches.
-- The repository has no commits yet (branch `main`).
+- Remote `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main` (pushed). Branch protection pending the Director (00-INDEX pending board, row 5).
 
 ## 6. Working with the v1 repository
 

@@ -15,7 +15,7 @@
 | Artifacts | [`proposal.md`](../../openspec/changes/f1-daemon-registry-thin-client/proposal.md) · [`specs/`](../../openspec/changes/f1-daemon-registry-thin-client/specs/README.md) (9 capabilities, 47 requirements, 85 scenarios) · [`design.md`](../../openspec/changes/f1-daemon-registry-thin-client/design.md) (D-11..D-30, §20 build order) · [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) (44 PR slices) | Engram twins under `sdd/f1-daemon-registry-thin-client/*` |
 | SDD preflight | Automatic · hybrid · auto-chain · 400 lines/PR; re-collected in session 2 (the gate requires it per session) | [`openspec/config.yaml`](../../openspec/config.yaml) `session:` |
 | Delivery | `chain_strategy: stacked-to-main`; `size:exception` only for whole-file AS-IS vendored PRs (PR-02, PR-20) with the v1 body SHA-256 in the provenance header (DN-06, `bus-v2-f1-tasks-001`) | [`05-tribunal/INDEX.md#director-notes`](../05-tribunal/INDEX.md#director-notes) |
-| Tribunal | 6 debates closed in CONSENSUS (landing, F0 docs audit, F1 proposal, session-1 closure, F1 design+spec, F1 tasks); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
+| Tribunal | 7 debates closed in CONSENSUS (landing, F0 docs audit, F1 proposal, session-1 closure, F1 design+spec, F1 tasks, session-2 closure); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
 | Repository | `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, `main` pushed. **Branch protection not configured** (Director to choose rules; a PR-only rule would block the direct docs commits Kairo makes at session close) | `git remote -v` |
 | Code | **None yet.** PR-01 (scaffold) is the first code | `tasks.md` PR-01 |
 
