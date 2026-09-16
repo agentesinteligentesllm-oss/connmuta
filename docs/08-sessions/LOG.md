@@ -4,6 +4,65 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-16 — Session 5: F1 apply, PR-03 merged (stopped at the PR-03 → PR-04 boundary)
+
+**Closed**
+
+- Handoff followed as written, with two runtime corrections: the SDD preflight was first collected
+  with model-authored question text/order and was refused twice (`SDD child dispatch refused: …
+  preflight is missing, invalid, or uncorroborated`, then `… model-authored preflight text cannot
+  create parent-confirmed authority`) until re-collected with the exact canonical marker text and
+  option order from `sdd-orchestrator-workflow.md` and the sub-agent prompt stopped hand-authoring
+  the `## SDD Session Preflight` block; `sdd-attempt acquire` required `--request-id` and
+  `--evidence-goal` (not documented in the prior handoff) and `settle` rejected `--json`. `main`
+  clean and up to date; `gentle-ai sdd-status`: `nextRecommended: apply`, 17/210, no blockers; ledger
+  `acquire` for PR-03 with `--max-changed-lines 600` → `proceed`.
+- `sdd-apply` (sonnet) on PR-03 under Strict TDD: RED (`TS2307` missing module) → GREEN; vendored
+  `src/shared/secrets.ts` from `v1:src/secrets.ts` @ `bf8f365` with the sole functional change
+  `export` on `TELEGRAM_BOT_TOKEN_RE`; v1 body sha256 (`742bf433…2790bf6`) computed and cross-checked.
+  Deviation: v1's own 10-digit fixture token collides with `repo-scan.test.ts`'s own stricter 8–10
+  digit `TOKEN_SHAPE_RE` (PT-22) — narrowed the test fixture to 7 digits, still exercises the shared
+  unbounded regex.
+- Kairo's review before the audit found a genuine defect the apply agent's own verification missed:
+  `apply-progress.md`'s "Corrections" note quoted v1's 10-digit fixture token **verbatim** to explain
+  the narrowing above — which retripped PT-22's own scan on the doc file itself (`repo-scan.test.ts`
+  flagged `openspec/.../apply-progress.md`, `tokenShape:true`), caught only because Kairo verified
+  from a clean detached worktree rather than trusting the agent's self-reported 103/103. Fixed by
+  redacting the literal string to a description (`bd1cebf`); re-verified green from a second fresh
+  worktree. Flagged as a defect class for every future `sdd-apply` launch: describe a
+  matched-and-rejected secret shape, never quote it.
+- Three work-unit commits plus the fix (`2626a49` feat(shared), `c3d5704` docs(threat-model),
+  `837d94d` docs(sdd), `bd1cebf` fix(sdd)); authored diff 250 lines (< 400), no `size:exception`
+  (SEAM bodies are not exempt under DN-06). Clean detached worktree (`npm ci --ignore-scripts`),
+  run twice: 103/103 both times, `test:static` 8/8 pre-fix-caught-the-bug and 8/8 post-fix.
+  Fresh-context phase-contract validator: PASS, no findings (recomputed the hash, the test count,
+  and confirmed both THREAT-MODEL cells).
+- Debate `bus-v2-f1-pr-03-001` (1 round, CONSENSUS, `APPROVE`, objections `[]`): provenance, budget,
+  the fixture deviation, the intentional PT-22/`secrets.ts` regex orthogonality, and the doc-hygiene
+  fix all ratified.
+- PR #4 (`f1/03-secrets` → `main`) opened under `agentesinteligentesllm-oss` after the consensus; CI
+  green on the PR (run `35145603619`: both Node 24.15 and 26 matrices pass) → merged by Kairo under
+  DN-08 (`77855b9`, branch deleted, fast-forward).
+- Native attempt ledger: PR-03 attempt settled `passed` (evidence revision `sha256:543802a5…6d7` =
+  SHA-256 of the manifest `PR-03 f1/03-secrets tip bd1cebf merged 77855b9; clean worktree verify-03:
+  node --test 103/103, test:static 8/8; CI run 35145603619 pass (node 24.15, 26); tribunal
+  bus-v2-f1-pr-03-001 CONSENSUS`) → `state: complete`, no maintainer decision required.
+- Documentation refresh (this handoff, LOG, tribunal row + record for `-001`, 00-INDEX status,
+  AGENTS.md status, README status, `openspec/config.yaml` context, `state.yaml`) and closure audit
+  `bus-v2-session-5-closure-001`.
+
+**Opened**
+
+- PR-04 (`shared/thread-record.ts`, SEAM, ≈190 lines) — next session; see HANDOFF.
+- GitHub Actions warns that `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 (forced
+  to Node 24 by the runner) — bump to the current majors in a later CI PR, audited (carried).
+- Stale `dist/` remains a footgun under `npm test` (carried from session 3).
+
+**How it knows**: tribunal envelope read through the Arena bridge (`bus-v2-f1-pr-03-001`,
+`bus-v2-session-5-closure-001`); `gentle-ai sdd-status` / `sdd-attempt acquire|settle` output;
+GitHub API (`gh pr view 4`, run `35145603619`); clean-worktree `node --test` runs (both before and
+after the doc-hygiene fix); independent SHA-256 recomputation of the v1 body hash by Kairo.
+
 ## 2026-09-16 — Session 4: F1 apply, PR-02 merged (stopped at the PR-02 → PR-03 boundary)
 
 **Closed**

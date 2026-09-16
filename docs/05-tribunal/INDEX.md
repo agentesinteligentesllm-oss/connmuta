@@ -24,6 +24,8 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-pr-02-001` | 2026-09-16 ~17:05Z → watchdog close | Kairo (proposer, writer), Alpha (auditor) | 1 (PROPOSAL only) | `ESCALATED` — closed by the broker watchdog on a turn timeout before Alpha's `AUDIT` reached the channel; Alpha's out-of-band verdict (relayed by the Director) was `APPROVE`; no disagreement | none | re-run as `bus-v2-f1-pr-02-002` by the Director's decision |
 | `bus-v2-f1-pr-02-002` | 2026-09-16 ~19:25Z → ~19:30Z | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (second code slice of F1) | `deliveredText` helper split (`test/fakes/delivered-text.ts`, PR-18 must import it); `constants.ts` joins the provenance registry; RED-fidelity deviation on task 2.1 recorded |
 | `bus-v2-session-4-closure-001` | 2026-09-16 ~19:55Z → ~20:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
+| `bus-v2-f1-pr-03-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (third code slice of F1) | doc-hygiene defect class flagged: a fixture-token narrative must describe the shape, never quote it verbatim, or it retrips PT-22 on the doc file itself; PT-22/`shared/secrets.ts` regex duplication left orthogonal, ratified |
+| `bus-v2-session-5-closure-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -284,6 +286,42 @@ live-status refresh (00-INDEX, AGENTS.md, README, `openspec/config.yaml`, `state
 | (4) Live-status sweep | Clean and synchronized across the five files; `gentle-ai sdd-status` 17/210, no blockers |
 
 Outcome: CONSENSUS in one round; session 4 closed at the PR-02 → PR-03 boundary.
+
+## `bus-v2-f1-pr-03-001` — record
+
+Audit of the third F1 code slice before it opened on GitHub (DN-05): branch `f1/03-secrets`
+(commits `2626a49` feat, `c3d5704` docs(threat-model), `837d94d` docs(sdd), `bd1cebf` fix), the
+whole-file SEAM vendor of `v1:src/secrets.ts` (`export` added to `TELEGRAM_BOT_TOKEN_RE`) and a
+doc-hygiene defect Kairo found and fixed in its own clean-worktree verification pass.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Provenance: `src/shared/secrets.ts:1-3` sha256 `742bf433…f2790bf6`, recomputed independently against `telegram-agent-bus@bf8f365` (no header/imports to strip, hash covers the full 86-line body) | Ratified: exact match; the only functional delta from v1 is `export` on `TELEGRAM_BOT_TOKEN_RE` (`src/shared/secrets.ts:24`) |
+| (2) Budget: 250 authored lines against the 400-line cap; SEAM body not `size:exception` under DN-06 | Ratified: no exception requested or needed |
+| (3) Fixture deviation: v1's own 10-digit fixture token collides with `test/security/repo-scan.test.ts:13`'s own stricter `TOKEN_SHAPE_RE` (PT-22, an 8–10-digit scan v1 never had to survive); narrowed to 7 digits in `test/shared/secrets.test.ts:13`, still exercises `shared/secrets.ts`'s unbounded regex | Ratified: sound, no coverage lost |
+| (4) `repo-scan.test.ts` keeps its own `TOKEN_SHAPE_RE` copy instead of importing the now-exported `TELEGRAM_BOT_TOKEN_RE` | Ratified as an intentional orthogonality: PT-22's repo-wide scan should not depend on product code; DRY duplication noted, not fixed, no follow-up required |
+| (5) Kairo's finding (`bd1cebf`): the `sdd-apply` agent's own "Corrections" note in `apply-progress.md` quoted v1's 10-digit fixture token verbatim, which retripped PT-22 on the doc file itself; redacted to a description, re-verified green from a second clean detached worktree | Ratified: correct fix; flagged as a defect class for future `sdd-apply` prompts — describe a matched-and-rejected secret shape, never quote it |
+| (6) Verification: clean detached worktree (`npm ci --ignore-scripts`) run twice — once pre-fix (PT-22 caught the doc issue), once post-fix — full suite 103/103, static 8/8 both times after the fix; independent fresh-context phase-contract validator PASS | Ratified |
+
+Outcome: CONSENSUS in one round. PR #4 (`f1/03-secrets` → `main`) opened after the audit under
+`agentesinteligentesllm-oss`; CI (`windows-latest` × Node 24.15/26) green (run `35145603619`);
+merged by Kairo under DN-08 (`77855b9`, branch deleted). Native attempt ledger settled `passed`,
+`state: complete`.
+
+## `bus-v2-session-5-closure-001` — record
+
+Audit of everything written in session 5 before the docs commit on `main`: the merged PR #4, the
+handoff for PR-04, the log, the tribunal row/record for `bus-v2-f1-pr-03-001`, and the live-status
+refresh (AGENTS.md, README.md, 00-INDEX, `openspec/config.yaml`, `state.yaml`).
+
+| Question | Alpha's ruling |
+|---|---|
+| (a) Doc-hygiene rule framing | Precisely scoped (root cause: PT-22 scans every tracked file, not only `src/**`/`test/**`; prescriptive rule: describe the shape, never quote the literal) — sufficient without over-constraining |
+| (b) SDD-preflight guidance accuracy | Accurately details both dispatch-refusal causes (non-canonical wording/order; hand-authored preflight block in a sub-agent prompt) and gives an unambiguous clean-start path |
+| (c) Status-line sweep | Complete and coherent across all 8 changed files; zero stale PR-03-as-next references; 21/210 confirmed |
+| (d) Fidelity to `bus-v2-f1-pr-03-001` | Faithful; no unratified addition or extrapolation |
+
+Outcome: CONSENSUS in one round; session 5 closed at the PR-03 → PR-04 boundary.
 
 ## Reserved: `bus-v2-referee-001`
 
