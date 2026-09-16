@@ -676,6 +676,14 @@ as-is, it would actively mislead a future reader about the current security post
 mechanism D-05 changes. Corrected in place to describe the fail-closed behavior and point at
 `protocol-apply.ts`'s `isAddressee`.
 
+Before opening the tribunal debate, a fresh-context read-only validator agent independently
+re-derived the pinned hash (matched), verified all four named design changes against the code and v1
+source, reran the full test suite (128/128) and static gates (8/8), and confirmed the twins.test.ts
+CI-blocking claim above by reading the test directly. It found one residual defect the first
+doc-comment fix (commit `0b86808`) missed: `thread-record.ts`'s `to` field docstring, three lines
+above `to_user_id`'s, repeated the same stale "the addressee check fails open" claim. Fixed in a
+follow-up commit. No other finding from the validator required a change.
+
 Next: Alpha audits PR-05 (tribunal debate `bus-v2-f1-pr-05-001`) before any commit, same as every
 prior PR — the Director's authorization to decide the budget question does not skip that audit.
 
