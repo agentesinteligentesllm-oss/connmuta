@@ -15,12 +15,14 @@ automatically.
 
 ## Status
 
-**F0 closed; F1 planned (specs, design, tasks audited). No code yet — `apply` starts at PR-01 of [`openspec/changes/f1-daemon-registry-thin-client/tasks.md`](./openspec/changes/f1-daemon-registry-thin-client/tasks.md).**
+**F0 closed; F1 `apply` in progress — PR-01a (scaffold, CI, static gates) and PR-01b (`shared/constants.ts`) merged; next slice PR-02 of 45 in [`openspec/changes/f1-daemon-registry-thin-client/tasks.md`](./openspec/changes/f1-daemon-registry-thin-client/tasks.md).**
 
 This repository currently holds the constitution, the architecture landed by the tribunal in debate
 `bus-v2-landing-architecture-001` (consensus after two rounds), the decision records, the backlog and
-the work plan. Implementation begins with phase F1 once the Director closes the decisions listed on
-the [pending-decisions board](./docs/00-INDEX.md#pending-director-decisions).
+the work plan, and the first F1 code: the package scaffold, the CI workflow, the static security
+gates (PT-21, PT-22), the twin rule and `src/shared/constants.ts`. Every pull request is audited by
+the tribunal before it opens; open Director decisions are on the
+[pending-decisions board](./docs/00-INDEX.md#pending-director-decisions).
 
 ## Start here
 

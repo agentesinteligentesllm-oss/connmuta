@@ -4,6 +4,30 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-16 — Session 3: F1 apply, PR-01a and PR-01b merged (stopped at the PR-01b → PR-02 boundary)
+
+**Closed**
+
+- SDD preflight re-collected (Automatic · hybrid · auto-chain); the first attempt was refused by the runtime because the option menu was reordered — canonical order is mandatory. `gentle-ai sdd-status`: `nextRecommended: apply`, 207 tasks, no blockers.
+- `sdd-apply` (sonnet) on PR-01 under Strict TDD: 8/8 tasks green, but the real authored diff was ≈790 lines against the 400-line budget with no applicable exception (new code). Kairo re-sliced at the module boundary under `auto-chain`: **PR-01a** scaffold + CI + static gates (380 authored lines) and **PR-01b** `shared/constants.ts` + twin (386); `tasks.md` amended in place (45 slices, 210 tasks, budget-count rule in the header). No `sdd-tasks` re-run.
+- Kairo's review before the audit: `tsconfig.base.json` + `extends` (five identical blocks collapsed); `tsBuildInfoFile` moved under `dist/.tsbuildinfo/` after `npm pack` was found shipping `tsconfig.tsbuildinfo` with absolute paths (assertion added, RED first); `MCP_SERVER_NAME` comment corrected; tuning literal removed from the constants twin.
+- Clean-worktree CI simulation caught `repo-scan.test.ts` matching its own deny-list literals once tracked (it had passed only because the file was untracked) — fixed by excluding the scanner's own path, squashed into the security-tests commit.
+- Fresh-context phase-contract validator: `pass`, no blocking findings (provenance SHA-256 recomputed: identical; 21 changed files all traced to scope).
+- Debate `bus-v2-f1-pr-01-001` (1 round, CONSENSUS, `APPROVE`): re-slice, both slices, scope additions, fixes, deviations 6a–6d and the THREAT-MODEL §4 scope-cell convention ratified; real PT-22 deny-list deferred to B-16 / PR-42.
+- PR #1 (PR-01a → `main`) and PR #2 (PR-01b, stacked) opened under `agentesinteligentesllm-oss`; GitHub produced no Actions run while the workflow was absent from `main` (verified for `pull_request` and branch `push`; no incident). Director authorized both merges: #1 → `1369886` (CI green, Node 24.15 43 s / Node 26 33 s), PR #2 retargeted to `main` and reopened to trigger CI (green), #2 → `5798bab` (CI green).
+- `sdd-init` re-run on `main`: `openspec/config.yaml` `strict_tdd: true`, `testing:` block real; `session:`/`rules:` unchanged except the stale cross-reference in `strict_tdd_policy`.
+- Native attempt ledger: PR-01 attempt settled `passed` (`changed_lines: 2676` — the ledger counts generated `npm-shrinkwrap.json` and both slices), `blocked: maintainer_decision`; the Director authorized the objective reset (`next_action: begin`).
+- Director note DN-07: this project lives only under `agentesinteligentesllm-oss`; other agents on the machine use another account on an unrelated project. Kairo had switched the machine-global `gh` account twice (403 recovery, then restore); replaced by a repo-local `credential.helper` + per-command `GH_TOKEN`, global account left as the other agents had it.
+- Documentation refresh (this handoff, LOG, tribunal row + record + DN-07, 00-INDEX status and rows 3/5/6, AGENTS.md status/§4/§5, README status, CHECKLIST B-16, config.yaml, state.yaml) and closure audit `bus-v2-session-3-closure-001` (1 round, `APPROVE_WITH_CHANGES`: two stale remnants — `config.yaml` "PR-01b open", `state.yaml` "start at PR-01" — fixed before the commit).
+
+**Opened**
+
+- PR-02 (`shared/envelope.ts`, `size:exception` AS-IS hash-pinned) — next session; acquire the ledger with `--max-changed-lines` sized to what the ledger measures.
+- Stale `dist/` outputs keep running under `npm test` until removed — a `clean` step to propose in a later PR (audited).
+- Branch protection on `main`; B-16 remainder including the out-of-tree tenant deny-list.
+
+**How it knows**: tribunal envelopes read through the Arena bridge (`bus-v2-f1-pr-01-001`, `bus-v2-session-3-closure-001`); `gentle-ai sdd-status`/`sdd-attempt status` output; GitHub API (`gh pr view`, `actions/runs` 35063093980, 35063218082, 35063447683); clean-worktree `node --test` runs; Engram observations #3121 (preflight order), #3122 (scope additions), #3131 (re-slice), #3133 (repo-scan self-match), #3137 (consensus), #3139/#3140 (gh account isolation), #3126 (apply-progress).
+
 ## 2026-09-16 — Session 2: F1 spec, design and tasks (planning closed at the `tasks` boundary)
 
 **Closed**

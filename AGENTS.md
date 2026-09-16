@@ -9,7 +9,7 @@ project (decision D5 of the landing debate, phase F2) is a different document, p
 template. v1's equivalent of that end-user document is `docs/AGENT-GUIDE-using-the-bus.md` in the
 `telegram-agent-bus` repository.
 
-**Status.** F1 planning closed (specs, design and tasks under `openspec/changes/f1-daemon-registry-thin-client/`, audited). `apply` starts at PR-01. No code yet.
+**Status.** F1 `apply` in progress: PR-01a and PR-01b merged (`main` = scaffold, CI, static gates, `src/shared/{constants,version}.ts` with twins). Next slice PR-02 of 45 in `openspec/changes/f1-daemon-registry-thin-client/tasks.md`. Every PR is audited by Alpha before it opens (DN-05).
 
 ## 1. Reading order
 
@@ -87,13 +87,14 @@ When a live-state file and a design document disagree, apply the precedence rule
 
 ## 4. What is decided and what is pending
 
-Decided (tribunal consensus, pending only the Director's formal confirmation where noted): topology,
-daemon, persistence, committed project file, listening model, Arena-light, stack, governance, work
-plan — D1 to D11 in the tribunal record. The four new ADRs are "accepted by tribunal, pending
-Director".
+Decided (tribunal consensus; ADR-0028..0031 `accepted` by the Director, DN-04): topology, daemon,
+persistence, committed project file, listening model, Arena-light, stack, governance, work plan — D1
+to D11 in the tribunal record; SDD preflight (Automatic · hybrid · auto-chain) and F1 delivery
+(`stacked-to-main`, DN-06); license Apache-2.0 (DN-04).
 
-Pending the Director: final product name (B-11), license (B-16), SDD preflight (pace, artifact
-store, PR strategy), macOS scope (B-12). Full board:
+Pending the Director: trademark screening of the product name (B-11), the B-16 remainder
+(SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright-holder line), macOS scope (B-12), branch
+protection on `main`. Full board:
 [`docs/00-INDEX.md`](./docs/00-INDEX.md#pending-director-decisions).
 
 Open spikes for F0: B-05 (gentle-ai installer study), B-07 (bot-to-bot group visibility for
@@ -109,7 +110,12 @@ rendering per host).
   of the product. Never commit it (ADR-0031: the repository ships no hooks or settings that execute
   code on open).
 - `.gitignore` also excludes `*.token`, `.conmuta/`, `.env`, `node_modules/`, `dist/`, session dumps
-  (`*.txt`) and local caches.
+  (`*.txt`, except the seeded PT-22 fixture `test/fixtures/repo-scan-negative.txt`) and local caches.
+- **GitHub authentication is isolated from the machine-global `gh` account** (Director, DN-07): other
+  agents on this machine use a different account for unrelated projects, and `gh auth switch` would
+  break them. This checkout's `.git/config` carries a local `credential.helper` that fetches the
+  `agentesinteligentesllm-oss` token at call time; `gh` commands run with
+  `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`. Never run `gh auth switch`.
 - Remote `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main` (pushed). Branch protection pending the Director (00-INDEX pending board, row 5).
 
 ## 6. Working with the v1 repository

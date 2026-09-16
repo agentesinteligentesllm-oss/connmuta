@@ -18,6 +18,8 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-design-001` | 2026-09-16 ~02:55Z → ~03:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (design elaborates 0028–0031; decisions D-11..D-30 in `design.md` §18) | B-13, B-15, B-18 designed; B-16 (D-10 vs DN-04) and the AS-IS `size:exception` policy raised to the Director |
 | `bus-v2-f1-tasks-001` | 2026-09-16 ~03:40Z → ~03:50Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (task breakdown of the F1 change) | `size:exception` narrowed to whole-file AS-IS copies (PR-02, PR-20); PR-07 and PR-22 re-sliced; THREAT-MODEL §4 updated per PR |
 | `bus-v2-session-2-closure-001` | 2026-09-16 ~04:10Z → ~04:20Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
+| `bus-v2-f1-pr-01-001` | 2026-09-16 ~05:35Z → ~05:55Z | Kairo (proposer, writer), Alpha (auditor); Director (merge authority) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (first code slice of F1) | PR-01 re-sliced into PR-01a/PR-01b (45 slices); THREAT-MODEL §4 scope-cell convention; real PT-22 deny-list deferred to B-16 / PR-42 |
+| `bus-v2-session-3-closure-001` | 2026-09-16 ~06:55Z → ~07:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE_WITH_CHANGES`, 2 objections accepted and fixed before the commit | none | — |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -88,6 +90,7 @@ Changes or inputs ordered directly by the Director (GOVERNANCE §3). Each note i
 | DN-04 | 2026-09-16 | The Director accepted the Apache-2.0 license, confirmed the four new ADRs (0028–0031) by delegating implementation of everything the tribunal landed ("toma las riendas y aplica todo lo que consideres prudente"), authorized commits, pull requests and merges at Kairo's discretion, stated that no GitHub repository exists yet (to be shared later), and asked that sessions be switched at phase boundaries with a handoff so no session carries unnecessary context. | [LICENSE](../../LICENSE), [ADR index](../03-adr/INDEX.md), [session handoff](../08-sessions/HANDOFF.md) |
 | DN-05 | 2026-09-16 | The Director shared the GitHub repository `agentesinteligentesllm-oss/connmuta` (public, empty) and the owner-account credential for it; Kairo registered `origin`, pushed `main` (F0 history) and left branch protection pending a Director choice of rules. The Director also asked that every complement, correction or implementation be audited by Alpha so that neither documentation nor code carries ambiguity. | [session handoff](../08-sessions/HANDOFF.md) |
 | DN-06 | 2026-09-16 | For F1 delivery the Director chose the chain strategy `stacked-to-main` (each PR merges to `main` in sequence; no tracker branch) and accepted `size:exception` **only** for pull requests that vendor v1 modules AS-IS with a SHA-256 of the v1 body at `bf8f365` carried in the provenance header and re-verified by a test (tribunal ruling `bus-v2-f1-design-001` ask 5); SEAM and new modules stay within the 400-line budget. Kairo's assumption, open to veto: D-10 is superseded by DN-04 (`LICENSE` ships now, `private: true` until F6). | [design.md §20](../../openspec/changes/f1-daemon-registry-thin-client/design.md), [CHECKLIST B-16](../06-backlog/CHECKLIST.md) |
+| DN-07 | 2026-09-16 | The Director reminded that this project lives **only** under the `agentesinteligentesllm-oss` GitHub account, that other agents on the same machine work under a different account on an unrelated project, and asked that nothing interfere with them. Kairo isolated this repository's GitHub authentication (repo-local credential helper, per-command `GH_TOKEN`; no more `gh auth switch`). The Director also authorized merging PR #1 (PR-01a) and PR #2 (PR-01b) and the native attempt-ledger reset after the PR-01 re-slice. | [session handoff](../08-sessions/HANDOFF.md), [AGENTS.md §5](../../AGENTS.md) |
 | DN-03 | 2026-09-15 | Requirements added after the PROPOSAL: an optional group referee with moderation rules and ticket labels (B-01, B-02, B-03), a desktop version for Windows and if possible macOS (B-04), and a dedicated study of the gentle-ai installer (B-05). Quoted in the debate as amendments A2, A3, A4. | [CHECKLIST](../06-backlog/CHECKLIST.md), round 2 above |
 
 ## `bus-v2-f0-docs-audit-001` — record
@@ -193,6 +196,46 @@ row, pending board rows 3 and 5–7, AGENTS.md status and remote, README status,
 | (6) Anything to fix in this session | Nothing pending; the documentation-refresh commit closes the session |
 
 Outcome: CONSENSUS; session 2 closed at the F1 `tasks` → `apply` boundary.
+
+## `bus-v2-f1-pr-01-001` — record
+
+Audit of the first F1 code slice before it opened on GitHub (DN-05): branches
+`f1/01a-scaffold-ci-gates` and `f1/01b-shared-constants`, the apply-time re-slice of PR-01, the
+orchestrator's scope additions and the defects found in Kairo's own review.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Re-slice PR-01 → PR-01a (380 authored lines) + PR-01b (386); `tasks.md` amended in place (45 slices, budget-count rule in the header) | Ratified: both under 400; DN-06 `size:exception` does not apply to new code; the amendment is exact |
+| (2) PR-01a content: `package.json` (design §2.3), `tsconfig.base.json` + project references, CI, twin rule, PT-21, PT-22 | Approved; verified in a clean worktree (8/8); no `.tsbuildinfo` in `npm pack`; the scanner's self/fixture exclusion is justified |
+| (3) PR-01b content: `src/shared/constants.ts` (design §3, SEAM of `v1:src/config.ts:26-166`) + twin | Approved; provenance SHA-256 `4ce5e514…b48a` recomputed independently and identical; W1/W8, `NODE_FLOOR`, derivations verified (14/14, static 6/6) |
+| (4) Scope additions: `.gitignore` negation for the PT-22 fixture; `test/shared/version.test.ts` twin; `tsconfig.base.json` | Ratified |
+| (5) Defects found and fixed before the audit: `tsbuildinfo` packed by `npm pack` (absolute paths); `repo-scan.test.ts` matching itself once tracked | Ratified; RED reproduced before GREEN in both |
+| (6) Deviations: inert `client`/`daemon`/`cli` tsconfigs out of the root `references` (TS18003); `test:wrong-room` glob until PR-41; TypeScript 7.0.2 needs `types: ["node"]`; `npm-cli.js` spawn on win32 | Ratified (6a–6d) |
+| (7) THREAT-MODEL §4 file-name rule satisfied by the `scope` cell; real tenant deny-list outside the tree (B-16, PR-42) | Ratified; convention stands for later PRs |
+
+Outcome: CONSENSUS in one round. PR #1 (PR-01a) and PR #2 (PR-01b) opened after the audit; CI
+(`windows-latest` × Node 24.15/26) green on both merges (`1369886`, `5798bab`) under the
+Director's authorization (DN-07). Lesson recorded in `tasks.md`: estimates built from v1 line counts
+under-count SEAM modules whose doc comments must be re-authored; `sdd-apply` measures the real diff
+before each PR opens.
+
+## `bus-v2-session-3-closure-001` — record
+
+Audit of everything written in session 3 before the docs commit on `main`: the merged PRs #1 and #2,
+the handoff, the log, the tribunal row/record for `bus-v2-f1-pr-01-001`, DN-07, the live-status
+refresh (00-INDEX, AGENTS.md, README, CHECKLIST B-16) and the `sdd-init` re-run in
+`openspec/config.yaml`.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Handoff self-sufficient for PR-02 | Yes: exact pointers, canonical preflight order, ledger `--max-changed-lines` sized to what the ledger measures, clean-worktree verification step; no decision repeated |
+| (2) Tribunal fidelity and hygiene | Faithful to the `bus-v2-f1-pr-01-001` envelope and DN-07; no token, secret or unrelated account in the text |
+| (3) LOG accuracy | Correct, newest first, "how it knows" with run ids and Engram ids |
+| (4) Live-status sweep | Two remnants found: `openspec/config.yaml` context still said "PR-01b open" (the `sdd-init` re-run happened between the two merges) and `state.yaml` still said "start at PR-01" with a pending `apply` block — both fixed in the same commit; `gentle-ai sdd-status` re-run after the fix: `apply`, 210 tasks / 11 complete, no blockers |
+| (5) Anything else | Nothing; the docs commit closes the session |
+
+Outcome: CONSENSUS after one AUDIT round (`APPROVE_WITH_CHANGES`, objections 1–2 accepted with
+evidence); session 3 closed at the PR-01b → PR-02 boundary.
 
 ## Reserved: `bus-v2-referee-001`
 

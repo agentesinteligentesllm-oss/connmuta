@@ -2,41 +2,41 @@ schema: spec-driven
 
 context: |
   Conmuta (working name, B-11 pending trademark clearance): a project-scoped
-  Telegram agent bus. Status F0 landing -- 45 Markdown docs, zero source code.
+  Telegram agent bus. Status F1 apply in progress -- PR-01a and PR-01b merged
+  (scaffold, CI, static gates, shared/constants.ts); next slice PR-02.
   Ratified stack for F1 onward (ADR-0028..0031): Node.js >= 24 LTS,
   TypeScript -> ESM, node:test, @modelcontextprotocol/sdk + zod, node:sqlite
   ledger, @clack/prompts, @napi-rs/keyring. Wire: emit AGENTBUS/2, accept
   /1 and /2, no wire change (CONSTITUTION.md rule W1). First SDD change:
   f1-daemon-registry-thin-client (WORK-PLAN.md).
 
-strict_tdd: false
+strict_tdd: true
 
 testing:
-  status: planned
+  status: active
   test_runner: node:test
-  projects: []
+  projects:
+    - path: "."
+      stack: "Node.js >= 24, TypeScript -> ESM (tsc -b project references)"
+      test_command: "npm test"
+      build_command: "npm run build"
   layers:
-    unit: false
+    unit: true
     integration: false
     e2e: false
   coverage: false
   quality_tools:
     linter: false
-    type_checker: false
+    type_checker: true
     formatter: false
-  planned_test_command: "npm test"       # tsc && node --test "dist/**/*.test.js"
-  planned_build_command: "npm run build" # tsc
+  test_command: "npm test"
+  build_command: "npm run build"
   note: >
-    Zero in-scope projects are discovered (no package.json, no src/ tree yet)
-    -- sdd-init's Strict TDD decision gate therefore fails closed to
-    `strict_tdd: false` at the workspace level. This is a detection-time
-    state, not a policy override: CONSTITUTION.md sections 5-6,
-    GOVERNANCE.md section 6 and ADR-0031 already ratify Strict TDD Mode (red
-    before green; every src file has a test counterpart under test/) as
-    binding project policy starting at F1. `rules.apply` below carries that
-    binding policy forward for sdd-apply. Re-run sdd-init once F1's
-    package.json and a real `npm test` exist so `strict_tdd` flips to true
-    against an actual workspace-level command.
+    Detection now succeeds after PR-01a: package.json, tsconfig project
+    references and CI exist, and `npm test` (tsc -b && node --test
+    "dist/test/**/*.test.js") is the single workspace-level command covering
+    the one in-scope project. The binding policy statement in
+    rules.apply.strict_tdd_policy remains in force unchanged.
 
 session:
   execution_mode: auto
@@ -67,9 +67,9 @@ rules:
     strict_tdd_policy: >
       Strict TDD is binding project policy (CONSTITUTION.md section 6,
       GOVERNANCE.md section 6): red before green, every src file has a test
-      counterpart under test/ with the same base name. This policy overrides
-      the detection-time `strict_tdd: false` above, which only reflects that
-      no test runner exists yet in this documentation-only tree.
+      counterpart under test/ with the same base name. Detection confirmed it
+      on 2026-09-16 after PR-01a (`strict_tdd: true` above); the policy is
+      binding regardless of the detection state.
     test_command: "npm test"
   verify:
     test_command: "npm test"

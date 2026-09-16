@@ -47,12 +47,19 @@ phases:
     tribunal_state: consensus
     tribunal_rulings: size:exception only for whole-file AS-IS (PR-02, PR-20); PR-07 -> 07a/07b(+07c); PR-22 -> 22a/22b; THREAT-MODEL §4 cell updated in each PR that pins a PT; PR-05 watched
     forecast: 44 PR slices, ~13,000 authored lines, 2 exception slices (~1,760 vendored body lines excluded), 207 tasks
+    apply_time_amendment: PR-01 re-sliced into PR-01a/PR-01b on 2026-09-16 (real diff ~790 vs ~350 estimated; new code, no DN-06 exception) -> 45 PR slices, 210 tasks; ratified in bus-v2-f1-pr-01-001
     delivery_strategy: auto-chain (DN-06: exception-ok scoped to hash-pinned whole-file AS-IS)
     chain_strategy: stacked-to-main
   apply:
-    status: pending
+    status: in_progress
+    started_at: "2026-09-16"
+    completed_slices: PR-01a (#1 1369886), PR-01b (#2 5798bab) -- 11/210 tasks, CI green on both merges
+    tribunal_debate: bus-v2-f1-pr-01-001
+    tribunal_state: consensus
+    apply_progress: apply-progress.md (engram sdd/f1-daemon-registry-thin-client/apply-progress)
+    attempt_ledger: PR-01 attempt passed; objective reset by the Director on 2026-09-16 (next_action begin)
   verify:
     status: pending
   archive:
     status: pending
-next_recommended: apply (new session; start at PR-01; see docs/08-sessions/HANDOFF.md)
+next_recommended: apply (new session; start at PR-02; see docs/08-sessions/HANDOFF.md)
