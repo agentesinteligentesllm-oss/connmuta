@@ -38,7 +38,8 @@ export interface ThreadRecord {
    * roster drift a silent black hole. `fetchTool` now translates through the anchor at the trust
    * boundary — the same treatment `from` already received — so downstream code reads one
    * namespace. Records written before the wire release, and those from a peer that sends no
-   * anchor, keep the old meaning; their `to_user_id` is `null` and the addressee check fails open.
+   * anchor, keep the old meaning; their `to_user_id` is `null`, and the addressee check now fails
+   * CLOSED on that case (D-05; see {@link ThreadRecord.to_user_id}).
    */
   to: string | null;
   /** The OPENING body only; everything after it lives in {@link ThreadRecord.history}. */
