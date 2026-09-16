@@ -26,6 +26,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-session-4-closure-001` | 2026-09-16 ~19:55Z → ~20:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-f1-pr-03-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (third code slice of F1) | doc-hygiene defect class flagged: a fixture-token narrative must describe the shape, never quote it verbatim, or it retrips PT-22 on the doc file itself; PT-22/`shared/secrets.ts` regex duplication left orthogonal, ratified |
 | `bus-v2-session-5-closure-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
+| `bus-v2-session-5-handoff-audit-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 2 | `CONSENSUS` — round 1 `APPROVE_WITH_CHANGES` (4 objections), round 2 `APPROVE`, objections `[]` | none | Director-requested dedicated clarity/ambiguity/completeness audit of `HANDOFF.md`; 3 objections accepted and fixed as cited; 1 accepted in substance with its cited SHA-256 rejected as unverifiable (a model cannot compute a hash by reasoning) and replaced with Kairo's independently-computed value |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -322,6 +323,23 @@ refresh (AGENTS.md, README.md, 00-INDEX, `openspec/config.yaml`, `state.yaml`).
 | (d) Fidelity to `bus-v2-f1-pr-03-001` | Faithful; no unratified addition or extrapolation |
 
 Outcome: CONSENSUS in one round; session 5 closed at the PR-03 → PR-04 boundary.
+
+## `bus-v2-session-5-handoff-audit-001` — record
+
+Director-requested dedicated audit of `docs/08-sessions/HANDOFF.md` for clarity, ambiguity and
+completeness (distinct from `bus-v2-session-5-closure-001`, which checked status-line consistency):
+could a fresh session with zero conversation memory start PR-04 correctly from the handoff alone?
+
+| # | Objection (round 1) | Kairo's response |
+|---|---|---|
+| 1 | PR-04 SEAM facts (v1 line range, body hash) and `test/fixtures/v1-provenance.json` omitted from `tasks.md:101`'s Scope cell were missing from the handoff, risking a repeat of the PR-02 `constants.ts` discovery | Accepted in substance (line range 73, confirmed by direct inspection; `tasks.md` Scope gap, confirmed) — **but the cited SHA-256 was rejected**: Kairo independently extracted the frozen `bf8f365` blob and computed `bd17737239958c20b317c0ea11860716d7db1da23f17eac9677e53d0c49d6160` via the exact `vendoredBody` algorithm, which did not match Alpha's cited digest. A language model cannot compute SHA-256 by reasoning; Kairo's mechanically-computed value replaced it in the handoff |
+| 2 | The relative Markdown link to `sdd-orchestrator-workflow.md` in `HANDOFF.md:18` was broken (5 `../` hops instead of the 6 needed to reach the user's home directory) | Accepted: confirmed by path arithmetic; fixed by citing the path as plain text (`~/.claude/...`), since a path outside the repository tree should never be a repo-relative link |
+| 3 | Step 6 created the `verify-04` worktree but never explicitly removed it in the numbered sequence | Accepted: added `git worktree remove … --force` directly after the verification run in step 6, with a "do not defer to session close" note |
+| 4 | The handoff's SDD-preflight row quoted only the first of two exact dispatch-refusal error strings hit this session | Accepted: both exact strings now quoted verbatim, each tied to its cause |
+
+Outcome: round 1 `APPROVE_WITH_CHANGES`; round 2 (after Kairo's `COUNTER` fixing 2–4 and correcting
+1's evidence) `CONSENSUS`, `APPROVE`, objections `[]`. `HANDOFF.md` ratified as unambiguous and
+self-sufficient for a zero-context PR-04 start.
 
 ## Reserved: `bus-v2-referee-001`
 

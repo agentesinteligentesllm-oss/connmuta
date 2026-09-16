@@ -15,7 +15,7 @@
 | Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) 45 slices, unchanged this session; design and specs unchanged | Engram twins under `sdd/f1-daemon-registry-thin-client/*` (project key `telegram_bus_agent`) |
 | Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**` and `test/**` for a leading `Provenance:` header; the scanned set must equal `test/fixtures/v1-provenance.json` (4 entries: `constants.ts` SEAM, `envelope.ts` AS-IS, `envelope.test.ts` AS-IS, `secrets.ts` SEAM); AS-IS bodies must hash-match, SEAM bodies must differ and list `Changes:`. **Every vendored file from now on (AS-IS or SEAM) needs a design §12 header and a fixture entry, or `test:static` fails** | `test/security/provenance.test.ts:39-66` |
 | **Doc-hygiene rule (new this session, ratified `bus-v2-f1-pr-03-001`)** | Any `apply-progress.md` narrative that explains a rejected/matched secret-shaped string (a token fixture, a PEM block, etc.) must **describe the shape, never quote the literal string** — quoting it verbatim retrips `test/security/repo-scan.test.ts` (PT-22) on the doc file itself, since PT-22 scans every tracked file, not just `src/**`/`test/**`. Kairo caught this in PR-03's own doc note (`8574479135:AAHk...` quoted verbatim) via the clean-detached-worktree verification pass; fixed in `bd1cebf`. Forward this rule explicitly to every future `sdd-apply` launch prompt whose scope includes a secret-shaped fixture | `docs/05-tribunal/INDEX.md` `bus-v2-f1-pr-03-001` record item (5) |
-| SDD preflight | Automatic · hybrid · auto-chain; `chain_strategy: stacked-to-main` (DN-06); re-collect per session with `AskUserQuestion` **using the exact canonical marker text and option order from `~/.claude/skills/_shared/sdd-orchestrator-workflow.md`** (`Gentle AI SDD preflight 1/3:` Interactive/Automatic, `2/3:` OpenSpec/Engram/Both, `3/3:` Ask me/Single PR/Auto) — a semantically-equivalent but differently-worded/ordered preflight is refused by the native dispatcher (`SDD child dispatch refused`); never hand-author the `## SDD Session Preflight` block in a sub-agent prompt, the runtime prepends it itself | [`openspec/config.yaml`](../../openspec/config.yaml) `session:`; [`sdd-orchestrator-workflow.md`](../../../../../.claude/skills/_shared/sdd-orchestrator-workflow.md) lines 45-69 |
+| SDD preflight | Automatic · hybrid · auto-chain; `chain_strategy: stacked-to-main` (DN-06); re-collect per session with `AskUserQuestion` **using the exact canonical marker text and option order from `~/.claude/skills/_shared/sdd-orchestrator-workflow.md` lines 45-69** (`Gentle AI SDD preflight 1/3:` Interactive/Automatic, `2/3:` OpenSpec/Engram/Both, `3/3:` Ask me/Single PR/Auto). Two distinct refusals hit this session, both fixed by using the exact canonical wording/order and never hand-authoring the preflight block: (a) `SDD child dispatch refused: parent-confirmed SDD preflight is missing, invalid, or uncorroborated` — the `AskUserQuestion` text/order did not match the canonical marker format; (b) `SDD child dispatch refused: model-authored preflight text cannot create parent-confirmed authority` — the sub-agent launch prompt hand-authored a `## SDD Session Preflight` heading; the runtime derives and prepends that block itself, never write it | `openspec/config.yaml` `session:`; `~/.claude/skills/_shared/sdd-orchestrator-workflow.md` lines 45-69 (this is a machine-local tool path outside the repository tree — reference it as plain text, not a repo-relative Markdown link) |
 | Strict TDD | `openspec/config.yaml` `strict_tdd: true` — forward `STRICT TDD MODE IS ACTIVE. Test runner: npm test` to every `sdd-apply` | `openspec/config.yaml` `testing:` |
 | `sdd-attempt acquire`/`settle` CLI flags | Current binary requires `--request-id` and `--evidence-goal` on `acquire` (not just `--work-unit`), and `settle` takes no `--json` flag. `acquire` reply may omit `settle_obligation` — nothing to honour beyond the standard settle when it does | `gentle-ai sdd-attempt acquire --help` |
 | Tribunal | 16 debates closed (15 CONSENSUS; `bus-v2-f1-pr-02-001` `ESCALATED` by the broker watchdog on a turn timeout, re-run as `bus-v2-f1-pr-02-002` CONSENSUS); `bus-v2-f1-pr-03-001` CONSENSUS this session; none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
@@ -30,6 +30,16 @@
    [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) (PR-03
    section and its corrections), and [`design.md`](../../openspec/changes/f1-daemon-registry-thin-client/design.md)
    §12 row `src/state.ts:15-87` types (`thread-record.ts`). Specs are read per PR by the apply agent.
+   **PR-04 SEAM facts verified this session** (Kairo, independently computed and cross-checked against
+   the algorithm in `test/security/provenance.test.ts:39-66`): `v1:src/state.ts:15-87` is 73 lines
+   (`HistoryEntry` and the thread-state type block, no header, no leading import to strip); v1 body
+   sha256 `bd17737239958c20b317c0ea11860716d7db1da23f17eac9677e53d0c49d6160`. **`tasks.md:100-101`'s
+   Scope line for PR-04 lists only `src/shared/thread-record.ts` and its test twin — it does NOT list
+   `test/fixtures/v1-provenance.json`, the same gap PR-01b's `constants.ts` had before PR-02 introduced
+   the registry.** The provenance mechanism scans every headered file regardless of what a PR's Scope
+   line says (design §12), so the apply agent must still add a SEAM entry
+   (`v1Path: "src/state.ts:15-87"`, `commit: "bf8f365"`, `verdict: "SEAM"`) and the design §12 header
+   with this hash, or `test:static` fails the same way the `constants.ts` discovery did in PR-02.
 2. `gh auth status` **only to read**; never `gh auth switch` (the machine-global active account flips
    to another local agent's between sessions — expected, not an incident; every `gh` call still runs
    with the explicit `GH_TOKEN` prefix per AGENTS.md §5, unaffected by the global flip). Verify
@@ -53,11 +63,14 @@
    attribution), verifies from a **clean detached worktree** (`git worktree add --detach
    ../telegram_bus_agent-worktrees/verify-04 <sha>` — a branch checked out in the main worktree cannot
    be added again — then `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"
-   && npm run test:static`), runs the fresh-context phase-contract validator (sonnet, read-only), then
-   opens debate `bus-v2-f1-pr-04-001` with Alpha. `gh pr create` only after CONSENSUS; merge once CI
-   is green (DN-08). **If the broker closes a debate `ESCALATED` on a watchdog timeout with no
-   disagreement, do not merge on it: re-run the same proposal under the next id (`-002`) so the record
-   shows the real outcome** (session 4, decided by the Director).
+   && npm run test:static`, then `git worktree remove ../telegram_bus_agent-worktrees/verify-04
+   --force` — remove it right after the run completes, do not defer cleanup to session close), runs
+   the fresh-context phase-contract validator (sonnet, read-only), then opens debate
+   `bus-v2-f1-pr-04-001` with Alpha. `gh pr create` only after CONSENSUS; merge once CI is green
+   (DN-08). **If the broker closes a debate `ESCALATED` on a watchdog timeout with no disagreement, do
+   not merge on it: re-run the same proposal under the next id (`-002`) so the record shows the real
+   outcome** (session 4, decided by the Director). If a doc-hygiene fix is needed (see the row above),
+   re-run the clean-worktree verification a second time after the fix, same remove-after-use rule.
 7. `gentle-ai sdd-attempt settle …` after the PR merges (evidence revision = SHA-256 of a short
    manifest written into the LOG, as in sessions 4 and 5).
 8. Stop at a PR boundary. Rewrite this file, append to [`LOG.md`](./LOG.md), record the debate(s) in
