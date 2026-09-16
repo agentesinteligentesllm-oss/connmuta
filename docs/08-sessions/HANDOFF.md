@@ -13,7 +13,7 @@
 | Phase | **F0 closed. F1 planning open: exploration and proposal done, tribunal consensus on the proposal.** | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
 | SDD change | `f1-daemon-registry-thin-client`, next phases `spec` + `design` (parallel), then `tasks` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) |
 | SDD preflight | Automatic · hybrid (openspec + Engram) · auto-chain · 400 lines/PR (decided, DN-04 era) | [`openspec/config.yaml`](../../openspec/config.yaml) `session:` |
-| Tribunal | 3 debates closed in CONSENSUS; none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
+| Tribunal | 4 debates closed in CONSENSUS (landing, F0 docs audit, F1 proposal, session-1 closure); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
 | Director decisions | Name Conmuta (DN-02) · Apache-2.0 (DN-04) · ADR-0028..0031 accepted (DN-04) · commits/PR/merge authorized (DN-04) | [`05-tribunal/INDEX.md#director-notes`](../05-tribunal/INDEX.md#director-notes) |
 | Repository | Local git, branch `main`, F0 committed. **No GitHub remote yet** (the Director will share one) | `git log` |
 | Code | **None.** By mandate, no code before spec, design and tasks exist and are audited | [`CONSTITUTION.md`](../01-constitution/CONSTITUTION.md) |

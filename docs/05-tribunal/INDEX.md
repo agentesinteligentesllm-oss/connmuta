@@ -14,6 +14,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-landing-architecture-001` | 2026-09-16 00:32Z → ~00:50Z | Kairo (proposer, writer), Alpha (auditor); Director (authorizes) | 2 | `CONSENSUS` — `APPROVE`, objections `[]` | [0028](../03-adr/0028-project-scoped-bijective-binding.md), [0029](../03-adr/0029-per-user-daemon-and-thin-clients.md), [0030](../03-adr/0030-sqlite-ledger-and-json-registry.md), [0031](../03-adr/0031-npm-distribution-and-license.md) | B-06, B-14, B-17, B-18 decided; B-05 confirmed as spike (A4); B-07–B-13, B-15, B-16 opened; B-01–B-04 Director-originated and scheduled (F7/F8) |
 | `bus-v2-f0-docs-audit-001` | 2026-09-16 ~01:30Z → ~01:45Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (audit of this documentation tree) | — |
 | `bus-v2-f1-proposal-001` | 2026-09-16 ~01:50Z → ~02:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (implements 0028–0031) | B-13, B-15, B-18 scheduled in F1 |
+| `bus-v2-session-1-closure-001` | 2026-09-16 ~02:15Z → ~02:25Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -114,6 +115,19 @@ Audit of the F1 SDD proposal (`openspec/changes/f1-daemon-registry-thin-client/p
 | (e) D-02, D-03, D-05, D-07..D-10 | Ratified |
 
 Outcome: CONSENSUS; spec and design of F1 authorized to run in parallel.
+
+## `bus-v2-session-1-closure-001` — record
+
+Audit of everything done after the F1 proposal consensus: Director note DN-04 (Apache-2.0, ADR-0028..0031 confirmed, commit authority, session-switch rule), the `LICENSE` file, the ADR status changes, the session continuity mechanism (`docs/08-sessions/`) and the four commits on `main`.
+
+| Question | Alpha's ruling |
+|---|---|
+| (a) Reading DN-04 as confirmation of ADR-0028..0031 | Defensible and correct: recorded expressly in DN-04 and in the ADR headers, the Director keeps the veto |
+| (b) HANDOFF/LOG design | Complies with "no repeated information": an operational pointer that defers to the ADRs and 00-INDEX; the single entry point is preserved |
+| (c) The four commits | Correct reviewable units, conventional commits, zero AI attribution, clean tree |
+| (d) Handoff completeness | The six-step start for session 2 is self-sufficient; session 2 does not need this session's context |
+
+Outcome: CONSENSUS; session 1 closed at the F0 → F1 spec/design boundary.
 
 ## Reserved: `bus-v2-referee-001`
 

@@ -13,7 +13,7 @@
 - F0 documentation tree (45 files) written, verified (links, leaks, consistency) and audited: debate `bus-v2-f0-docs-audit-001` (CONSENSUS).
 - Director notes DN-01..DN-04: mockups; name Conmuta; referee / desktop / gentle-ai requirements; license Apache-2.0 + ADR-0028..0031 confirmed + commit authority.
 - gentle-ai SDD initialized (hybrid); `f1-daemon-registry-thin-client` explored and proposed; debate `bus-v2-f1-proposal-001` (CONSENSUS).
-- First commits on `main`; `LICENSE` added.
+- First commits on `main`; `LICENSE` added; session closure audited in `bus-v2-session-1-closure-001` (CONSENSUS).
 
 **Opened**
 
