@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../dist",
+    "tsBuildInfoFile": "../../dist/.tsbuildinfo/cli.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "references": [{ "path": "../shared" }, { "path": "../client" }, { "path": "../daemon" }]
+}

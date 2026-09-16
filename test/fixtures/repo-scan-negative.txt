@@ -1,0 +1,3 @@
+# Seeded negative fixture for PT-22 - synthetic values only
+token-shape-marker: 123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+tenant-deny-list-marker: ORION-OCG-INTERNAL
