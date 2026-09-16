@@ -15,7 +15,7 @@ automatically.
 
 ## Status
 
-**F0 closed; F1 `apply` in progress — PR-01a (scaffold, CI, static gates), PR-01b (`shared/constants.ts`), PR-02 (provenance mechanism, `shared/envelope.ts` AS-IS), PR-03 (`shared/secrets.ts` SEAM) and PR-04 (`shared/thread-record.ts` SEAM) merged; next slice PR-05 of 45 in [`openspec/changes/f1-daemon-registry-thin-client/tasks.md`](./openspec/changes/f1-daemon-registry-thin-client/tasks.md).**
+**F0 closed; F1 `apply` in progress — PR-01a (scaffold, CI, static gates), PR-01b (`shared/constants.ts`), PR-02 (provenance mechanism, `shared/envelope.ts` AS-IS), PR-03 (`shared/secrets.ts` SEAM), PR-04 (`shared/thread-record.ts` SEAM) and PR-05 (`shared/protocol-apply.ts` SEAM, D-05) merged; next slice PR-06 of 45 in [`openspec/changes/f1-daemon-registry-thin-client/tasks.md`](./openspec/changes/f1-daemon-registry-thin-client/tasks.md).**
 
 This repository currently holds the constitution, the architecture landed by the tribunal in debate
 `bus-v2-landing-architecture-001` (consensus after two rounds), the decision records, the backlog and

@@ -4,6 +4,86 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-16 — Session 7: F1 apply, PR-05 merged (stopped at the PR-05 → PR-06 boundary)
+
+**Closed**
+
+- Handoff followed as written, with one new defect class found in the preflight gate itself. The
+  first two `AskUserQuestion` preflight calls succeeded at the tool level but the SDD child dispatch
+  guard refused `sdd-apply` both times with "parent-confirmed SDD preflight is missing, invalid, or
+  uncorroborated" — not because the answers were wrong, but because the **option order** did not
+  match the canonical list in `sdd-orchestrator-workflow.md` lines 60-68 (Pace must be offered
+  Interactive-then-Automatic, PR strategy Ask me-then-Single PR-then-Auto; Kairo had reordered them to
+  put the session's actual choice first). The tool itself never complains about option order — only
+  the downstream dispatch guard checks it, silently, after the fact. Re-asked a third time with the
+  options in the exact canonical order and dispatch succeeded immediately. Flagging this as a defect
+  class for every future preflight: option ORDER is load-bearing, not just the option set, even though
+  nothing signals that at the point the question is asked.
+- `sdd-apply` (sonnet) on PR-05 under Strict TDD: RED (`TS2307` missing module) → GREEN; vendored
+  `src/shared/protocol-apply.ts` from `v1:src/protocol.ts:1-333` @ `bf8f365` implementing D-05's
+  fail-closed null-anchor rule (`isAddressee`/`classifyRejection`), `ThreadRecord` from PR-04, no
+  `first_surfaced_at`, `isDuplicateEid` unused; 20 tests. Correctly stopped and reported rather than
+  pushing through when the real diff came in at 609 authored lines — 209 over the 400-line cap and
+  56% over `tasks.md`'s own ≈390 estimate for this pre-flagged "largest non-exception slice."
+- Kairo's review before presenting the overage to the Director found a real defect of its own: the
+  `to_user_id` doc comment in PR-04's `src/shared/thread-record.ts` still described v1's pre-D-05
+  fail-**open** behavior on a null anchor — directly contradicted by the change this PR was making.
+  Fixed before any commit.
+- Director authorization: asked whether to grant a size exception or force a re-slice; the Director
+  responded with full delegated authority ("tomo las riendas... toda mi autorización") to decide.
+  **Decision**: a one-time, PR-05-scoped size exception, explicitly distinct from DN-06 (which stays
+  scoped to whole-file AS-IS vendoring only, per `bus-v2-f1-tasks-001` items 1-2 — not amended).
+  Grounds: (a) `tasks.md` itself pre-flagged this module as "one cohesive state-machine module, not
+  splittable per design" before apply even started; (b) the obvious alternative — implementation and
+  test twin in separate stacked PRs, the same pattern already planned for PR-07b/PR-07c — is unsafe:
+  `test/twins.test.ts:29-44` requires every `src/**/*.ts` file to have its twin present in the same
+  tree, so the first PR's own merge to `main` would fail CI. This is a new finding that also applies
+  to the PR-07b/PR-07c split planned later in `tasks.md` — flagged for reconsideration before that
+  slice.
+- Committed as 4 work-unit commits (`493546e` feat protocol-apply+twin+fixture, `0b86808` fix
+  thread-record doc, `966e914` docs threat-model, `6f2ab61` docs sdd bookkeeping) after independently
+  re-verifying the build, full suite (128/128), static gates (8/8), and the `git diff --numstat`
+  figures myself rather than trusting the subagent's report at face value.
+- A fresh-context, read-only validator agent independently re-derived the pinned hash (2 more
+  methods), re-checked all 4 design-contract changes against the code and v1 source, reran the full
+  suite and static gates, and confirmed the `twins.test.ts` claim above by reading the test directly.
+  It found one residual defect Kairo's first pass missed: the **adjacent** `to` field's doc comment in
+  `thread-record.ts`, three lines above `to_user_id`'s, repeated the identical stale fail-open claim.
+  Fixed in a follow-up commit (`b25b073`), recorded in a fifth commit (`47ee59b`). The validator also
+  self-disclosed a minor process slip of its own (wrote one stray file under `/tmp` despite a
+  read-only mandate; did not use it for any evidence) — cleaned up.
+- Debate `bus-v2-f1-pr-05-001` (1 round, `CONSENSUS`, `APPROVE`, no objections): Alpha independently
+  ratified the hash, the SEAM contract, the size-exception decision and grounds, and both doc fixes.
+- PR #6 (`f1/05-protocol-apply` → `main`) opened after the audit under `agentesinteligentesllm-oss`;
+  CI (`windows-latest` × Node 24.15/26) green (run `35161651361`); merged by Kairo under DN-08
+  (`fec730b`, branch deleted). Verified from a clean detached worktree both before and after the merge
+  (`npm ci --ignore-scripts && npm run build && node --test && npm run test:static`, 128/128 and 8/8
+  both times).
+- Native attempt ledger: settle was initially `blocked: maintainer_decision` — the ledger's
+  `changed_lines` (825) counts the full diff across all 6 commits including SDD bookkeeping
+  (`tasks.md`/`apply-progress.md`), which the review-policy budget explicitly excludes, so it exceeded
+  the 500-line objective even though the review-load total (609) was already the authorized exception.
+  Same systemic ledger-vs-review-policy gap as the PR-01 reset. Reset by Kairo under the Director's
+  session-wide delegation, citing the PR-01 precedent; `next_action: begin`, ready for PR-06.
+- Noticed, but did not touch: an untracked file `telegram-agent-bus/alpha_response.json` (an unrelated
+  Arena envelope, dated 2026-09-06, from a different conversation entirely) sitting in the v1
+  checkout. Not caused by this session or by the validator; left as-is per the safety rule on
+  unfamiliar state — flagged for Director awareness only, not a repository defect.
+- Documentation refresh (this handoff, LOG, tribunal row + record, `AGENTS.md`/`README.md`/
+  `00-INDEX.md`/`config.yaml`/`state.yaml` status lines and task counts swept for PR-05 → PR-06).
+
+**Opened**
+
+- PR-06 (`shared/protocol-select.ts` + `shared/fence.ts`, SEAM, D-15) — next session.
+- Revisit the `test/twins.test.ts` split-safety risk (found this session) before PR-07b/PR-07c's
+  planned implementation/test-twin split.
+
+**How it knows**: tribunal envelope `bus-v2-f1-pr-05-001` read through the Arena bridge; `gentle-ai
+sdd-status`/`sdd-attempt status`/`sdd-attempt reset` output; GitHub API (`gh pr checks 6`, `gh pr view
+6`, run `35161651361`); clean-worktree `node --test` runs (pre- and post-merge); two independent
+subagent reports (`sdd-apply` implementer, fresh-context Explore validator); Engram observations (to
+be saved this session).
+
 ## 2026-09-16 — Session 6: F1 apply, PR-04 merged (stopped at the PR-04 → PR-05 boundary)
 
 **Closed**

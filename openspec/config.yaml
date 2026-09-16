@@ -2,10 +2,10 @@ schema: spec-driven
 
 context: |
   Conmuta (working name, B-11 pending trademark clearance): a project-scoped
-  Telegram agent bus. Status F1 apply in progress -- PR-01a, PR-01b, PR-02, PR-03 and
-  PR-04 merged (scaffold, CI, static gates, shared/constants.ts, provenance mechanism,
-  shared/envelope.ts AS-IS, shared/secrets.ts SEAM, shared/thread-record.ts SEAM); next
-  slice PR-05.
+  Telegram agent bus. Status F1 apply in progress -- PR-01a, PR-01b, PR-02, PR-03,
+  PR-04 and PR-05 merged (scaffold, CI, static gates, shared/constants.ts, provenance
+  mechanism, shared/envelope.ts AS-IS, shared/secrets.ts SEAM, shared/thread-record.ts
+  SEAM, shared/protocol-apply.ts SEAM D-05); next slice PR-06.
   Ratified stack for F1 onward (ADR-0028..0031): Node.js >= 24 LTS,
   TypeScript -> ESM, node:test, @modelcontextprotocol/sdk + zod, node:sqlite
   ledger, @clack/prompts, @napi-rs/keyring. Wire: emit AGENTBUS/2, accept

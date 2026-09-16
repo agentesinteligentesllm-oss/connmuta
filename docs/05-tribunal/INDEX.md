@@ -28,6 +28,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-session-5-closure-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
 | `bus-v2-session-5-handoff-audit-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor) | 2 | `CONSENSUS` — round 1 `APPROVE_WITH_CHANGES` (4 objections), round 2 `APPROVE`, objections `[]` | none | Director-requested dedicated clarity/ambiguity/completeness audit of `HANDOFF.md`; 3 objections accepted and fixed as cited; 1 accepted in substance with its cited SHA-256 rejected as unverifiable (a model cannot compute a hash by reasoning) and replaced with Kairo's independently-computed value |
 | `bus-v2-f1-pr-04-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (fourth code slice of F1) | `sdd-apply` self-check defect class flagged: a shell `head -c -1` cross-check silently strips a real trailing newline when hashing a line-range slice of a larger source file, producing a false "orchestrator value is wrong" claim; caught by Kairo before commit, independently re-verified 4 ways |
+| `bus-v2-f1-pr-05-001` | 2026-09-16 | Kairo (proposer, writer), Alpha (auditor); Director (delegated the budget decision to Kairo this session); Kairo (merge authority, DN-08) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (fifth code slice of F1) | One-time, PR-05-scoped size exception (609 authored lines vs. the 400-line cap) granted under explicit Director authorization, distinct from DN-06 (which stays AS-IS-only); grounds: the state machine is not safely splittable and a test/implementation split across stacked PRs would fail `test/twins.test.ts` on the first PR's own merge, a risk that also applies to the planned PR-07b/PR-07c split; two stale fail-open doc comments in `thread-record.ts` (PR-04) corrected |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -344,6 +345,29 @@ Outcome: CONSENSUS in one round. PR #5 (`f1/04-thread-record` → `main`) opened
 `agentesinteligentesllm-oss`; CI (`windows-latest` × Node 24.15/26) green (run `35156561623`); merged
 by Kairo under DN-08 (`f0097f0`, branch deleted). Native attempt ledger settled `passed`,
 `state: complete`.
+
+## `bus-v2-f1-pr-05-001` — record
+
+Audit of the fifth F1 code slice before it opened on GitHub (DN-05): branch `f1/05-protocol-apply`
+(commits `493546e` feat, `0b86808`/`b25b073` fix, `966e914` docs(threat-model), `6f2ab61`/`47ee59b`
+docs(sdd)), the SEAM vendor of `applyEnvelope`/`isAddressee`/`classifyRejection` from
+`v1:src/protocol.ts:1-333` implementing D-05's fail-closed null-anchor rule, and a Director-authorized
+one-time size exception for a real diff that came in well over both the 400-line cap and the tasks.md
+estimate.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) Provenance: `src/shared/protocol-apply.ts:1-6` sha256 `e8b6f8a4…2ffcbe`, recomputed independently against `telegram-agent-bus@bf8f365` (6-line import block stripped; body is v1 lines 7-333 including the real trailing newline before v1 line 334) | Ratified: exact match, verified independently by Alpha in addition to Kairo's 3 methods and a separate fresh-context validator's 2 more methods |
+| (2) Contract: all 4 named design.md:448 changes (`ThreadRecord` import, REPLY drops `first_surfaced_at`, D-05 fail-closed with the ADR-13 originator arms intact, `isDuplicateEid` unused) verified present in the code and exercised by 20 tests | Ratified |
+| (3) Budget: real diff 609 authored lines (311 impl + 288 test + 6 fixture + 4 docs), 209 over the 400-line cap and 56% over tasks.md's own ~390 estimate; tasks.md itself pre-flagged this module as "one cohesive state-machine module, not splittable per design" before apply started. Director explicitly authorized Kairo this session to decide. Kairo granted a one-time, PR-05-scoped size exception, distinct from DN-06 (which stays AS-IS-only, `bus-v2-f1-tasks-001` items 1-2, not amended), on the grounds that the apparent alternative — implementation and test twin in separate stacked PRs, the pattern already planned for PR-07b/PR-07c — is unsafe: `test/twins.test.ts:29-44` requires every `src/**/*.ts` file to have its twin present in the same tree, so the first PR's own merge to `main` would fail CI. Confirmed as fact by an independent fresh-context validator reading `twins.test.ts` and `ci.yml` directly; no safer split found after searching by function and by test-case group | Ratified: the exception and its grounds are sound; the `twins.test.ts` risk noted for reconsideration before PR-07b/PR-07c |
+| (4) Doc fix: two stale comments in `src/shared/thread-record.ts` (PR-04's file) describing v1's pre-D-05 fail-OPEN behavior on a null anchor (`to` field docstring and `to_user_id` field docstring) — the first caught by Kairo, the second (a residual the first pass missed) caught by the independent validator, both corrected before commit | Ratified |
+| (5) Verification: clean detached worktree (`npm ci --ignore-scripts`) before and after merge — full suite 128/128 (up from 108), static 8/8; independent fresh-context validator re-derived the hash, re-checked the contract against v1 and design, and reran the suite itself | Ratified |
+
+Outcome: CONSENSUS in one round. PR #6 (`f1/05-protocol-apply` → `main`) opened after the audit under
+`agentesinteligentesllm-oss`; CI (`windows-latest` × Node 24.15/26) green (run `35161651361`); merged
+by Kairo under DN-08 (`fec730b`, branch deleted). Native attempt ledger settled `passed`; its
+`changed_lines` (825) counted the full diff including SDD bookkeeping the review-policy budget
+excludes, so the objective needed a Director-delegated reset (same systemic gap as the PR-01 reset).
 
 ## `bus-v2-session-5-handoff-audit-001` — record
 
