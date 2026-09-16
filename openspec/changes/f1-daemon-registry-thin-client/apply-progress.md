@@ -287,9 +287,10 @@ Measured with `git diff HEAD --numstat` (staged + unstaged vs. the branch point 
 
 ## Corrections applied this round
 
-1. **Fixture token digit count changed from the v1 original**: v1's own test fixture token
-   (`8574479135:AAHk3x9pQ7vLz2mR8sT1uV6wX0yZaBcDeFg`, a 10-digit bot id) is exactly the shape
-   `test/security/repo-scan.test.ts`'s own `TOKEN_SHAPE_RE` (`\b\d{8,10}:[A-Za-z0-9_-]{35}\b`, PT-22)
+1. **Fixture token digit count changed from the v1 original**: v1's own test fixture token (a
+   10-digit bot id followed by a 35-char auth string — not reproduced verbatim here, since embedding
+   the literal shape in a tracked doc would itself retrip the scan this note describes) is exactly
+   the shape `test/security/repo-scan.test.ts`'s own `TOKEN_SHAPE_RE` (`\b\d{8,10}:[A-Za-z0-9_-]{35}\b`, PT-22)
    is built to catch — confirmed by running the full suite with the v1 literal in place: `npm test`
    failed `repository scan over tracked files is clean (PT-22)` with
    `unexpected token-shape or deny-list hit(s): [{"path":"test/shared/secrets.test.ts",
