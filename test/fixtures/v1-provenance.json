@@ -28,5 +28,11 @@
     "v1Path": "src/state.ts:15-87",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/shared/protocol-apply.ts",
+    "v1Path": "src/protocol.ts:1-333",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]

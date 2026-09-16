@@ -494,3 +494,199 @@ the full working-tree diff and creates the work-unit commit(s).
 ## Next
 
 Tribunal audit of PR-04 (`bus-v2-f1-pr-04-001`), then PR-05 (`shared/protocol-apply.ts`, SEAM, D-05).
+
+---
+
+# Apply Progress: F1 — PR-05 (`shared/protocol-apply.ts`, SEAM, D-05)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branch | `f1/05-protocol-apply` → `main` (stacked on PR-04) |
+| Mode | Strict TDD |
+| Status | Implemented and verified; tasks 5.1–5.4 marked `[x]`. **Real diff is 609 authored lines — 209 over the 400-line cap and well past the ≈390 tasks.md estimate. Flagged for the orchestrator before this PR opens; see "Budget overage" below.** |
+
+## ⚠ Budget overage — decision needed before this PR opens
+
+Measured with `git diff HEAD --numstat` (staged, vs. the branch point on `main`):
+
+| File | + | − |
+|---|---|---|
+| `src/shared/protocol-apply.ts` | 311 | 0 |
+| `test/shared/protocol-apply.test.ts` | 288 | 0 |
+| `test/fixtures/v1-provenance.json` | 6 | 0 |
+| `docs/02-architecture/THREAT-MODEL.md` | 2 | 2 |
+| **Authored total (budget-counted)** | **609** | |
+
+tasks.md's own forecast called PR-05 "the largest non-exception slice in the whole 45-PR plan… ≈390 lines" and told `sdd-apply` to "watch its real diff size." The real total is **609** — 219 lines over that estimate (56%) and 209 over the 400-line hard cap, a materially larger overage than PR-01's 790-vs-350 re-slice (which was ~2.3x estimate on a scaffold PR with 45 named constants; this is ~1.6x on one state-machine module).
+
+**Why it does not shrink further without cutting real coverage:**
+- `src/shared/protocol-apply.ts` (311 lines) is smaller than v1's own vendored body (327 lines, `protocol.ts:7-333`) even after adding a new `RosterEntry` interface and rewriting three doc comments for the D-05 fail-closed behavior — the dedup branch, `isDuplicateEid`, and the two `first_surfaced_at` assignments were removed, not compressed. This is a SEAM, so DN-06's `size:exception` does not apply (PR-03/PR-04 precedent): the whole file counts.
+- `test/shared/protocol-apply.test.ts` (288 lines, 20 tests) covers exactly what task 5.1 asks for — REQUEST/ACK/REPLY/RESOLVED/NOTED/IGNORED outcomes, all four `RejectionReason` values, the ADR-13 originator arms, and three dedicated D-05 cases (rejected-unanchored, anchored-not-flagged triangulation, and the arm-bypass-stays-countable case) — plus the REQUEST-anchoring and not-mine cases task 5.2's SEAM change list depends on being exercised. None of the 20 is incidental; each maps to a named behavior in design §8.2/§8.3 or a v1 precedent test.
+- **A split was considered and rejected as unsafe, not just inconvenient**: `isAddressee`/`classifyRejection` are the single mechanism every ACK/REPLY/RESOLVED transition routes through. Splitting into "PR-05a: transitions" + "PR-05b: D-05 fail-closed" would ship PR-05a with v1's fail-OPEN anchor behavior live on `main` — reintroducing the exact PT-17 defect this change exists to close, even temporarily. Design §8.3 and tasks.md both describe this as "one cohesive state-machine module, not splittable per design" for this reason, not merely as a size convenience.
+
+**Recommendation**: `size:exception` on cohesion grounds (not the DN-06 AS-IS-hash exception — a new, review-workload exception for this one slice), same as tasks.md's own pre-flagging of PR-05 as an outlier. If the orchestrator prefers a split instead, the only safe boundary I can see is temporal, not mechanical: land PR-05 exactly as implemented (state machine + full test suite, D-05 included from the start), and that itself is already the smallest cohesive unit — I did not find a way to make two safe cuts. Not committed, not opened as a PR; awaiting the orchestrator's decision on how to proceed.
+
+## Scope
+
+`src/shared/protocol-apply.ts` (SEAM from `v1:src/protocol.ts:1-333` @ `bf8f365`), `test/shared/protocol-apply.test.ts`
+(apply-side slice adapted from `v1:test/protocol.test.ts`, read-only reference), `test/fixtures/v1-provenance.json`
+(one SEAM entry appended), `docs/02-architecture/THREAT-MODEL.md` (PT-16, PT-17 scope cells).
+
+## Design deviation note: `applyEnvelope`'s signature (not itself in the design's "Changes" list, but required by it)
+
+Design §12's Changes list for this row is exactly four items (ThreadRecord import, REPLY drops
+`first_surfaced_at`, D-05 fail-closed, `isDuplicateEid` unused) and does not spell out a signature
+change. But v1's `applyEnvelope(state: State, incoming, context)` operated over a whole
+`state.threads` map plus `state.seen_eids`; v2 has no `State` type at all — `ledger/*` REPLACED
+`state.ts`'s schema/load/save (ADR-0030), and design §8.2 step 7 says applyEnvelope runs "over the
+**single thread row** loaded as a ThreadRecord (`ledger/threads.ts` adapter)". Implemented that
+literally: `applyEnvelope(existing: ThreadRecord | undefined, incoming, context): ApplyResult`,
+where `ApplyResult.thread?: ThreadRecord` replaces the old `state: State` return field. This is the
+necessary consequence of items (1) and (4) together, not an invented fifth change — noting it here
+per the "don't silently deviate" rule since design's own bullet list did not spell it out.
+
+A second gap: v1's `ApplyContext.roster: Record<string, RosterEntry>` imported `RosterEntry` from
+`config.ts`, which v2 has not built yet (`daemon/binding-config.ts` is a later PR, and `shared/`
+cannot depend on `daemon/`). Defined a minimal local `RosterEntry { user_id: number }` — the only
+field this module ever reads off a roster entry — rather than block on an unbuilt module or invent a
+speculative fuller shape.
+
+## TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 5.1 | `test/shared/protocol-apply.test.ts` | Unit | N/A (new) | ✅ Written | ✅ Passed | ✅ 20 tests across REQUEST/ACK/REPLY/RESOLVED/NOTED/IGNORED, all 4 rejection reasons, 2 ADR-13 arms, 3 D-05 cases | ➖ None needed |
+| 5.2 | `src/shared/protocol-apply.ts` | Unit (via 5.1) | N/A (new) | ✅ (5.1's RED covered it) | ✅ Passed | ➖ Single vendored module, changes named in the header | ➖ SEAM, no further refactor beyond the named changes |
+| 5.3 | (verification, no new test) | — | — | — | ✅ 128/128 full suite, 8/8 static suite | — | — |
+| 5.4 | `docs/02-architecture/THREAT-MODEL.md` | N/A (docs) | N/A | — | — | — | — |
+
+Two test-fixture bugs surfaced and fixed during the first GREEN run (both in the test file, not
+production code): (1) the "REQUEST between two other peers" case needs its `to` to be a KNOWN roster
+member other than the caller for `isOurBusiness` to return `false` — an unknown `to` fails toward
+storing by design (C2), so the fixture needed a fourth roster entry (`@dev4-agent`); (2) the "D-05
+arm: continuing own thread" case must use an originator who is NOT `context.agentId`, or the separate
+`isOurOwnSend` bypass (our own sends are never re-judged) fires instead of the `continuingOwnThread`
+arm the test targets. Both were caught by the very first execution (2/20 failing) and fixed before
+re-running; neither touched `src/shared/protocol-apply.ts`.
+
+## RED evidence (task 5.1, genuine failure captured before GREEN)
+
+With `test/shared/protocol-apply.test.ts` written and `src/shared/protocol-apply.ts` not yet created,
+`npm run build` failed for the intended reason (missing module, not a syntax or type error):
+
+```
+test/shared/protocol-apply.test.ts:11:8 - error TS2307: Cannot find module '../../src/shared/protocol-apply.js' or
+its corresponding type declarations.
+
+11 } from "../../src/shared/protocol-apply.js";
+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found 1 error in test/shared/protocol-apply.test.ts:11
+```
+
+After implementing `src/shared/protocol-apply.ts` and fixing the two test-fixture bugs above, GREEN:
+`node --test "dist/test/shared/protocol-apply.test.js"` → **20/20 pass**.
+
+## Hash computation and reference cross-check
+
+The orchestrator's launch prompt supplied a pinned `v1 body sha256` of
+`e8b6f8a427d57f3133e088d7fe8659f66e41ba2c259e57050d30e1514a2ffcbe` for `v1:src/protocol.ts:1-333`
+(body = lines 7-333, stated as independently verified three ways this session — Node `vendoredBody()`
+against the real 477-line file, `sed | sha256sum`, `sed | openssl dgst -sha256` — with an explicit
+warning that a prior session's `head -c -1` shell one-liner produces a WRONG hash on a line-range
+slice whose last line is followed by a real line in the source (exactly PR-04's PR history: the same
+bug, on `state.ts:15-87`, was caught and reverted last session).
+
+Re-derived independently before trusting it, using the exact target algorithm rather than a blind
+byte-strip: `git show bf8f365:src/protocol.ts` (478 elements after `split("\n")`, confirming line 334
+is real and non-empty content follows through line 477 — line 333 is `}` and line 334 is the blank
+separator before `computeWorkDigest`'s doc comment), array-sliced `lines.slice(6, 333)` (0-indexed,
+lines 7-333), joined with `\n`, with a trailing `\n` appended (since line 333 is followed by a real
+line 334, not EOF — same rule PR-04 established). Cross-checked three ways:
+
+| Method | Result |
+|---|---|
+| Node `crypto`, exact `vendoredBody()`-equivalent slice + trailing `\n` | `e8b6f8a427d57f3133e088d7fe8659f66e41ba2c259e57050d30e1514a2ffcbe` |
+| `git show bf8f365:src/protocol.ts \| sed -n '7,333p' \| sha256sum` | `e8b6f8a427d57f3133e088d7fe8659f66e41ba2c259e57050d30e1514a2ffcbe` |
+| `git show bf8f365:src/protocol.ts \| sed -n '7,333p' \| openssl dgst -sha256` | `e8b6f8a427d57f3133e088d7fe8659f66e41ba2c259e57050d30e1514a2ffcbe` |
+| (control) same slice WITHOUT the trailing `\n` | `fb82385de416cf2b1a50d6475bfcf0a04681be5c0068e20d348c941b762dbaac` — confirms the trailing-newline rule matters here too, same as PR-04 |
+
+All three real methods agree with the orchestrator-supplied value exactly. No correction needed —
+the header in `src/shared/protocol-apply.ts` carries `e8b6f8a427d57f3133e088d7fe8659f66e41ba2c259e57050d30e1514a2ffcbe`
+as supplied.
+
+## Data hygiene check (AGENTS.md §3)
+
+Grepped `src/shared/protocol-apply.ts` and `test/shared/protocol-apply.test.ts` for `@`-prefixed
+usernames, 8–10-digit numeric ids, and `-100…` chat ids. `@`-matches are the synthetic AgentBus
+wire-level identifiers `@dev1-agent`/`@dev2-agent`/`@dev3-agent`/`@dev4-agent`/`@dev2-unknown` (same
+convention PR-02/PR-04 already established as safe — matching `AGENT_ID_PATTERN`, not Telegram
+usernames) and one TSDoc `{@link MAX_THREAD_HISTORY}` cross-reference. The four 8–10-digit numeric
+runs are the roster `user_id` fixture values, copied unmodified from `v1:test/protocol.test.ts`'s own
+`ROSTER` literal (`8223456789`, `8123456789`, `8323456789`, `8423456789`) — the same synthetic values
+v1's own test suite already carried; not a token shape (`checkForSecrets`'/PT-22's
+`TOKEN_SHAPE_RE` needs a trailing `:` plus a 35-char string, which plain numeric ids never match).
+Zero `-100…` chat-id-shaped strings. `npm run test:static` (PT-22 repo-scan) passed with both new
+files staged and scanned — confirms this by execution, not only by inspection.
+
+## Verification (run in order, from clean)
+
+| Command | Result |
+|---|---|
+| `rm -rf dist && npm run build` | exit 0, no errors |
+| `node --test "dist/test/shared/protocol-apply.test.js"` | **20/20 pass** (0 fail) |
+| `node --test "dist/test/security/provenance.test.js" "dist/test/twins.test.js"` | **3/3 pass** (0 fail) — SEAM hash-inequality holds (the one named change makes the body diverge from the AS-IS reference); registry equality holds; twin coverage holds |
+| `rm -rf dist && npm test` (from clean) | **128/128 pass** (0 fail) — up from 108 before this PR (+20 new) |
+| `npm run test:static` | **8/8 pass** (0 fail) — same count as PR-04 (no new static-only assertion added by this PR) |
+| `git status --short` (after) | only `src/shared/protocol-apply.ts`, `test/shared/protocol-apply.test.ts`, `test/fixtures/v1-provenance.json` (staged), `docs/02-architecture/THREAT-MODEL.md` + `tasks.md` + `apply-progress.md` (unstaged) changed; nothing under `dist/`, `node_modules/`, or the v1 checkout; no commit made |
+
+Note on staging: as in PR-02/PR-03/PR-04, the three new/modified files carrying a provenance-relevant
+identity (`protocol-apply.ts`, `protocol-apply.test.ts`, `v1-provenance.json`) were `git add`-staged
+(not committed) so `git ls-files -z` — the mechanism both `provenance.test.ts` and
+`repo-scan.test.ts` use to enumerate scanned files — could see them during verification.
+`THREAT-MODEL.md`, `tasks.md`, and `apply-progress.md` were left unstaged. Kairo reviews the full
+working-tree diff, decides how to resolve the budget overage above, and creates the work-unit
+commit(s).
+
+## Orchestrator decision on the budget overage (Kairo, Director-authorized this session)
+
+Independently re-verified before deciding: rebuilt from clean and reran `node --test` on the focused
+suite (20/20), the full suite (128/128), and `test:static` (8/8) myself, and cross-checked
+`git diff main --numstat` line-for-line against the table above (matches exactly). Read
+`src/shared/protocol-apply.ts` and `test/shared/protocol-apply.test.ts` in full — the size is real
+engineering (dense load-bearing comments on a security-relevant state machine, 20 tests each mapped
+to a named behavior, no padding) not inflation.
+
+**Decision: PR-05 gets a one-time, PR-05-scoped size exception, distinct from DN-06.** DN-06's
+`size:exception` stays exactly as ratified — AS-IS whole-file vendoring only (`bus-v2-f1-tasks-001`
+items 1-2); this does not amend it. This is a separate, narrower exception for this one slice, on
+the grounds tasks.md itself already recorded before apply even started (§ "Largest non-exception
+slice", line 37: "one cohesive state-machine module") plus one new finding from this session: the
+apparent alternative — ship the state machine in one PR and its test twin in a follow-on PR, the
+same pattern tasks.md already plans for PR-07b/PR-07c — is not actually safe here, because
+`test/twins.test.ts:29-44` requires every `src/**/*.ts` file to have its twin present in the *same*
+tree, so the first PR's own merge to `main` would fail CI. This same risk applies to the PR-07b/c
+split when that slice is reached; flag it there before assuming that split is CI-safe.
+
+**Additional fix found on review (not part of the flagged overage, small):** `src/shared/thread-record.ts`'s
+`to_user_id` doc comment (written under PR-04, before D-05 existed) still described the OLD v1
+behavior — "the addressee check FAILS OPEN" — which this very PR replaces with fail-closed. Left
+as-is, it would actively mislead a future reader about the current security posture of the exact
+mechanism D-05 changes. Corrected in place to describe the fail-closed behavior and point at
+`protocol-apply.ts`'s `isAddressee`.
+
+Before opening the tribunal debate, a fresh-context read-only validator agent independently
+re-derived the pinned hash (matched), verified all four named design changes against the code and v1
+source, reran the full test suite (128/128) and static gates (8/8), and confirmed the twins.test.ts
+CI-blocking claim above by reading the test directly. It found one residual defect the first
+doc-comment fix (commit `0b86808`) missed: `thread-record.ts`'s `to` field docstring, three lines
+above `to_user_id`'s, repeated the same stale "the addressee check fails open" claim. Fixed in a
+follow-up commit. No other finding from the validator required a change.
+
+Next: Alpha audits PR-05 (tribunal debate `bus-v2-f1-pr-05-001`) before any commit, same as every
+prior PR — the Director's authorization to decide the budget question does not skip that audit.
+
+## Next
+
+PR-06 (`shared/protocol-select.ts` + `shared/fence.ts`, SEAM, D-15) once PR-05 merges.
