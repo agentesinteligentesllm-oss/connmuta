@@ -55,9 +55,10 @@ export interface ThreadRecord {
   /**
    * The identity anchor (C4). Taken from the envelope's own `to_user_id` when the sender supplied
    * one, else from a local roster lookup of `to`. `null` only when neither source can answer — a
-   * pre-`v1.0.0` peer addressing a name we do not hold — and there the addressee check FAILS OPEN,
-   * because failing closed would reject every resolution on a thread whose peers disagree about a
-   * name.
+   * pre-`v1.0.0` peer addressing a name we do not hold — and there the addressee check FAILS CLOSED
+   * (D-05, `shared/protocol-apply.ts`'s `isAddressee`): v1 failed open on this same null case, and
+   * PR-05 replaced it, since an unresolved anchor is exactly the state a forged or drifted `to`
+   * produces.
    */
   to_user_id: number | null;
   /** The reply anchor (E1): the message id of the GROUP copy, whenever one has been seen. */
