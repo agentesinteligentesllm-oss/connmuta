@@ -10,48 +10,66 @@
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F0 closed. F1 planning open: exploration and proposal done, tribunal consensus on the proposal.** | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| SDD change | `f1-daemon-registry-thin-client`, next phases `spec` + `design` (parallel), then `tasks` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) |
-| SDD preflight | Automatic · hybrid (openspec + Engram) · auto-chain · 400 lines/PR (decided, DN-04 era) | [`openspec/config.yaml`](../../openspec/config.yaml) `session:` |
-| Tribunal | 4 debates closed in CONSENSUS (landing, F0 docs audit, F1 proposal, session-1 closure); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
-| Director decisions | Name Conmuta (DN-02) · Apache-2.0 (DN-04) · ADR-0028..0031 accepted (DN-04) · commits/PR/merge authorized (DN-04) | [`05-tribunal/INDEX.md#director-notes`](../05-tribunal/INDEX.md#director-notes) |
-| Repository | Local git, branch `main`, F0 committed. **No GitHub remote yet** (the Director will share one) | `git log` |
-| Code | **None.** By mandate, no code before spec, design and tasks exist and are audited | [`CONSTITUTION.md`](../01-constitution/CONSTITUTION.md) |
+| Phase | **F1 planning closed: spec, design and tasks exist, gated and audited. `apply` not started.** | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, 207 tasks pending, 0 blocked reasons | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) |
+| Artifacts | [`proposal.md`](../../openspec/changes/f1-daemon-registry-thin-client/proposal.md) · [`specs/`](../../openspec/changes/f1-daemon-registry-thin-client/specs/README.md) (9 capabilities, 47 requirements, 85 scenarios) · [`design.md`](../../openspec/changes/f1-daemon-registry-thin-client/design.md) (D-11..D-30, §20 build order) · [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) (44 PR slices) | Engram twins under `sdd/f1-daemon-registry-thin-client/*` |
+| SDD preflight | Automatic · hybrid · auto-chain · 400 lines/PR; re-collected in session 2 (the gate requires it per session) | [`openspec/config.yaml`](../../openspec/config.yaml) `session:` |
+| Delivery | `chain_strategy: stacked-to-main`; `size:exception` only for whole-file AS-IS vendored PRs (PR-02, PR-20) with the v1 body SHA-256 in the provenance header (DN-06, `bus-v2-f1-tasks-001`) | [`05-tribunal/INDEX.md#director-notes`](../05-tribunal/INDEX.md#director-notes) |
+| Tribunal | 6 debates closed in CONSENSUS (landing, F0 docs audit, F1 proposal, session-1 closure, F1 design+spec, F1 tasks); none open | [`05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) |
+| Repository | `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, `main` pushed. **Branch protection not configured** (Director to choose rules; a PR-only rule would block the direct docs commits Kairo makes at session close) | `git remote -v` |
+| Code | **None yet.** PR-01 (scaffold) is the first code | `tasks.md` PR-01 |
 
 ## Next session — exact start
 
-1. Read [`../../AGENTS.md`](../../AGENTS.md) §1 reading order (this file is step 1 there), then only:
-   [`proposal.md`](../../openspec/changes/f1-daemon-registry-thin-client/proposal.md),
-   [`exploration.md`](../../openspec/changes/f1-daemon-registry-thin-client/exploration.md) §Q1–Q4,
-   ADR-0028/0029/0030, [`DATA-MODEL.md`](../02-architecture/DATA-MODEL.md), [`THREAT-MODEL.md`](../02-architecture/THREAT-MODEL.md) §4.
-   Do not re-read the F0 analysis bundle or v1's `design.md`; the ADRs already carry what matters.
-2. Run `gentle-ai sdd-status f1-daemon-registry-thin-client --cwd <repo> --json`; it must say `nextRecommended: spec` (or design). If it says otherwise, stop and report.
-3. Launch `sdd-spec` (sonnet) and `sdd-design` (opus) **in parallel** with the tribunal rulings of
-   `bus-v2-f1-proposal-001` as fixed inputs: Option A spawn site; per-session token at `POST /session`;
-   one change with auto-chained PRs; `needs_action` as a VIEW. Design gets the fresh-context
-   phase-contract validator (GOVERNANCE §5 / orchestrator gate).
-4. Debate the **design** with Alpha (GOVERNANCE §3) before `tasks`. Spec is audited inline by the gate; send it to Alpha in the same debate as the design to save a round.
-5. `sdd-tasks` (sonnet) with the 400-line Review Workload Forecast; ask the chain strategy once (`stacked-to-main` recommended: no tracker branch until a remote exists).
-6. Stop at the end of `tasks`. Rewrite this file, append to [`LOG.md`](./LOG.md), `mem_session_summary`, commit, and tell the Director to open the next session for `apply`.
+1. Read [`../../AGENTS.md`](../../AGENTS.md) §1 (this file is step 0 there), then only
+   [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) header + Review
+   Workload Forecast + PR-01..PR-03, and [`design.md`](../../openspec/changes/f1-daemon-registry-thin-client/design.md)
+   §2 (layout), §3 (constants), §12 (provenance header format). The specs are read per PR by the
+   apply agent, not up front. Do not re-read the proposal, the exploration or the ADRs unless a task cites them.
+2. Run the SDD preflight (`AskUserQuestion`, three groups) and then
+   `gentle-ai sdd-status f1-daemon-registry-thin-client --cwd <repo> --json`; it must say
+   `nextRecommended: apply` with `blockedReasons: []`. Otherwise stop and report.
+3. Launch `sdd-apply` (sonnet) **one PR slice at a time**, starting at PR-01, with: `delivery_strategy: auto-chain`,
+   `chain_strategy: stacked-to-main`, the DN-06 exception scope, Strict TDD forwarding
+   (`STRICT TDD MODE IS ACTIVE. Test runner: npm test`), the `chained-pr` and `work-unit-commits`
+   skill paths, and the native attempt ledger (`gentle-ai sdd-attempt acquire … settle …`).
+   Branch `f1/01-scaffold-constants-ci` from `main`; PR targets `main`.
+4. After each slice: fresh-context phase-contract validator (design/apply rule), then **Alpha audits
+   the PR** (Director instruction DN-05: every artifact is audited before use) in a debate
+   `bus-v2-f1-pr-NN-001`; open the PR with `gh pr create` only after CONSENSUS; merge after the
+   Director's word (DN-04 delegates it, but say what was merged).
+5. After PR-01 merges, re-run `sdd-init` so `openspec/config.yaml` `strict_tdd` flips to `true`
+   against the real `npm test` (success criterion in the proposal).
+6. Stop at a PR boundary, never mid-slice. Rewrite this file, append to [`LOG.md`](./LOG.md),
+   `mem_session_summary`, commit and push.
 
 ## Do not redo
 
-- The 11-agent analysis and the F0 documentation audit: closed (`bus-v2-f0-docs-audit-001`).
-- The bot-topology, daemon, SQLite, Docker, name and license debates: closed; reopening needs new evidence and a new debate.
-- Spikes B-07 and B-08 are **not** F1 blockers (proposal D-04); do not wait on them.
+- Spec, design and tasks: gated and audited (`bus-v2-f1-design-001`, `bus-v2-f1-tasks-001`). Any change to them needs new evidence and a new debate.
+- The spec/design reconciliation (D-14, D-16, D-17, D-19, D-20, D-21, D-24, D-29): applied in the spec re-run; the tribunal records list every touched line.
+- The provenance-header question: resolved — the v1 body SHA-256 is in the header (design §12).
+- Spikes B-07 and B-08 are not F1 blockers (proposal D-04).
 
 ## Open points carried forward
 
 | Id | Point | Owner |
 |---|---|---|
-| B-11 | Trademark screening for "Conmuta"; reserve npm scope, GitHub org and domain when the Director gives the go | Director |
-| B-16 | `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`; copyright-holder line for `package.json` (`author`) needs the legal name from the Director | Kairo (F1/F6) |
-| — | GitHub remote: when shared, `git remote add origin`, push `main`, protect it, and switch PR chaining to `feature-branch-chain` if the Director wants a tracker branch | Kairo, after the Director shares the URL |
-| — | The v1 production bus (`~/.agentbus`) had 139 h without a fetch at session start; out of scope here, mentioned once to the Director | Director |
-| B-07, B-08 | Real-Telegram and Windows-ACL spikes; schedule when the Director authorizes creating two test bots | Director + Kairo |
+| — | Branch protection on `main` (rules to choose; see "Repository" above) | Director |
+| B-16 / D-10 | Kairo's assumption in DN-06: D-10 superseded by DN-04 (`LICENSE` ships, `private: true` until F6); open to veto. SECURITY/CONTRIBUTING/CHANGELOG and the `author` line still open | Director |
+| B-11 | Trademark screening for "Conmuta"; `PRODUCT_NAME` is the single rename constant (PR-01) | Director |
+| — | T22 bytes-per-hour ceiling and the origin-label organisation marker: no backlog id yet; documented as open in PR-42 | Director |
+| B-07, B-08 | Real-Telegram and Windows-ACL spikes; schedule when two test bots exist | Director + Kairo |
+| — | The v1 production bus (`~/.agentbus`) had 139 h without a fetch at session-1 start; out of scope | Director |
 
 ## Environment facts the next session should not re-measure
 
-- Machine: Windows 11, Node 24.16, npm 11.5, gentle-ai 2.9.1, Cursor / OpenCode / Codex / Gemini CLI / AGY / Antigravity installed (the IDE-detection test bench for F2).
+- Machine: Windows 11, Node 24.16, npm 11.5, gentle-ai 2.9.1; Cursor / OpenCode / Codex / Gemini CLI / AGY / Antigravity installed.
 - Arena bridge for this repo: `.mcp.json` (gitignored); collaborator Alpha in the right panel.
-- Engram project key: `telegram_bus_agent` (folder name); topic keys under `sdd/f1-daemon-registry-thin-client/*`.
+- GitHub: `gh` is authenticated for two accounts; the **active** one must be `agentesinteligentesllm-oss`
+  (`gh auth status`; switch with `gh auth switch -h github.com -u agentesinteligentesllm-oss`). `gh` is
+  the git credential helper for `github.com`. The credential itself lives in the OS keyring and in a
+  pinned Engram entry (`config/github-remote-auth-connmuta`) — never in this tree.
+- **Engram project key**: `telegram_bus_agent` (all SDD twins live there). Since the remote was added,
+  auto-detection returns `connmuta` — pass `project: telegram_bus_agent` explicitly on every
+  `mem_search` / `mem_save` and in every sub-agent prompt. Topic keys: `sdd/f1-daemon-registry-thin-client/{explore,proposal,spec,spec/<capability>,design,tasks,state}`.
+- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, read-only; real line counts of every reused module are in `tasks.md` (forecast section).

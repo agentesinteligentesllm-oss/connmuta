@@ -15,6 +15,8 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f0-docs-audit-001` | 2026-09-16 ~01:30Z → ~01:45Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (audit of this documentation tree) | — |
 | `bus-v2-f1-proposal-001` | 2026-09-16 ~01:50Z → ~02:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (implements 0028–0031) | B-13, B-15, B-18 scheduled in F1 |
 | `bus-v2-session-1-closure-001` | 2026-09-16 ~02:15Z → ~02:25Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none | — |
+| `bus-v2-f1-design-001` | 2026-09-16 ~02:55Z → ~03:05Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (design elaborates 0028–0031; decisions D-11..D-30 in `design.md` §18) | B-13, B-15, B-18 designed; B-16 (D-10 vs DN-04) and the AS-IS `size:exception` policy raised to the Director |
+| `bus-v2-f1-tasks-001` | 2026-09-16 ~03:40Z → ~03:50Z | Kairo (proposer, writer), Alpha (auditor) | 1 | `CONSENSUS` — `APPROVE`, objections `[]` | none (task breakdown of the F1 change) | `size:exception` narrowed to whole-file AS-IS copies (PR-02, PR-20); PR-07 and PR-22 re-sliced; THREAT-MODEL §4 updated per PR |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -83,6 +85,8 @@ Changes or inputs ordered directly by the Director (GOVERNANCE §3). Each note i
 | DN-01 | 2026-09-15 | The Director shared three wireframe mockups in the opening brief: Installation (requirements validator, global install with PATH, detection of CLIs such as Claude Code, OpenCode, AGY), Control panel (Add group, Add bot, Assign project, Overview), the three forms (ID, name, user instructions) and the Overview table (bot, bot id, group, group id, assigned project, collaborator agents, totals). Witnessed by Kairo in session; the images are not stored in this repository. | [OVERVIEW §10.2](../02-architecture/OVERVIEW.md), [WORK-PLAN F2](../07-plan/WORK-PLAN.md) |
 | DN-02 | 2026-09-16 | The Director chose **Conmuta** as the product name (recommended by Kairo, ratified by Alpha). Trademark screening (B-11) and registry reservations remain pending. | [00-INDEX pending board](../00-INDEX.md#pending-director-decisions), [CHECKLIST B-11](../06-backlog/CHECKLIST.md) |
 | DN-04 | 2026-09-16 | The Director accepted the Apache-2.0 license, confirmed the four new ADRs (0028–0031) by delegating implementation of everything the tribunal landed ("toma las riendas y aplica todo lo que consideres prudente"), authorized commits, pull requests and merges at Kairo's discretion, stated that no GitHub repository exists yet (to be shared later), and asked that sessions be switched at phase boundaries with a handoff so no session carries unnecessary context. | [LICENSE](../../LICENSE), [ADR index](../03-adr/INDEX.md), [session handoff](../08-sessions/HANDOFF.md) |
+| DN-05 | 2026-09-16 | The Director shared the GitHub repository `agentesinteligentesllm-oss/connmuta` (public, empty) and the owner-account credential for it; Kairo registered `origin`, pushed `main` (F0 history) and left branch protection pending a Director choice of rules. The Director also asked that every complement, correction or implementation be audited by Alpha so that neither documentation nor code carries ambiguity. | [session handoff](../08-sessions/HANDOFF.md) |
+| DN-06 | 2026-09-16 | For F1 delivery the Director chose the chain strategy `stacked-to-main` (each PR merges to `main` in sequence; no tracker branch) and accepted `size:exception` **only** for pull requests that vendor v1 modules AS-IS with a SHA-256 of the v1 body at `bf8f365` carried in the provenance header and re-verified by a test (tribunal ruling `bus-v2-f1-design-001` ask 5); SEAM and new modules stay within the 400-line budget. Kairo's assumption, open to veto: D-10 is superseded by DN-04 (`LICENSE` ships now, `private: true` until F6). | [design.md §20](../../openspec/changes/f1-daemon-registry-thin-client/design.md), [CHECKLIST B-16](../06-backlog/CHECKLIST.md) |
 | DN-03 | 2026-09-15 | Requirements added after the PROPOSAL: an optional group referee with moderation rules and ticket labels (B-01, B-02, B-03), a desktop version for Windows and if possible macOS (B-04), and a dedicated study of the gentle-ai installer (B-05). Quoted in the debate as amendments A2, A3, A4. | [CHECKLIST](../06-backlog/CHECKLIST.md), round 2 above |
 
 ## `bus-v2-f0-docs-audit-001` — record
@@ -128,6 +132,48 @@ Audit of everything done after the F1 proposal consensus: Director note DN-04 (A
 | (d) Handoff completeness | The six-step start for session 2 is self-sufficient; session 2 does not need this session's context |
 
 Outcome: CONSENSUS; session 1 closed at the F0 → F1 spec/design boundary.
+
+## `bus-v2-f1-design-001` — record
+
+Audit of the F1 SDD design (`openspec/changes/f1-daemon-registry-thin-client/design.md`, decisions
+D-11..D-30) together with the nine F1 delta specs (`specs/*/spec.md`, 44 requirements, 72 scenarios),
+as required by GOVERNANCE §3. Both artifacts were produced in parallel from the proposal and the
+rulings of `bus-v2-f1-proposal-001`; the orchestrator's fresh-context validator had reported
+`PASS WITH WARNINGS` (0 blockers, 5 spec-side reconciliation items) before the debate.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) D-11..D-30 as elaborations of rulings (a)–(e) | Ratified. Expressly: D-14 mutual HMAC proof with domain-separated labels (`identity:` / `session:`) and a per-session bearer, the per-boot secret never travelling; D-16 two lock files (`daemon.lock` singleton + heartbeat, `spawn.lock` spawner election); D-17 distinct error taxonomy; D-19 new-session cursor at `SESSION_CATCHUP_HOURS`; D-20 `updates.body` NULL only for `rejected`/`ignored`; D-21 `PRAGMA synchronous = FULL`; D-26 timer allow-list extended to `daemon/serve/fetch.js` with the reverse-import-graph assertion that it cannot reach `transport/*` or `send/*` |
+| (2) D-15 fence applied by the daemon at the IPC boundary | Accepted: one fencing and origin-labelling site guarantees no client (MCP or the future panel) handles raw peer input; the amendment note on proposal deliverable 11 is recorded in `tasks.md` |
+| (3) D-29 `conmuta daemon stop` and `conmuta validate` in F1 | Ratified as in scope: a supported stop is required by the rollback plan on Windows; the validator needs a callable surface for the opt-in pre-commit hook (I-2) |
+| (4) Spec reconciliation plan | Approved without changes: (i) `ipc-handshake` adopts `DAEMON_IDENTITY_MISMATCH` and the `POST /session` HMAC proof (the bearer is the response), plus scenarios for the other D-17 codes; (ii) `v1-migration` drops the `AGENTBUS_BOT_TOKEN` env fallback (only `config.json` or `--token-stdin`, D-24); (iii) `daemon-lifecycle` splits `DAEMON_LOCK_STALE_SECONDS` from `SPAWN_LOCK_STALE_SECONDS` (D-16); (iv) `ledger` and `durable-inbox` cover the remaining retention/session constants, D-19 and D-20. Spec yields to design in every case |
+| (5) Hash-pinned AS-IS vendored modules as a review substitute | Favourable: a SHA-256 of the v1 body at `bf8f365`, carried in the provenance header and re-verified by a test, is a falsifiable and safe substitute for line-by-line review of strictly AS-IS modules (envelope, `transport/*`, predicates, pure schemas) and justifies `size:exception` for those PRs only; SEAM modules keep full review within the 400-line budget. Acceptance of the exception itself is the Director's (pending) |
+| (6) D-10 vs DN-04 | No objection: D-10 is formally superseded by DN-04 (Apache-2.0 in force; `private: true` until F6) |
+| (7) Independent audit of §5.2 DDL, §8.2 admission, §14 static assertions | Conformant: STRICT tables, no body column in `audit_log` or `unknown_senders`, write-ahead transaction before the offset advance, indexed `needs_action` VIEW (ADR-0030 rules 2/4/5); seven-step admission drops `foreign_chat` at step 3, records `unknown_senders` without body at step 4, applies D-05 fail-closed at step 7 (ADR-0029 rule 1, OVERVIEW §7.2); spawn isolation (literal argv, `shell: false`, single site `client/spawn.ts`) and timer isolation by reverse-graph analysis (CONSTITUTION §3, PT-07/27/28) |
+
+Outcome: CONSENSUS in one round; `sdd-spec` re-run once with plan (4) as corrective feedback, then
+`sdd-tasks`.
+
+## `bus-v2-f1-tasks-001` — record
+
+Audit of the F1 task breakdown (`openspec/changes/f1-daemon-registry-thin-client/tasks.md`: PR
+slices, Review Workload Forecast, Strict-TDD ordering) before the session closed at the `tasks`
+boundary, at the Director's instruction that every artifact be audited before it is used.
+
+| Question | Alpha's ruling |
+|---|---|
+| (1) PR-07 vendored range extracts as `size:exception` | Rejected as exception: a hash over a spliced extract is not falsifiable against a git blob at `bf8f365` — the splice itself is unreviewed code. The exception is restricted to whole-file 1:1 copies; `tool-schemas.ts` and `tool-output.ts` are SEAM and are re-sliced under the ordinary budget (PR-07a, PR-07b, optional PR-07c) |
+| (2) Whole-file AS-IS set | Confirmed: `envelope.ts` (+ twin) and `daemon/transport/{types,group,direct,dual}.ts` (+ twins). `test/security/predicates.ts` is also a range extract (v1 `test/security.test.ts:25-101`), ≈77 lines: SEAM, no exception (PR-39 ≈197 lines) |
+| (3) One file across two chained PRs (`telegram.ts` PR-18/19; `serve/status.ts`, `serve/thread.ts` PR-24/25) | Sound under `stacked-to-main`: each PR compiles and passes its tests alone; keeping one target file avoids artificial micro-modules |
+| (4) Near-budget slices | PR-22 pre-split into PR-22a (`daemon/admission.ts`, the seven-step pipeline carrying invariants 1, 4, 5) and PR-22b (`daemon/poller.ts`); PR-05 stays as one cohesive state-machine module with a watch instruction to `sdd-apply` |
+| (5) Documentation cadence | Per GOVERNANCE: every PR that lands a PT-xx pinning test updates that row's file-name cell in THREAT-MODEL §4 within the same PR; PR-42 remains the close-out for DATA-MODEL and CHECKLIST |
+| (6) Independent sample (PR-10, PR-12, PR-16, PR-30, PR-32, PR-41) | RED strictly precedes GREEN; paths match design §2.1; requirements and PT ids match `specs/README.md`; verify commands are real `node --test` runs. A stale note on the provenance-header format at the end of `tasks.md` was to be removed during the re-slice |
+
+Kairo also recorded, as writer, the amendment that the v1 body SHA-256 travels in the provenance
+header (design §12; PR-02), as ruled in `bus-v2-f1-design-001` item 5 and DN-06.
+
+Outcome: CONSENSUS in one round; re-slices (1), (2), (4), (5) and the cleanup (6) applied to
+`tasks.md` before the session closed: 44 PR slices, 2 with `size:exception`, 207 tasks.
 
 ## Reserved: `bus-v2-referee-001`
 
