@@ -1202,7 +1202,8 @@ rule:
 
 ## Scope and budget (measured, not estimated)
 
-Final figures are the corrected tip `05ba773`; the pre-audit tip `dbb7494` measured 398.
+Final figures are after both correction rounds; the audited tip `dbb7494` measured 398 and the final
+code tip measures 420.
 
 | Path | Lines | Kind |
 |---|---|---|
@@ -1212,13 +1213,13 @@ Final figures are the corrected tip `05ba773`; the pre-audit tip `dbb7494` measu
 | `test/shared/error-payload.test.ts` | 77 | twin |
 | `test/fixtures/v1-provenance.json` | +12 | two SEAM registry entries |
 | `docs/02-architecture/THREAT-MODEL.md` | +1/−1 | PT-02 file-name cell |
-| **budget total** | **415 / 400** | **15-line disclosed PR-scoped exception** — see the correction round |
+| **budget total** | **420 / 400** | **20-line disclosed PR-scoped exception** — see the correction rounds |
 
 The tasks-phase estimate was ≈290 lines. That under-count is the one PR-01a already recorded
 (`bus-v2-f1-pr-01-001`): a SEAM module's doc comments must be **re-authored**, never copied, and the
 estimate counted v1's lines instead. The first draft measured 402 and 2 lines were trimmed from the two
-`Changes:` blocks rather than taking an exception; the audited tip then landed at 398, and the bounded
-correction round below carries it to 415.
+`Changes:` blocks rather than taking an exception; the audited tip landed at 398, and the two bounded
+correction rounds below carry it to 420.
 
 ## TDD cycle evidence
 
@@ -1301,20 +1302,48 @@ than moved, which is the JD-6 correction PR-06's judges asked for on `fence.ts`:
 
 ## Verification from a clean detached worktree
 
-Run twice: at the pre-audit tip `f3b3383` (169/169, 8/8) and again at the corrected code tip
-`05ba773`, after the correction round.
+Run three times: at the pre-audit tip `f3b3383`, at the round-1 tip `05ba773`, and at the round-2 code
+tip `53d5aad` — identical results every time.
 
 ```
-git worktree add --detach ../telegram_bus_agent-worktrees/verify-07a-fix 05ba773
+git worktree add --detach ../telegram_bus_agent-worktrees/verify-07a-r2 53d5aad
 npm ci --ignore-scripts && npm run build
 node --test "dist/test/**/*.test.js"   -> 169 tests, 169 pass, 0 fail
 npm run test:static                    ->   8 tests,   8 pass, 0 fail
+(node --test on the three focused files) ->  18 tests,  18 pass, 0 fail
 ```
 
 Only the committed files are present in that tree; the worktree was removed as soon as the run
-finished. `git diff --name-status c971e25..05ba773` is exactly the five code/test/fixture paths plus
-the `THREAT-MODEL.md` cell, with **no** edit to any hash-pinned AS-IS file, no wire change and no
-dependency change. The doc commits that follow `05ba773` are SDD bookkeeping: they carry no code.
+finished. `git diff --name-status c971e25..53d5aad` lists those five code/test/fixture paths, the
+`THREAT-MODEL.md` cell and the two SDD bookkeeping files (`tasks.md`, `apply-progress.md`) that the
+same slice added — the bookkeeping is what the budget rule excludes from review load, and the claim
+here is only about the rest: **no** edit to any hash-pinned AS-IS file, no wire change, no dependency
+change. The doc commits that follow `05ba773` carry no code.
+
+## Correction round 2 (fix-caused defects only)
+
+Both judges re-judged the frozen ledger plus the round-1 delta. They confirmed every round-1 fix real and
+falsifiable (C1's mutant now kills, A3's field-set pins fail on an added key, B4's case can fail, both
+pinned hashes re-derive, the allow-list is untouched) and found **no behavioural regression and no
+CRITICAL**. What they did find was four defects the correction round itself created — the same pattern
+PR-06's round 2 produced — all fixed here:
+
+| Fix-caused | Item | Correction |
+|---|---|---|
+| C3 (both) | The `Changes:` clause claimed the added JSDoc paragraph states "the destination half … and the `to_user_id` half", but the paragraph named only `chat_id`/`bot`/`group`/`to_chat` | The paragraph now names `to_user_id` and the roster derivation, so the header claim is true |
+| C4 (both) | C2's fix left the twin titling `toolErrorPayload` "the client-local constructor" and driving `DAEMON_DOWN` through it — the exact misuse C2 was about, now sourced from the test | The case is titled for the tool-level constructor, uses a real tool-level code, and asserts `retryable: false` |
+| C5 (both) | This record said round 1 cost "12 net lines"; the real figure is **17** (415 − 398) | Corrected to 17 |
+| C6 (one) | The claim that `git diff --name-status c971e25..05ba773` is "exactly the five code/test/fixture paths plus the THREAT-MODEL cell" omitted the two SDD bookkeeping files inside that range | Reworded below |
+| C7 (one) | `export type SendToolInput` is at v1:111 with line 110 blank, i.e. **two** lines past the cited range, not one | Corrected in the header |
+
+## Judgment Day verdict
+
+**Target:** `c971e25..05ba773` plus the correction rounds; branch `f1/07a-tool-schemas-errors`.
+**Round 1:** 0 CRITICAL; 2 corroborated WARNINGs (both introduced), 4 single-judge suggestions, 1
+pre-existing suspect queued. **Round 2:** 0 CRITICAL, 0 WARNING, 5 fix-caused items (4 corroborated, 1
+single-judge), all fixed. **Confirmed severe findings: none.** `scoped_rejudgment: approved`.
+**`JUDGMENT: APPROVED`** — with S1 (pre-existing `constants.ts` pin) and A4 (design §12's stale AS-IS
+rows) carried to the Director rather than fixed here.
 
 ## Carried forward to PR-07b (re-verified here, as the handoff asked)
 
@@ -1384,13 +1413,16 @@ report rather than a change; S1 is queued. Commits `aedd5d9`, `05ba773`.
 | B3 | `Changes:` names `SendToolInput` (v1:111) and the three rewritten per-tool JSDoc lines, and no longer claims v1 stated the guarantee "only for `from`" | Header-only review now sees the whole delta |
 | B4 | The case serializes both payloads through `errorResult` and compares the round trip | The case can now fail |
 
-**Disclosed PR-scoped exception: 15 lines over the 400-line policy.** The slice measures **415**
-changed lines (`112 + 66 + 146 + 77 + 12` in `src`/`test`, plus the 2-line THREAT-MODEL cell) — inside
-the policy at 398 before the correction round, 415 after it. The Director authorized this correction
-round with a disclosed PR-scoped exception (the same instrument as PR-06b's 26-line one, distinct from
-DN-06's AS-IS exception); the round cost 12 net lines after a passed prose-only compression, and the
-remaining overage is disclosed here rather than absorbed by deleting reasoning. It is a review-load
-disclosure, not an unreviewed change: every added line is a test assertion or an accuracy fix.
+**Disclosed PR-scoped exception: 20 lines over the 400-line policy.** The slice measures **420**
+changed lines (`115 + 66 + 146 + 80 + 12` in `src`/`test`, plus the 2-line THREAT-MODEL cell). It was
+inside the policy at **398** before the audit; round 1 cost **+17** (415) and round 2, which fixed the
+defects round 1 itself created, cost **+5** (420). The Director authorized the correction round with a
+disclosed PR-scoped exception — the same instrument as PR-06b's 26-line one, distinct from DN-06's
+AS-IS exception — and was told to expect ~10-15 lines; the real figure is 20, and this is the honest
+number rather than a trimmed one. A prose-only compression pass was attempted and yielded ~1 line, so
+the alternatives were deleting reasoning the judges had just validated or disclosing the overage. This
+is a review-load disclosure, not an unreviewed change: every added line is a test assertion or an
+accuracy fix, and the extra 20 lines are 5% of the policy.
 
 ## Verification after the correction round
 
