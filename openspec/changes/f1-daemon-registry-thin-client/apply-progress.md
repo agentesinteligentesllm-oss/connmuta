@@ -1839,15 +1839,18 @@ pass to attack, and inventing one would misrepresent what that instrument is for
 
 # PR-08a — `shared/token-shape.ts` + `shared/project-file.ts` (re-sliced at apply time from PR-08)
 
-**Slice status:** implemented, verified at the code tip `888c1ec`, re-sliced at apply time from PR-08
-into PR-08a/PR-08b. Awaiting its Judgment Day audit. The tribunal is **not** available (Arena bridge
-down), so this slice is audited by the substitute path and **DN-05 is unsatisfied** — the same
-disclosure PR-06, PR-07a and PR-07b carry.
+**Slice status:** implemented; **both independent lifecycles closed** at the code tip `ddfa1c3`,
+re-sliced at apply time from PR-08 into PR-08a/PR-08b. Judgment Day returned **approved** for
+`014f661..ddfa1c3` after one bounded correction round, and the ordinary native review closed
+**approved** with its authority burned. The tribunal is **not** available (Arena bridge down), so this
+slice is audited by the substitute path and **DN-05 is unsatisfied** — the same disclosure PR-06,
+PR-07a and PR-07b carry.
 
 | Field | Value |
 |---|---|
 | Branch | `f1/08a-shared-validators` → `main`, from `main` @ `014f661` |
-| Code commits | `984c2f3` (`token-shape.ts` + its twin), `888c1ec` (`project-file.ts` + its twin) |
+| Code commits | `984c2f3` (`token-shape.ts` + its twin), `888c1ec` (`project-file.ts` + its twin), `ddfa1c3` (Judgment Day round 1 + the four folded hardening rows) |
+| Docs commit | `44ea9a1` (the re-slice note, the PT cells, this record) |
 | Requirements | `project-binding › Committed project file schema` (PT-06); `project-binding › Token-shape validator` (PT-05, D-29) |
 | Provenance | none — PR-08a vendors **no** v1 range; `test/fixtures/v1-provenance.json` stays at 11 entries |
 | tsconfig | untouched: both modules live in `src/shared/`, already referenced by the root project |
@@ -1873,20 +1876,25 @@ smaller slice claimed.
 
 ## Scope and budget (PR-08a)
 
-| Path | Authored lines |
-|---|---|
-| `src/shared/token-shape.ts` | 82 |
-| `test/shared/token-shape.test.ts` | 114 |
-| `src/shared/project-file.ts` | 247 |
-| `test/shared/project-file.test.ts` | 305 |
-| **budget total** | **748 / 400** — **348-line PR-08a-scoped exception** |
+| Path | Authored lines, final | At the audited tip `888c1ec` |
+|---|---|---|
+| `src/shared/token-shape.ts` | 99 | 82 |
+| `test/shared/token-shape.test.ts` | 120 | 114 |
+| `src/shared/project-file.ts` | 316 | 247 |
+| `test/shared/project-file.test.ts` | 419 | 305 |
+| **budget total** | **954 / 400** — **554-line PR-08a-scoped exception** | 748 / 400 |
+
+The correction round grew the slice by **206 lines** (748 → 954), which is the documented expectation
+rather than a surprise: PR-07a grew 398→420 and PR-07b 495→554, and the four hardening rows the
+Director folded into the same round are the reason this figure is larger than those. The growth is
+tests and doc comments, never review context removed.
 
 Grounds for the exception, in the shape PR-06b's was granted: these are two modules that share one
 contract (`project-file.ts` applies `token-shape.ts` to the parsed document), so splitting them at the
 file boundary would put one module's consumer in a different PR than its provider for no review gain;
 and the test files carry one assertion per documented rule — uniqueness, `referee` membership, the four
 content rules, the unknown-key path per level, and the never-echo property — every one of which the
-mutation round below shows can fail. Trimming them is exactly what the budget rule forbids.
+mutation rounds below show can fail. Trimming them is exactly what the budget rule forbids.
 The exception is **PR-08a-scoped** and distinct from DN-06 (which stays AS-IS-only and is not amended).
 
 ## TDD cycle evidence
@@ -1976,10 +1984,110 @@ a trap PR-08's own scope would have hit on its first build.
 requires a twin for every non-declaration `.ts` under `src/`, so PR-08b adds
 `test/cli/main.test.ts`. Carried finding, not an invention of this record.
 
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the initial review tree `44ea9a1` and
+returned only the graph-v1 shape (`{"rows":[…]}`), one exhaustive pass each, in the clean worktree
+`../telegram_bus_agent-worktrees/jd-08a`. The record uses the graph-v1 shape throughout; PR-07a's
+older `{"findings":…,"evidence":…}` drift is not repeated here.
+
+**Both judges found the same CRITICAL, independently — and it was real.** A document-derived **key**
+name was rendered verbatim into `ProjectFileProblem.field`, so a token pasted into key position instead
+of value position came back **echoed in the problem list**, in a value this module documents as reaching
+operator terminals, pre-commit output and (F2) `doctor`. That falsified the type's own "value-free by
+construction" guarantee, which was true of values and false of keys. `JD-A-001` and `JD-B-001`, both
+`deterministic`, both `open`, the same defect from two directions.
+
+| Judge | Row | Severity | Disposition |
+|---|---|---|---|
+| A | `JD-A-001` | CRITICAL | fixed in round 1; re-judged `verified` |
+| B | `JD-B-001` | CRITICAL | fixed in round 1; re-judged `verified` |
+| A | `JD-A-002` | WARNING | informational — **folded** by Director decision (below) |
+| A | `JD-A-003` | SUGGESTION | informational (the version early-return's deliberate precedence) |
+| B | `JD-B-002` | SUGGESTION | informational — **folded** by Director decision |
+| B | `JD-B-003` | SUGGESTION | informational — **folded** by Director decision |
+| B | `JD-B-004` | SUGGESTION | informational — **folded** by Director decision |
+
+Frozen ledger (canonical, keys sorted as the runtime's `canonicalHash` does):
+`28dd8e53bbb3c8a4213619e07e4db6531052b4e09b8b9fdd77b708cbae08ac`, batch `1 of 2`, authorized IDs
+`JD-A-001`, `JD-B-001`. The two rows were normalized before freezing so that **no token-shaped literal
+is written into this file** (PT-22/doc hygiene, `bus-v2-f1-pr-03-001`): the field the judges reproduced
+is described as "the 7-digit fixture token".
+
+### Round 1 — the correction (one bounded batch)
+
+| Item | Value |
+|---|---|
+| Mechanism | `jd-fix-agent`, the standalone dispatch the runtime accepts, allowed surfaces `src/shared/project-file.ts` + its twin |
+| Fix | `REDACTED_FIELD_SEGMENT`/`keySegment` redact a key that is itself forbidden content; `joinPath` uses it, and the walk now inspects **key names** too, reporting the rule against the container path so the operator still learns where the problem is |
+| TDD | five tests written RED first (all five failed against the unpatched build with the token echoed), then GREEN |
+| Result | that file 35/35; the correction commit is `ddfa1c3` |
+
+### The four informational rows, folded by Director decision
+
+Judgment Day's own rule is that WARNING and SUGGESTION candidates become one-time informational rows and
+never schedule fixes. The Director was asked explicitly whether to fold them into this same round —
+because folding them **before** re-judgment is what makes the re-judged tree the shipped tree, and
+because the PR was not yet open — and chose to fold all four. They are therefore an **author decision
+disclosed as such**, not part of the authorized severe batch:
+
+| Row | Change | Why it matters |
+|---|---|---|
+| `JD-A-002` (WARNING) | the field walk applies the whole shared secret table via `checkForSecrets`, so a PEM block or a `.env`-style assignment committed inside `conmuta.json` is refused; the rule vocabulary is now `SecretRule` plus this module's three own names | the loader is the only consumer that sees the file first; a committed secret is the threat class PT-05 exists for |
+| `JD-B-002` (SUGGESTION) | the walk is bounded by `MAX_CONTENT_WALK_DEPTH = 32` | a ~5k-deep document made the documented pre-commit path throw `RangeError` instead of returning a verdict; no **accepted** file can reach the bound, because the strict schema caps accepted documents at three levels |
+| `JD-B-004` (SUGGESTION) | the `Authorization` literal is matched case-insensitively, through one exported `matchesAuthorizationLiteral` shared by both consumers | RFC 9110 §5.1 makes field names case-insensitive; **disclosed as a hardening beyond the requirement's literal spelling**, in the fail-closed direction |
+| `JD-B-003` (SUGGESTION) | `RosterEntry` renamed `ProjectRosterEntry` | `shared/protocol-apply.ts:50` already exports a `RosterEntry` (its minimal `user_id` projection, inside an audited SEAM); two public types with one name in one layer force every consumer that needs both to alias one, and the rename is free only while this type is unpublished |
+
+### Mutants for the corrected tree (round 1)
+
+Four, all killed, each built first on a cleaned `dist/` and restored byte-identically with a `sha256`
+check: `M8` the CRITICAL fix reverted (a forbidden key named verbatim again), `M6` the loader stops
+consulting the shared secret table, `M7` the `Authorization` literal matched case-sensitively again,
+**`M5` the depth bound removed — which is what proves the deep-document test is load-bearing rather
+than decorative** (without the bound the walk really does throw).
+
+### Re-judgment (scoped, one round)
+
+Each judge received only its own frozen ID, that ID's exact hash-bound row, and the fix diff
+(`git show ddfa1c3`), with the four folded rows disclosed for **fix-line regression** purposes only.
+Result: `JD-A-001 → verified`, `JD-B-001 → verified`. No regression was returned and no second round was
+needed, so the terminal re-judgment budget of two rounds is unspent.
+
+### Final verification and verdict
+
+One final verification, in the frozen worktree at `ddfa1c3` with `dist/` rebuilt from scratch:
+**229/229** tests and `test:static` **8/8**. With no severe row surviving:
+
+**`JUDGMENT: APPROVED`** for `014f661..ddfa1c3`.
+
+## The ordinary native review — a separate, independent lifecycle
+
+The Receipt-driven Development switch is on and the Director never left this candidate unreviewed, so
+the preflight ran. It was executed against the **frozen worktree** (`workspaceRoot`), not the main tree,
+so the candidate is exactly this slice and excludes PR-08b's uncommitted files:
+
+| Step | Result |
+|---|---|
+| `inspect` | `ready`, action `start`, offered a **committed-range** START (`--base-ref=014f661… --committed-only=true`) |
+| `start` | lineage `review-f644a39f445a2a0c`, risk **medium** (reason: not purely passive documentation), lens `review-reliability`, 7 changed files, 1121 changed lines, correction budget 200 |
+| `status` | `collect` with exactly one slot |
+| `capture` (1st) | **forecast, no mutation**: transport `pi_host_relay`, **1 model run**, lens `review-reliability` — relayed, then re-submitted with `reviewerRunAcknowledged: true` |
+| `capture` (2nd) | `approved` — closure `native-last-event-closure` |
+| `acknowledge-approved` | **authority burned** (`gentle-ai.review-acknowledged/v1`); delivery is ordinary repository policy |
+
+The closure's own text is the disposition of its findings: *"This review is approved and its receipt
+stands. Every finding listed here is non-blocking: none opened a correction, none reopens this review,
+and no correction transition is offered for this candidate."* Four advisory findings, recorded verbatim
+by id and location and filed as backlog **B-22** rather than acted on here: `R3-01` (WARNING,
+`src/shared/project-file.ts:294-296`), `R3-02` (WARNING, `test/shared/project-file.test.ts:5-9`),
+`R3-03` (SUGGESTION, `test/shared/project-file.test.ts:352-362`), `R3-04` (SUGGESTION,
+`src/shared/project-file.ts:151-158`). Review approval **never** authorizes delivery, and this PR is not
+authorization either: commit, push, PR and merge stay ordinary repository policy.
+
 ## Next
 
-- Judgment Day over the frozen range (two blind read-only judges, graph-v1 shapes only), a bounded
-correction round, and at most one scoped re-judgment — appended to this record when it runs.
-- Then the ordinary native review for this candidate, and only after that: push, PR-08a, CI, and the
-Director's merge decision. PR-08b is prepared afterwards, on top of the merged `main`.
+- Push `ddfa1c3`, open PR-08a, wait for the CI matrix, and leave the merge to the Director.
+- PR-08b (`roster-hash.ts`, `cli/validate.ts`, `cli/main.ts`, `EXIT_VALIDATION_FAILED`, the tsconfig
+  wiring and the twins) is prepared afterwards on top of the merged `main`, with its own verification,
+  its own Judgment Day audit and its own review lifecycle.
 
