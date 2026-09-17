@@ -25,9 +25,16 @@ export interface CliIo {
 	readonly readStdin: () => string;
 }
 
-/** One line per invocation form this build wires; `mcp`, `daemon stop` and `migrate-v1` land later. */
+/**
+ * One line per invocation form this build wires; `mcp`, `daemon stop` and `migrate-v1` land later.
+ *
+ * The usage text describes what **this build accepts**, not the requirement's bracket notation: the
+ * spec spells the surface `conmuta validate [<path> | --stdin]`, and this CLI refuses a bare
+ * invocation deliberately (see `apply-progress.md` §PR-08b, `JD-A-002`), so advertising an optional
+ * target here would promise an operator a form that exits 2. `test/cli/main.test.ts` pins the text.
+ */
 const USAGE_LINES = [
-	`usage: ${PRODUCT_NAME} validate [<path> | --stdin]`,
+	`usage: ${PRODUCT_NAME} validate <path> | --stdin`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
 ];
 

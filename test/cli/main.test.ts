@@ -157,8 +157,14 @@ test("a subcommand reserved for a later slice is a usage error, not a stub that 
   }
 });
 
-test("the usage line names the one command this build wires", () => {
+test("the usage line names the one command this build wires, and only the forms it accepts", () => {
   const captured = makeIo();
   runCli([], captured.io);
-  assert.match(captured.err.join("\n"), /validate/);
+  const text = captured.err.join("\n");
+  assert.match(text, /validate/);
+  // The program's own text must describe the program: the requirement writes the target as optional
+  // (`conmuta validate [<path> | --stdin]`), but this build refuses a bare invocation on purpose, so
+  // advertising an optional target would promise a form that exits 2 (JD-A-002, disclosed).
+  assert.match(text, /validate <path> \| --stdin/);
+  assert.equal(text.includes("[<path>"), false, "the usage text must not advertise an optional target");
 });

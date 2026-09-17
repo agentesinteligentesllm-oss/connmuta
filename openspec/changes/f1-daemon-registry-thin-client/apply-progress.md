@@ -2095,9 +2095,11 @@ authorization either: commit, push, PR and merge stay ordinary repository policy
 
 # PR-08b — `shared/roster-hash.ts` + the CLI (`conmuta validate`, `cli/main.ts`) — the second half of the re-sliced PR-08
 
-**Slice status:** implemented and verified at the code tip `d0eac03`, stacked on PR-08a (merged as PR #11,
-`1770f84`). Awaiting its Judgment Day audit; DN-05 is unsatisfied for it too, for the same reason as the
-rest of F1 (Arena bridge down).
+**Slice status:** implemented; **both independent lifecycles closed** at the corrected tip `a464a66` (code) /
+`03c2231` (record), stacked on PR-08a (merged as PR #11, `1770f84`). Judgment Day returned **approved** for
+`72e09c0..a464a66`; the ordinary native review was **declined for this candidate**, so its risk-gated
+fallback ran instead. DN-05 is unsatisfied for it too, for the same reason as the rest of F1 (Arena bridge
+down).
 
 | Field | Value |
 |---|---|
@@ -2117,9 +2119,10 @@ rest of F1 (Arena bridge down).
 | `src/cli/main.ts` | 132 | 125 |
 | `test/cli/main.test.ts` | 164 | 150 |
 | `src/shared/constants.ts` | +14 / −1 (`EXIT_VALIDATION_FAILED`) | same |
-| `tsconfig.json`, `src/cli/tsconfig.json` | +6 / −2 (the build wiring below) | same |
+| `src/cli/tsconfig.json` | +5 / −1 (the build wiring below) | same |
 | `src/shared/token-shape.ts`, `test/shared/token-shape.test.ts` | +4 / −4, +1 / −1 | comment-only |
-| **budget total** | **759 / 400** — **359-line PR-08b-scoped exception** | 672 / 400 |
+| **budget total** (`git diff --numstat -- src test`) | **759 / 400** — **359-line PR-08b-scoped exception** | 671 / 400 |
+| `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** | same |
 
 The exception follows the same grounds as PR-08a's: the CLI's value is in its contract — argument
 handling, exit codes, never echoing, not executing on import — and `test/cli/validate.test.ts` exercises
@@ -2127,11 +2130,12 @@ it at the **process boundary** (a real child process, the design §15 "Integrati
 only place a token could leak into a message. Trimming those cases is exactly what the budget rule
 forbids.
 
-The correction round grew the slice from **672 to 759** (+87 net), and two of its files are **PR-08a's**,
-touched comment-only: `src/shared/token-shape.ts` and `test/shared/token-shape.test.ts` carried
-`design.md` citations that this slice's own appended design row invalidated, so leaving them stale would
-have shipped a trace that cannot be followed (AGENTS.md §3). No behaviour in a merged file changed, no
-hash-pinned file was touched, and the correction is itself the covered evidence above.
+The correction round grew the slice from **671 to 759** in that same `src`/`test` scope — **+88** — and two of
+its files are **PR-08a's**, touched comment-only: `src/shared/token-shape.ts` and
+`test/shared/token-shape.test.ts` carried `design.md` citations that this slice's own appended design row
+invalidated, so leaving them stale would have shipped a trace that cannot be followed (AGENTS.md §3). No
+behaviour in a merged file changed, no hash-pinned file was touched, and the correction is itself the
+covered evidence above.
 
 ## The three carried findings this slice closes
 
@@ -2149,8 +2153,12 @@ slices that write their first source file (PR-32, PR-15), with that instruction 
 | Step | Command | Observed |
 |---|---|---|
 | 8.3 RED | `node node_modules/typescript/bin/tsc -b` | `TS2307: Cannot find module '../../src/cli/main.js'` / `'../../src/cli/validate.js'` and `TS2305: … has no exported member 'EXIT_VALIDATION_FAILED'` — the RED for these modules was taken while the slice was still one tree, before PR-08a was split out, and is recorded here rather than replayed |
-| 8.4 GREEN | focused run over the three new suites + `roster-hash` | **34/34** |
-| 8.5 Verify | the exact command task 8.5 names | **75/75** (the four suites it lists) |
+| 8.4 GREEN (at `bc5beec`) | focused run over the three new suites + `roster-hash` | **34/34** |
+| 8.5 Verify (at `bc5beec`) | the exact command task 8.5 names | **75/75** (the four suites it lists) |
+
+Both counts are **tip-labelled deliberately**, because they are pre-correction: at the frozen tip the same
+commands report **39/39** and **79/79**, the correction round having added five tests. An unlabelled count
+that has moved is the defect class this record's own audits keep finding.
 
 ## Mutants bound to this candidate
 
@@ -2198,8 +2206,9 @@ Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the initial review
 worktree, one exhaustive pass each, graph-v1 rows only. The Arena bridge is down, so nothing was debated
 and **DN-05 is unsatisfied for PR-08b** as for the rest of F1.
 
-Result: **1 CRITICAL**, 3 WARNINGs and 3 SUGGESTIONs — eight rows of which two pairs are the same defect
-reached independently.
+Result: **1 CRITICAL**, 3 WARNINGs and 4 SUGGESTIONs — eight rows, of which two pairs are the same defect
+reached independently. (An earlier revision of this record said three SUGGESTIONs, and `03c2231`'s own
+commit message repeated it; the table below has four, which is the figure that counts.)
 
 | Judge | Row | Severity | Disposition |
 |---|---|---|---|
@@ -2220,10 +2229,11 @@ Frozen ledger (canonical keys, the runtime's `canonicalHash`):
 
 `src/cli/main.ts` is the package's only `bin` target (`package.json` → `dist/src/cli/main.js`) and carried
 no shebang: `git grep -n '^#!'` over the tree returned nothing, and `build` is only `tsc -b`, which copies a
-shebang but does not add one. The consequence is not cosmetic. ADR-0012's remediation table, row 2 — status
-`inherited-valid (constitution-level: the governing rule)` — prescribes **exactly** `#!/usr/bin/env node` on
-line 1, "pinned by an assertion over the built bundle", and records the failure mode of its absence as
-*"exit 0 with zero bytes on both streams — the least diagnosable outcome"*. A pre-commit hook reads that
+shebang but does not add one. The consequence is not cosmetic. ADR-0012 — a constitution-level governing rule, its own `Status` being
+`inherited-valid (constitution-level: the governing rule)` — carries a remediation table whose **row 2**
+prescribes **exactly** `#!/usr/bin/env node` on line 1, "pinned by an assertion over the built bundle", and
+records the failure mode of its absence as *"exit 0 with zero bytes on both streams — the least diagnosable
+outcome"*. A pre-commit hook reads that
 silence as *clean*, so on POSIX the PT-05 control that keeps a token out of a committed `conmuta.json`
 could be bypassed with no signal at all.
 
@@ -2283,8 +2293,48 @@ One final verification, in a clean worktree at the corrected tip with `dist/` re
 
 **`JUDGMENT: APPROVED`** for `72e09c0..a464a66`.
 
+## The ordinary native review — DECLINED for this candidate
+
+The Receipt-driven Development switch is on and the Director never left this candidate unreviewed, so the
+preflight ran against the frozen worktree (`workspaceRoot`), which binds the candidate to this slice exactly.
+`inspect` returned `ready` with a committed-range START; the START resolved consent as
+**`declined_this_candidate`**:
+
+- `lineage_created: false`, `mutation_performed: false`, `reset_eligible: false` — **no lineage exists and
+  nothing was approved or mutated**;
+- risk tier **high**, reason `process_boundary` on `src/cli/main.ts`, 15 changed files, 978 changed lines,
+  correction budget 0 — the fork/spawn signal raised by the child-process integration test this slice adds
+  on purpose.
+
+**It is recorded as a decline, never as a review that closed**, and the same candidate is not re-reviewed.
+The documented fallback is Receipt-driven Development's risk-gated path: `assess` with the decline stated
+returned risk `high`, `outcome_source: explicit`, and the plan *"the writer self-verifies and a separate
+independent verifier always runs"*. So both halves ran:
+
+- **Writer self-verification** — the clean-worktree runs, the mutants and the final verification above.
+- **Independent verifier** — `gentle-ai-verify` ran read-only over the frozen candidate `72e09c0..03c2231`
+  and reproduced every figure that matters: 268/268 and 8/8; the built entry's shebang **and** the
+  assertion's non-vacuity (deleting the emitted line made it fail 13 pass / 1 fail); mutants M10 and M11
+  killed, each restored byte-identically; both known-answer vectors re-derived outside the module; the
+  exit-code contract (8 for content, 2 for usage); the nine re-pointed citations each resolving to the
+  paragraph they name; and that the `JD-A-002` narrowing is disclosed as a deviation rather than as the
+  requirement's own wording.
+- **It also found five record defects, all corrected in the commit that carries this section** — see the
+  correction note below. That is the instrument working: the writer's own verification had passed over
+  every one of them.
+
+### Correction note — the verifier's five record defects
+
+| # | Defect | Correction |
+|---|---|---|
+| 1 | "3 SUGGESTIONs" against a table with four, repeated in `03c2231`'s commit message | corrected to four here, with the commit message's error named rather than silently left |
+| 2 | The budget table mixed scopes: the root `tsconfig.json` (+1/−1) sat outside the `-- src test` measure, so the table summed to 760 while the stated total was 759, and the audited tip read 672 in one scope and 671 in the other | the table now names its scope; the audited tip is 671 in that same scope; total 759; growth **+88**; the root tsconfig is listed as not counted |
+| 3 | The native review was forward-referenced ("recorded below") with no section below, and the slice status still said the audit was pending | the decline is recorded above and the status line corrected |
+| 4 | ADR-0012's document-level `Status` was presented as remediation row 2's status | reworded: the status is the ADR's, the prescription is row 2's |
+| 5 | The TDD table's `34/34` and `75/75` were pre-correction and unlabelled | both tip-labelled, with the frozen-tip figures (`39/39`, `79/79`) recorded |
+| 6 | *(its separate observation, not one of the five)*: the emitted usage text advertised the requirement's optional target (`[<path> | --stdin]`) while this build refuses a bare invocation with `EXIT_USAGE`, so the program's own text promised a form that exits 2 | the usage text now states the accepted forms and a test pins it, so the text cannot drift back into advertising an optional target |
+
 ## Next
 
-- Push, PR-08b, CI, and the Director's merge decision — the ordinary native review for this candidate runs
-  before the PR opens, as it did for PR-08a, and is recorded below.
+- Push, PR-08b, CI, and the Director's merge decision.
 
