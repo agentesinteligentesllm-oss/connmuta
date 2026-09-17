@@ -59,6 +59,12 @@ test("findTokenShapes counts both a token shape and an Authorization literal in 
   assert.equal(findings.count, 2);
 });
 
+test("findTokenShapes matches the Authorization literal in any casing (RFC 9110 §5.1 hardening)", () => {
+  for (const text of ["authorization: Bearer opaque", "AUTHORIZATION: Bearer opaque", "Authorization: Bearer opaque"]) {
+    assert.equal(findTokenShapes(text).count, 1, `expected one hit in ${text}`);
+  }
+});
+
 test("findTokenShapes is pure: the same input yields the same count and the input is untouched", () => {
   const text = `${FIXTURE_TOKEN}`;
   const first = findTokenShapes(text);

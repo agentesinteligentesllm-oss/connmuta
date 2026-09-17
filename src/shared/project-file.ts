@@ -2,14 +2,21 @@ import { z } from "zod";
 
 import { PROJECT_FILE_SCHEMA_VERSION, PROJECT_ID_PATTERN } from "./constants.js";
 import { AGENT_ID_PATTERN } from "./envelope.js";
-import { AUTHORIZATION_LITERAL, findTokenShapes } from "./token-shape.js";
+import { checkForSecrets, type SecretRule } from "./secrets.js";
+import { matchesAuthorizationLiteral } from "./token-shape.js";
 
 /**
  * One member of a project's bus roster (DATA-MODEL §1).
  *
+ * Named with the `Project` prefix because `shared/protocol-apply.ts` already exports a `RosterEntry`
+ * — the single `user_id` projection its own consumer reads, deliberately minimal and part of an
+ * audited SEAM. Two public types with one name in one layer would force every module that needs
+ * both to alias one of them, and the registry work in PR-09 (which copies this shape into
+ * `roster_snapshot`) needs both. The shorter name stays with the older, narrower, audited type.
+ *
  * `username` is display-only and is never an authorization input; `user_id` is the identity anchor.
  */
-export interface RosterEntry {
+export interface ProjectRosterEntry {
 	readonly agent_id: string;
 	readonly user_id: number;
 	readonly username: string;
@@ -20,19 +27,22 @@ export interface ProjectFile {
 	readonly schema_version: typeof PROJECT_FILE_SCHEMA_VERSION;
 	readonly project_id: string;
 	readonly group_id: number;
-	readonly roster: readonly RosterEntry[];
+	readonly roster: readonly ProjectRosterEntry[];
 	readonly referee?: string;
 }
 
 /**
  * The content rules the field-level walk enforces (DATA-MODEL §1 "Must never contain").
  *
- * The first two are {@link findTokenShapes}' classes; the last two are this module's own, because a
- * committed local path is a leak of machine layout rather than a secret shape.
+ * The secret shapes are {@link SecretRule} — the shared table `shared/secrets.ts` already owns —
+ * rather than a second vocabulary invented here: a PEM block or a `.env`-style assignment committed
+ * inside `conmuta.json` is the same class of leak as a bot token, and the CLI's raw-text fallback
+ * (PR-08b) uses the same table. The remaining three rules are this module's own, because a committed
+ * local path is a leak of machine layout rather than a secret shape.
  */
 export type ForbiddenContentRule =
+	| SecretRule
 	| "authorization_literal"
-	| "token_shape"
 	| "drive_prefix"
 	| "path_separator";
 
@@ -42,7 +52,9 @@ export type ForbiddenContentRule =
  * **Every member is value-free by construction.** A problem carries a `kind`, the offending
  * `field`, and the `rule` that fired — never the matched or rejected text. This is a structural
  * guarantee, not a review promise: `unsupported_schema_version.found` is typed `number`, so a
- * string can never be smuggled through it, and no other member has a field that could hold one.
+ * string can never be smuggled through it, and no other member has a field that could hold one —
+ * a document-derived key that is itself forbidden content is not named either, it is replaced by
+ * {@link REDACTED_FIELD_SEGMENT}.
  * These problems reach operator terminals, pre-commit hooks and (F2) `doctor` output, so a value
  * here would copy the very content the validator exists to keep out (PT-05, PT-06).
  */
@@ -113,6 +125,20 @@ interface IssueShape {
 	readonly keys?: readonly string[];
 }
 
+/**
+ * Stands in for a document-derived key name that is itself forbidden content (PT-05).
+ *
+ * A key is document text exactly like a value is, so a token pasted into key position instead of
+ * value position must be rejected without being echoed — the same harm the value walk exists to
+ * prevent, in the same value-free `field` string.
+ */
+const REDACTED_FIELD_SEGMENT = "<redacted>";
+
+/** One document-derived key, redacted when the key itself trips a content rule. */
+function keySegment(key: string): string {
+	return forbiddenContentRule(key) === undefined ? key : REDACTED_FIELD_SEGMENT;
+}
+
 /** Render a zod issue path as `roster[0].agent_id`-style text; the document root is `<root>`. */
 function renderPath(path: readonly PropertyKey[]): string {
 	if (path.length === 0) {
@@ -125,10 +151,17 @@ function renderPath(path: readonly PropertyKey[]): string {
 	return rendered;
 }
 
-/** Append an unknown-key name to its parent path, so an unknown key names the key itself. */
+/**
+ * Append an unknown-key name to its parent path, so an unknown key names the key itself.
+ *
+ * A benign key keeps being named — naming the offending field is the point of the report. A key that
+ * is itself forbidden content is redacted instead ({@link keySegment}), because this string reaches
+ * operator terminals, pre-commit hook output and (F2) `doctor` output.
+ */
 function joinPath(path: readonly PropertyKey[], key: string): string {
 	const parent = renderPath(path);
-	return parent === "<root>" ? key : `${parent}.${key}`;
+	const segment = keySegment(key);
+	return parent === "<root>" ? segment : `${parent}.${segment}`;
 }
 
 /**
@@ -146,30 +179,58 @@ function issueToProblems(issue: IssueShape): ProjectFileProblem[] {
 }
 
 /**
- * The first content rule `value` violates, in this fixed order: `Authorization` literal, token
- * shape, drive prefix, path separator.
+ * The first content rule `value` violates, in this fixed order: the `Authorization` literal, the
+ * shared secret table, a drive prefix, a path separator.
  *
- * The order is load-bearing and pinned: a Windows path such as `C:\project` contains a separator
- * too, so the anchored drive-prefix rule must be asked first or the report would name the weaker
- * rule. `Authorization` is asked before the token shape because {@link findTokenShapes} counts both
- * shapes together and the specific rule is the more useful report.
+ * Ordering is load-bearing and pinned. The `Authorization` literal comes first because the shared
+ * table does not know it; the secret shapes come before the two path rules so a value that leaks a
+ * secret is reported as a secret rather than as a path; and a Windows path such as `C:\project`
+ * contains a separator too, so the anchored drive-prefix rule must be asked before the separator
+ * rule or the report would name the weaker of the two.
+ *
+ * Delegating the secret shapes to {@link checkForSecrets} rather than to the narrower
+ * `findTokenShapes` is what makes the loader refuse a PEM private key or a `.env`-style assignment
+ * committed inside `conmuta.json`: a committed secret is the threat class PT-05 exists for, and the
+ * loader is the only consumer that sees the file before anything else does.
  */
 function forbiddenContentRule(value: string): ForbiddenContentRule | undefined {
-	if (value.includes(AUTHORIZATION_LITERAL)) return "authorization_literal";
-	if (findTokenShapes(value).count > 0) return "token_shape";
+	if (matchesAuthorizationLiteral(value)) return "authorization_literal";
+	const shared = checkForSecrets(value);
+	if (!shared.ok) return shared.rule;
 	if (DRIVE_PREFIX_RE.test(value)) return "drive_prefix";
 	if (PATH_SEPARATORS.some((separator) => value.includes(separator))) return "path_separator";
 	return undefined;
 }
 
 /**
- * Walk every string in the raw parsed document, in document order, collecting content problems.
+ * Maximum document depth the content walk descends to.
+ *
+ * The strict schema accepts at most three levels (document, `roster`, entry), so a document deeper
+ * than this bound is refused by the schema regardless of what the walk does: the bound exists only
+ * so a pathological document yields that refusal instead of an uncaught `RangeError` from this
+ * recursion, which would crash the documented pre-commit path with a stack trace rather than a
+ * verdict (`JSON.parse` itself handles depth far beyond this). It can therefore not hide a secret in
+ * an **accepted** file, because no accepted file reaches it.
+ */
+const MAX_CONTENT_WALK_DEPTH = 32;
+
+/**
+ * Walk every string in the raw parsed document — values and key names — in document order,
+ * collecting content problems.
  *
  * Runs over the **raw** value rather than the validated file on purpose: a file with an unknown key
  * is refused anyway, and skipping the walk there would hide a token sitting in the same document.
  * The path is built with the same `roster[0].agent_id` convention as the schema problems.
  */
-function collectForbiddenContent(value: unknown, path: string, findings: ProjectFileProblem[]): void {
+function collectForbiddenContent(
+	value: unknown,
+	path: string,
+	findings: ProjectFileProblem[],
+	depth = 0,
+): void {
+	if (depth > MAX_CONTENT_WALK_DEPTH) {
+		return;
+	}
 	if (typeof value === "string") {
 		const rule = forbiddenContentRule(value);
 		if (rule !== undefined) {
@@ -178,12 +239,20 @@ function collectForbiddenContent(value: unknown, path: string, findings: Project
 		return;
 	}
 	if (Array.isArray(value)) {
-		value.forEach((item, index) => collectForbiddenContent(item, `${path}[${index}]`, findings));
+		value.forEach((item, index) => collectForbiddenContent(item, `${path}[${index}]`, findings, depth + 1));
 		return;
 	}
 	if (typeof value === "object" && value !== null) {
 		for (const [key, item] of Object.entries(value)) {
-			collectForbiddenContent(item, path === "" ? key : `${path}.${key}`, findings);
+			// A key is document text too, and is checked as such: a token in key position is a match
+			// the validator must reject without echoing. The rule is reported against the container
+			// path, and the key itself is redacted out of the child path.
+			const rule = forbiddenContentRule(key);
+			if (rule !== undefined) {
+				findings.push({ kind: "forbidden_content", field: path === "" ? "<root>" : path, rule });
+			}
+			const segment = keySegment(key);
+			collectForbiddenContent(item, path === "" ? segment : `${path}.${segment}`, findings, depth + 1);
 		}
 	}
 }

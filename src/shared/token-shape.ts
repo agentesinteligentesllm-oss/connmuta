@@ -33,9 +33,26 @@ function countTokenShapes(text: string): number {
 	return text.match(new RegExp(TELEGRAM_BOT_TOKEN_RE.source, "g"))?.length ?? 0;
 }
 
-/** Occurrences of the `Authorization` literal in `text`, counted without a regex. */
+/**
+ * Occurrences of the `Authorization` literal in `text`, matched case-insensitively.
+ *
+ * RFC 9110 §5.1 makes HTTP field names case-insensitive, and the leak PT-05 controls is a committed
+ * `Authorization` header, so `authorization: Bearer …` is the same leak as `Authorization: …`. This
+ * is deliberately stricter than the literal spelling the requirement names; the hardening is
+ * disclosed in `apply-progress.md` rather than presented as the requirement's own wording.
+ */
 function countAuthorizationLiterals(text: string): number {
-	return text.split(AUTHORIZATION_LITERAL).length - 1;
+	return text.toLowerCase().split(AUTHORIZATION_LITERAL.toLowerCase()).length - 1;
+}
+
+/**
+ * Whether `text` carries the `Authorization` literal in any casing.
+ *
+ * Exported so the field-level walk in `project-file.ts` shares this one case-insensitive definition
+ * with the raw-text scan instead of hard-coding a third spelling of the rule.
+ */
+export function matchesAuthorizationLiteral(text: string): boolean {
+	return countAuthorizationLiterals(text) > 0;
 }
 
 /**

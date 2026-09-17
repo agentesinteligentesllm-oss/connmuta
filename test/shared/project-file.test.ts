@@ -218,7 +218,7 @@ test("a token-shaped value is rejected, names the offending field, and never ech
   assert.deepEqual(problems[0], {
     kind: "forbidden_content",
     field: "roster[0].username",
-    rule: "token_shape",
+    rule: "telegram_bot_token_shape",
   });
   assert.equal(
     JSON.stringify(problems).includes(FIXTURE_TOKEN),
@@ -237,7 +237,7 @@ test("the offending field is named for the entry that actually carries it", () =
   assert.deepEqual(reject(text)[0], {
     kind: "forbidden_content",
     field: "roster[1].username",
-    rule: "token_shape",
+    rule: "telegram_bot_token_shape",
   });
 });
 
@@ -293,6 +293,64 @@ test("structural problems are reported before content problems, and both are rep
   });
 });
 
+// --- Requirement: Token-shape validator — a key is document text too (PT-05) ---
+
+test("a token-shaped top-level key is rejected by rule and never echoed", () => {
+  const problems = reject(file({ [FIXTURE_TOKEN]: 1 }));
+  assert.equal(
+    JSON.stringify(problems).includes(FIXTURE_TOKEN),
+    false,
+    "a key pasted in token position must not be echoed: this result reaches logs and terminals",
+  );
+  assert.deepEqual(problems, [
+    { kind: "schema_invalid", field: "<redacted>" },
+    { kind: "forbidden_content", field: "<root>", rule: "telegram_bot_token_shape" },
+  ]);
+});
+
+test("a token-shaped key inside a roster entry is rejected and never echoed", () => {
+  const problems = reject(
+    file({
+      roster: [
+        { agent_id: "@alice-agent", user_id: 100000001, username: "alice_example_bot", [FIXTURE_TOKEN]: 1 },
+      ],
+    }),
+  );
+  assert.equal(JSON.stringify(problems).includes(FIXTURE_TOKEN), false);
+  assert.deepEqual(problems[0], { kind: "schema_invalid", field: "roster[0].<redacted>" });
+  assert.deepEqual(problems[1], { kind: "forbidden_content", field: "roster[0]", rule: "telegram_bot_token_shape" });
+});
+
+test("an Authorization literal in key position is rejected by rule and never echoed", () => {
+  const problems = reject(file({ [AUTHORIZATION_LITERAL]: 1 }));
+  assert.equal(JSON.stringify(problems).includes(AUTHORIZATION_LITERAL), false);
+  assert.deepEqual(problems, [
+    { kind: "schema_invalid", field: "<redacted>" },
+    { kind: "forbidden_content", field: "<root>", rule: "authorization_literal" },
+  ]);
+});
+
+test("a forbidden value under a token-shaped key is named without the key being echoed", () => {
+  const problems = reject(file({ [FIXTURE_TOKEN]: "a/b" }));
+  assert.equal(
+    JSON.stringify(problems).includes(FIXTURE_TOKEN),
+    false,
+    "the key-derived path of a nested finding must not carry the key",
+  );
+  assert.deepEqual(problems, [
+    { kind: "schema_invalid", field: "<redacted>" },
+    { kind: "forbidden_content", field: "<root>", rule: "telegram_bot_token_shape" },
+    { kind: "forbidden_content", field: "<redacted>", rule: "path_separator" },
+  ]);
+});
+
+test("redaction is scoped to the forbidden key: a benign unknown key is still named", () => {
+  const problems = reject(file({ extra_key: 1, [FIXTURE_TOKEN]: 2 }));
+  const fields = problems.map((problem) => (problem.kind === "schema_invalid" ? problem.field : problem.kind));
+  assert.deepEqual(fields, ["extra_key", "<redacted>", "forbidden_content"]);
+  assert.equal(JSON.stringify(problems).includes(FIXTURE_TOKEN), false);
+});
+
 test("a value carrying both the Authorization literal and a token shape is reported as the literal", () => {
   const problems = reject(
     file({ roster: [{ agent_id: "@alice-agent", user_id: 100000001, username: `x ${FIXTURE_TOKEN} Authorization` }] }),
@@ -302,4 +360,60 @@ test("a value carrying both the Authorization literal and a token shape is repor
     field: "roster[0].username",
     rule: "authorization_literal",
   });
+});
+
+// --- The loader applies the whole shared secret table, not only the token shape (JD-A-002) ---
+
+test("a PEM private-key block in a schema-valid field is refused without echoing it", () => {
+  const pem = "-----BEGIN RSA PRIVATE KEY-----";
+  const problems = reject(
+    file({ roster: [{ agent_id: "@alice-agent", user_id: 100000001, username: pem }] }),
+  );
+  assert.deepEqual(problems[0], {
+    kind: "forbidden_content",
+    field: "roster[0].username",
+    rule: "pem_private_key_block",
+  });
+  assert.equal(JSON.stringify(problems).includes(pem), false);
+});
+
+test("a .env-style secret assignment in a schema-valid field is refused", () => {
+  const problems = reject(
+    file({ roster: [{ agent_id: "@alice-agent", user_id: 100000001, username: "BOT_TOKEN = 1234567890abcdef" }] }),
+  );
+  assert.deepEqual(problems[0], {
+    kind: "forbidden_content",
+    field: "roster[0].username",
+    rule: "env_style_secret_assignment",
+  });
+});
+
+test("the Authorization literal is refused in any casing (RFC 9110 §5.1 hardening)", () => {
+  for (const value of ["authorization: Bearer opaque", "AUTHORIZATION: Bearer opaque", "Authorization: Bearer opaque"]) {
+    const problems = reject(
+      file({ roster: [{ agent_id: "@alice-agent", user_id: 100000001, username: value }] }),
+    );
+    assert.deepEqual(problems[0], {
+      kind: "forbidden_content",
+      field: "roster[0].username",
+      rule: "authorization_literal",
+    });
+  }
+});
+
+// --- A pathological document is refused, never a crash (JD-B-002) ---
+
+/**
+ * A 20000-level nested object, built by concatenation: `JSON.stringify` would recurse into it and
+ * fail before the parser ever saw the document.
+ */
+function deeplyNestedDocument(depth: number): string {
+  const open = '{"a":'.repeat(depth);
+  const close = "}".repeat(depth);
+  return `{"schema_version":1,"project_id":"prj-example","group_id":-1,"roster":[{"agent_id":"@alice-agent","user_id":100000001,"username":${open}1${close}}]}`;
+}
+
+test("a 20000-level document is refused instead of crashing the content walk", () => {
+  const result = parseProjectFile(deeplyNestedDocument(20_000));
+  assert.equal(result.ok, false, "a document this deep cannot satisfy the strict schema");
 });
