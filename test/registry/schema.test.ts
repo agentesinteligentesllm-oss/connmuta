@@ -253,6 +253,28 @@ test("settings is optional and strict: the two documented keys are accepted, a t
 	assert.deepEqual(problemsOf(withBinding({ settings: { reminder_window_hours: 0 } })), [{ kind: "schema_invalid" }]);
 });
 
+test("a malformed document reports one shape problem, not one per bad member (JD-A-005)", () => {
+	// A strict object with several bad members produces one zod issue per member and every one of them maps
+	// to the same value-free `{ kind: "schema_invalid" }`, so an uncollapsed list would carry the same row
+	// two or nine times and its length would say nothing an operator can act on.
+	const twoDefects = withBot({ bot_id: -1, added_at: "not a date" });
+	assert.deepEqual(problemsOf(twoDefects), [{ kind: "schema_invalid" }]);
+
+	// The other half of the rule, and the one that keeps the collapse from hiding a real refusal: it is
+	// per kind, so a document that also violates an invariant still reports both kinds.
+	const mixed = validRegistryDocument();
+	mixed.groups.push({ group_id: -1001234567892, added_at: "2026-09-16T00:00:00Z" });
+	mixed.projects.push({ project_id: "prj-shared", path: "C:\\work\\shared" });
+	mixed.bindings.push(activeBinding({ project_id: "prj-shared", group_id: -1001234567892, bot_id: -1 }));
+	const problems = problemsOf(mixed);
+	assert.equal(problems.filter((problem) => problem.kind === "schema_invalid").length, 1, JSON.stringify(problems));
+	assert.equal(
+		problems.some((problem) => problem.kind === "invariant_violated"),
+		true,
+		JSON.stringify(problems),
+	);
+});
+
 test("projects[].path is informational: this schema does not require an absolute path (F2 doctor owns that rule)", () => {
 	// DATA-MODEL §2.3 calls the field an "absolute local path" and this schema enforces only "a
 	// non-empty string": an absolute-path test differs per platform (a drive prefix versus a POSIX
@@ -267,18 +289,18 @@ test("projects[].path is informational: this schema does not require an absolute
 });
 
 test("the snapshot entry is the project file's roster entry, not a second declaration (DATA-MODEL §1)", () => {
-	// The valid entries in this table are deliberately distinct from the known-good entry the document
-	// leads with: a pair of entries is now subject to the roster array's own rules as well, so an entry
-	// identical to the leading one is refused for a reason the entry declaration alone never sees, and
-	// the equality under test would compare two different questions (the array-level rules are pinned
-	// separately, below).
+	// Two rules apply to a two-entry snapshot and this table pins the *entry* one: **every** entry below
+	// is therefore distinct in `agent_id` from the known-good entry the document leads with. An entry that
+	// repeated `@alice-agent` is refused by the array's own uniqueness rule whatever its own shape was, so
+	// a looser entry declaration would change no verdict — which is exactly how this pin was masked once
+	// already, and why round 1's scoped re-judgment reported a regression (`M4` survived the sweep again).
 	const entries: JsonObject[] = [
 		rosterSnapshotEntry({ agent_id: "@carol-agent", user_id: 100000003, username: "carol_example_bot" }),
 		rosterSnapshotEntry({ agent_id: "@bob-agent", user_id: 100000002, username: "bob_example_bot" }),
-		{ agent_id: "@alice-agent", user_id: 100000001 },
-		rosterSnapshotEntry({ extra_field: 1 }),
-		rosterSnapshotEntry({ user_id: -1 }),
-		rosterSnapshotEntry({ agent_id: "alice-agent" }),
+		{ agent_id: "@carol-agent", user_id: 100000003 },
+		rosterSnapshotEntry({ agent_id: "@carol-agent", user_id: 100000003, extra_field: 1 }),
+		rosterSnapshotEntry({ agent_id: "@carol-agent", user_id: -1 }),
+		rosterSnapshotEntry({ agent_id: "carol-agent", user_id: 100000003 }),
 	];
 
 	for (const entry of entries) {
