@@ -2108,23 +2108,30 @@ rest of F1 (Arena bridge down).
 
 ## Scope and budget (measured)
 
-| Path | Authored lines |
-|---|---|
-| `src/shared/roster-hash.ts` | 39 |
-| `test/shared/roster-hash.test.ts` | 86 |
-| `src/cli/validate.ts` | 63 |
-| `test/cli/validate.test.ts` | 189 |
-| `src/cli/main.ts` | 125 |
-| `test/cli/main.test.ts` | 150 |
-| `src/shared/constants.ts` | +14 / −1 (`EXIT_VALIDATION_FAILED`) |
-| `tsconfig.json`, `src/cli/tsconfig.json` | +6 / −2 (the build wiring below) |
-| **budget total** | **672 / 400** — **272-line PR-08b-scoped exception** |
+| Path | Final lines | At the audited tip `bc5beec` |
+|---|---|---|
+| `src/shared/roster-hash.ts` | 39 | 39 |
+| `test/shared/roster-hash.test.ts` | 120 | 86 |
+| `src/cli/validate.ts` | 68 | 63 |
+| `test/cli/validate.test.ts` | 212 | 189 |
+| `src/cli/main.ts` | 132 | 125 |
+| `test/cli/main.test.ts` | 164 | 150 |
+| `src/shared/constants.ts` | +14 / −1 (`EXIT_VALIDATION_FAILED`) | same |
+| `tsconfig.json`, `src/cli/tsconfig.json` | +6 / −2 (the build wiring below) | same |
+| `src/shared/token-shape.ts`, `test/shared/token-shape.test.ts` | +4 / −4, +1 / −1 | comment-only |
+| **budget total** | **759 / 400** — **359-line PR-08b-scoped exception** | 672 / 400 |
 
 The exception follows the same grounds as PR-08a's: the CLI's value is in its contract — argument
 handling, exit codes, never echoing, not executing on import — and `test/cli/validate.test.ts` exercises
 it at the **process boundary** (a real child process, the design §15 "Integration" layer), which is the
 only place a token could leak into a message. Trimming those cases is exactly what the budget rule
 forbids.
+
+The correction round grew the slice from **672 to 759** (+87 net), and two of its files are **PR-08a's**,
+touched comment-only: `src/shared/token-shape.ts` and `test/shared/token-shape.test.ts` carried
+`design.md` citations that this slice's own appended design row invalidated, so leaving them stale would
+have shipped a trace that cannot be followed (AGENTS.md §3). No behaviour in a merged file changed, no
+hash-pinned file was touched, and the correction is itself the covered evidence above.
 
 ## The three carried findings this slice closes
 
@@ -2163,10 +2170,13 @@ byte-identically with a `sha256` check:
 
 | Tree | Tests | `test:static` |
 |---|---|---|
-| `d0eac03` (PR-08b code tip) | **263 / 263** | **8 / 8** |
+| `d0eac03` (PR-08b code tip, pre-audit) | **263 / 263** | **8 / 8** |
+| `a464a66` (the corrected tip; `dist/` rebuilt from scratch) | **268 / 268** | **8 / 8** |
 
 That is PR-08a's 229 plus this slice's **34**: `test/shared/roster-hash.test.ts` (8),
-`test/cli/validate.test.ts` (13) and `test/cli/main.test.ts` (13).
+`test/cli/validate.test.ts` (13) and `test/cli/main.test.ts` (13). The correction round adds five more:
+the shebang assertion over the built bundle, the `Authorization`-only and token-shaped raw-path cases, and
+the disagreeing-order roster vector with its own non-vacuity check.
 
 ## Reportable contradictions resolved or carried
 
@@ -2182,9 +2192,99 @@ That is PR-08a's 229 plus this slice's **34**: `test/shared/roster-hash.test.ts`
    requirement's literal spelling. Disclosed in PR-08a's record as a fail-closed hardening (RFC 9110
    §5.1); `cli/validate.ts` inherits it because it shares the definition rather than restating it.
 
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the initial review tree `bc5beec` in a clean
+worktree, one exhaustive pass each, graph-v1 rows only. The Arena bridge is down, so nothing was debated
+and **DN-05 is unsatisfied for PR-08b** as for the rest of F1.
+
+Result: **1 CRITICAL**, 3 WARNINGs and 3 SUGGESTIONs — eight rows of which two pairs are the same defect
+reached independently.
+
+| Judge | Row | Severity | Disposition |
+|---|---|---|---|
+| B | `JD-B-001` | **CRITICAL** | the sole `bin` target had no shebang; fixed in round 1, re-judged `verified` |
+| A | `JD-A-001` | WARNING | the raw-text path names the wrong rule (also `JD-B-002`); folded |
+| B | `JD-B-002` | WARNING | same defect as `JD-A-001`, independently reached; folded |
+| B | `JD-B-003` | WARNING | the test covering the raw-text scan could not fail; folded |
+| A | `JD-A-002` | SUGGESTION | the bare `conmuta validate` narrowing was undisclosed; disclosed below |
+| A | `JD-A-003` | SUGGESTION | `design.md` citations left stale by this slice's own appended row (also `JD-B-005`); fixed |
+| B | `JD-B-004` | SUGGESTION | the roster-hash sort key was unpinned; folded |
+| B | `JD-B-005` | SUGGESTION | same as `JD-A-003`; fixed |
+
+Frozen ledger (canonical keys, the runtime's `canonicalHash`):
+`2ef778b4266cf0ff8af5d2c296497b3ed7f70c058a989715cf55329774910867`, batch `1 of 2`, authorized ID
+`JD-B-001`.
+
+### The CRITICAL, and why it is constitution-level
+
+`src/cli/main.ts` is the package's only `bin` target (`package.json` → `dist/src/cli/main.js`) and carried
+no shebang: `git grep -n '^#!'` over the tree returned nothing, and `build` is only `tsc -b`, which copies a
+shebang but does not add one. The consequence is not cosmetic. ADR-0012's remediation table, row 2 — status
+`inherited-valid (constitution-level: the governing rule)` — prescribes **exactly** `#!/usr/bin/env node` on
+line 1, "pinned by an assertion over the built bundle", and records the failure mode of its absence as
+*"exit 0 with zero bytes on both streams — the least diagnosable outcome"*. A pre-commit hook reads that
+silence as *clean*, so on POSIX the PT-05 control that keeps a token out of a committed `conmuta.json`
+could be bypassed with no signal at all.
+
+**The ADR was re-read in this session rather than trusted from the row**, and it says what the row claims.
+Two things about this defect are worth keeping: it was invisible to every gate in the tree (CI runs
+`windows-latest` only, where npm's shim invokes `node` explicitly and masks it), and it was invisible to
+this slice's own eight mutants and its author's read of the file, because a shebang is not a property of
+the source's *behaviour* — it is a packaging contract. That is the class of defect an adversarial read
+finds and a test suite does not.
+
+### Round 1 — the correction
+
+**The authorized severe batch** (`jd-fix-agent`, round 1 of 2, surfaces `src/cli/main.ts` +
+`test/cli/main.test.ts`): the shebang, the ADR-0012 comment naming why it is load-bearing, and an assertion
+that reads the **built** file's first line. Its non-vacuity was proven by deleting that line from the
+untracked `dist/` and watching the assertion fail (13 pass / 1 fail), and the *packaged* artifact was
+checked with `npm pack` + `tar -xOf`, which is the artifact npm bin-links on POSIX.
+
+**The four informational rows**, folded by the author under the Director's established preference from
+PR-08a. Judgment Day's own rule is that WARNING and SUGGESTION rows schedule no fix; folding them before
+the re-judgment is what keeps the re-judged tree the shipped tree, and the PR was not yet open. Disclosed
+as an author decision, not as part of the authorized batch:
+
+| Row | Change | Why |
+|---|---|---|
+| `JD-A-001`/`JD-B-002` | the non-JSON path **recovers** the rule that fired instead of hard-coding the token shape | `findTokenShapes` counts two shapes through one API, so a malformed document whose only forbidden shape is an `Authorization` header was reported as a bot token — sending an operator to hunt a token that does not exist |
+| `JD-B-003` | the raw-scan test now asserts the forbidden line is present **and** that it precedes the parse complaint | `parseProjectFile` reports `invalid_json` on its own, so deleting the scan left every existing assertion true: the guarantee the docstring calls load-bearing was unpinned (ADR-0012's rule) |
+| `JD-B-004` | a second roster-hash vector whose `agent_id` and `user_id` orders **disagree** | with only the first vector, sorting by `user_id` reproduced every assertion, so the sort key was unpinned in a cross-module contract |
+| `JD-A-003`/`JD-B-005` | nine `design.md` citations re-pointed (148→149, 150→151, 588→589, 143→144) | this slice's own appended design row shifted every later line, and the traceability doctrine says every statement traces to a source |
+
+**Disclosed, not coded — `JD-A-002`.** The requirement spells the surface as
+`conmuta validate [<path> | --stdin]`, whose bracket notation makes the target optional; this CLI refuses
+the bare form with `EXIT_USAGE`. The narrowing is deliberate: a default target would need the walk-up
+`client/binding.ts` owns in PR-33, and silently validating `./conmuta.json` would validate the wrong file
+in any directory that is not the project root. Unlike the case-insensitive `Authorization` match and the
+appended exit-code row, this one was **not** disclosed before the audit flagged it, which is the real
+defect the judge named — so it is disclosed here.
+
+### Mutants for the corrected tree (round 1)
+
+Three, all killed, each built first on a cleaned `dist/` and restored byte-identically with a `sha256`
+check: `M9` the raw-text rule assumed again, `M10` the raw-text scan removed — **the mutant that proves
+`JD-B-003` is closed**, because that test could not fail before this round — and `M11` the roster pairs
+re-keyed to `user_id`.
+
+### Re-judgment (scoped, one round)
+
+Judge B received only `JD-B-001`, its exact hash-bound row, and the fix diff (`git show a464a66`), with the
+four folded rows disclosed for **fix-line regression** purposes only. Result: **`JD-B-001 → verified`**, no
+regression, so the second scoped round is unspent — as in PR-08a.
+
+### Final verification and verdict
+
+One final verification, in a clean worktree at the corrected tip with `dist/` rebuilt from scratch:
+**268/268** tests and `test:static` **8/8**, and the emitted `dist/src/cli/main.js` starts with
+`#!/usr/bin/env node`. With no severe row surviving:
+
+**`JUDGMENT: APPROVED`** for `72e09c0..a464a66`.
+
 ## Next
 
-- Judgment Day over `72e09c0..<this tip>`, a bounded correction round, and a scoped re-judgment.
-- Then the ordinary native review for this candidate, and only after that: push, PR-08b, CI, and the
-  Director's merge decision.
+- Push, PR-08b, CI, and the Director's merge decision — the ordinary native review for this candidate runs
+  before the PR opens, as it did for PR-08a, and is recorded below.
 
