@@ -69,6 +69,14 @@ about to be reported — not by an unfinished draft the Director deferred to thi
 will change before then, PR-09b's own preflight is a fresh, independent candidate; this declined one is
 simply dead.
 
+**Both identities of this unchanged content are now declined, and no further preflight should be attempted
+until the content changes.** After the close-out docs commit moved the surrounding tree, the preflight
+re-identified the same three paths as a new candidate (`sha256:0bc4e9dd958042cc72de53fc6bb4bd189e82372bb39c5f10cc44fe76e318fd11`, `lineage review-44f9022ad8d8481f`) and `review.start` resolved
+`declined_this_candidate` a second time — same 3 files, same 536 lines, `lineage_created: false`, no
+mutation. That is the host's own answer to the same question, not an inference: do not spend another round
+on it. A genuinely new candidate appears only once this half is written and verified, and its preflight runs
+then, on the changed content.
+
 ---
 
 ## §1 — Where the work stands
