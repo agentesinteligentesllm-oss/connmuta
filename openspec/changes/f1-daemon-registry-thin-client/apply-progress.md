@@ -1834,3 +1834,260 @@ corrected in this commit, one tested and rejected: it held that `apply.tribunal_
 sentence, and its unquoted form is rejected by a strict parser, so the quoting was required.
 **Judgment Day was deliberately not run**: there is no behavioural surface for a two-lens adversarial
 pass to attack, and inventing one would misrepresent what that instrument is for.
+
+---
+
+# PR-08a — `shared/token-shape.ts` + `shared/project-file.ts` (re-sliced at apply time from PR-08)
+
+**Slice status:** implemented; **both independent lifecycles closed** at the code tip `ddfa1c3`,
+re-sliced at apply time from PR-08 into PR-08a/PR-08b. Judgment Day returned **approved** for
+`014f661..ddfa1c3` after one bounded correction round, and the ordinary native review closed
+**approved** with its authority burned. The tribunal is **not** available (Arena bridge down), so this
+slice is audited by the substitute path and **DN-05 is unsatisfied** — the same disclosure PR-06,
+PR-07a and PR-07b carry.
+
+| Field | Value |
+|---|---|
+| Branch | `f1/08a-shared-validators` → `main`, from `main` @ `014f661` |
+| Code commits | `984c2f3` (`token-shape.ts` + its twin), `888c1ec` (`project-file.ts` + its twin), `ddfa1c3` (Judgment Day round 1 + the four folded hardening rows) |
+| Docs commit | `44ea9a1` (the re-slice note, the PT cells, this record) |
+| Requirements | `project-binding › Committed project file schema` (PT-06); `project-binding › Token-shape validator` (PT-05, D-29) |
+| Provenance | none — PR-08a vendors **no** v1 range; `test/fixtures/v1-provenance.json` stays at 11 entries |
+| tsconfig | untouched: both modules live in `src/shared/`, already referenced by the root project |
+
+## Why PR-08 was re-sliced (measured, not estimated)
+
+The tasks phase planned PR-08 at ≈370 authored lines against a 400-line budget. The realised slice is
+**1,400 authored lines** (`git diff --numstat` over the ten files: 983 code, 251 doc-comment, 166
+blank), i.e. **3.5× the budget and 2.3× the largest PR this repository has accepted** (PR-05, 609).
+That is not a rounding error, so it was escalated to the Director before any commit, with the four
+options (one PR with a 1,400-line exception / two stacked PRs / four file-boundary PRs / trim tests and
+comments). The Director chose the file-and-dependency boundary: **PR-08a** (the two shared validators)
+and **PR-08b** (roster hash + the CLI), each with its own disclosed, PR-scoped exception. Precedent:
+the same in-place re-slice as PR-01 → PR-01a/PR-01b and PR-06 → PR-06a/PR-06b. The split is not
+cosmetic: `cli/validate.ts` imports `project-file.ts`, so PR-08b's candidate stacks on PR-08a's and the
+review unit for each half is roughly half.
+
+Root cause, stated plainly: the tasks-phase estimate for this slice was **3.8× under** (≈370 vs 1,400),
+and the two halves are over budget *in the same way* — the test files carry one assertion per rule the
+gated documents state (DATA-MODEL §1's field table, the four content rules, the unknown-key path). The
+budget rule forbids trimming review context to fit, which is why an exception is declared rather than a
+smaller slice claimed.
+
+## Scope and budget (PR-08a)
+
+| Path | Authored lines, final | At the audited tip `888c1ec` |
+|---|---|---|
+| `src/shared/token-shape.ts` | 99 | 82 |
+| `test/shared/token-shape.test.ts` | 120 | 114 |
+| `src/shared/project-file.ts` | 316 | 247 |
+| `test/shared/project-file.test.ts` | 419 | 305 |
+| **budget total** | **954 / 400** — **554-line PR-08a-scoped exception** | 748 / 400 |
+
+The correction round grew the slice by **206 lines** (748 → 954), which is the documented expectation
+rather than a surprise: PR-07a grew 398→420 and PR-07b 495→554, and the four hardening rows the
+Director folded into the same round are the reason this figure is larger than those. The growth is
+tests and doc comments, never review context removed.
+
+Grounds for the exception, in the shape PR-06b's was granted: these are two modules that share one
+contract (`project-file.ts` applies `token-shape.ts` to the parsed document), so splitting them at the
+file boundary would put one module's consumer in a different PR than its provider for no review gain;
+and the test files carry one assertion per documented rule — uniqueness, `referee` membership, the four
+content rules, the unknown-key path per level, and the never-echo property — every one of which the
+mutation rounds below show can fail. Trimming them is exactly what the budget rule forbids.
+The exception is **PR-08a-scoped** and distinct from DN-06 (which stays AS-IS-only and is not amended).
+
+## TDD cycle evidence
+
+Red before green, per module, both twins shipped in the same commit as the module they test.
+
+| Step | Command | Observed RED |
+|---|---|---|
+| 8.1 RED | `node node_modules/typescript/bin/tsc -b` | `TS2307: Cannot find module '../../src/shared/project-file.js'` and `…/token-shape.js` — the legitimate brand-new-module RED per `strict-tdd.md` |
+| 8.1 RED (first green attempt) | `node --test "dist/test/shared/project-file.test.js" "dist/test/shared/token-shape.test.js"` | 38/44 pass, **6 fail** — see the defect below |
+| 8.2 GREEN | same two commands | **44/44** pass |
+
+**The RED caught a real defect, which is the point of the order.** `parseProjectFile` returned
+`{ ok: true, file }` whenever the schema passed, discarding the content findings collected by the walk:
+a file with a valid shape and a token-shaped value in a schema-valid field was **accepted**. The six
+failures were the content-rule cases. Fixed by refusing when either the schema fails or content problems
+exist, and pinned by mutant M2 below. Two smaller corrections came from the same round: an assertion of
+mine expected the literal spelling `Authorization` where the message names the rule token
+`authorization_literal`, and one content case seeded `project_id` — which also violates the slug pattern,
+so the structural problem correctly came first; the case now seeds a schema-valid field.
+
+**One test-side defect the security gates caught, recorded because it is a reusable trap:** the first
+draft of `token-shape.test.ts` used the *synthetic deny-list markers* from
+`test/security/repo-scan.test.ts` as a fake operator marker. That test excludes only itself from the
+repository scan, so quoting its markers in any other file fails PT-22. Replaced with a marker invented
+for this test; `npm run test:static` then passed. The token fixtures keep the house 7-digit bot-id run
+so they exercise the shared shape while staying outside PT-22's 8–10 digit scan (documented in both
+test files).
+
+## Mutant matrix — each built first, each restored byte-identically
+
+Seven mutants were built during the slice against the pre-split working tree (all seven killed). Four of
+them attack PR-08a's files, and those four were **re-run bound to the actual candidate** `888c1ec` in the
+clean verification worktree, so this PR's evidence is not inherited from a tree that no longer exists:
+
+| # | Mutant | Test that killed it |
+|---|---|---|
+| M1 | Drive-prefix rule asked *after* the path-separator rule, so a Windows path is reported as the weaker rule | `test/shared/project-file.test.ts` — “reported as a drive prefix, not a separator” |
+| M2 | Content problems dropped on the success path — **the exact defect the RED caught** | `test/shared/project-file.test.ts` — the four content cases |
+| M3 | `z.strictObject` replaced by a stripping `z.object` | `test/shared/project-file.test.ts` — “unknown key is rejected, never stripped” |
+| M4 | `assertNoTokenShape` stops consulting the shared secret table | `test/shared/token-shape.test.ts` — the PEM, `.env`-style and configured-marker cases |
+
+The three remaining mutants (roster hash including `username`, the CLI echoing the document on a refusal,
+and the CLI running on import) attack PR-08b's files and are recorded there. Every mutant ran on a
+byte-restored copy and the restore was verified by `sha256` before the next one; the round ends with the
+candidate green again.
+
+## Verification from a clean detached worktree
+
+`git worktree add --detach ../telegram_bus_agent-worktrees/verify-08a 888c1ec`, then
+`npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"`, then
+the same worktree re-checked-out at `014f661` (with `rm -rf dist` first, because a stale `dist/`
+silently fakes results) to **measure** the baseline instead of citing it:
+
+| Tree | Tests | `test:static` |
+|---|---|---|
+| `014f661` (`main`, measured) | **175 / 175** | 8 / 8 |
+| `888c1ec` (PR-08a code tip) | **219 / 219** | **8 / 8** |
+
+PR-08a therefore adds **44 tests**: `test/shared/token-shape.test.ts` (14) +
+`test/shared/project-file.test.ts` (30). The 253-test figure recorded for the whole slice belongs to the
+pre-split tree (219 + the 34 tests of PR-08b's three suites), and is not claimed here. The focused command
+task 8.5 names passes on the 08a subset. Worktree removed; `git worktree list` shows only the main tree.
+
+## Reportable contradictions (reported, not resolved — AGENTS.md §2)
+
+1. **`conmuta validate` has no exit code anywhere in the gated documents.** `design.md:126` enumerates
+the other commands' codes 2–7 and reserves 1 for uncaught errors; the command D-29 introduces has none,
+yet the documented pre-commit one-liner has to branch on it. PR-08b resolves it by adding
+`EXIT_VALIDATION_FAILED = 8` to `constants.ts` with its reasoning, disclosed as an apply-time addition
+to design §11's table rather than a silent new literal.
+2. **`design.md:124` lists `TELEGRAM_BOT_TOKEN_RE` under `constants.ts`**, but the exported regex ships
+in `src/shared/secrets.ts:24`; `design.md:444` (the §12 reuse row) is the source of truth. PR-08a imports
+from `secrets.ts` and does **not** rewrite the design table — reported here instead.
+3. **PT-05 and PT-06 carried no file-name cell.** Both rows' second cell held only a scope phrase
+(`installer unit + hook`, `shared unit`), and `THREAT-MODEL.md:7` calls the PT identifiers proposed names
+rather than files, delegating the real names to the F1 spec (`design.md:550`). Task 8.6's “file-name
+cell” therefore means *filling a cell that did not exist*. Done in this slice for PT-06 and for PT-05's
+`token-shape` half; **PR-08b appends PT-05's `cli/validate` half**, so each PR names only the files it
+actually adds. The cell is touched twice on purpose: an over-claimed cell is the defect two judges
+caught in PR-06a.
+4. **`src/cli/tsconfig.json` referenced `../client` and `../daemon`, neither of which has a single `.ts`
+file**, so a `tsc -b` that reached it would fail `TS18003`. Deferring those two references to PR-32 and
+PR-15 is a PR-08b change (with the reason written next to them in the file); recorded here because it is
+a trap PR-08's own scope would have hit on its first build.
+5. **The twin `test/cli/main.ts`'s scope omitted is real**, as HANDOFF §4 predicted: `test/twins.test.ts`
+requires a twin for every non-declaration `.ts` under `src/`, so PR-08b adds
+`test/cli/main.test.ts`. Carried finding, not an invention of this record.
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the initial review tree `44ea9a1` and
+returned only the graph-v1 shape (`{"rows":[…]}`), one exhaustive pass each, in the clean worktree
+`../telegram_bus_agent-worktrees/jd-08a`. The record uses the graph-v1 shape throughout; PR-07a's
+older `{"findings":…,"evidence":…}` drift is not repeated here.
+
+**Both judges found the same CRITICAL, independently — and it was real.** A document-derived **key**
+name was rendered verbatim into `ProjectFileProblem.field`, so a token pasted into key position instead
+of value position came back **echoed in the problem list**, in a value this module documents as reaching
+operator terminals, pre-commit output and (F2) `doctor`. That falsified the type's own "value-free by
+construction" guarantee, which was true of values and false of keys. `JD-A-001` and `JD-B-001`, both
+`deterministic`, both `open`, the same defect from two directions.
+
+| Judge | Row | Severity | Disposition |
+|---|---|---|---|
+| A | `JD-A-001` | CRITICAL | fixed in round 1; re-judged `verified` |
+| B | `JD-B-001` | CRITICAL | fixed in round 1; re-judged `verified` |
+| A | `JD-A-002` | WARNING | informational — **folded** by Director decision (below) |
+| A | `JD-A-003` | SUGGESTION | informational (the version early-return's deliberate precedence) |
+| B | `JD-B-002` | SUGGESTION | informational — **folded** by Director decision |
+| B | `JD-B-003` | SUGGESTION | informational — **folded** by Director decision |
+| B | `JD-B-004` | SUGGESTION | informational — **folded** by Director decision |
+
+Frozen ledger (canonical, keys sorted as the runtime's `canonicalHash` does):
+`28dd8e53bbb3c8a4213619e07e4db6531052b4e09b8b9fdd77b708cbae08ac`, batch `1 of 2`, authorized IDs
+`JD-A-001`, `JD-B-001`. The two rows were normalized before freezing so that **no token-shaped literal
+is written into this file** (PT-22/doc hygiene, `bus-v2-f1-pr-03-001`): the field the judges reproduced
+is described as "the 7-digit fixture token".
+
+### Round 1 — the correction (one bounded batch)
+
+| Item | Value |
+|---|---|
+| Mechanism | `jd-fix-agent`, the standalone dispatch the runtime accepts, allowed surfaces `src/shared/project-file.ts` + its twin |
+| Fix | `REDACTED_FIELD_SEGMENT`/`keySegment` redact a key that is itself forbidden content; `joinPath` uses it, and the walk now inspects **key names** too, reporting the rule against the container path so the operator still learns where the problem is |
+| TDD | five tests written RED first (all five failed against the unpatched build with the token echoed), then GREEN |
+| Result | that file 35/35; the correction commit is `ddfa1c3` |
+
+### The four informational rows, folded by Director decision
+
+Judgment Day's own rule is that WARNING and SUGGESTION candidates become one-time informational rows and
+never schedule fixes. The Director was asked explicitly whether to fold them into this same round —
+because folding them **before** re-judgment is what makes the re-judged tree the shipped tree, and
+because the PR was not yet open — and chose to fold all four. They are therefore an **author decision
+disclosed as such**, not part of the authorized severe batch:
+
+| Row | Change | Why it matters |
+|---|---|---|
+| `JD-A-002` (WARNING) | the field walk applies the whole shared secret table via `checkForSecrets`, so a PEM block or a `.env`-style assignment committed inside `conmuta.json` is refused; the rule vocabulary is now `SecretRule` plus this module's three own names | the loader is the only consumer that sees the file first; a committed secret is the threat class PT-05 exists for |
+| `JD-B-002` (SUGGESTION) | the walk is bounded by `MAX_CONTENT_WALK_DEPTH = 32` | a ~5k-deep document made the documented pre-commit path throw `RangeError` instead of returning a verdict; no **accepted** file can reach the bound, because the strict schema caps accepted documents at three levels |
+| `JD-B-004` (SUGGESTION) | the `Authorization` literal is matched case-insensitively, through one exported `matchesAuthorizationLiteral` shared by both consumers | RFC 9110 §5.1 makes field names case-insensitive; **disclosed as a hardening beyond the requirement's literal spelling**, in the fail-closed direction |
+| `JD-B-003` (SUGGESTION) | `RosterEntry` renamed `ProjectRosterEntry` | `shared/protocol-apply.ts:50` already exports a `RosterEntry` (its minimal `user_id` projection, inside an audited SEAM); two public types with one name in one layer force every consumer that needs both to alias one, and the rename is free only while this type is unpublished |
+
+### Mutants for the corrected tree (round 1)
+
+Four, all killed, each built first on a cleaned `dist/` and restored byte-identically with a `sha256`
+check: `M8` the CRITICAL fix reverted (a forbidden key named verbatim again), `M6` the loader stops
+consulting the shared secret table, `M7` the `Authorization` literal matched case-sensitively again,
+**`M5` the depth bound removed — which is what proves the deep-document test is load-bearing rather
+than decorative** (without the bound the walk really does throw).
+
+### Re-judgment (scoped, one round)
+
+Each judge received only its own frozen ID, that ID's exact hash-bound row, and the fix diff
+(`git show ddfa1c3`), with the four folded rows disclosed for **fix-line regression** purposes only.
+Result: `JD-A-001 → verified`, `JD-B-001 → verified`. No regression was returned and no second round was
+needed, so the terminal re-judgment budget of two rounds is unspent.
+
+### Final verification and verdict
+
+One final verification, in the frozen worktree at `ddfa1c3` with `dist/` rebuilt from scratch:
+**229/229** tests and `test:static` **8/8**. With no severe row surviving:
+
+**`JUDGMENT: APPROVED`** for `014f661..ddfa1c3`.
+
+## The ordinary native review — a separate, independent lifecycle
+
+The Receipt-driven Development switch is on and the Director never left this candidate unreviewed, so
+the preflight ran. It was executed against the **frozen worktree** (`workspaceRoot`), not the main tree,
+so the candidate is exactly this slice and excludes PR-08b's uncommitted files:
+
+| Step | Result |
+|---|---|
+| `inspect` | `ready`, action `start`, offered a **committed-range** START (`--base-ref=014f661… --committed-only=true`) |
+| `start` | lineage `review-f644a39f445a2a0c`, risk **medium** (reason: not purely passive documentation), lens `review-reliability`, 7 changed files, 1121 changed lines, correction budget 200 |
+| `status` | `collect` with exactly one slot |
+| `capture` (1st) | **forecast, no mutation**: transport `pi_host_relay`, **1 model run**, lens `review-reliability` — relayed, then re-submitted with `reviewerRunAcknowledged: true` |
+| `capture` (2nd) | `approved` — closure `native-last-event-closure` |
+| `acknowledge-approved` | **authority burned** (`gentle-ai.review-acknowledged/v1`); delivery is ordinary repository policy |
+
+The closure's own text is the disposition of its findings: *"This review is approved and its receipt
+stands. Every finding listed here is non-blocking: none opened a correction, none reopens this review,
+and no correction transition is offered for this candidate."* Four advisory findings, recorded verbatim
+by id and location and filed as backlog **B-22** rather than acted on here: `R3-01` (WARNING,
+`src/shared/project-file.ts:294-296`), `R3-02` (WARNING, `test/shared/project-file.test.ts:5-9`),
+`R3-03` (SUGGESTION, `test/shared/project-file.test.ts:352-362`), `R3-04` (SUGGESTION,
+`src/shared/project-file.ts:151-158`). Review approval **never** authorizes delivery, and this PR is not
+authorization either: commit, push, PR and merge stay ordinary repository policy.
+
+## Next
+
+- Push `ddfa1c3`, open PR-08a, wait for the CI matrix, and leave the merge to the Director.
+- PR-08b (`roster-hash.ts`, `cli/validate.ts`, `cli/main.ts`, `EXIT_VALIDATION_FAILED`, the tsconfig
+  wiring and the twins) is prepared afterwards on top of the merged `main`, with its own verification,
+  its own Judgment Day audit and its own review lifecycle.
+
