@@ -4,6 +4,53 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 12: PR-09 re-sliced; PR-09a (registry document) delivered and merged as #13
+
+**Closed**
+
+- **PR-09 measured 1,570 authored lines against its ≈380 estimate** (4.1×), so it was escalated to the
+  Director before anything was committed. The Director chose a **re-slice into two audited halves** over one
+  1,170-line exception, and authorized the commits as work units. PR-09a — the registry *document*:
+  `src/registry/{schema,invariants}.ts`, the new `src/registry` compile unit, the shared roster-entry
+  schema and the extracted `applyRosterUniqueness`, each with its twin — landed at **1,266 lines with a
+  disclosed 866-line PR-scoped exception**, PR **#13** merged as `b205dc7` (code tip `2279c15`), CI green
+  on both legs. **48/210 tasks**, **304 tests**, `test:static` 8/8.
+- **Judgment Day (the tribunal substitute; DN-05 unsatisfied)**: 13 rows (1 CRITICAL, 4 WARNING, 8
+  SUGGESTION), four pairs reached independently by both judges. The CRITICAL: `roster_snapshot` inherited
+  only the *entry* shape of `conmuta.json`'s roster, not its roster-level uniqueness rules, so a
+  hand-edited registry could repeat an `agent_id` or map two agents to one `user_id` in the daemon's
+  admission source. The fix extracted `applyRosterUniqueness` (`3508243`). The first scoped re-judgment
+  **contradicted** (verified vs regression); the parent diagnosed it by re-running the mutant sweep and found
+  **two mutants surviving that the correction itself had introduced** (`M4` re-masked, `M7` unpinned),
+  corrected in `010ed85`; both judges then resolved `verified` → **`JUDGMENT: APPROVED`**. Record:
+  `bus-v2-f1-pr-09a-audit-001`.
+- **The ordinary native review was declined for this candidate** (`lineage_created: false`, no mutation,
+  risk medium), so it is recorded as a decline, never a closure, and that candidate was not re-reviewed. The
+  RDD fallback ran: an independent `gentle-ai-verify` pass reproduced every headline figure (304/304, 8/8,
+  75/75, the budget as measured then, the `M4`/`M6`/`M7` kills) and found **eleven record defects** —
+  including two of the writer's own figures that had been *computed* rather than measured, and a row count
+  that contradicted its own table. All corrected before the commit that claims them.
+- **Two cross-module contradictions filed rather than silently resolved**: **B-27** (the shared token regex
+  matches this project's own `sha256:` roster hash, so R5's raw-text scan would refuse every valid
+  registry — PR-09b works around it at the call site and the root cause needs a decision) and **B-29**
+  (nothing at load time ties `roster_hash` to its snapshot). **B-28** (no R1–R6 row demands referential
+  integrity; an F2 `doctor` item) joins them. **B-26** stays open: PR-09a filled only PT-18's cell and left
+  PT-25's to PR-09b, per that row's own prescription.
+- **The stale remote branches are gone.** Only `f1/09-registry` remained after the earlier merges; the
+  Director authorized deleting it, so `origin` now has `main` alone.
+
+**Opened**
+
+- **PR-09b** — `src/registry/loader.ts` + `test/registry/loader.test.ts`: the mtime/size fingerprint
+  hot-reload (D-12), last-good-in-memory, the never-renamed quarantine-on-invalid refusal, the R5 pre-parse
+  scan through `assertNoTokenShape`, the loader scenarios of task 9.1, 9.3–9.6, and PT-25's registry-side
+  half. Its files are already written and green in the local working tree (uncommitted); its plan, the
+  `sha256:`/R5 collision it resolves and the fresh-session prompt are in `HANDOFF.md`.
+
+**How this entry knows**: the merge commit `b205dc7` and `gh pr checks 13` (both legs pass); the verified
+tip `2279c15`; `apply-progress.md` §PR-09a; `docs/05-tribunal/INDEX.md` `bus-v2-f1-pr-09a-audit-001`;
+`git ls-remote --heads origin`.
+
 ## 2026-09-17 — Session 11: PR-08 delivered in two audited halves (PR-08a #11, PR-08b #12)
 
 **Closed**
