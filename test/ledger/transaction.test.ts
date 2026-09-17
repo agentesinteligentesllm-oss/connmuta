@@ -57,20 +57,48 @@ const MAX_PROBE_PAGES = 8;
 /** Rows enough to exceed {@link MAX_PROBE_PAGES} many times over before the insert loop would end. */
 const BULK_INSERT_ROWS = 100_000;
 
+/** The pragmas and the probe table every test in this suite starts from. */
+function openProbe(db: DatabaseSync): void {
+	db.exec("PRAGMA journal_mode = WAL");
+	db.exec("PRAGMA foreign_keys = ON");
+	db.exec(PROBE_DDL);
+}
+
 /** Opens a fresh temp-file ledger, runs `operation`, and removes the directory even on failure. */
 function withDatabase(operation: (db: DatabaseSync, path: string) => void): void {
 	const dir = mkdtempSync(join(tmpdir(), "conmuta-ledger-"));
 	const path = join(dir, "ledger.db");
 	const db = new DatabaseSync(path);
 	try {
-		db.exec("PRAGMA journal_mode = WAL");
-		db.exec("PRAGMA foreign_keys = ON");
-		db.exec(PROBE_DDL);
+		openProbe(db);
 		operation(db, path);
 	} finally {
 		db.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
+}
+
+/**
+ * The same fresh temp-file ledger, for a test that must await queued continuations before asserting.
+ *
+ * The async-callback tests are about work *scheduled* for later, so their assertions are only meaningful
+ * once that work has had a chance to run; every other test in the suite stays with the synchronous helper.
+ */
+async function withDatabaseAwaiting(operation: (db: DatabaseSync) => Promise<void> | void): Promise<void> {
+	const dir = mkdtempSync(join(tmpdir(), "conmuta-ledger-await-"));
+	const db = new DatabaseSync(join(dir, "ledger.db"));
+	try {
+		openProbe(db);
+		await operation(db);
+	} finally {
+		db.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+/** One turn of the macrotask queue, so anything the code under test scheduled has certainly run. */
+function afterQueuedWork(): Promise<void> {
+	return new Promise((resolve) => setImmediate(resolve));
 }
 
 /** One row in `probe`, written by the connection the test is driving. */
@@ -194,21 +222,98 @@ test("a callback that ends the transaction itself never replaces the caller's er
 	});
 });
 
-test("an async callback is refused before the commit, and the part that already ran is rolled back", () => {
-	// `() => T` accepts `T = Promise<void>`, so the type cannot forbid this; the value check before `COMMIT`
-	// can, and turning the misuse into a refusal is what keeps a partial batch from being committed silently.
-	withDatabase((db) => {
+test("an async callback is refused before it runs, so nothing it would have written exists", async () => {
+	// `() => T` accepts `T = Promise<void>`, so the type cannot forbid this; refusing the callback's own
+	// shape before `BEGIN` can, and it is the only point at which the refusal leaves nothing behind.
+	await withDatabaseAwaiting(async (db) => {
+		let started = false;
+
 		assert.throws(
 			() =>
 				withTransaction(db, async () => {
+					started = true;
 					insert(db, 1);
 				}),
 			{ message: ASYNC_CALLBACK_MESSAGE },
-			"a promise-returning callback must be refused rather than committed early",
+			"an async callback must be refused rather than committed early",
 		);
 
-		assert.equal(rowCount(db), 0, "the synchronous part of the callback was rolled back, not committed");
+		await afterQueuedWork();
+		assert.equal(started, false, "the body must not have been started at all");
+		assert.equal(rowCount(db), 0, "nothing the callback would have written may exist");
 		assert.equal(db.isTransaction, false, "the connection is left clean for the next batch");
+	});
+});
+
+test("an async callback with a tail after its await cannot leave that tail behind", async () => {
+	// Round 2's correction, and the reason the refusal moved before `BEGIN`: refusing an async callback
+	// *after* calling it left its post-`await` statements to run on this connection once the transaction had
+	// been rolled back, where they autocommit — the caller got an error *and* a half-applied batch, with only
+	// the later statements persisted. The queue is drained before asserting so a tail that did run has
+	// certainly landed, which is what makes this test able to fail for the old shape.
+	await withDatabaseAwaiting(async (db) => {
+		let started = false;
+
+		assert.throws(
+			() =>
+				withTransaction(db, async () => {
+					started = true;
+					insert(db, 1);
+					await Promise.resolve();
+					insert(db, 2);
+				}),
+			{ message: ASYNC_CALLBACK_MESSAGE },
+		);
+
+		await afterQueuedWork();
+		assert.equal(started, false, "an async body must not have been started at all");
+		assert.equal(rowCount(db), 0, "neither the pre-await nor the post-await statement may exist");
+		assert.equal(db.isTransaction, false);
+	});
+});
+
+test("a thenable returned by a plain callback is refused, rolled back, and settled", async () => {
+	// The residual shape: a function that is not itself `async` can still return a thenable. It is refused
+	// before `COMMIT` and rolled back, and the abandoned promise is settled on the way out — a rejection
+	// nobody handles would reach the process after the misuse had been reported.
+	await withDatabaseAwaiting(async (db) => {
+		let assimilated = false;
+		const thenable = { then: () => { assimilated = true; } };
+
+		assert.throws(
+			() =>
+				withTransaction(db, () => {
+					insert(db, 1);
+					return thenable;
+				}),
+			{ message: ASYNC_CALLBACK_MESSAGE },
+		);
+
+		assert.equal(rowCount(db), 0, "the callback's writes were rolled back, not committed");
+		await afterQueuedWork();
+		assert.equal(assimilated, true, "the abandoned thenable must be settled rather than left to reject unhandled");
+		assert.equal(db.isTransaction, false);
+	});
+});
+
+test("a function-shaped thenable is refused too: Promises/A+ counts objects and functions", () => {
+	// Promises/A+ §1.1 defines a thenable as "an object or function that defines a then method", and both
+	// `await` and `Promise.resolve` assimilate either — so a check that only looked at objects would let a
+	// function-valued thenable through while the docstring claimed it caught all of them.
+	withDatabase((db) => {
+		const functionThenable = Object.assign(() => undefined, { then: () => undefined });
+
+		assert.throws(
+			() =>
+				withTransaction(db, () => {
+					insert(db, 1);
+					return functionThenable;
+				}),
+			{ message: ASYNC_CALLBACK_MESSAGE },
+		);
+
+		assert.equal(rowCount(db), 0, "the callback's writes were rolled back, not committed");
+		assert.equal(db.isTransaction, false);
 	});
 });
 

@@ -26,13 +26,23 @@ import type { DatabaseSync } from "node:sqlite";
  *   `UNIQUE (bot_id, update_id)` in `schema.ts`.
  * - **The connection is left outside any transaction** on every path, because the poller reuses it.
  *
- * **Boundary, pinned rather than stated.** `fn` must be synchronous. `node:sqlite` is a synchronous API,
- * so a Promise-returning callback would let `COMMIT` land *before* that promise settled and then run the
- * rest of the work outside the transaction — a partial write with no error and no rollback. The type
- * cannot forbid it (`() => T` accepts `T = Promise<void>`), so the value is checked before `COMMIT` and a
- * thenable is refused with the transaction rolled back: the misuse becomes an error the caller sees
- * instead of a write it does not. `test/ledger/transaction.test.ts` pins both halves — the refusal, and
- * that the callback's synchronous part was rolled back.
+ * **Boundary, refused up front.** `fn` must be synchronous. `node:sqlite` is a synchronous API, so a
+ * callback that keeps running after this function has returned would write *outside* the transaction:
+ * `COMMIT` lands first and every later statement autocommits on the same connection. `() => T` cannot
+ * forbid that (`T = Promise<void>` is assignable), so it is refused at both points where a refusal is
+ * possible.
+ *
+ * - An `async` callback is refused **before it runs**, which is the only point at which refusing it
+ *   prevents the work. Nothing it would have written exists at all, so a callback with a tail after an
+ *   `await` cannot leave that tail behind. This is the shape a caller actually writes, and it is checked
+ *   structurally: a bound or proxied `async` function whose identity does not survive falls through to the
+ *   value check below.
+ * - A thenable *returned* by a callback that is not itself `async` is refused before `COMMIT` and the
+ *   transaction is rolled back, so everything the callback did is undone. What that promise's own
+ *   continuation does afterwards is the caller's code on the caller's connection, and this module has no
+ *   reach into it — the refusal is what turns such a continuation into a visible bug rather than a silent
+ *   one. The abandoned promise is settled on the way out, because a rejection nobody handles would take
+ *   the process down after the misuse had already been reported.
  *
  * This module only delimits. It owns no table and no column, and it does not advance
  * `offsets.next_update_id`: the one transaction per poll batch that does is PR-12's
@@ -56,18 +66,42 @@ export const NESTED_TRANSACTION_MESSAGE =
  * spelling of the refusal rather than matching prose.
  */
 export const ASYNC_CALLBACK_MESSAGE =
-	"withTransaction: the callback returned a thenable; it must run synchronously, because this transaction commits when it returns (design §5.3).";
+	"withTransaction: the callback is an async function (or returned a thenable); it must run synchronously, because this transaction commits when it returns (design §5.3).";
+
+/**
+ * Whether `fn` is an `async` function — the shape whose body continues after an `await` returns.
+ *
+ * Read structurally because `AsyncFunction` is not a distinct `typeof`, and checked *before* the callback
+ * is called: an async body that has already started cannot be stopped, and its later statements autocommit
+ * once this module has rolled the transaction back. A bound or proxied async function whose constructor
+ * identity does not survive slips past this check and is then caught by {@link isThenable} on its returned
+ * value, with the continuation hazard the module doc describes.
+ */
+function isAsyncFunction(fn: () => unknown): boolean {
+	// The optional chain is deliberate: a callable whose prototype was replaced has no `constructor`, and
+	// reading through it must answer "not async" rather than throwing a `TypeError` before the transaction.
+	return fn.constructor?.name === "AsyncFunction";
+}
 
 /**
  * Whether `value` is a thenable, i.e. what `async () => …` returns.
  *
- * Structural rather than `instanceof Promise`, because a caller may return any thenable and the check
- * has to catch all of them. A `then` read that throws is deliberately **not** swallowed: it propagates as
- * the caller's own error, which the surrounding `catch` turns into a rollback — the one outcome that
- * cannot be mistaken for a committed batch.
+ * Structural rather than `instanceof Promise`, and it covers functions as well as objects because
+ * Promises/A+ §1.1 defines a thenable as "an object or function that defines a then method" — a function
+ * carrying `then` is assimilated by `await` and by `Promise.resolve`, so it has to be refused here or the
+ * promise of a synchronous callback is not kept. A `then` read that throws is deliberately **not**
+ * swallowed: it propagates as the caller's own error, which the surrounding `catch` turns into a rollback —
+ * the one outcome that cannot be mistaken for a committed batch.
  */
 function isThenable(value: unknown): boolean {
-	return value !== null && typeof value === "object" && typeof (value as { then?: unknown }).then === "function";
+	if (value === null) {
+		return false;
+	}
+	const type = typeof value;
+	if (type !== "object" && type !== "function") {
+		return false;
+	}
+	return typeof (value as { then?: unknown }).then === "function";
 }
 
 /**
@@ -86,12 +120,18 @@ export function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
 	if (db.isTransaction) {
 		throw new Error(NESTED_TRANSACTION_MESSAGE);
 	}
+	if (isAsyncFunction(fn)) {
+		// Refused before `BEGIN`, so nothing the callback would have written exists at all — including a tail
+		// it would have run after its first `await`, which no later rollback could reach.
+		throw new Error(ASYNC_CALLBACK_MESSAGE);
+	}
 	db.exec("BEGIN IMMEDIATE");
 	try {
 		const value = fn();
-		// Before `COMMIT`, and deliberately inside the `try`: refusing here rolls back the synchronous part
-		// of the callback instead of committing it and leaving the rest to run outside the transaction.
 		if (isThenable(value)) {
+			// Settle the abandoned promise: an unhandled rejection would reach the process after the misuse was
+			// already reported, and Node's default policy for one is to take the process down.
+			void Promise.resolve(value).catch(() => undefined);
 			throw new Error(ASYNC_CALLBACK_MESSAGE);
 		}
 		db.exec("COMMIT");
