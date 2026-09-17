@@ -4,6 +4,75 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 10: F1 apply, PR-07b merged (stopped at the PR-07b → PR-08 boundary)
+
+**Closed**
+
+- PR-07b (`shared/tool-output.ts`, SEAM) implemented, audited, reviewed and merged as PR #10
+  (`bd3c6ed`; audited code tip `cec18ef`). The slice extracts `v1:src/tools/fetch.ts:65-348` — the fetch
+  tool's input type, every output shape it returns, and the compact tick's two trims — into the one
+  definition the daemon and the client share, plus the carried **D4** correction as its first commit
+  (`27100ce`).
+- **Budget: 554 lines against 400, a disclosed 154-line PR-scoped exception** — and that is the honest
+  figure, not a trimmed one. It was trimmed from 549 to **495** before the authorization request, then
+  the single bounded correction round took it to 554. 284 of the 554 are the design-mandated vendored
+  range (`v1:src/tools/fetch.ts:65-348`), which no trim can reduce; the Director chose the disclosed
+  exception over chaining PR-07c for the shape half (≈449) or fitting at ≈405 by under-disclosing the
+  header. The PR-07c split `tasks.md` allowed is **not CI-safe** and was refused: `test/twins.test.ts`
+  fails a `src` file whose twin is missing in the same tree.
+- **Judgment Day found seven real rows and zero CRITICAL.** Round 1 over `a3b56c3..1b73722` (two blind
+  judges, native `{"rows":[…]}` shape — disclosed drift from the `findings`/`evidence` shape PR-07a
+  recorded): a header clause that attributed two exported functions to design §8.4, which mandates
+  nothing of the kind; a twin that constrained **no member** of five declared output types, so deleting
+  `LogEntry.basis` or narrowing `UnannouncedClosure.resolved_at` left the whole suite green; a digest
+  assertion over a test-local literal that could not fail, against a gate that names digest rendering;
+  a gated carried-findings note still describing D4 as live after it was closed; a fence case that
+  restated PT-13's assertions and over-claimed its title; and a decorative round-trip assertion.
+- **The fix round produced a defect of its own, and the mutants caught it**: mutual assignability alone
+  tolerates a dropped optional member, so the first version of the shape pins stayed green under M9t.
+  `SameShape` (key set **and** structure) was written in response. Re-judgment 1 then returned
+  `regression` on that row **with no reason** — the native resolution shape carries none — so the sweep
+  was finished by hand instead of guessed: two defects the fix had left (an unsupported universal in a
+  JSDoc, and a mutant table still presenting pre-audit counts and stale line numbers). Fix round 2
+  corrected both and the terminal re-judgment resolved **8/8 rows `verified` from both judges**.
+  Terminal verdict **`JUDGMENT: APPROVED`** for `a3b56c3..cec18ef`; **DN-05 unsatisfied**
+  (`bus-v2-f1-pr-07b-audit-001`).
+- **An independent ordinary native review also closed on the candidate** (lineage
+  `review-7a57283629321227`, one lens `review-reliability`, tier medium): **approved**, authority burned
+  (`gentle-ai.review-acknowledged/v1`), one advisory non-blocking finding
+  (`R3-tool-output-shape`), recorded as backlog **B-21** on the closure's own terms — it never reopens
+  the review and is not a reason to re-run it.
+- Evidence: provenance re-derived with two methods, both validated against the ratified fence pin
+  (`25d39d9c…`, control `01c35ebf…`); 4 behavioural mutants killed and **all 15 type pins mutated one by
+  one, none vacuous**; verified from clean detached worktrees at the pre-audit and corrected tips
+  (**176/176** then **175/175** full, `test:static` **8/8**, focused 15/15), with the verified tree hash
+  identical to the committed one. The ledger, the correction rounds, the deviations and the two
+  reportable contradictions are in `apply-progress.md`'s PR-07b section.
+- **Post-merge sweep done**: `HANDOFF.md` rewritten for PR-08, this entry prepended, and the status
+  lines swept in `AGENTS.md`, `README.md`, `docs/00-INDEX.md`, `openspec/config.yaml` and `state.yaml`;
+  `docs/05-tribunal/INDEX.md` carries `bus-v2-f1-pr-07b-audit-001` with its independence-from-review
+  field.
+
+**Opened**
+
+- **Three backlog rows, because the audits recommended formalizing them and nothing should live only in
+  a handoff table**: **B-19** the pre-existing blind-stripped pin at `src/shared/constants.ts:3`
+  (`4ce5e514…` vs the rule-conformant `039d53a2…`) — needs its own audited change and invalidates
+  PR-04's wrong-value-control table; **B-20** design §12's AS-IS rows over line-range extracts (now
+  three: `tool-schemas` ×2 reported by PR-07a, `tool-output` ×1 by PR-07b) — a design amendment the
+  Director owns, since `design.md` is gated; **B-21** the review's advisory finding.
+- PR-08 (`conmuta.json` schema, token-shape validator, `conmuta validate`, D-29) is the next slice,
+  under the settled route: ODD with the SDD contract preserved, audited by Judgment Day.
+
+**How it knows**: `git log`/`git diff *a3b56c3*` and the merged PR #10 with its CI matrix green on both
+entries; two blind judges' `{"rows":[…]}` results plus two scoped re-judgments in `{"resolutions":[…]}`
+form (round 1 and terminal), all recorded in `apply-progress.md`; `npm test` 175/175 and
+`npm run test:static` 8/8 from clean detached worktrees and on merged `main`; mutation runs repeated on
+faithful byte-restored copies (M1 5/1, M2 4/2, M3 4/2, M4 5/1, fifteen type pins each failing its own
+line); the native review's own envelopes (`approved`, `authority: burned`); `gentle-ai sdd-status`
+(`nextRecommended: apply`, **41/210**); `docs/05-tribunal/INDEX.md`
+(`bus-v2-f1-pr-07b-audit-001`); Engram observations #3283–#3287 and the session-10 summary.
+
 ## 2026-09-17 — Session 9: F1 apply, PR-07a merged (stopped at the PR-07a → PR-07b boundary)
 
 **Closed**
