@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { ASYNC_CALLBACK_MESSAGE, NESTED_TRANSACTION_MESSAGE, withTransaction } from "../../src/ledger/transaction.js";
+import { DEFERRED_CALLBACK_MESSAGE, NESTED_TRANSACTION_MESSAGE, withTransaction } from "../../src/ledger/transaction.js";
 
 /**
  * The `node:sqlite` transaction spike (design §5.3): the idiom `withTransaction` relies on, confirmed
@@ -234,7 +234,7 @@ test("an async callback is refused before it runs, so nothing it would have writ
 					started = true;
 					insert(db, 1);
 				}),
-			{ message: ASYNC_CALLBACK_MESSAGE },
+			{ message: DEFERRED_CALLBACK_MESSAGE },
 			"an async callback must be refused rather than committed early",
 		);
 
@@ -262,7 +262,7 @@ test("an async callback with a tail after its await cannot leave that tail behin
 					await Promise.resolve();
 					insert(db, 2);
 				}),
-			{ message: ASYNC_CALLBACK_MESSAGE },
+			{ message: DEFERRED_CALLBACK_MESSAGE },
 		);
 
 		await afterQueuedWork();
@@ -272,26 +272,79 @@ test("an async callback with a tail after its await cannot leave that tail behin
 	});
 });
 
-test("a thenable returned by a plain callback is refused, rolled back, and settled", async () => {
-	// The residual shape: a function that is not itself `async` can still return a thenable. It is refused
-	// before `COMMIT` and rolled back, and the abandoned promise is settled on the way out — a rejection
-	// nobody handles would reach the process after the misuse had been reported.
+test("a thenable returned by a plain callback is refused, rolled back, and settled, rejection included", async () => {
+	// The residual shape: a function that is none of the deferred shapes can still return a thenable. It is
+	// refused before `COMMIT` and rolled back, and the abandoned promise is settled on the way out. The
+	// *rejecting* thenable is the half that matters and the half a fulfillment-only settle would satisfy
+	// while leaving an unhandled rejection behind — which Node's default policy turns into a process exit,
+	// after the misuse had already been reported.
 	await withDatabaseAwaiting(async (db) => {
-		let assimilated = false;
-		const thenable = { then: () => { assimilated = true; } };
+		const rejections: unknown[] = [];
+		const observer = (reason: unknown): void => {
+			rejections.push(reason);
+		};
+		process.on("unhandledRejection", observer);
+		try {
+			let assimilated = false;
+			const thenable = {
+				then: (_resolve: unknown, reject: (reason: Error) => void): void => {
+					assimilated = true;
+					reject(new Error("synthetic rejection from an abandoned thenable"));
+				},
+			};
 
-		assert.throws(
-			() =>
-				withTransaction(db, () => {
+			assert.throws(
+				() =>
+					withTransaction(db, () => {
+						insert(db, 1);
+						return thenable;
+					}),
+				{ message: DEFERRED_CALLBACK_MESSAGE },
+			);
+
+			assert.equal(rowCount(db), 0, "the callback's writes were rolled back, not committed");
+			await afterQueuedWork();
+			assert.equal(assimilated, true, "the abandoned thenable must be assimilated, not dropped");
+			assert.deepEqual(rejections, [], "its rejection must be handled here, not left to the process");
+			assert.equal(db.isTransaction, false);
+		} finally {
+			process.off("unhandledRejection", observer);
+		}
+	});
+});
+
+test("a generator callback is refused too: its body would start on the caller's first next()", async () => {
+	// The third deferred shape, and the one an `async`-only pre-flight let through: a generator body does not
+	// run when the callback is called, so `withTransaction` would have committed an empty transaction and
+	// handed the caller an iterator whose every statement autocommits outside it.
+	await withDatabaseAwaiting(async (db) => {
+		let started = false;
+		const shapes: ReadonlyArray<[string, () => Generator<number> | AsyncGenerator<number>]> = [
+			[
+				"function*",
+				function* () {
+					started = true;
 					insert(db, 1);
-					return thenable;
-				}),
-			{ message: ASYNC_CALLBACK_MESSAGE },
-		);
+					yield 1;
+				},
+			],
+			[
+				"async function*",
+				async function* () {
+					started = true;
+					await Promise.resolve();
+					insert(db, 2);
+				},
+			],
+		];
 
-		assert.equal(rowCount(db), 0, "the callback's writes were rolled back, not committed");
+		for (const [name, shape] of shapes) {
+			assert.throws(() => withTransaction(db, shape), { message: DEFERRED_CALLBACK_MESSAGE }, `${name} must be refused`);
+		}
+
 		await afterQueuedWork();
-		assert.equal(assimilated, true, "the abandoned thenable must be settled rather than left to reject unhandled");
+		assert.equal(started, false, "no generator body may have started");
+		assert.equal(rowCount(db), 0, "nothing a generator would have written may exist");
 		assert.equal(db.isTransaction, false);
 	});
 });
@@ -309,7 +362,7 @@ test("a function-shaped thenable is refused too: Promises/A+ counts objects and 
 					insert(db, 1);
 					return functionThenable;
 				}),
-			{ message: ASYNC_CALLBACK_MESSAGE },
+			{ message: DEFERRED_CALLBACK_MESSAGE },
 		);
 
 		assert.equal(rowCount(db), 0, "the callback's writes were rolled back, not committed");

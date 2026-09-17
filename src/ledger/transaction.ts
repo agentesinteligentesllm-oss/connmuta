@@ -27,22 +27,22 @@ import type { DatabaseSync } from "node:sqlite";
  * - **The connection is left outside any transaction** on every path, because the poller reuses it.
  *
  * **Boundary, refused up front.** `fn` must be synchronous. `node:sqlite` is a synchronous API, so a
- * callback that keeps running after this function has returned would write *outside* the transaction:
- * `COMMIT` lands first and every later statement autocommits on the same connection. `() => T` cannot
- * forbid that (`T = Promise<void>` is assignable), so it is refused at both points where a refusal is
- * possible.
+ * callback whose body keeps going after this function has returned would write *outside* the transaction:
+ * the transaction commits first and every later statement autocommits on the same connection. `() => T`
+ * cannot forbid that (`T = Promise<void>` is assignable), so every shape that defers its own body is
+ * refused before it starts.
  *
- * - An `async` callback is refused **before it runs**, which is the only point at which refusing it
- *   prevents the work. Nothing it would have written exists at all, so a callback with a tail after an
- *   `await` cannot leave that tail behind. This is the shape a caller actually writes, and it is checked
- *   structurally: a bound or proxied `async` function whose identity does not survive falls through to the
- *   value check below.
- * - A thenable *returned* by a callback that is not itself `async` is refused before `COMMIT` and the
- *   transaction is rolled back, so everything the callback did is undone. What that promise's own
- *   continuation does afterwards is the caller's code on the caller's connection, and this module has no
- *   reach into it — the refusal is what turns such a continuation into a visible bug rather than a silent
- *   one. The abandoned promise is settled on the way out, because a rejection nobody handles would take
- *   the process down after the misuse had already been reported.
+ * - An `async` function (its body continues after the first `await`) and a generator function (its body
+ *   starts on the first `next()`) are refused **before `BEGIN`**, which is the only point at which refusing
+ *   them prevents the work: nothing they would have written exists, and a generator's caller never
+ *   receives the iterator it would have driven later. The check reads the intrinsic constructor name, so a
+ *   bound or proxied function whose identity does not survive falls through to the value check below.
+ * - A thenable *returned* by a callback that is none of those is refused before `COMMIT`, and the
+ *   transaction is rolled back so everything the callback did is undone; the abandoned promise is settled
+ *   on the way out, because a rejection nobody handles would reach the process after the misuse had
+ *   already been reported. What that promise's own continuation does afterwards is the caller's code on
+ *   the caller's connection and outside this module's reach — the refusal turns it into a visible bug, and
+ *   does not pretend to stop it.
  *
  * This module only delimits. It owns no table and no column, and it does not advance
  * `offsets.next_update_id`: the one transaction per poll batch that does is PR-12's
@@ -65,22 +65,36 @@ export const NESTED_TRANSACTION_MESSAGE =
  * Exported for the same reason as {@link NESTED_TRANSACTION_MESSAGE}: the caller and its test pin one
  * spelling of the refusal rather than matching prose.
  */
-export const ASYNC_CALLBACK_MESSAGE =
-	"withTransaction: the callback is an async function (or returned a thenable); it must run synchronously, because this transaction commits when it returns (design §5.3).";
+export const DEFERRED_CALLBACK_MESSAGE =
+	"withTransaction: the callback is deferred (an async or generator function, or it returned a thenable); it must run synchronously, because this transaction commits when it returns (design §5.3).";
 
 /**
- * Whether `fn` is an `async` function — the shape whose body continues after an `await` returns.
+ * The callable shapes whose body runs *later*: an `async` function (after its first `await`) and a generator
+ * (on its first `next()`).
  *
- * Read structurally because `AsyncFunction` is not a distinct `typeof`, and checked *before* the callback
- * is called: an async body that has already started cannot be stopped, and its later statements autocommit
- * once this module has rolled the transaction back. A bound or proxied async function whose constructor
- * identity does not survive slips past this check and is then caught by {@link isThenable} on its returned
- * value, with the continuation hazard the module doc describes.
+ * Named as the intrinsics name them, because `AsyncFunction` and `GeneratorFunction` are not distinct
+ * `typeof` values — the constructor's name is the only structural handle on them.
  */
-function isAsyncFunction(fn: () => unknown): boolean {
-	// The optional chain is deliberate: a callable whose prototype was replaced has no `constructor`, and
-	// reading through it must answer "not async" rather than throwing a `TypeError` before the transaction.
-	return fn.constructor?.name === "AsyncFunction";
+const DEFERRED_CALLBACK_SHAPES: ReadonlySet<string> = new Set([
+	"AsyncFunction",
+	"GeneratorFunction",
+	"AsyncGeneratorFunction",
+]);
+
+/**
+ * Whether `fn` is one of the shapes in {@link DEFERRED_CALLBACK_SHAPES}.
+ *
+ * Read structurally and checked *before* the callback is called: an async body that has already started
+ * cannot be stopped, and a generator's body has not even started when this function returns — its
+ * statements would run on this same connection outside the transaction, where they autocommit. A bound or
+ * proxied function whose constructor identity does not survive slips past this check and is then caught by
+ * {@link isThenable} on its returned value, with the continuation hazard the module doc describes.
+ *
+ * The optional chain is deliberate: a callable whose prototype was replaced has no `constructor`, and
+ * reading through it must answer "not deferred" rather than throwing a `TypeError` before the transaction.
+ */
+function isDeferredCallback(fn: () => unknown): boolean {
+	return DEFERRED_CALLBACK_SHAPES.has(fn.constructor?.name ?? "");
 }
 
 /**
@@ -120,10 +134,11 @@ export function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
 	if (db.isTransaction) {
 		throw new Error(NESTED_TRANSACTION_MESSAGE);
 	}
-	if (isAsyncFunction(fn)) {
+	if (isDeferredCallback(fn)) {
 		// Refused before `BEGIN`, so nothing the callback would have written exists at all — including a tail
-		// it would have run after its first `await`, which no later rollback could reach.
-		throw new Error(ASYNC_CALLBACK_MESSAGE);
+		// it would have run after its first `await`, and a generator body that would have started on the
+		// caller's first `next()`, which no later rollback could reach.
+		throw new Error(DEFERRED_CALLBACK_MESSAGE);
 	}
 	db.exec("BEGIN IMMEDIATE");
 	try {
@@ -132,7 +147,7 @@ export function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
 			// Settle the abandoned promise: an unhandled rejection would reach the process after the misuse was
 			// already reported, and Node's default policy for one is to take the process down.
 			void Promise.resolve(value).catch(() => undefined);
-			throw new Error(ASYNC_CALLBACK_MESSAGE);
+			throw new Error(DEFERRED_CALLBACK_MESSAGE);
 		}
 		db.exec("COMMIT");
 		return value;
