@@ -230,15 +230,17 @@ than one 1,570-line PR — three times the largest exception this repository has
 at the only boundary that compiles on its own, the loader (neither `schema.ts` nor `invariants.ts` imports
 it, and the twin rule forbids shipping a module without its test):
 
-  - **PR-09a** (`f1/09a-registry-document`): `src/registry/schema.ts` (309) + `src/registry/invariants.ts`
+  - **PR-09a** (`f1/09-registry` — the block's original branch, which carries this half; PR-09b takes its own
+    branch): `src/registry/schema.ts` (309) + `src/registry/invariants.ts`
     (133) + `src/registry/tsconfig.json` (14) + the root `references` entry + `test/registry/fixtures.ts`
-    (110) + `test/registry/schema.test.ts` (368) + `test/registry/invariants.test.ts` (267) +
+    (88) + `test/registry/schema.test.ts` (390) + `test/registry/invariants.test.ts` (267) +
     `src/shared/project-file.ts` (+55 / −20: the shared roster-entry schema and, after round 1, the shared
     `applyRosterUniqueness`) = **1,256 authored lines, 856 over** the 400-line budget; granted a
     PR-09a-scoped size exception. (The half measured 1,063 — 663 over — when the Director granted it and
     1,570 for the whole slice when the re-slice was decided; `d5d73a0`'s `M4` correction and Judgment Day
-    round 1's mandated fixes moved both figures, which is why every number here is measured rather than
-    carried over.) Grounds: the
+    round 1's mandated fixes, its informational folds and the correction of the two defects that
+    correction itself introduced moved both figures, which is why every number here is measured rather
+    than carried over.) Grounds: the
     strict shape, the version rule and R1–R3 are one contract — the invariants are applied *through* the
     schema, so no path parses a registry without them — and the twins carry one assertion per rule: the
     RED→GREEN, the active-only boundaries of R1/R2, R3's missing `active` qualifier, the R4 and
@@ -266,7 +268,7 @@ it, and the twin rule forbids shipping a module without its test):
     filled across two commits.
 
 - [ ] 9.1 RED: write `test/registry/invariants.test.ts` covering R1–R6's five spec scenarios (duplicate `bot_id` rejected, hot-reload without restart, malformed registry quarantined not defaulted, binding never rewritten from bus/API data) plus R3/R4 checks.
-- [x] 9.2 GREEN: implement `src/registry/schema.ts` (`z.strictObject`, `roster_snapshot`/`roster_hash` required, `REGISTRY_VERSION`) and `src/registry/invariants.ts` (`superRefine` for R1–R6).
+- [x] 9.2 GREEN: implement `src/registry/schema.ts` (`z.strictObject`, `roster_snapshot`/`roster_hash` required, `REGISTRY_VERSION`) and `src/registry/invariants.ts` (`superRefine` for R1–R3 — the refinement cannot decide R4, R5 or R6; see the note below).
 - [ ] 9.3 RED: write `test/registry/loader.test.ts` asserting the mtime/size fingerprint reload (D-12) and the never-renamed quarantine-on-invalid behavior.
 - [ ] 9.4 GREEN: implement `src/registry/loader.ts` (last-good-in-memory, `registry_invalid` condition, R5 pre-parse scan via `token-shape.ts` from PR-08).
 - [ ] 9.5 Verify: `npm run build && node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/registry/loader.test.js"`.
