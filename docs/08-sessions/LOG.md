@@ -4,6 +4,50 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 12, continued: PR-09b (the registry loader) delivered and merged as #14
+
+**Closed**
+
+- **PR-09b** — the machine registry **loader**: `src/registry/loader.ts` + its twin, and `addSecondBinding`
+  restored in `test/registry/fixtures.ts` — is merged as PR **#14** (`0858595`, code tip `3eba70d`, record tip
+  `14f3424`), CI green on both legs, branch deleted. It closes **row PR-09**, so **11 of the 45 rows are done,
+  delivered as 14 PRs**; **53/210 tasks**, **328 tests**, `test:static` 8/8. Budget **775 authored lines with a
+  disclosed 375-line PR-09b-scoped exception** (272 before Judgment Day).
+- The draft was written in the PR-09a session and left uncommitted and unreviewed; two review identities were
+  declined for it. This session reviewed it as a reviewer, added the **stat/read seam** that makes the
+  stat-before-read ordering pinnable (ADR-12), made the R5 exemption's mask case-insensitive, and closed the
+  tasks.
+- **Judgment Day round 1: 12 rows — 1 CRITICAL, 6 WARNING, 5 SUGGESTION.** The CRITICAL (`JD-A-001`) came
+  from a **single judge** and was real: the R5 exemption's mask took `sha256:` plus 64 hex characters, and a
+  token's own digit run could complete those 64, so the mask swallowed the digits and left `:<secret>` — a
+  document with a real token inside it **loaded**, and the module's documented proof was false. The writer
+  **reproduced it against the built module before touching anything**, the Director authorized the batch, and
+  the fix bounds the mask with `(?![0-9a-fA-F:])`, so a token's colon can never be swallowed. Both judges
+  then resolved `verified` on the terminal scoped re-judgment → **`JUDGMENT: APPROVED`**.
+- Eight informational rows were folded in the same batch: the latched `registry_invalid` after a
+  timestamp-preserving restore (both judges), the UTF-8 BOM PowerShell writes, the unpinned
+  "fingerprint only for a parsed file" guarantee (two mutants survived it), the fixture's mangled
+  `C:\work\second` path, this record's own regressed `test:static` attribution, a design §7.1 citation and a
+  count. Two findings were **reported, not coded**: **B-30** (R5's strictness refuses free-form human text) and
+  **B-31** (a JSON-escaped colon bypasses the raw-text scan). Nine mutants die on the corrected tree.
+- **The ordinary native review was granted and closed APPROVED this time** (lineage
+  `review-c5a6b9c191154861`, one `review-reliability` lens, risk medium, correction budget 200): its four
+  advisory SUGGESTION findings are **B-32**, the exact acknowledgement was executed and the envelope reports
+  `authority: burned`. Approval authorizes no delivery.
+- One hygiene trap fired exactly as the handoff documents it: the judge's own reproduction carried a **9-digit
+  bot id**, which trips this repository's PT-22 scan, so the fixture had to move to the 7-digit shape every
+  suite here uses before the static gate passed.
+
+**Opened**
+
+- **PR-10** — `src/ledger/{schema,transaction}.ts` + their twins: the `node:sqlite` transaction spike the
+  risk register wants before PR-12 (`BEGIN IMMEDIATE`, no savepoints) and the full DDL from design §5.2.
+  The new compile unit needs `src/ledger/tsconfig.json` plus the root `references` entry. PT-10's cell.
+
+**How this entry knows**: PR #14's merge commit `0858595` and `gh pr checks 14` (both legs pass);
+`apply-progress.md` §PR-09b; `docs/05-tribunal/INDEX.md` `bus-v2-f1-pr-09b-audit-001`; the review envelope
+`gentle-ai.review-acknowledged/v1`; `git ls-remote --heads origin`.
+
 ## 2026-09-17 — Session 12: PR-09 re-sliced; PR-09a (registry document) delivered and merged as #13
 
 **Closed**
