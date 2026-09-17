@@ -221,17 +221,20 @@ Requirements: `project-binding › Machine registry schema and invariants` (PT-1
 Runtime harness: N/A — loader tested against temp fixture files (design §15 "Integration" layer, temp homes).
 
 **Apply-time re-slice (Director-authorized this session; same in-place precedent as PR-01, PR-06 and PR-08).**
-The ≈380-line estimate was 3.9× under: the files below measure **1,570 authored lines**
-(`git diff --numstat -- src test`), because every module carries the doc-comment density its audited
-siblings do and every twin carries one assertion per rule plus its boundary. Rather than one
-1,570-line PR — three times the largest exception this repository has accepted — the slice is cut at
-the only boundary that compiles on its own, the loader (neither `schema.ts` nor `invariants.ts` imports
+The ≈380-line estimate was 3.9× under: the files below measured **1,570 authored lines** when this
+re-slice was decided (`git diff --numstat -- src test`), because every module carries the doc-comment
+density its audited siblings do and every twin carries one assertion per rule plus its boundary. Rather
+than one 1,570-line PR — three times the largest exception this repository has accepted — the slice is cut
+at the only boundary that compiles on its own, the loader (neither `schema.ts` nor `invariants.ts` imports
 it, and the twin rule forbids shipping a module without its test):
 
   - **PR-09a** (`f1/09a-registry-document`): `src/registry/schema.ts` (262) + `src/registry/invariants.ts`
     (133) + `src/registry/tsconfig.json` (14) + the root `references` entry + `test/registry/fixtures.ts`
-    (100) + `test/registry/schema.test.ts` (280) + `test/registry/invariants.test.ts` (267) = **1,056
-    authored lines, 656 over** the 400-line budget; granted a PR-09a-scoped size exception. Grounds: the
+    (100) + `test/registry/schema.test.ts` (277) + `test/registry/invariants.test.ts` (267) +
+    `src/shared/project-file.ts` (+10 / −1, the shared roster-entry schema) = **1,063 authored lines, 663
+    over** the 400-line budget; granted a PR-09a-scoped size exception. (The half measured 1,066 when the
+    re-slice was decided; `d5d73a0`'s `M4` correction moved `schema.test.ts` from 280 to 277, which is why
+    the figures in `apply-progress.md` are measured and not carried over.) Grounds: the
     strict shape, the version rule and R1–R3 are one contract — the invariants are applied *through* the
     schema, so no path parses a registry without them — and the twins carry one assertion per rule: the
     RED→GREEN, the active-only boundaries of R1/R2, R3's missing `active` qualifier, the R4 and

@@ -2354,9 +2354,10 @@ Branch `f1/09a-registry-document` from `main` @ `e177c58`.
 | Field | Value |
 |---|---|
 | Code commit | `c9b4ee1` (`schema.ts`, `invariants.ts`, the unit wiring, the three test files and the shared `rosterEntrySchema` export) |
+| Correction commit | `d5d73a0` (the `M4` mutant's fix in `test/registry/schema.test.ts`; see the mutant matrix below) |
 | Requirements | `project-binding › Machine registry schema and invariants` (PT-18; PT-25's half lands in PR-09b) |
 | Provenance | none — no v1 range is vendored; the fixture stays at **11** entries, and all three new modules carry no `Provenance:` header |
-| Budget | **1,056 authored lines / 400** — a **656-line PR-09a-scoped exception**, disclosed in `tasks.md` and granted by the Director when the 1,570-line whole was measured (3.9× the ≈380 estimate) |
+| Budget | **1,063 authored lines / 400** — a **663-line PR-09a-scoped exception**, disclosed in `tasks.md` and granted by the Director when the 1,570-line whole was measured (3.9× the ≈380 estimate) |
 
 ## Scope and budget (measured)
 
@@ -2366,10 +2367,10 @@ Branch `f1/09a-registry-document` from `main` @ `e177c58`.
 | `src/registry/invariants.ts` | 133 |
 | `src/registry/tsconfig.json` (new compile unit, counted in `src`) | 14 |
 | `test/registry/fixtures.ts` | 100 |
-| `test/registry/schema.test.ts` | 280 |
+| `test/registry/schema.test.ts` | 277 (`280` before `d5d73a0`'s `M4` correction) |
 | `test/registry/invariants.test.ts` | 267 |
 | `src/shared/project-file.ts` | +10 / −1 (`export` on the shared roster-entry schema) |
-| **budget total** (`git diff --numstat -- src test`) | **1,056 / 400** — 656-line exception |
+| **budget total** (`git diff --numstat e177c58..HEAD -- src test`) | **1,063 / 400** — 663-line exception |
 | `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** |
 
 **Why the shared export, and why it is not drift.** `bindings[].roster_snapshot` is a *copy* of
@@ -2385,18 +2386,73 @@ no hash-pinned file is involved.
 
 | Step | Command | Observed |
 |---|---|---|
-| 9.1/9.2 RED | `node node_modules/typescript/bin/tsc -b` | `TS2305` for every API the three twins use, over modules that exist and export nothing (`parseRegistryDocument`, `Registry`, `REGISTRY_INVARIANTS`, `REGISTRY_INVARIANT_TAG`, `applyRegistryInvariants`, `RegistryInvariant`, `RegistryIssueSink`, `registryInvariantFromIssue`, `REGISTRY_INVALID_CONDITION`, `createRegistryLoader`, `parseRegistryText`, `rosterEntrySchema`), plus the consequent `TS7006`/`TS18046`/`TS2578` inside the tests |
-| 9.2 GREEN | `node node_modules/typescript/bin/tsc -b` then the two suites | clean build; `test/registry/schema.test.js` + `test/registry/invariants.test.js` **29/29** |
-| full suite (PR-09a tree) | `npm run build && node --test "dist/test/**/*.test.js"` | **297/297** (PR-08's 268 + these 29) |
-| `test:static` | `node --test "dist/test/security/*.test.js"` | **8/8** — the twin walk, the provenance registry (still 11 entries) and the repo scan all pass with the new files staged (`git add -N` first, because those scanners read `git ls-files`) |
+| 9.1/9.2 RED | `node node_modules/typescript/bin/tsc -b` | `TS2305` for every API the twins use, over modules that exist and export nothing (`parseRegistryDocument`, `Registry`, `REGISTRY_INVARIANTS`, `REGISTRY_INVARIANT_TAG`, `applyRegistryInvariants`, `RegistryInvariant`, `RegistryIssueSink`, `registryInvariantFromIssue`, `rosterEntrySchema`), plus the consequent `TS7006`/`TS18046`/`TS2578` inside the tests |
+| 9.2 GREEN (local tree) | `node node_modules/typescript/bin/tsc -b`, then the two suites | clean build; **30/30** in the two suites (`schema` 14, `invariants` 16), inside a local full run of 45/45 that also carried PR-09b's three loader suites — which are **not** part of this commit |
+| full suite (clean worktree at `d5d73a0`) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **298/298** (PR-08's 268 + `schema` 14 + `invariants` 16) |
+| focused, task 9.5's half | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js"` | **30/30** |
+| `test:static` (clean worktree at `d5d73a0`) | `node --test "dist/test/security/*.test.js"` | **8/8** — the twin walk, the provenance registry (still 11 entries) and the repo scan all pass with the new files staged (`git add -N` first, because those scanners read `git ls-files`) |
+
+**A figure in the first draft of this table was computed, not measured, and is corrected here.** It said
+`29/29` and `297/297` — `268 + 29`, written before the clean-worktree run existed. The measured numbers
+are **30** and **298**. The row now names where each was run, because a computed figure presented as a
+measured one is exactly the defect class this repository's records keep finding, and the only reason it
+was caught is that a clean worktree was built afterwards rather than trusted. It is recorded rather than
+silently edited.
 
 Four GREEN-cycle failures were real and were fixed as test defects, not as implementation conveniences:
-`R3` fires together with `min(1)` on an empty `roster_snapshot` (both true, both pinned); `agent_id`
-mutated alone refuses the document for R3 rather than for the wire regex, so the case now replaces agent,
-bot and snapshot entry in lockstep; a strict key plus a discriminator can both complain about one
-`token_ref` field, so the table asserts "only shape problems, at least one" instead of an exact count; and
-the drift table's entries had to be paired with a binding whose identity was derived from them. Each is
-recorded because the *implementation* was right and the *expectation* was wrong.
+`R3` fires together with `min(1)` on an empty `roster_snapshot` (both true, both pinned); a strict key
+plus a discriminator can both complain about one `token_ref` field, so the table asserts "only shape
+problems, at least one" instead of an exact count; the `agent_id` case mutated alone refused the document
+for R3 rather than for the wire regex, so it now replaces agent, bot and snapshot entry in lockstep; and
+the drift table's entries had to be paired with a binding whose identity was derived from them — which the
+mutant sweep then proved was still the **wrong** construction (see `M4` below). Each is recorded because
+the *implementation* was right and the *expectation* was wrong.
+
+## Verification from a clean detached worktree
+
+`git worktree add --detach ../telegram_bus_agent-worktrees/verify-09a <tip>` from the repository root — a
+tree that contains only what this slice committed, which is the point: the local tree still holds PR-09b's
+uncommitted loader files, and a run there would report figures this half cannot claim.
+
+| Tree | Command | Result |
+|---|---|---|
+| `d5d73a0` (code tip; the docs commit that records this changes no code) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **298/298** |
+| `d5d73a0` | `node --test "dist/test/security/*.test.js"` | **8/8** |
+| `d5d73a0` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js"` | **30/30** |
+
+The worktree is removed as soon as the run finishes, and an empty `telegram_bus_agent-worktrees`
+directory is the expected end state (HANDOFF §8). One harness defect was found and fixed while doing this:
+the first mutant sweep invoked `npm run build` through `spawnSync` without a shell, which on Windows
+cannot execute `npm` at all, so all five mutants reported `build=FAILED` and looked killed when nothing had
+run. The sweep now calls `node node_modules/typescript/bin/tsc -b` directly, which is also what the handoff
+prescribes; the first sweep's output was discarded rather than reported.
+
+## Mutant matrix — each built first on a cleaned `dist/`, each restored byte-identically
+
+Run in the clean detached worktree (`../telegram_bus_agent-worktrees/verify-09a`, at `d5d73a0`), each
+mutant applied to the source, `dist/` removed, `tsc -b` rebuilt, the focused suite run, then
+`git checkout --` restore verified by `sha256sum` before and after (all five `restored=true`, and the
+worktree's `git status` clean apart from the harness script).
+
+| # | Mutant | Result | Test that killed it |
+|---|---|---|---|
+| `M1` | R1/R2 count **every** binding, not only the active ones (the `status !== "active"` guard dropped) | killed, 28/30 | *R1 counts active bindings only* + *R2 counts active bindings only, like R1* |
+| `M2` | R3 checks only that the agent is **present**, dropping `entry.user_id !== binding.bot_id` | killed, 29/30 | *R3: a binding whose agent is absent from its snapshot, or carries another user_id, is refused* |
+| `M3` | the version rule refuses **every** version but this build's (`!==` instead of `>`), so a lower version takes the upgrade path | killed, 29/30 | *a version that is not a future integer falls through to the schema, never to the upgrade path* |
+| `M4` | the snapshot entry is a **second, looser declaration** (`z.number()` for `user_id`) instead of the shared `rosterEntrySchema` | **survived the first sweep**, killed after the fix below, 29/30 | *the snapshot entry is the project file's roster entry, not a second declaration* |
+| `M5` | R2 checks `group_id` only, dropping the `project_id` dimension | killed, 29/30 | *R2: two active bindings sharing a group_id, or sharing a project_id, are refused* |
+
+**`M4` survived, and that is the sweep earning its cost.** The drift pin derived the binding's `agent_id`
+and `bot_id` from the entry under test, so an entry the project file refuses — a negative or fractional
+`user_id` — was refused a second time by the binding's own `bot_id` rule; the assertion
+"registry refuses === project file refuses" held as `false === false`, and a second, looser declaration of
+the snapshot shape changed no verdict. The pin now leads the snapshot with a known-good entry for the
+binding's own agent, so R3 is satisfied whatever the entry under test says and the entry's shape is the
+only thing that can move the verdict. Fixed in `d5d73a0` (its own commit, with the reasoning); `M4` dies on
+the re-run, and the four others were re-run on that same corrected tree and still die.
+
+The loader's never-rename/quarantine boundary — the mutant HANDOFF §5.5 asks for — belongs to **PR-09b**,
+where the loader lands: PR-09a has no code that touches the filesystem.
 
 ## Discovered while writing PR-09b's tests, and resolved there
 
