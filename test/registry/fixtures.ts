@@ -86,3 +86,35 @@ export function validRegistryDocument(): {
 		bindings: [activeBinding()],
 	};
 }
+
+/**
+ * Add one more *consistent* binding — a second bot, group, project and roster snapshot — so the result is
+ * a valid registry with two active bindings and satisfies R1, R2 and R3 at once.
+ *
+ * Mutates in place and returns the same document, because every caller wants the extended document rather
+ * than a copy. Kept here rather than in a suite so the four arrays cannot drift apart: a binding added
+ * without its bot or group would fail R2 for a reason unrelated to what a test means to exercise.
+ *
+ * PR-09b's loader suite is its only caller, which is why Judgment Day round 1's `JD-B-005` kept it out of
+ * PR-09a's commit (an unexercised helper that half could not fail on) and why it returns here.
+ */
+export function addSecondBinding(document: ReturnType<typeof validRegistryDocument>): typeof document {
+	document.bots.push({
+		bot_id: 100000002,
+		username: "bob_example_bot",
+		token_ref: { store: "file", path: "secrets/100000002.token" },
+		added_at: "2026-09-16T00:00:00Z",
+	});
+	document.groups.push({ group_id: -1001234567891, added_at: "2026-09-16T00:00:00Z" });
+	document.projects.push({ project_id: "prj-second", path: "C:\work\second" });
+	document.bindings.push(
+		activeBinding({
+			project_id: "prj-second",
+			bot_id: 100000002,
+			group_id: -1001234567891,
+			agent_id: "@bob-agent",
+			roster_snapshot: [rosterSnapshotEntry({ agent_id: "@bob-agent", user_id: 100000002, username: "bob_example_bot" })],
+		}),
+	);
+	return document;
+}
