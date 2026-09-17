@@ -899,3 +899,49 @@ execution and not only by inspection.
 Tribunal audit of PR-06a and PR-06b (`bus-v2-f1-pr-06-001`, one debate covering both units, the
 PR-01a/PR-01b precedent) before either PR opens; then PR-06a → CI → merge, then PR-06b → CI → merge
 (DN-08 pre-authorizes push/PR-open/merge once CI is green). Tasks 6.1–6.4 flip in the PR-06b commit.
+
+## Independent validator (fresh-context, read-only) — findings and disposition
+
+A fresh-context read-only verifier (`gentle-ai-verify`, no implementation context) reviewed the
+committed slice `ef58020..733d283` on its own. It re-derived the pinned hash with its own method
+(`git -C ../telegram-agent-bus show bf8f365:src/tools/fetch.ts | sed -n '43,63p' | sha256sum` →
+`68e241b2…be878`, matching the header, with the range's trailing `0a` confirmed present via `xxd`),
+reproduced the module body hash (`00ab82db…e2f79`) two ways and confirmed it differs as a SEAM
+requires, confirmed the registry entry matches the header's identity line exactly on `v1Path`,
+`commit` and `verdict`, confirmed the PT-13/PT-14 cells are the only THREAT-MODEL change and that no
+other row moved, confirmed both commits' file sets and that PR-06b's files appear in neither, ran
+`npm run build` plus the three focused suites itself (7/7, 2/2, 1/1, clean build), and audited all
+seven fence cases for failable-ness and the soundness helper's containment shape.
+
+Dispositions:
+
+1. **`Changes:` granularity — accepted, actioned.** It reported that the header does not name, by
+   name, the `FenceOrigin` interface, the `escapeAttribute` helper, `wrapUntrusted`'s signature
+   change, or the reworded JSDoc paragraph, while judging that the list does cover every
+   semantic/behavioural difference. Change (1) now names the required `origin: FenceOrigin` parameter
+   explicitly, because PR-23/PR-25 consume that signature and a reader of the header alone should not
+   have to infer it. The rest are declarations and a comment reword — the same granularity the
+   accepted PR-05 header uses, which likewise does not enumerate its added types or its local helper.
+2. **Body-escape coverage — accepted, no action needed.** Only 2 of the 7 cases would fail if
+   `body.replace(/</g, "&lt;")` were removed (5 cases use `<`-free bodies). Two independent failing
+   cases is what the ADR-12 governing rule requires, and on removal both the escape case and the
+   hostile-payload case fail, so the guarantee is genuinely pinned. Recorded as a coverage note.
+3. **Commit-scope premise correction — accepted.** The verification request attributed the
+   THREAT-MODEL change to `733d283`; it is in `0c58972` (the second commit is docs-only). The content
+   assertion held; the imprecision was in the request, not in the change.
+4. **`exploration.md:26` staleness — reported, deliberately not rewritten.** That row says the
+   pure-function bodies (`selectTiered`, `trimSurfaced`/`trimWaiting`, `wrapUntrusted`) "port
+   unchanged" while their inputs change, and `wrapUntrusted`'s input does now change by gaining a
+   required `origin`. The same paragraph already qualifies that the inputs change, and design §11 and
+   §18 D-15 supersede the exploration phase on this exact point, so the contradiction is resolved by
+   the documented precedence rule (`docs/00-INDEX.md`). It is **reported rather than silently
+   resolved**, and routed to the tribunal: amending a superseded historical phase artifact is a
+   different act from fixing a stale source comment (the PR-04/PR-05 precedent), and the governing
+   rule says to report a contradiction instead of rewriting it. Not decided unilaterally.
+5. **ADR-0027 v1 citation — no action.** `docs/03-adr/0027-…:41` shows the **v1** `wrapUntrusted` call
+   shape; it cites v1 line numbers throughout and the label is unchanged, so it is a correct v1
+   citation, not a stale v2 claim. Every other fence reference (`OVERVIEW.md:192`,
+   `THREAT-MODEL.md:57,100`, `design.md:457`, the thin-client spec) becomes *more* accurate.
+
+Note on method: the header lives outside the hashed body (`vendoredBody` strips it), so strengthening
+change (1) does not disturb either pinned hash — re-confirmed after the edit.
