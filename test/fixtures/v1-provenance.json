@@ -34,5 +34,11 @@
     "v1Path": "src/protocol.ts:1-333",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/shared/fence.ts",
+    "v1Path": "src/tools/fetch.ts:43-63",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]

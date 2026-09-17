@@ -690,3 +690,259 @@ prior PR — the Director's authorization to decide the budget question does not
 ## Next
 
 PR-06 (`shared/protocol-select.ts` + `shared/fence.ts`, SEAM, D-15) once PR-05 merges.
+
+---
+
+# Apply Progress: F1 — PR-06, re-sliced into PR-06a (`shared/fence.ts`) + PR-06b (`shared/protocol-select.ts`) (SEAM, D-15)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branches | `f1/06a-fence` → `main`; `f1/06b-protocol-select` → `main` (serial, both branched from `main` at `ef58020`) |
+| Mode | Strict TDD |
+| Workflow | **ODD for this slice only** — see "Why ODD, not the SDD dispatcher" |
+| Status | Both slices implemented and verified (Strict TDD); tasks 6.1–6.4 deliberately still `[ ]` until PR-06b lands |
+
+## Why ODD, not the SDD dispatcher
+
+The planned `sdd-apply` launch was refused before the child started:
+
+`SDD dispatch refused before child launch: SDD preflight cancelled or invalid; no session consent recorded.`
+
+That gate is host-owned and, by design, not satisfiable by an agent: `extensions/gentle-ai.ts:9255`
+calls `runSddPreflight`, which requires a native `ctx.ui.select` confirmation dialog and refuses
+dispatch while `prefs.prompted` is false (`lib/sdd-preflight.ts:896-926`). Answering the canonical
+`Gentle AI SDD preflight 1/3:`–`3/3:` questionnaire through the agent's own question tool does NOT
+create that consent — and manufacturing it would be precisely the "model-authored preflight text
+cannot create parent-confirmed authority" defect this repository already recorded twice.
+
+**Environment drift found this session (supersedes the PR-06 handoff instructions).** `gentle-ai` is
+now **3.0.2** (was 2.9.1): `sdd-attempt acquire` / `settle` / `status` / `reset` are retired — only
+`sdd-attempt grant` remains, and the CLI reports `Runtime attempt operations are retired`. So the
+handoff's steps about sizing `--max-changed-lines` and calling `sdd-attempt settle` are obsolete. The
+native SDD status still reads `nextRecommended: apply`, 28/210 complete, `blockedReasons: []`. Engram
+now also derives the session project from the git remote as `connmuta` and **rejects** writes passed
+as `telegram_bus_agent` (`session project does not match requested project`); reads across projects
+still work, so the earlier `sdd/f1-daemon-registry-thin-client/*` observations remain readable.
+
+The Director explicitly authorized choosing the workflow for this slice. ODD is the harness default
+and SDD is a branch inside it; the branch was unreachable, so the slice ran under ODD **with every
+substantive SDD contract preserved**: the same design §12 rows, the same tasks 6.1–6.4, Strict TDD,
+the same pinned hashes, the same provenance fixture, the same THREAT-MODEL §4 update, the same
+400-line review budget and the same tribunal audit. The delegated writer was `gentle-ai-worker`
+(bounded, write-surface-restricted), not `sdd-apply`.
+
+**Disclosed consequence.** The orchestrator — not the `sdd-apply` executor — owns the SDD bookkeeping
+for this slice, and no `sdd-apply` phase envelope exists for it. The native SDD status stays truthful
+because checkboxes are flipped only when the work is actually complete (i.e. after PR-06b). The ODD
+feature document that tracked the slice locally was intentionally **not** committed: AGENTS.md §2
+names where live state lives (openspec, Engram, docs, ADRs) and does not include an ODD tree, so
+adding one to the product repository would be governance drift; its substance is folded into this
+file and the Engram twin.
+
+## Pinned provenance — re-derived independently, four methods, all agreeing
+
+| v2 path | v1 source | verdict | v1 body sha256 |
+|---|---|---|---|
+| `src/shared/protocol-select.ts` | `src/protocol.ts:335-478` @ `bf8f365` | SEAM | `29bcf0038187541d6448d5c68a554d77b0789fbdcfea77ce087de441d96621ce` |
+| `src/shared/fence.ts` | `src/tools/fetch.ts:43-63` @ `bf8f365` | SEAM | `68e241b22383bf6a9ec4a9d112b1960fe4c9c6d00fe2c6f03644f47a978be878` |
+
+Methods: (a) `node` `crypto` running the real `vendoredBody()` from
+`test/security/provenance.test.ts`; (b) `sed -n 'A,Bp' | sha256sum`; (c) `sed … | openssl dgst
+-sha256`; (d) a round trip that synthesizes the v2 file as header + imports + the range body and
+confirms `vendoredBody()` recovers the range. Wrong-value controls (the value obtained if the
+trailing newline is wrongly stripped): `110b649676bbff0c1f39b4a4ebe9fa0b962bb6f4c6e5d359ab81296ae5c6dd53`
+(protocol) and `6ef490b84bffe7af2110342a027e7f68c60ae86df2ab15b04c0aa9cdb8b3118a` (fetch). **No
+`head -c -1`** was used anywhere: that strips a real trailing newline whenever a further line exists
+in the source (hostile finding `bus-v2-f1-pr-04-001` item 3).
+
+Range facts: `src/protocol.ts` has 477 real lines; line 335 is `/**`, so the import-stripping step is
+a no-op and the body runs 335–477 through EOF with `isNeedsAction` last. `src/tools/fetch.ts` line 63
+is followed by real lines 64–65, so its trailing newline is content.
+
+**The registry scanner never validates the header hash against the v1 source** — it only asserts that
+a SEAM body *differs* from the pinned value (`provenance.test.ts:113-119`). The pinned value is
+therefore verified only by independent re-derivation, which is why it was re-derived four times.
+
+## PR-06a — `src/shared/fence.ts` (SEAM, D-15)
+
+Real SEAM delta versus `v1:src/tools/fetch.ts:43-63`, confirmed by diffing `vendoredBody(v2)` against
+the extracted v1 range body:
+
+- restored, verbatim, the label's leading JSDoc from `v1:src/tools/fetch.ts:35-42` (immediately above
+  the vendored range) — the fence's layer-7 rationale and its per-entry AUTHORSHIP rule;
+- added `FenceOrigin` (`project_id`, `agent_id`, `user_id`) and the `escapeAttribute` helper;
+- the opening tag now carries the three origin attributes in a fixed order;
+- added the D-15 comment paragraph and rewrote the invariant sentence so it stays true for an
+  attributed opening tag;
+- the body escape is byte-identical to v1: `body.replace(/</g, "&lt;")`.
+
+Attribute values are escaped `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `"` → `&quot;`, in that
+order. Rationale: PT-14 requires the origin label to be *trustworthy*, so a value carrying `"` must
+not be able to inject a second attribute (a forged `user_id`), and one carrying `>` must not be able
+to close the opening tag early — `>` is the character that ENDS a tag and `<` only ever opens one, so
+escaping `<` alone would have left the label readable but closable. `escapeHtml` was deliberately **not** reused: it is module-local in
+`src/shared/envelope.ts:214` (not exported) and that file is AS-IS with a pinned hash.
+
+TDD: RED observed first (both new test files import modules that did not exist:
+`error TS2307: Cannot find module '../../src/shared/fence.js'` from `npm run build`, and
+`ERR_MODULE_NOT_FOUND` plus `tests 2 / pass 0 / fail 2` from the focused run), then GREEN.
+The 8 fence cases include v1's hostile payload (`v1:test/tools/fetch.test.ts:328-357`), an
+attribute-injection case (`agent_id` carrying `"` and an embedded `user_id=` attribute), a two-origin
+loop that defeats hardcoding, and an exact-output assertion pinning the whole format. The soundness
+helper is a containment invariant — starts with the label, ends with the closing delimiter, exactly
+one closing delimiter, exactly two raw `<` — and deliberately does **not** reintroduce v1's replaced
+outer-shape regex, which returned `true` on the payload that defeated the control (ADR-12).
+
+## PR-06b — `src/shared/protocol-select.ts` (SEAM)
+
+Real SEAM delta versus `v1:src/protocol.ts:335-477`:
+
+1. `MS_PER_HOUR` re-declared module-local (v1 keeps it at `src/protocol.ts:7`, outside the range);
+2. `computeWorkDigest(state, agentId, reminderWindowHours, now)` became
+   `computeWorkDigest(threads, agentId, windowHours, now, surfaced: ReadonlySet<string>, checkpointAt: string | null)`
+   — design §12's own signature, including the `windowHours` rename it specifies;
+3. `Object.entries(state.threads)` → `Object.entries(threads)`;
+4. the row component `thread.first_surfaced_at === null ? 0 : 1` → `surfaced.has(id) ? 1 : 0`
+   (per-client surfaced state is the ledger's `client_surfaced`);
+5. `checkpoint=${state.last_checkpoint?.at ?? ""}` → `checkpoint=${checkpointAt ?? ""}`
+   (`string | null` matches `binding_state.last_checkpoint_at TEXT`).
+
+Every other byte of the range is faithful, including all of `Tiers`, `TieredSelection`,
+`selectTiered`, `computeAgeHours`, `isReminderDue`, `isNeedsAction` and their load-bearing comments.
+
+**Accepted v1 residue, recorded rather than silently rewritten:** `computeWorkDigest`'s doc comment
+still contains the sentence "`next_update_id` is deliberately excluded…". v2 passes a plain thread
+map, so the field is not an input at all and the sentence cannot mislead about current behaviour —
+the rule it states (Telegram traffic must not flip the digest) is *more* true in v2, not less. It was
+therefore kept byte-faithful instead of expanding the SEAM delta with an unaudited doc rewrite.
+
+TDD: RED observed first (`TS2307` for `../../src/shared/protocol-select.js`; the `TS7006`
+`implicitly has an 'any' type` errors in the same run had the same cause — with the import
+unresolved, `Tiers<string>` inference is lost and the filter callbacks fall back to `any`), then
+GREEN, then TRIANGULATE. The 16 cases cover the digest's turn/history/surfaced/checkpoint/reminder
+components, the third-party exclusion, all seven F3 `selectTiered` properties, the exact reminder
+boundary built from `REQUEST_REMINDER_WINDOW_HOURS`, and the turn-based `isNeedsAction` rule
+(including a resolved-thread case that kills a naive `awaiting === caller` implementation).
+
+## Orchestrator review findings — not caught by any automated check
+
+Both were found by reading the new files in full before committing, the same way PR-04's stale
+comment and PR-05's second stale comment were found. Neither would have failed any gate.
+
+1. **Incomplete `Changes:` list in `src/shared/fence.ts`.** The module restores the label's leading
+   JSDoc verbatim from `v1:src/tools/fetch.ts:35-42`, which sits *outside* the vendored range 43-63.
+   That is a real difference between the pinned range body and the v2 body, and a reviewer
+   re-deriving the header's claim would have hit an undeclared one. Declared in the header as change
+   (3). Deleting the comment instead was rejected: it is faithful v1 text that explains ADR-06 layer
+   7, and removing vendored documentation to simplify bookkeeping is the wrong trade.
+2. **The digest's `reminders=` component was not pinned by any test.** `computeWorkDigest`'s own
+   vendored comment calls `reminder_count` "clock-derived and is mandatory", and warns that dropping
+   it leaves the feature "dead on arrival *while appearing to work*". The first pass asserted the
+   `isReminderDue` boundary but never that crossing it flips the digest, so a mutant deleting the
+   `reminders=` term from `canonical` left all 22 tests green — exactly the "documented guarantee must
+   be pinned by a test that can fail" rule (ADR-12 governing rule). Added a test varying only the
+   injected clock across the window with every other discrete input held fixed. **Mutant evidence:**
+   with that component removed, `npm run build` succeeds and the focused run reports
+   `tests 16 / pass 15 / fail 1`, failing exactly "crossing the reminder window flips the digest even
+   though no other discrete state moved" and nothing else; restoring the component returns 16/16. The
+   file was restored byte-identical (`diff` against the backup is empty).
+
+## Re-slice and budget decision (Director-authorized this session)
+
+| Slice | `src` | `test` | fixture | docs | Authored total | Budget |
+|---|---|---|---|---|---|---|
+| PR-06a (`fence.ts` + twin) | 74 | 110 | 6 | 2 | **192** | inside 400 |
+| PR-06b (`protocol-select.ts` + twin) | 160 | 240 | 6 | 0 | **406** | 6 over |
+| PR-06 as one slice (not taken) | 225 | 335 | 12 | 4 | 576 | 176 over |
+
+`tasks.md` estimated ≈315. The real diff is 576. Unlike PR-05 (609, approved as one PR), these are two
+**independent** modules with no cohesion argument, and the split is at a clean file boundary, so the
+file boundary was used instead of one large exception: PR-06a lands inside budget and carries the
+D-15 security control with its own focused review; PR-06b needs a **6-line** PR-scoped exception
+distinct from DN-06 (which stays AS-IS-only and is not amended). Grounds for those 6 lines: 143 of
+the module's 160 lines are the byte-faithful v1 body the SEAM requires, and 16 behavioral cases plus
+a shared `ThreadRecord` fixture helper cannot shed 6 lines without deleting review context — which
+the budget rule forbids. Not taken: the implementation/test-twin split across two PRs, which
+`test/twins.test.ts:29-44` makes CI-unsafe on the first PR's own merge (the same finding that
+carried PR-05).
+
+## Verification (orchestrator-run, from clean, after staging the new files)
+
+| Command | Result |
+|---|---|
+| `npm run build` (after `rm -rf dist`) | exit 0, no diagnostics |
+| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **23/23 pass** |
+| `rm -rf dist && npm test` | **151/151 pass** (up from 128; +23) |
+| `npm run test:static` | **8/8 pass** (provenance registry equality + repo scan + pack) |
+| `node --test "dist/test/twins.test.js"` | 1/1 (both new modules have their twin) |
+| SEAM delta diff vs the v1 range bodies | matches the declared `Changes:` lists exactly |
+| mutant deletion of the `reminders=` component | fails exactly the one new test (see finding 2) |
+
+Staging note: as in PR-02…PR-05, the new files were `git add`-ed (not committed) before the local
+runs, because both `provenance.test.ts` and `repo-scan.test.ts` enumerate files through `git ls-files`
+and would otherwise not see them. The delegated writer may not stage at all, so staging is
+parent-owned by necessity and the writer's report accordingly shows the provenance registry failing
+pre-staging by set difference — expected, not a defect.
+
+## Data hygiene (AGENTS.md §3)
+
+The new test fixtures use the repository's established synthetic identifiers (`@dev1-agent`,
+`@dev2-agent`, `@dev3-agent`, `@dev4-agent`) matching the wire-level agent-id convention, and the
+numeric roster id literals already carried by v1's own suite (`v1:test/protocol.test.ts`) — plain
+numeric ids, not token-shaped (PT-22's token shape requires a colon plus a 35-character run, which
+plain digits never match). Zero chat-id-shaped strings, zero usernames, zero real tenant identifiers,
+zero tokens. `npm run test:static` (PT-22) passed with the new files staged, confirming this by
+execution and not only by inspection.
+
+## Next
+
+Tribunal audit of PR-06a and PR-06b (`bus-v2-f1-pr-06-001`, one debate covering both units, the
+PR-01a/PR-01b precedent) before either PR opens; then PR-06a → CI → merge, then PR-06b → CI → merge
+(DN-08 pre-authorizes push/PR-open/merge once CI is green). Tasks 6.1–6.4 flip in the PR-06b commit.
+
+## Independent validator (fresh-context, read-only) — findings and disposition
+
+A fresh-context read-only verifier (`gentle-ai-verify`, no implementation context) reviewed the
+committed slice `ef58020..733d283` on its own. It re-derived the pinned hash with its own method
+(`git -C ../telegram-agent-bus show bf8f365:src/tools/fetch.ts | sed -n '43,63p' | sha256sum` →
+`68e241b2…be878`, matching the header, with the range's trailing `0a` confirmed present via `xxd`),
+reproduced the module body hash (`00ab82db…e2f79`) two ways and confirmed it differs as a SEAM
+requires, confirmed the registry entry matches the header's identity line exactly on `v1Path`,
+`commit` and `verdict`, confirmed the PT-13/PT-14 cells are the only THREAT-MODEL change and that no
+other row moved, confirmed both commits' file sets and that PR-06b's files appear in neither, ran
+`npm run build` plus the three focused suites itself (7/7, 2/2, 1/1, clean build), and audited all
+seven fence cases for failable-ness and the soundness helper's containment shape.
+
+Dispositions:
+
+1. **`Changes:` granularity — accepted, actioned.** It reported that the header does not name, by
+   name, the `FenceOrigin` interface, the `escapeAttribute` helper, `wrapUntrusted`'s signature
+   change, or the reworded JSDoc paragraph, while judging that the list does cover every
+   semantic/behavioural difference. Change (1) now names the required `origin: FenceOrigin` parameter
+   explicitly, because PR-23/PR-25 consume that signature and a reader of the header alone should not
+   have to infer it. The rest are declarations and a comment reword — the same granularity the
+   accepted PR-05 header uses, which likewise does not enumerate its added types or its local helper.
+2. **Body-escape coverage — accepted, no action needed.** Only 2 of the 7 cases would fail if
+   `body.replace(/</g, "&lt;")` were removed (5 cases use `<`-free bodies). Two independent failing
+   cases is what the ADR-12 governing rule requires, and on removal both the escape case and the
+   hostile-payload case fail, so the guarantee is genuinely pinned. Recorded as a coverage note.
+3. **Commit-scope premise correction — accepted.** The verification request attributed the
+   THREAT-MODEL change to `733d283`; it is in `0c58972` (the second commit is docs-only). The content
+   assertion held; the imprecision was in the request, not in the change.
+4. **`exploration.md:26` staleness — reported, deliberately not rewritten.** That row says the
+   pure-function bodies (`selectTiered`, `trimSurfaced`/`trimWaiting`, `wrapUntrusted`) "port
+   unchanged" while their inputs change, and `wrapUntrusted`'s input does now change by gaining a
+   required `origin`. The same paragraph already qualifies that the inputs change, and design §11 and
+   §18 D-15 supersede the exploration phase on this exact point, so the contradiction is resolved by
+   the documented precedence rule (`docs/00-INDEX.md`). It is **reported rather than silently
+   resolved**, and routed to the tribunal: amending a superseded historical phase artifact is a
+   different act from fixing a stale source comment (the PR-04/PR-05 precedent), and the governing
+   rule says to report a contradiction instead of rewriting it. Not decided unilaterally.
+5. **ADR-0027 v1 citation — no action.** `docs/03-adr/0027-…:41` shows the **v1** `wrapUntrusted` call
+   shape; it cites v1 line numbers throughout and the label is unchanged, so it is a correct v1
+   citation, not a stale v2 claim. Every other fence reference (`OVERVIEW.md:192`,
+   `THREAT-MODEL.md:57,100`, `design.md:457`, the thin-client spec) becomes *more* accurate.
+
+Note on method: the header lives outside the hashed body (`vendoredBody` strips it), so strengthening
+change (1) does not disturb either pinned hash — re-confirmed after the edit.
