@@ -97,10 +97,10 @@ test("the folding branch of a trim drops the body; the overdue branch keeps it, 
 type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
 /**
- * Structural equivalence that survives BOTH blind spots a single check has, each measured on a mutant:
- * mutual assignability alone tolerates a DROPPED optional member (an object with an extra optional
- * property is still assignable to one without it — M9t), and a key set alone tolerates a NARROWED
- * member type (M8t). Only both together reject every member-level regression this module can take.
+ * Structural equivalence that survives both blind spots a single check has, each one measured on a
+ * mutant rather than argued: mutual assignability alone tolerated a DROPPED optional member (an object
+ * with an extra optional property is still assignable to one without it — M9t stayed green), and a key
+ * set alone tolerates a NARROWED member type (M8t). Neither half is redundant.
  */
 type SameShape<A, B> = MutuallyAssignable<A, B> extends true ? MutuallyAssignable<keyof A, keyof B> : false;
 type Expect<T extends true> = T;
