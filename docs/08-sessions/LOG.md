@@ -14,7 +14,7 @@
   halves are merged: **PR-08a** (`shared/token-shape.ts` + `shared/project-file.ts`; 954 authored after its
   correction round, disclosed PR-scoped exception) as **PR #11**, and **PR-08b** (`shared/roster-hash.ts` +
   the CLI `cli/{validate,main}.ts` + `EXIT_VALIDATION_FAILED` + the build wiring; 772 after its
-  corrections, disclosed exception) as **PR #12**. F1 now stands at **47/210 tasks**, 12 of 45 slices,
+  corrections, disclosed exception) as **PR #12**. F1 now stands at **47/210 tasks** with 10 of the 45 task rows delivered as 12 PRs and 35 rows remaining,
   `main` `c345049`, **268 tests**, `test:static` 8/8.
 - **Two CRITICALs, both found by the substitute audit and both invisible to the writer's own evidence.**
   PR-08a's: `ProjectFileProblem.field` was built from document-derived **key names**, so a token pasted

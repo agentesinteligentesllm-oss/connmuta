@@ -17,7 +17,8 @@
 (`http://127.0.0.1:8766/mcp`, the Electron app) is **not available**: assume it stays down, so **no slice
 is audited by the tribunal and nothing may wait for a debate**. The Pi-native SDD preflight gate is also
 closed and only a human can open it (§2), so slices run **ODD with the full SDD contract preserved** and
-are audited by **Judgment Day**. Both were proven on PR-06, PR-07a, PR-07b, PR-08a and PR-08b.
+are audited by **Judgment Day**. That route has been proven end to end on PR-06, PR-07a, PR-07b,
+PR-08a and PR-08b.
 
 **Copy-paste prompt to start the next session:**
 
@@ -43,11 +44,11 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F1 `apply` in progress. PR-01a…PR-05, PR-06a/PR-06b, PR-07a, PR-07b, PR-08a and PR-08b merged to `main`** (`#1`–`#12`; `#11` `1770f84`, `#12` `c345049`); next slice **PR-09**. **33 of 45 slices remain.** | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| Phase | **F1 `apply` in progress.** Merged to `main`: **`#1`–`#12`**, covering the `tasks.md` rows PR-01a…PR-07b and the two PR-08 halves (`#11` `1770f84`, `#12` `c345049`). **10 of the 45 rows are done, delivered as 12 PRs** — PR-06 and PR-08 were each re-sliced *in place* into two PRs, and no row was ever re-numbered — **so 35 rows remain: PR-09…PR-42.** Next slice: **PR-09**. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
 | SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **47/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
-| Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) — 45 slices, 210 tasks. Apply-time edits so far: the PR-01 re-slice, the PR-06 row (re-slice), the PR-07a block, the PR-07b carried-findings note (+ its D4 amendment), the **PR-08 re-slice block** (two halves, their real figures and their exceptions), and the checkbox flips. No slice was ever re-numbered. | Engram under project **`connmuta`** |
+| Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) — **45 rows, 210 tasks** (45 rows correspond to 47 PRs, because PR-06 and PR-08 were each re-sliced in place into two). Apply-time edits so far: the PR-01 re-slice, the PR-06 row (re-slice), the PR-07a block, the PR-07b carried-findings note (+ its D4 amendment), the **PR-08 re-slice block** (two halves, their real figures and their exceptions), and the checkbox flips. No row was ever re-numbered. | Engram under project **`connmuta`** |
 | Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**` for a leading `Provenance:` header; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **11 entries, unchanged since PR-07b**. PR-08a and PR-08b vendor **no** v1 range; three new authored files (`token-shape.ts`, `project-file.ts`, `roster-hash.ts`) must therefore carry **no** `Provenance:` header | `test/security/provenance.test.ts` |
-| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output,token-shape,project-file,roster-hash}.ts`, `src/cli/{main,validate}.ts`, all with twins — **268 tests**, `test:static` **8**; `main` tip `c345049` | PRs `#1`–`#12` |
+| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output,token-shape,project-file,roster-hash}.ts`, `src/cli/{main,validate}.ts`, all with twins — **268 tests**, `test:static` **8** | PRs `#1`–`#12` |
 | **Audit status of the last five slices** | PR-06 **waived**; PR-07a, PR-07b, **PR-08a and PR-08b** ran under the same **Judgment Day substitute** by explicit Director decision. **DN-05 is unsatisfied for all five.** PR-07b's and PR-08a's candidates *additionally* closed an ordinary native review (independent lifecycles); PR-08b's was **declined** and its RDD fallback ran (§2.5). | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-pr-06-waiver-001`, `bus-v2-f1-pr-07a-audit-001`, `bus-v2-f1-pr-07b-audit-001`, `bus-v2-f1-pr-08a-audit-001`, `bus-v2-f1-pr-08b-audit-001` |
 
 ---
@@ -62,7 +63,8 @@ before the child launches with
 That gate is host-owned and not satisfiable by an agent: `extensions/gentle-ai.ts` calls
 `runSddPreflight`, which needs a native `ctx.ui.select` confirmation and refuses while `prefs.prompted` is
 false. **Re-verified independently in session 11, by evidence rather than by quoting this file:** the
-durable preference path is `<cwd>/.pi/gentle-ai/sdd-preflight.json` (`lib/sdd-preflight.ts:564`) and **it
+durable preference path is `<cwd>/.pi/gentle-ai/sdd-preflight.json` (`lib/sdd-preflight.ts:566`, the
+`return join(cwd, …)` inside `sddPreflightDiskPath`) and **it
 does not exist in this workspace**, and the session carried no `## SDD Session Preflight` block, which
 `isParentConfirmedSddPreflightContext` requires verbatim. Answering the questionnaire through the agent's
 own question tool does not create consent, and manufacturing it would be the recorded defect class.
@@ -103,8 +105,9 @@ and PT-06 were filled by PR-08a/PR-08b across two commits on purpose, each namin
 files this slice really adds.
 
 **4. Budget policy, and the lesson that keeps repeating.** 400 lines of *authored* src+test, measured as
-`git diff --numstat -- src test`, with disclosed PR-scoped exceptions otherwise. Six precedents now:
-PR-06b 26, PR-07a 20, PR-07b 154, **PR-08a 348 → 554**, **PR-08b 272 → 372**. Two lessons are now
+`git diff --numstat -- src test`, with disclosed PR-scoped exceptions otherwise. Five PR-scoped
+precedents now: PR-06b 26, PR-07a 20, PR-07b 154, **PR-08a 348 → 554**, **PR-08b 272 → 372** (plus
+DN-06's separate `size:exception`, which is only for whole-file AS-IS vendoring). Two lessons are now
 first-class:
 
 - **Measure after the correction, in the same pass as the edit.** PR-08a's correction cost +206 and
@@ -163,12 +166,13 @@ and a `Provenance:` header on any new file is a defect.
 | Item | State | Pointer |
 |---|---|---|
 | **A `bin` entry needs a shebang, and no gate here can catch its absence** | `src/cli/main.ts` line 1 is `#!/usr/bin/env node` (ADR-0012 remediation row 2, "pinned by an assertion over the built bundle"). CI runs `windows-latest` only, where npm's shim invokes node explicitly, so the failure mode — *exit 0 with zero bytes on both streams* — is invisible here. The test reads the **built** file, not the source. Any future `bin` addition needs the same treatment | `src/cli/main.ts:1`, `test/cli/main.test.ts` |
-| **Appending a row to a gated document shifts every later `file:line` citation** | PR-08b's appended `EXIT_VALIDATION_FAILED` row moved `design.md` by one, invalidating nine citations in files PR-08a had already merged. Re-point citations **in the same commit** that appends the row | `src/shared/token-shape.ts`, `src/shared/roster-hash.ts`, `src/cli/validate.ts` |
+| **Appending a row to a gated document shifts every later `file:line` citation** | PR-08b's appended `EXIT_VALIDATION_FAILED` row moved `design.md` by one, invalidating nine citations across five files PR-08a had already merged. Re-point citations **in the same commit** that appends the row, and re-derive each one (`design.md:149` roster, `:151` validator, `:589` D-27, `:144` R5) | `src/cli/validate.ts`, `src/shared/token-shape.ts`, `src/shared/roster-hash.ts`, `test/shared/token-shape.test.ts`, `test/shared/roster-hash.test.ts` |
 | **A correction is itself unaudited until something re-checks it** | Two of PR-08b's defects were introduced *by* its correction. Run the focused re-check after a correction, and re-measure every figure the correction could have moved | `apply-progress.md` §PR-08b correction note |
 | **`dist/` staleness fakes results, and `tsc -b` is incremental** | A confusing result was traced to the emitted JS behaving as the pre-fix code while `grep` showed the fix present; `rm -rf dist` resolved it. Always purge before believing a surprising run, and restore mutants byte-for-byte (`read_bytes`/`write_bytes`, never text mode — CRLF) | session 11 mutant rounds |
 | **PT-22's deny-list markers are reserved** | `test/security/repo-scan.test.ts` defines two *synthetic* tenant markers (its `TENANT_DENY_LIST`) and excludes only itself from the scan, so reusing either as a fake operator marker in another file fails the scan — **including in documentation: quoting them here failed `test:static` while this very file was being written**. Invent a fresh marker. Token fixtures use a **7-digit** bot-id run, outside PT-22's `\d{8,10}` scan | `test/security/repo-scan.test.ts` |
 | **zod v4's `unrecognized_keys` puts the key names in `issue.keys`, not `issue.path`** | The path is empty, so naming an unknown field requires reading `keys` and appending each to the rendered parent (`roster[0].role`). One issue can carry several keys | `src/shared/project-file.ts` |
-| **`ProfileFileProblem`-style result types should be value-free by construction** | PR-08a's CRITICAL was a document-derived **key** echoed into a problem's `field`. A "cannot leak" claim is only as strong as its weakest string field, including field names; a forbidden key is now redacted (`<redacted>`) | `src/shared/project-file.ts` |
+| **`ProjectFileProblem`-style result types should be value-free by construction** | PR-08a's CRITICAL was a document-derived **key** echoed into a problem's `field`. A "cannot leak" claim is only as strong as its weakest string field, **including field names**, which are document text too; a forbidden key is now redacted (`<redacted>`) and the walk checks key names as well as values | `src/shared/project-file.ts` |
+| **PT-25's owner disagrees between two gated documents — reported, not resolved** | `tasks.md`'s PR-09 block lists `project-binding › Machine registry schema and invariants` **(PT-18, PT-25)** and task 9.6 tells PR-09 to fill PT-25's cell, while `design.md:551` (deliverable 15's PT→file mapping) sends **PT-25 to `daemon/send/send-path`**. Both readings are defensible: the row's assertion ("binding is never rewritten from bus or API data") is registry-side R6 *and* the daemon-side `GroupMigratedError` behaviour. Precedent: crediting the fence twin with PT-14 was an over-claim two judges caught in PR-06a. **Do not silently resolve it**: fill only the half this slice really pins, say so in the PR, and leave the rest to the daemon slice that owns it (backlog **B-26**) | `tasks.md` PR-09 · `design.md:551` · `THREAT-MODEL.md` §4 PT-25 |
 | **`state.yaml` is YAML, and a plain scalar cannot hold `": "`** | Four values were once unquoted and contained one, making the whole document unparseable while `gentle-ai sdd-status` kept working. Session 11 validated the file with PyYAML after editing; **no gate does this for you**, so parse it after any edit | `bus-v2-f1-b19-repin-001` |
 | **`node --test` output is ANSI-coloured, and `ℹ` breaks cp1252 decoding** | A grep anchored at `^ℹ` can find nothing while the suite is failing; strip escape codes and decode utf-8, or trust the exit code | sessions 9–11 |
 | **`gentle-ai` is 3.0.2 and the attempt ledger is retired** | Only `sdd-attempt grant` remains. `gentle-pi` is 3.1.1 | `gentle-ai sdd-attempt --help` |
@@ -182,17 +186,29 @@ and a `Provenance:` header on any new file is a defect.
 
 1. **§0**: confirm `main`, `git pull --ff-only`, `rm -rf dist`, read the SDD status. Then read
    [`../../AGENTS.md`](../../AGENTS.md) §1–§2, this file's §2, `apply-progress.md`'s PR-08b section (the
-   correction note included), `tasks.md`'s **PR-09** block, and design §4's registry section
-   (`design.md` around the schema/invariants/reload paragraphs) plus design §12's rows for the registry.
+   correction note included), `tasks.md`'s **PR-09** block, and — in `design.md` — §4's registry rows
+   (`grep -n 'registry/schema.ts\|registry/invariants.ts\|registry/loader.ts\|Hot-reload mechanism'`:
+   currently 136, 140, 144, 147), the `node:fs` allow-list row (currently 524, which constrains
+   `registry/loader.js`), and the PT→file mapping (currently 551, the source of the PT-25 conflict in §4
+   of this file). **Design §12 has no row naming `registry/*`**: the registry is new code, so vendoring
+   nothing is the expected verdict, exactly as for PR-08a's three modules.
 2. **State the plan in one line and proceed — this is not a question and there is no waiting turn:**
    ODD + Judgment Day (§2). Do **not** ask the Director to choose a workflow and do **not** wait for the
    TUI.
 3. **Branch** `f1/09-registry` from `main`, and follow `tasks.md`'s PR-09 block exactly (it names the
-   modules, the requirements PT-18/PT-25, and the six sub-tasks). Strict TDD, twins in the same PR,
-   `src/registry/tsconfig.json` joining the root `references` when its first `.ts` lands (**check that
-   against the same TS18003 trap that bit `src/cli`** — a referenced composite project with no inputs
-   fails the build).
-4. **Docs in the same PR**: PT-18/PT-25 cells with the tests this slice adds (task 9.6).
+   modules, the requirements PT-18/PT-25, and the six sub-tasks 9.1–9.6). Strict TDD, twins in the same PR.
+   **Two build facts, both verified:** `src/registry/` and `test/registry/` **do not exist yet**, and every
+   existing unit directory (`src/{shared,cli,client,daemon}/`) carries its own `tsconfig.json`. So this
+   slice must **create** `src/registry/tsconfig.json` — mirror `src/cli/tsconfig.json`
+   (`extends: ../../tsconfig.base.json`, `rootDir: ../..`, `outDir: ../../dist`, `tsBuildInfoFile:
+   ../../dist/.tsbuildinfo/registry.tsbuildinfo`, `include: ["**/*.ts"]`, one reference to `../shared`) —
+   **and** add `{ "path": "src/registry" }` to the root `tsconfig.json` `references`, or the slice fails
+   its own merge with `TS18003` (an empty composite unit). Do **not** repeat `src/cli`'s mistake of
+   referencing a sibling unit before that unit has any `.ts` file.
+4. **Docs in the same PR**: PT-18/PT-25 cells with the tests this slice adds (task 9.6) — but **read §4's
+   PT-25 row first**: the row's owner disagrees between `tasks.md` and `design.md:551`, so name only the half
+   this slice really pins, state that in the PR body, and leave the rest to the daemon slice that owns it
+   (backlog **B-26**).
 5. **Verify** from a clean detached worktree, not the working tree: `git worktree add --detach … <sha>`,
    then `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js" && npm run test:static`,
    then remove the worktree. Run the focused command too, and at least four mutants on a cleaned `dist/`
@@ -262,10 +278,10 @@ and a `Provenance:` header on any new file is a defect.
 | B-16 / D-10 | `LICENSE` ships with `private: true`; SECURITY/CONTRIBUTING/CHANGELOG and the copyright-holder line open; a **real tenant deny-list** for PT-22 must live outside the tree (CI secret) — decide at PR-42 | Director |
 | B-11 | Trademark screening; `PRODUCT_NAME` is the single rename constant (`src/shared/constants.ts`) | Director |
 | B-12 | macOS scope; B-13 migration runbook closes when PR-38 merges | Director + Kairo |
-| — | **No gate validates the YAML in this tree.** Session 11 parsed `state.yaml` with PyYAML after editing it; consider a cheap validity check over `git ls-files '*.y*ml'` in a later PR, audited, so the class cannot recur silently | Kairo → Alpha |
-| — | **No POSIX CI leg**, so packaging/execution contracts (shebangs, file modes, bin-links) cannot fail here: the ADR-0012 shebang defect was found by an audit, not by a gate. A POSIX matrix entry (or a targeted assertion) is a candidate for a later CI PR | Kairo → Alpha |
-| — | `npm test` runs whatever is in a stale `dist/`; consider a `clean` step in a later PR, audited | Kairo → Alpha |
-| — | GitHub Actions deprecation warning: `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 — bump majors in a later CI PR, audited. Also: delete the stale remote branches of the six merged PRs (needs Director authorization) | Kairo → Alpha / Director |
+| B-24 | **No POSIX CI leg**, so packaging/execution contracts (shebangs, file modes, bin-links) cannot fail here: the ADR-0012 shebang defect was found by an audit, not by a gate | Kairo → Alpha |
+| B-25 | **Three cheap gates/hygiene items for one later audited PR**: (a) a YAML validity check over `git ls-files '*.y*ml'` — session 11 parsed `state.yaml` with PyYAML by hand, because no gate checks it and a broken `state.yaml` once stayed unparseable for several sessions; (b) a `clean` step before `npm test`, so a stale `dist/` cannot fake results; (c) bump `actions/checkout` and `actions/setup-node` off Node 20 | Kairo → Alpha |
+| B-26 | **PT-25's owner is attributed differently by two gated documents** — `tasks.md`'s PR-09 block claims it for the registry slice, `design.md:551` sends it to `daemon/send/send-path`. Report, do not silently resolve: whichever slice fills the cell names only what it pins | Director → Kairo |
+| — | Delete the stale remote branches of the six merged PRs (`f1/{06a,06b,07a,07b,08a,08b}`) — a destructive git operation, so it needs the Director's word | Director |
 | — | T22 bytes-per-hour ceiling and the origin-label organisation marker (PR-42 close-out) | Director |
 | B-05, B-07, B-08, B-09 | gentle-ai installer study; Telegram bot-to-bot visibility; Windows IPC/DACL; MCP notification rendering per host — all F0 spikes, all still open | Director + Kairo |
 

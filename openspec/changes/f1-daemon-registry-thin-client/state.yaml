@@ -47,7 +47,7 @@ phases:
     tribunal_state: consensus
     tribunal_rulings: size:exception only for whole-file AS-IS (PR-02, PR-20); PR-07 -> 07a/07b(+07c); PR-22 -> 22a/22b; THREAT-MODEL §4 cell updated in each PR that pins a PT; PR-05 watched
     forecast: 44 PR slices, ~13,000 authored lines, 2 exception slices (~1,760 vendored body lines excluded), 207 tasks
-    apply_time_amendment: PR-01 re-sliced into PR-01a/PR-01b on 2026-09-16 (real diff ~790 vs ~350 estimated; new code, no DN-06 exception) -> 45 PR slices, 210 tasks; ratified in bus-v2-f1-pr-01-001
+    apply_time_amendment: PR-01 re-sliced into PR-01a/PR-01b on 2026-09-16 (real diff ~790 vs ~350 estimated; new code, no DN-06 exception) -> 45 task rows, 210 tasks (the rows map to 47 PRs, because PR-06 and PR-08 were each re-sliced in place into two); ratified in bus-v2-f1-pr-01-001
     delivery_strategy: "auto-chain (DN-06: exception-ok scoped to hash-pinned whole-file AS-IS)"
     chain_strategy: stacked-to-main
   apply:
