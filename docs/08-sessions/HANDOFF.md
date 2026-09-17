@@ -37,6 +37,8 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 
 `git pull --ff-only` must be a no-op or a fast-forward. The status command must print
 `nextRecommended: apply`, `completed: 47` of `210`, `blockedReasons: []`. Anything else: stop and report.
+(`verifyReport: missing` in that same output is **expected and correct** while `apply` is still running —
+the change's verify report belongs to the phase after `apply` closes, not to this one.)
 
 ---
 
