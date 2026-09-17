@@ -5,8 +5,11 @@
  * tool returns; (2) imports relocated — `RejectionReason` now comes from `shared/protocol-apply.js`
  * (v1's `protocol.js` split) and `Conditions` is declared here (see 4); every other import the file
  * carried belongs to code outside 65-348; (3) `trimSurfaced` and `trimWaiting` are EXPORTED, where v1
- * kept them module-private: they are the compact tick's only rendering and the daemon serves it from
- * here (design §8.4); (4) `Conditions` is declared here with its JSDoc re-authored from
+ * kept them module-private. Design §12's row for this range is AS-IS and mandates no such change, so it
+ * is a v2 choice with two reasons: they are the only behaviour the range carries and Strict TDD needs a
+ * falsifiable twin, and the per-client serve handler (design §8.4, `daemon/serve/fetch.ts`) then
+ * consumes one copy of the trim rule instead of keeping its own. Moving `wrapUntrusted` to
+ * `shared/fence.ts` (PR-06a, design §12's row for `fetch.ts:43-63`) is the same split; (4) `Conditions` is declared here with its JSDoc re-authored from
  * `v1:src/state.ts:89-111`, because the fetch output reports it and no `shared/` module owns it —
  * design §12 marks v1's state container REPLACED by `ledger/*`, so the type is a wire shape here while
  * the raised set stays ledger-side; (5) `gap_warning` gains the doc v1 kept only at its raise site

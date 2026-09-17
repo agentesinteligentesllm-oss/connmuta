@@ -1479,18 +1479,25 @@ Scoped re-judgment of the frozen ledger plus the fix delta (`dbb7494..HEAD`), th
 
 | Path | Added | Deleted | Kind |
 |---|---|---|---|
-| `src/shared/tool-output.ts` | 337 | 0 | SEAM, range extract of `v1:src/tools/fetch.ts:65-348` (284 vendored lines) |
-| `test/shared/tool-output.test.ts` | 145 | 0 | twin (ships in the same PR — see below) |
+| `src/shared/tool-output.ts` | 340 | 0 | SEAM, range extract of `v1:src/tools/fetch.ts:65-348` (284 vendored lines) |
+| `test/shared/tool-output.test.ts` | 201 | 0 | twin (ships in the same PR — see below) |
 | `test/fixtures/v1-provenance.json` | 6 | 0 | one SEAM registry entry |
 | `test/shared/error-payload.test.ts` | 7 | 3 | D4 (own commit, `27100ce`) |
-| **budget total** | **495** | **3** | **disclosed PR-scoped exception of 95 lines over the 400-line policy** |
+| **budget total** | **554** | **3** | **disclosed PR-scoped exception of 154 lines over the 400-line policy** |
 
 The tasks phase estimated ≈385 (≈284 extracted + ≈100 twin). The gap is the one PR-01a recorded
 (`bus-v2-f1-pr-01-001`): a SEAM module's doc comments must be **re-authored**, and an estimate that
 counts v1's lines under-counts. The first draft measured **549**; a prose pass over both files brought
-it to **495** before the authorization request, and the Director authorized the remaining exception
-explicitly this session (options offered: disclose 495 · chain PR-07c for the shape half ≈449 · fit at
-≈405 by under-disclosing the header). Precedents: PR-06b 26 lines, PR-07a 20.
+it to **495** before the authorization request, and the Director authorized that exception explicitly
+this session (options offered: disclose 495 · chain PR-07c for the shape half ≈449 · fit at ≈405 by
+under-disclosing the header).
+
+**It opened the audit at 495 and closed at 554: round 1 cost +59 net** — 56 of them the twin's shape
+pins and the rewritten fence case, 3 the module's header — every line of it a coverage gap the two
+judges found (`JD-A-002`, `JD-B-001`, `JD-B-003`), not new scope. The Director authorized the 495
+figure and reserved the merge, so this growth is disclosed here and in the PR rather than absorbed
+silently. Precedents: PR-06b 26 lines, PR-07a 20 — both far smaller, which is why this slice's
+justification rests on the design-mandated 284-line vendored range rather than on the precedent alone.
 
 **Why the PR-07c split the task block allows is not CI-safe** (re-verified by reading the test, handoff
 §2.4): `test/twins.test.ts:29-44` walks every `src/**/*.ts` and fails when `test/**/<same>.test.ts` is
@@ -1501,7 +1508,7 @@ twin therefore ships here, and the exception is taken instead of the split.
 
 | Task | Test file | Safety net | RED | GREEN | TRIANGULATE |
 |---|---|---|---|---|---|
-| 7b.1 | `test/shared/tool-output.test.ts` | N/A (new module) | ✅ `tsc` failed with `TS2307` at `(12,8)`, plus `TS2344` at `(127,3)` and `TS2578` at `(158,3)` — both secondary, both caused by the missing module | ✅ 7/7 | ✅ 7 cases: trim key set + marker, overdue verbatim, `trimWaiting` key set, the compact path cannot bypass the fence, the declared key set is exhaustive, `FetchToolInput` excess-property check, `Conditions` |
+| 7b.1 | `test/shared/tool-output.test.ts` | N/A (new module) | ✅ `tsc` failed with `TS2307` at `(12,8)`, plus `TS2344` at `(127,3)` and `TS2578` at `(158,3)` — both secondary, both caused by the missing module | ✅ 7/7, and 6/6 at the corrected tip (round 1 removed one case — see the ledger) | ✅ 6 cases: trim key set + marker, overdue verbatim, `trimWaiting` key set, folding drops the body while the overdue branch keeps it, the declared key set and every declared shape, `FetchToolInput` excess-property check |
 | 7b.2 | `src/shared/tool-output.ts` | covered by 7b.1 | ✅ (7b.1's RED) | ✅ | ✅ seven mutants, none surviving (below) |
 | 7b.3 | focused + full + static | — | — | ✅ 16/16, 176/176, 8/8 | — |
 
@@ -1564,7 +1571,7 @@ The tree verified is the one that was committed: the dangling tree built for ver
 ```
 git worktree add --detach ../telegram_bus_agent-worktrees/verify-07b <verified tree>
 npm ci --ignore-scripts && npm run build
-node --test "dist/test/**/*.test.js"                   -> 176 tests, 176 pass, 0 fail
+node --test "dist/test/**/*.test.js"                   -> 176 tests, 176 pass, 0 fail (pre-correction tip; 175/175 after round 1)
 npm run test:static                                    ->   8 tests,   8 pass, 0 fail
 node --test (the three focused files)                  ->  16 tests,  16 pass, 0 fail
 git ls-files --eol src/shared/tool-output.ts test/shared/tool-output.test.ts -> i/lf w/lf
@@ -1579,10 +1586,14 @@ budget table — **no** edit to any hash-pinned AS-IS file, no wire change, no d
 1. **design §12's row for this range says AS-IS over a SEAM module.** The row marks
    `src/tools/fetch.ts:65-348` types **AS-IS** → `shared/tool-output.ts`, while `tasks.md` 7b.2 and the
    tribunal ruling `bus-v2-f1-tasks-001` items 1-2 make a module extracted from a v1 line range a
-   **SEAM by construction**. The registry settles it independently: an AS-IS body must hash *equal* to
-   its pin, which a re-authored header and two exported functions cannot be, so only a SEAM verdict can
-   pass. This is the same A4-class contradiction PR-07a reported for `tool-schemas.ts`, and the handoff
-   predicted PR-07b would meet the same table shape. `design.md` is gated, so nothing is changed there.
+   **SEAM by construction**. The registry settles it independently, and by body alone: `vendoredBody`
+   strips the provenance header before hashing, so the header is irrelevant to the comparison — the two
+   `export` keywords on `trimSurfaced`/`trimWaiting` and the declared `Conditions` block are what make
+   the body differ from the pin, and an AS-IS entry requires exact equality. This is the same A4-class
+   contradiction PR-07a reported for `tool-schemas.ts`, and the handoff predicted PR-07b would meet the
+   same table shape. `design.md` is gated, so nothing is changed there. **Round 1 corrected this entry's
+   own wording**: it had named the re-authored header as one of the causes, which is exactly backwards —
+   `vendoredBody` strips it (findings JD-A-003 and JD-B-004, corroborated by both judges).
 2. **`Conditions`' home.** Recorded above as SEAM change 4. `design.md` §2's file list has no
    `shared/conditions.ts`, so declaring it in the one shared module that consumes it is the only
    design-consistent option; a later daemon PR (PR-31's `ipc/routes.ts`, the ledger's
@@ -1592,21 +1603,95 @@ budget table — **no** edit to any hash-pinned AS-IS file, no wire change, no d
 
 1. `Changes:` is a six-clause superset of the two clauses task 7b.2 names. No clause it names is
    contradicted; the full delta is what the provenance rule and PR-07a's B3 finding require.
-2. The pinned `v1 body sha256` is the hash of the cited **range** (65-348, terminating newline
+2. **The `export` on `trimSurfaced`/`trimWaiting` is a v2 choice, not a design mandate**, and it is a
+   deviation from design §12's AS-IS row for this range: that row mandates no export, no spec or design
+   section names either function except `exploration.md:26` (which places their *bodies* with the
+   daemon's split handler), and the word "compact" does not appear in `design.md` at all. The header and
+   this record say exactly that since round 1 (finding JD-A-001); the pre-correction header cited design
+   §8.4 as if it required the export, and commit `2a66fdc`'s message repeats that overstated
+   attribution. The message is not rewritten — the audited range is frozen and force-push is blocked
+   (DN-08) — so the correction is recorded here instead.
+3. **`digest` is pinned as carried, not as computed.** Task 7b.1 names "rendering of the fetch digest"
+   as this twin's coverage; the twin pins that `FetchToolOutput` carries a `digest` key (the declared-key
+   alias, falsifiable — M7t) while the digest's VALUE stays `shared/protocol-select.ts`'s business, whose
+   own twin pins it. The pre-correction twin's only digest assertion was `typeof digest === "string"` on
+   a test-local literal, which could not fail; round 1 removed it and records the narrowing here
+   (finding JD-B-001).
+4. The pinned `v1 body sha256` is the hash of the cited **range** (65-348, terminating newline
    included), not of the whole `src/tools/fetch.ts`. That is the ratified convention (§3,
    `bus-v2-f1-pr-04-001`) and exactly what PR-07a shipped for its own range rows.
-3. `docs/02-architecture/THREAT-MODEL.md` §4 is **unchanged**, and that is the rule check rather than an
+5. `docs/02-architecture/THREAT-MODEL.md` §4 is **unchanged**, and that is the rule check rather than an
    omission: this slice's Requirements line names no PT id, no PT row names `shared/tool-output.ts`,
    PT-13 is owned by `test/shared/fence.test.ts` (PR-06a) and PT-02 by `test/shared/tool-schemas.test.ts`
-   (PR-07a). Annotating a cell here would repeat the PT-14 over-claim two PR-06 judges caught.
-4. **Audit-tooling drift, disclosed:** handoff §2.2 says the judges return exactly
+   (PR-07a). Annotating a cell here would repeat the PT-14 over-claim two PR-06 judges caught. Round 1
+   removed the twin's restatement of PT-13's fence-soundness assertions for the same reason (JD-B-003).
+6. **Audit-tooling drift, disclosed:** handoff §2.2 says the judges return exactly
    `{"findings":[…],"evidence":[…]}` (how PR-07a recorded them). The installed `jd-judge-a`/`jd-judge-b`
    agents and the current Judgment Day skill mandate the graph-v1 shape `{"rows":[…]}` and forbid prose
    beside it. The runtime contract wins; round 1 returned rows in that shape, canonicalized below.
+7. **The correction round ran on WARNING rows.** The skill's strict reading is that WARNING and
+   SUGGESTION rows are informational and never schedule a fix; PR-07a's practice, under the Director's
+   authorization, was to fix the corroborated and introduced ones, and handoff §2.2's settled route ends
+   in "a bounded correction round". Round 1 followed that route. **No CRITICAL row was found.**
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) ran in parallel over the frozen range
+`a3b56c3..1b73722`, each told to falsify this record's claims rather than trust them. **Neither returned a
+CRITICAL row.** Both used the runtime's `{"rows":[…]}` shape (deviation 6). Canonicalized ledger, each
+row re-verified here before it was scheduled:
+
+| Id | Severity | Judge(s) | Verdict | Item |
+|---|---|---|---|---|
+| JD-A-001 | WARNING | A | **confirmed** | Header clause 3 justified the two exports with design §8.4, which mandates nothing of the kind ("compact" appears 0 times in `design.md`), and the deviations list never named the export |
+| JD-A-002 | WARNING | A | **confirmed** | The twin constrained no member of `LogEntry`, `RejectedEntry`, `UnappliedEntry`, `UnannouncedClosure` or `PendingSummary`: a mutant deleting `LogEntry.basis` or narrowing `UnannouncedClosure.resolved_at` left the whole suite green |
+| JD-B-001 | WARNING | B | **confirmed** | The only digest assertion was `typeof digest === "string"` over a test-local literal — it could not fail — and the coverage narrowing against task 7b.1 was undisclosed |
+| JD-B-002 | WARNING | B | **confirmed** | The gated carried-findings note still described D4 in the present tense although `27100ce` had closed it, and `tasks.md` carried no apply-time amendment |
+| JD-A-003 + JD-B-004 | SUGGESTION | **both** | **confirmed as one finding** | The AS-IS/SEAM rationale named the re-authored header as a cause, but `vendoredBody` strips the header before hashing |
+| JD-B-003 | SUGGESTION | B | **confirmed** | The fence case restated PT-13's soundness assertions (owned by `test/shared/fence.test.ts`), and its title claimed a "compact path" guarantee the case did not exercise — `trimSurfaced`'s overdue branch was untested against the fence |
+| JD-A-004 | SUGGESTION | A | **confirmed** | The `Conditions` round-trip assertion could not fail for any value the declared type admits |
+
+Judge A's four mutant line/column claims and its `grep -c compact` figure were re-checked against the
+frozen tree and are exact. The two judges' rows were entirely disjoint except for the AS-IS rationale,
+which both reached independently.
+
+### Corrections applied (round 1, introduced items only)
+
+| Finding | Correction | Falsifiability re-checked |
+|---|---|---|
+| JD-A-001 | Header clause 3 rewritten: the export is a v2 choice with its real reasons, and design §8.4 is cited only for the per-client serve handler. Deviation 2 records it | `grep -c compact design.md` → 0; the clause no longer claims a mandate |
+| JD-A-002 | `SameShape` pins — key set **and** structure — for every declared shape | M9t, M8t, M10t, M11t, M12t and M13t each now fail the build at the pin's own line; M9t and M8t were green before |
+| JD-B-001 | The `typeof digest` assertion removed; the narrowing recorded as deviation 3 | The digest's presence is pinned by the declared-key alias, which M7t kills |
+| JD-B-002 | An apply-time amendment appended to the gated carried-findings note (`tasks.md`); the audited text above it is unchanged | The gate now states D4's closure |
+| JD-A-003 + JD-B-004 | The rationale corrected in place, with the correction disclosed inside the entry | The two causes named are the `export` keywords and the `Conditions` block, both re-verified against `vendoredBody` |
+| JD-B-003 | The case retitled and rewritten: the folding branch drops the body even when it is a well-formed fenced one, the overdue branch keeps it raw, and fence soundness stays with its PT-13 owner | M2 and M3 each fail it (below) |
+| JD-A-004 | The case deleted rather than dressed up; `Conditions` is pinned by `_ConditionsShape` instead | M8t-class mutants prove the replacement pin can fail |
+
+**Round 1 measured +59 net lines** (module +3, twin +56): every one a coverage gap or an accuracy fix from
+the ledger above, none of it new scope. The suite is **175 tests** after round 1 (176 before): the single
+test removed is the decorative `Conditions` case, and the pins that replace it are compile-time.
+
+### Mutants added or re-run in round 1 (on the corrected tree, each built first)
+
+| # | Mutation | Observed |
+|---|---|---|
+| M2 (re-run) | drop `trimSurfaced`'s overdue exemption | **4 pass / 2 fail** — the identity case and the rewritten fence case's overdue assertion |
+| M3 (re-run) | `trimWaiting` copies the body through | **4 pass / 2 fail** — the `trimWaiting` key-set case and the folding case |
+| M8t | narrow `UnannouncedClosure.resolved_at` to `string` | build fails `TS2344` at `tool-output.test.ts(154,3)` (green before the fix) |
+| M9t | delete `LogEntry.basis` | build fails `TS2344` at `(144,3)` (green before the fix) |
+| M10t | add a member to `PendingSummary` | build fails `TS2344` at `(167,3)` |
+| M11t | add an optional member to `NeedsActionEntry` | build fails `TS2344` at `(131,3)` |
+| M12t | add an optional member to `WaitingOnPeerEntry` | build fails `TS2344` at `(138,3)` |
+| M13t | add a required member to the inline `checkpoint` shape | build fails `TS2344` at `(169,32)` **and** `TS2741` at `(179,3)` (the `FULL_OUTPUT` literal) |
+
+**A defect the round-1 fix itself introduced, found by its own mutant run:** the first version of the
+shape pins used mutual assignability alone, and M9t stayed green through it — an object with an extra
+optional property is still assignable to one without it. `SameShape` (key set *and* structure) was
+written in response, and M9t then failed at the pin. That is the class the round-2 scoped re-judgment
+exists to check, so it is disclosed here rather than presented as a clean fix.
 
 ## Next
 
-Judgment Day round 1 over the frozen range (which is this record's own commit range), then the bounded
-correction round it authorizes, then push and open the PR. The ledger, the corrections and the terminal
-verdict are appended to this section once each round closes — as PR-07a recorded them, round by round,
-rather than in advance.
+Scoped re-judgment of the round-1 correction delta, then push and open the PR. The Director authorized
+push + PR this session and reserved the merge decision; the 554-line figure is disclosed in the PR body
+so that decision is made on the real number.
