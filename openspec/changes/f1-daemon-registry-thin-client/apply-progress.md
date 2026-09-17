@@ -777,16 +777,17 @@ the extracted v1 range body:
   attributed opening tag;
 - the body escape is byte-identical to v1: `body.replace(/</g, "&lt;")`.
 
-Attribute values are escaped `&` → `&amp;`, `<` → `&lt;`, `"` → `&quot;`, in that order. Rationale:
-PT-14 requires the origin label to be *trustworthy*, so a value carrying `"` must not be able to
-inject a second attribute (a forged `user_id`) and one carrying `<` must not be able to close the
-opening tag early. `escapeHtml` was deliberately **not** reused: it is module-local in
+Attribute values are escaped `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `"` → `&quot;`, in that
+order. Rationale: PT-14 requires the origin label to be *trustworthy*, so a value carrying `"` must
+not be able to inject a second attribute (a forged `user_id`), and one carrying `>` must not be able
+to close the opening tag early — `>` is the character that ENDS a tag and `<` only ever opens one, so
+escaping `<` alone would have left the label readable but closable. `escapeHtml` was deliberately **not** reused: it is module-local in
 `src/shared/envelope.ts:214` (not exported) and that file is AS-IS with a pinned hash.
 
 TDD: RED observed first (both new test files import modules that did not exist:
 `error TS2307: Cannot find module '../../src/shared/fence.js'` from `npm run build`, and
 `ERR_MODULE_NOT_FOUND` plus `tests 2 / pass 0 / fail 2` from the focused run), then GREEN.
-The 7 fence cases include v1's hostile payload (`v1:test/tools/fetch.test.ts:328-357`), an
+The 8 fence cases include v1's hostile payload (`v1:test/tools/fetch.test.ts:328-357`), an
 attribute-injection case (`agent_id` carrying `"` and an embedded `user_id=` attribute), a two-origin
 loop that defeats hardcoding, and an exact-output assertion pinning the whole format. The soundness
 helper is a containment invariant — starts with the label, ends with the closing delimiter, exactly
@@ -851,11 +852,11 @@ comment and PR-05's second stale comment were found. Neither would have failed a
 
 | Slice | `src` | `test` | fixture | docs | Authored total | Budget |
 |---|---|---|---|---|---|---|
-| PR-06a (`fence.ts` + twin) | 65 | 95 | 6 | 4 | **≈170** | inside 400 |
+| PR-06a (`fence.ts` + twin) | 74 | 110 | 6 | 2 | **192** | inside 400 |
 | PR-06b (`protocol-select.ts` + twin) | 160 | 260 | 6 | 0 | **426** | 26 over |
-| PR-06 as one slice (not taken) | 225 | 355 | 12 | 4 | 596 | 196 over |
+| PR-06 as one slice (not taken) | 234 | 370 | 12 | 2 | **618** | 218 over |
 
-`tasks.md` estimated ≈315. The real diff is 596. Unlike PR-05 (609, approved as one PR), these are two
+`tasks.md` estimated ≈315. The real diff is 618. Unlike PR-05 (609, approved as one PR), these are two
 **independent** modules with no cohesion argument, and the split is at a clean file boundary, so the
 file boundary was used instead of one large exception: PR-06a lands inside budget and carries the
 D-15 security control with its own focused review; PR-06b needs a **26-line** PR-scoped exception
@@ -871,8 +872,8 @@ carried PR-05).
 | Command | Result |
 |---|---|
 | `npm run build` (after `rm -rf dist`) | exit 0, no diagnostics |
-| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **24/24 pass** (23/23 before the review-driven strengthening added one case) |
-| `rm -rf dist && npm test` | **152/152 pass** (up from 128; +24) |
+| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **25/25 pass** (24/24 before the judgment-day correction added the `>` case) |
+| `rm -rf dist && npm test` | **153/153 pass** (up from 128; +25) |
 | `npm run test:static` | **8/8 pass** (provenance registry equality + repo scan + pack) |
 | `node --test "dist/test/twins.test.js"` | 1/1 (both new modules have their twin) |
 | SEAM delta diff vs the v1 range bodies | matches the declared `Changes:` lists exactly |
@@ -966,8 +967,8 @@ Verification for PR-06b (orchestrator-run, from clean):
 | Command | Result |
 |---|---|
 | `npm run build` (after `rm -rf dist`) | exit 0, no diagnostics |
-| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **24/24 pass** — this is task 6.3's exact command |
-| `rm -rf dist && npm test` | **152/152 pass** |
+| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **25/25 pass** — this is task 6.3's exact command |
+| `rm -rf dist && npm test` | **153/153 pass** |
 | `npm run test:static` | **8/8 pass** (registry equality with all 8 entries) |
 | clean detached worktree at the PR-06b tip | full suite and static suite green, with only the committed files present |
 
@@ -1013,7 +1014,7 @@ its own and ran `npm run build`, the focused suites, `npm test` and `npm run tes
    `verdict`; the fixture holds 8 entries and the scanner's set-equality assertion passes.
 6. **`tasks.md` 6.1–6.4** are flipped and every artefact exists. The verifier could not run 6.3's
    two-file command verbatim under its authorized command set, so the orchestrator's own run of that
-   exact command (24/24, from a clean rebuild) is the evidence of record for 6.3.
+   exact command (25/25, from a clean rebuild) is the evidence of record for 6.3.
 7. **Commit scopes** are exactly as intended, and `src/shared/fence.ts` / `test/shared/fence.test.ts`
    are not modified relative to `4c83c29` (no double-touch across the two slices).
 8. **No other statement is made stale** by the new signature; every reference to
@@ -1077,8 +1078,8 @@ Neither judge was told any prior finding, and neither was given the other's.
 | JD-5 | `src/shared/fence.ts` body escape does not neutralise `&` | WARNING | **pre_existing** | one judge (A) |
 | JD-6 | `src/shared/fence.ts:4-8` `Changes:` list breadth | SUGGESTION | introduced | one judge (A) |
 
-Confirmed/suspect/contradiction counts: **3 confirmed by both judges**, 2 single-judge, 0
-contradictions, 0 CRITICAL.
+Confirmed/suspect/contradiction counts: **4 confirmed by both judges** (JD-1, JD-2, JD-3, and JD-4 at
+its stated location), 2 single-judge (JD-5, JD-6), 0 contradictions, 0 CRITICAL.
 
 **JUDGMENT: APPROVED** — no CRITICAL finding existed, so the protocol required no correction round.
 The orchestrator nonetheless applied a bounded correction round to the three *introduced* defects
