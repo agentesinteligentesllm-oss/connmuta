@@ -1731,9 +1731,13 @@ fifteen of them were each mutated, not a sample. The complement is that no behav
 
 ## Next
 
-One final verification from a clean detached worktree at the corrected tip, then push and open the PR.
-The Director authorized push + PR this session and reserved the merge decision; the 554-line figure is
-disclosed in the PR body so that decision is made on the real number.
+The slice is at the PR boundary: **PR #10** (`f1/07b-tool-output` → `main`) is open with the 554-line
+exception disclosed in its body, and the CI matrix (`build-and-test` on Node 24.15 and 26) is green.
+**The merge is the Director's decision and is not taken.** What remains after it: the post-merge
+bookkeeping sweep — rewrite `HANDOFF.md`, prepend to `LOG.md`, and sweep the status lines in
+`AGENTS.md`, `README.md`, `docs/00-INDEX.md`, `openspec/config.yaml` and `state.yaml` — per
+`HANDOFF.md` §5 step 8. The ODD feature document for this slice is deleted at close, as PR-07a's was;
+its substance is this record and Engram.
 
 ## Round 2 (terminal) — scoped re-judgment of the round-1 fix delta
 
