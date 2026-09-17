@@ -4,7 +4,13 @@ import assert from "node:assert/strict";
 import { REGISTRY_VERSION } from "../../src/shared/constants.js";
 import { rosterEntrySchema } from "../../src/shared/project-file.js";
 import { parseRegistryDocument } from "../../src/registry/schema.js";
-import { activeBinding, rosterSnapshotEntry, validRegistryDocument, type JsonObject } from "./fixtures.js";
+import {
+	VALID_ROSTER_HASH,
+	activeBinding,
+	rosterSnapshotEntry,
+	validRegistryDocument,
+	type JsonObject,
+} from "./fixtures.js";
 
 /** The document refused as expected; the problems it produced. */
 function problemsOf(document: unknown) {
@@ -57,6 +63,20 @@ function withBinding(overrides: JsonObject) {
 	return document;
 }
 
+/** The valid document with one project field replaced — a fresh document per call. */
+function withProject(overrides: JsonObject) {
+	const document = validRegistryDocument();
+	document.projects[0] = { ...document.projects[0], ...overrides };
+	return document;
+}
+
+/** The valid document with one group field replaced — a fresh document per call. */
+function withGroup(overrides: JsonObject) {
+	const document = validRegistryDocument();
+	document.groups[0] = { ...document.groups[0], ...overrides };
+	return document;
+}
+
 /**
  * The valid document with the binding's identity replaced **in lockstep** — its `agent_id`, its
  * `bot_id` and its snapshot entry together.
@@ -96,6 +116,9 @@ test("an unknown key is rejected at every level instead of being stripped (stric
 	documents.push(["root", root]);
 	documents.push(["bots[0]", withBot({ unexpected_key: 1 })]);
 	documents.push(["bindings[0]", withBinding({ unexpected_key: 1 })]);
+	documents.push(["groups[0]", withGroup({ unexpected_key: 1 })]);
+	documents.push(["projects[0]", withProject({ unexpected_key: 1 })]);
+	documents.push(["bots[0].token_ref", withBot({ token_ref: { store: "keychain", account: "bot:100000001", unexpected_key: 1 } })]);
 	documents.push([
 		"bindings[0].settings",
 		withBinding({ settings: { reminder_window_hours: 24, unexpected_key: 1 } }),
@@ -193,7 +216,11 @@ test("token_ref is the documented union and carries no token of its own (I-2)", 
 
 test("roster_hash must be the exact shape the shared hasher emits, not a bare digest", () => {
 	registryOf(validRegistryDocument());
-	assert.equal(activeBinding().roster_hash, "sha256:5428267f998d27b4fefc15451bdc264cd3a5a4137a2b1ae4a4b585960786abe1");
+	// The fixture derives this value with `computeRosterHash` over its own snapshot, so the assertion
+	// ties it to the single-entry known answer rather than to itself: a fixture that stopped describing
+	// one roster would fail here (round 1's `JD-A-001`/`JD-B-002`).
+	assert.equal(activeBinding().roster_hash, VALID_ROSTER_HASH);
+	assert.equal(VALID_ROSTER_HASH, "sha256:637627db2a9e58dea2b007df150da62dbbd45967d2aff85324714f32825d0513");
 	for (const hash of [
 		"5428267f998d27b4fefc15451bdc264cd3a5a4137a2b1ae4a4b585960786abe1",
 		"sha256:5428267f",
@@ -226,9 +253,27 @@ test("settings is optional and strict: the two documented keys are accepted, a t
 	assert.deepEqual(problemsOf(withBinding({ settings: { reminder_window_hours: 0 } })), [{ kind: "schema_invalid" }]);
 });
 
+test("projects[].path is informational: this schema does not require an absolute path (F2 doctor owns that rule)", () => {
+	// DATA-MODEL §2.3 calls the field an "absolute local path" and this schema enforces only "a
+	// non-empty string": an absolute-path test differs per platform (a drive prefix versus a POSIX
+	// root), the value chooses no authorization decision — a binding is by `project_id` — and the data
+	// model itself calls it informational. Pinned so the boundary is visible instead of implied, and
+	// reported in the record (round 1's `JD-A-004`/`JD-B-003`); a later tightening needs its own
+	// decision, not a silent test change.
+	registryOf(withProject({ path: "C:\\work\\example" }));
+	registryOf(withProject({ path: "relative/dir" }));
+	registryOf(withProject({ path: "/srv/project" }));
+	onlyShapeProblems(withProject({ path: "" }), "an empty path is not a path");
+});
+
 test("the snapshot entry is the project file's roster entry, not a second declaration (DATA-MODEL §1)", () => {
+	// The valid entries in this table are deliberately distinct from the known-good entry the document
+	// leads with: a pair of entries is now subject to the roster array's own rules as well, so an entry
+	// identical to the leading one is refused for a reason the entry declaration alone never sees, and
+	// the equality under test would compare two different questions (the array-level rules are pinned
+	// separately, below).
 	const entries: JsonObject[] = [
-		rosterSnapshotEntry(),
+		rosterSnapshotEntry({ agent_id: "@carol-agent", user_id: 100000003, username: "carol_example_bot" }),
 		rosterSnapshotEntry({ agent_id: "@bob-agent", user_id: 100000002, username: "bob_example_bot" }),
 		{ agent_id: "@alice-agent", user_id: 100000001 },
 		rosterSnapshotEntry({ extra_field: 1 }),
@@ -254,6 +299,52 @@ test("the snapshot entry is the project file's roster entry, not a second declar
 	// declaration that accepts (or refuses) everything.
 	assert.equal(entries.some((entry) => rosterEntrySchema.safeParse(entry).success), true);
 	assert.equal(entries.some((entry) => !rosterEntrySchema.safeParse(entry).success), true);
+});
+
+// --- The snapshot array itself: the roster-level rules DATA-MODEL §1 puts on `roster[]` ---
+
+test("a snapshot with two entries sharing one agent_id is refused (DATA-MODEL §1: agent_id unique)", () => {
+	// The snapshot is a copy of `conmuta.json`'s roster array, so the roster-level rules travel with
+	// it: two entries claiming one agent id make "the" admission entry for that agent ambiguous, which
+	// is what the file it was copied from refuses. The binding's own agent leads and its `user_id`
+	// equals `bot_id`, so R3 holds and the only rule that can move this verdict is the one under test.
+	const document = withBinding({
+		roster_snapshot: [rosterSnapshotEntry(), rosterSnapshotEntry({ user_id: 100000002 })],
+	});
+	assert.deepEqual(problemsOf(document), [{ kind: "schema_invalid" }]);
+});
+
+test("a snapshot listing two agents under one user_id is refused (DATA-MODEL §1: user_id unique)", () => {
+	// One Telegram account cannot be two agents; the identity anchor is non-injective otherwise.
+	const document = withBinding({
+		roster_snapshot: [rosterSnapshotEntry(), rosterSnapshotEntry({ agent_id: "@bob-agent" })],
+	});
+	assert.deepEqual(problemsOf(document), [{ kind: "schema_invalid" }]);
+});
+
+test("a snapshot with distinct agent_ids and distinct user_ids loads, so the rule is not blanket", () => {
+	const snapshot = [
+		rosterSnapshotEntry(),
+		rosterSnapshotEntry({ agent_id: "@bob-agent", user_id: 100000002, username: "bob_example_bot" }),
+	];
+	const registry = registryOf(withBinding({ roster_snapshot: snapshot }));
+	assert.equal(registry.bindings[0].roster_snapshot.length, 2);
+});
+
+test("R3's first-match lookup can no longer be order-dependent: a repeated agent_id is refused in either order", () => {
+	// Before this rule the verdict came from `.find`'s first match rather than from the document: a
+	// snapshot listing `@alice-agent` twice with different `user_id`s loaded when the entry carrying the
+	// binding's `bot_id` came first, and was refused as R3 when the stale one came first. Both orders
+	// are now refused by the duplicate rule, so no load depends on entry order.
+	const matching = rosterSnapshotEntry({ user_id: 100000001 });
+	const stale = rosterSnapshotEntry({ user_id: 100000009 });
+	for (const snapshot of [[matching, stale], [stale, matching]]) {
+		const problems = problemsOf(withBinding({ roster_snapshot: snapshot }));
+		assert.ok(
+			problems.some((problem) => problem.kind === "schema_invalid"),
+			JSON.stringify(snapshot),
+		);
+	}
 });
 
 // --- The problems themselves: value-free by construction ---
