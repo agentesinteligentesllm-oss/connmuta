@@ -1178,7 +1178,7 @@ hash-pinned AS-IS file, and ran the suites themselves (`npm test` 152/152 at the
 | Branch | `f1/07a-tool-schemas-errors` → `main` (branched from `main` at `c971e25`) |
 | Mode | Strict TDD |
 | Workflow | **ODD for this slice only** — the Director chose it this session over the two alternatives below |
-| Status | Implemented and verified (Strict TDD); tasks 7a.1–7a.6 `[x]`; reviewed range `c971e25..f3b3383` (396 insertions, 5 paths) |
+| Status | Implemented and verified (Strict TDD); tasks 7a.1–7a.6 `[x]`; first audited range `c971e25..dbb7494`, corrected range `c971e25..05ba773` |
 
 ## Audit path (Director decisions, session 9)
 
@@ -1202,22 +1202,23 @@ rule:
 
 ## Scope and budget (measured, not estimated)
 
+Final figures are the corrected tip `05ba773`; the pre-audit tip `dbb7494` measured 398.
+
 | Path | Lines | Kind |
 |---|---|---|
-| `src/shared/tool-schemas.ts` | 109 | SEAM (range extract of two v1 files) |
-| `src/shared/error-payload.ts` | 65 | SEAM |
-| `test/shared/tool-schemas.test.ts` | 135 | twin |
-| `test/shared/error-payload.test.ts` | 75 | twin |
+| `src/shared/tool-schemas.ts` | 112 | SEAM (range extract of two v1 files) |
+| `src/shared/error-payload.ts` | 66 | SEAM |
+| `test/shared/tool-schemas.test.ts` | 146 | twin |
+| `test/shared/error-payload.test.ts` | 77 | twin |
 | `test/fixtures/v1-provenance.json` | +12 | two SEAM registry entries |
-| reviewed range `c971e25..f3b3383` | **396** | 5 paths, 396 insertions, 0 deletions |
 | `docs/02-architecture/THREAT-MODEL.md` | +1/−1 | PT-02 file-name cell |
-| **budget total** | **398 / 400** | inside, no `size:exception` requested |
+| **budget total** | **415 / 400** | **15-line disclosed PR-scoped exception** — see the correction round |
 
-The tasks-phase estimate was ≈290 lines; the real diff is 396 before the doc cell. That is the same
-under-count PR-01a recorded (`bus-v2-f1-pr-01-001`): a SEAM module's doc comments must be **re-authored**,
-never copied, and the estimate counted v1's lines instead. Two lines were trimmed from the two
-`Changes:` blocks to stay inside the budget — the substance of both claims is intact, and the first
-draft at 402 would have needed either an exception or a trim; the trim was chosen.
+The tasks-phase estimate was ≈290 lines. That under-count is the one PR-01a already recorded
+(`bus-v2-f1-pr-01-001`): a SEAM module's doc comments must be **re-authored**, never copied, and the
+estimate counted v1's lines instead. The first draft measured 402 and 2 lines were trimmed from the two
+`Changes:` blocks rather than taking an exception; the audited tip then landed at 398, and the bounded
+correction round below carries it to 415.
 
 ## TDD cycle evidence
 
@@ -1300,16 +1301,20 @@ than moved, which is the JD-6 correction PR-06's judges asked for on `fence.ts`:
 
 ## Verification from a clean detached worktree
 
+Run twice: at the pre-audit tip `f3b3383` (169/169, 8/8) and again at the corrected code tip
+`05ba773`, after the correction round.
+
 ```
-git worktree add --detach ../telegram_bus_agent-worktrees/verify-07a f3b3383
+git worktree add --detach ../telegram_bus_agent-worktrees/verify-07a-fix 05ba773
 npm ci --ignore-scripts && npm run build
 node --test "dist/test/**/*.test.js"   -> 169 tests, 169 pass, 0 fail
 npm run test:static                    ->   8 tests,   8 pass, 0 fail
 ```
 
 Only the committed files are present in that tree; the worktree was removed as soon as the run
-finished. `git diff --stat c971e25..f3b3383` is exactly the five paths above, with **no** edit to any
-hash-pinned AS-IS file, no wire change and no dependency change.
+finished. `git diff --name-status c971e25..05ba773` is exactly the five code/test/fixture paths plus
+the `THREAT-MODEL.md` cell, with **no** edit to any hash-pinned AS-IS file, no wire change and no
+dependency change. The doc commits that follow `05ba773` are SDD bookkeeping: they carry no code.
 
 ## Carried forward to PR-07b (re-verified here, as the handoff asked)
 
@@ -1322,7 +1327,81 @@ number will exceed that estimate once the doc comments are re-authored. Decide *
 PR-07b: trim to fit, or take a **disclosed** PR-scoped exception like PR-06b's 26 lines. Never split a
 module from its twin.
 
+## Judgment Day audit (round 1) — substitute for the tribunal debate
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) were launched in parallel over the frozen
+range `c971e25..dbb7494`, each told to falsify the record's claims rather than trust them, and each
+required to return only `{"findings":[…],"evidence":[…]}`. **No CRITICAL finding.** Ledger:
+
+| Id | Severity | Causality | Verdict | Item |
+|---|---|---|---|---|
+| C1 | WARNING | introduced | **corroborated by both** | The PT-02 shape assertion inspected `sendInputBaseSchema`, not the schema the tools and the daemon actually use, and omitted `to_user_id`. Judge A proved it with a zod 4.6.5 probe: a `bot` key added to the refined and exported `sendInputSchema` passed every assertion in the file, and the tool surface accepted it. |
+| C2 | WARNING | introduced | **corroborated by both** | `toolErrorPayload`'s JSDoc told PR-34 to build the client-local payloads on it, while design §10's client taxonomy marks `DAEMON_DOWN`, `DAEMON_IDENTITY_MISMATCH` and `IPC_ERROR` retryable — none of which is in the tool-level allowlist. Following the shipped doc, PR-34 would mark a transiently-down daemon permanent. |
+| A3 | SUGGESTION | introduced | one judge | The exact field set was pinned only for `send`; `fetch`/`thread` were covered behaviourally, so an extra optional key satisfied every assertion. |
+| A4 | SUGGESTION | introduced | one judge | design §12's reuse table marks `src/tools/send.ts:47-109` and `src/index.ts:29-42` **AS-IS** → `shared/tool-schemas.ts`, while the module ships as SEAM. The record did not report that contradiction. |
+| B3 | SUGGESTION | introduced | one judge | The header under-disclosed its delta: `export type SendToolInput` comes from `v1:src/tools/send.ts:111`, one line past the cited range, and the three per-tool JSDoc lines were rewritten from `agentbus_*`. |
+| B4 | SUGGESTION | introduced | one judge | The case named "…survive serialization" never serialized anything: it read two fields off module-level literals and could not fail. |
+| S1 | WARNING | **pre_existing** | one judge (suspect) | `src/shared/constants.ts:3` pins the blind-stripped hash of `src/config.ts:26-166` (`4ce5e514…`) instead of the rule-conformant `039d53a2…`. Pre-existing from the PR-01b lineage, outside this slice's frozen range. Queued, not fixed here. |
+
+### A4 — the contradiction, reported rather than resolved silently (AGENTS.md §2)
+
+design §12's table carries one row per v1 range (`src/tools/send.ts:47-109` → AS-IS;
+`src/index.ts:29-42` → AS-IS), while this module is SEAM because it is **assembled** from both. The
+tribunal ruling `bus-v2-f1-tasks-001` items 1–2 settles it ("a module assembled from line ranges of
+several v1 files is a SEAM by construction") and task 7a.2 repeats it, so the SEAM verdict is the
+correct one and the §12 rows are the stale side. Nothing is changed in `design.md` here: it is gated
+and audited, so the contradiction is recorded for the Director instead. The registry cannot express
+it either — `v1Path` is a single token, so the second range appears only in the `Changes:` prose.
+
+### S1 — queued for the Director with its own evidence
+
+Re-derived here with my own method, plus the control that proves the method: `src/state.ts:15-87`
+pins `bd177372…`, which is the value **with** the terminating newline (rule-conformant), while
+`src/config.ts:26-166` pins `4ce5e514…`, which is the value **without** it. `039d53a2…` is the
+rule-conformant value. The scanner never notices, because for a SEAM it only asserts *inequality*.
+**Not fixed here**: it is pre-existing, one judge alone reported it, and it touches a file outside
+this slice; changing a pinned hash also invalidates the wrong-value-control table PR-04 recorded.
+Recommended minimal fix for whoever takes it: re-pin `constants.ts:3` to `039d53a2…` and record the
+old value as the strip control. **Recommended backlog id for the Director.**
+
+### Note for PR-34 (raised by C2)
+
+`client/errors.ts` must implement **design §10's client taxonomy** itself — `DAEMON_DOWN`,
+`DAEMON_IDENTITY_MISMATCH` and `IPC_ERROR` are `retryable: true`; `DAEMON_VERSION_MISMATCH`,
+`UNBOUND_PROJECT`, `BINDING_CHANGED`, `WRONG_ROOM` and `BINDING_MISMATCH` are `false` — and must
+**not** route client-local codes through `RETRYABLE_TOOL_CODES`, which classifies v1 tool codes only.
+
+## Correction round 1 (bounded, introduced items only)
+
+Per the Director's authorization and the PR-06 precedent (correct what this slice introduced, queue
+what it did not), one bounded round fixed C1, C2, B3 and B4 and folded A3 into C1's fix. A4 became a
+report rather than a change; S1 is queued. Commits `aedd5d9`, `05ba773`.
+
+| Finding | Correction | Falsifiability re-checked |
+|---|---|---|
+| C1 | Every forbidden key is now exercised behaviourally against the refined, tool-visible `sendInputSchema`; `to_user_id` joins the set; each read-only schema's exact field set is pinned | Mutant "add `bot` to the refined schema" now fails 1 test (it passed all of them before); mutant "add `to_user_id` to the base" fails 3 |
+| C2 | The JSDoc states the function is the TOOL-LEVEL fallback and that the client-local family keeps design §10's classification | The claim is now consistent with `design.md:399-402` and with the allow-list the twin pins |
+| B3 | `Changes:` names `SendToolInput` (v1:111) and the three rewritten per-tool JSDoc lines, and no longer claims v1 stated the guarantee "only for `from`" | Header-only review now sees the whole delta |
+| B4 | The case serializes both payloads through `errorResult` and compares the round trip | The case can now fail |
+
+**Disclosed PR-scoped exception: 15 lines over the 400-line policy.** The slice measures **415**
+changed lines (`112 + 66 + 146 + 77 + 12` in `src`/`test`, plus the 2-line THREAT-MODEL cell) — inside
+the policy at 398 before the correction round, 415 after it. The Director authorized this correction
+round with a disclosed PR-scoped exception (the same instrument as PR-06b's 26-line one, distinct from
+DN-06's AS-IS exception); the round cost 12 net lines after a passed prose-only compression, and the
+remaining overage is disclosed here rather than absorbed by deleting reasoning. It is a review-load
+disclosure, not an unreviewed change: every added line is a test assertion or an accuracy fix.
+
+## Verification after the correction round
+
+```
+node --test "dist/test/shared/tool-schemas.test.js"   ->  9 tests, 9 pass
+node --test "dist/test/shared/error-payload.test.js"  ->  7 tests, 7 pass
+node --test "dist/test/security/provenance.test.js"   ->  2 tests, 2 pass
+npm test                                              -> 169 tests, 169 pass, 0 fail
+npm run test:static                                   ->   8 tests,   8 pass, 0 fail
+```
+
 ## Next
 
-Judgment Day audit of `c971e25..f3b3383` (two blind read-only judges, then one scoped re-judgment if
-anything is corrected), then push and open the PR.
+Scoped re-judgment of the frozen ledger plus the fix delta (`dbb7494..HEAD`), then push and open the PR.
