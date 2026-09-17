@@ -2,7 +2,8 @@
  * Provenance: telegram-agent-bus src/config.ts:26-166 @ bf8f365 — verdict: SEAM (D-08).
  * v1 body sha256: 039d53a22b54f8c1a061c602f419e6272cd1f8a3fe260301d7fe36b4e892e15e
  * Changes: (1) LOCK_STALE_SECONDS, STATE_VERSION dropped; (2) OPEN_THREAD_BACKLOG_THRESHOLD
- * derived; (3) design §3 additions.
+ * derived; (3) design §3 additions; (4) `EXIT_VALIDATION_FAILED` added by PR-08 (design.md:126's
+ * exit-code table: the first command whose failure is neither a usage error nor a runtime fault).
  */
 
 /**
@@ -306,6 +307,18 @@ export const EXIT_DAEMON_ALREADY_RUNNING = 6;
 
 /** Exit code: a v1-to-v2 migration was refused (e.g. quarantined source data). */
 export const EXIT_MIGRATION_REFUSED = 7;
+
+/**
+ * Exit code: `conmuta validate` refused a file's content.
+ *
+ * Distinct from {@link EXIT_USAGE} (2) because the invocation was well-formed and the *content* was
+ * refused: a pre-commit hook and, in F2, `doctor` both branch on that difference, and reporting a
+ * data refusal as a usage error would make the two indistinguishable. Distinct from 1, which is
+ * reserved for uncaught errors and is never assigned a named constant (see the note above).
+ * design.md:126 enumerates the other commands' codes; `conmuta validate` is the first command whose
+ * failure is neither a usage error nor a runtime fault, so the table gains this next value.
+ */
+export const EXIT_VALIDATION_FAILED = 8;
 
 /**
  * Minimum number of files the client bundle's transitive closure must contain (§14).
