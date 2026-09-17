@@ -2895,23 +2895,24 @@ delivery — commit, push, PR and merge stay under ordinary repository policy.
 
 ## Scope and budget (measured)
 
-| File | Authored lines (re-measured after round 2) |
+| File | Authored lines (re-measured at the tip that ships) |
 |---|---|
 | `src/ledger/schema.ts` | 117 |
-| `src/ledger/transaction.ts` | 150 |
+| `src/ledger/transaction.ts` | 169 |
 | `src/ledger/tsconfig.json` (build wiring, not named in the block's Scope line) | 14 |
 | `test/ledger/schema.test.ts` | 625 |
-| `test/ledger/transaction.test.ts` | 379 |
-| **Total, `git diff --numstat -- src test`** | **1,285 added, 0 deleted** |
+| `test/ledger/transaction.test.ts` | 432 |
+| **Total, `git diff --numstat -- src test`** | **1,357 added, 0 deleted** |
 
 Outside the budget rule's own unit (`src test`): `tsconfig.json` (+1/−1, the root `references` entry) and
 `docs/02-architecture/THREAT-MODEL.md` (+1/−1, PT-10's cell). The block estimated ≈400, so the slice
-carries a **disclosed PR-10-scoped size exception, 885 over**, granted by the Director with the commit
+carries a **disclosed PR-10-scoped size exception, 957 over**, granted by the Director with the commit
 authorization and re-confirmed for the round-1 batch. The movement is recorded rather than smoothed —
 885 / 485 before any correction, **1,140 / 740** after round 1's batch (`+284 / −29`), **1,285 / 885** after
-round 2's fix (`+169 / −24`) — and the growth past the authorized batch is the cost of correcting a defect
-that batch introduced, disclosed rather than absorbed. Every figure is measured, never derived. Grounds: the
-DDL
+round 2's fix (`+169 / −24`), **1,357 / 957** after the independent verifier's three findings (`+118 / −50`
+and a doc fix) — and the growth past the authorized batch is the cost of correcting defects of this
+slice's own making, disclosed rather than absorbed. Every figure is measured at the tip it describes.
+Grounds: the DDL
 and its twin pin one property per constraint rather than a sample of them — the object inventory, `STRICT`
 plus the control that proves it bites, the `NOT NULL` inventory, the completeness *and* strictness of every
 closed vocabulary, both unique keys PT-10's replay needs, `seq`'s monotonicity, both cascades, both
@@ -2940,7 +2941,7 @@ comparison can say "different".
 |---|---|---|
 | 10.1 | `npm run build` → `test/ledger/transaction.test.ts(8,61): error TS2307: Cannot find module '../../src/ledger/transaction.js'` (exit 2) | `test/ledger/transaction.test.ts` **5/5** |
 | 10.3 | `npm run build` → `test/ledger/schema.test.ts(8,35): error TS2307: Cannot find module '../../src/ledger/schema.js'` (exit 2) | `test/ledger/schema.test.ts` **11/11** |
-| 10.5 | — | focused **16/16**; full suite **344/344** (328 → 344); `test:static` **8/8**. Re-measured after round 1: focused **21/21**, full **349/349**, `test:static` **8/8**. Re-measured again after round 2: focused **24/24**, full **352/352**, `test:static` **8/8** |
+| 10.5 | — | focused **16/16**; full suite **344/344** (328 → 344); `test:static` **8/8**. Re-measured after round 1: focused **21/21**, full **349/349**, `test:static` **8/8**. After round 2: focused **24/24**, full **352/352**. At the tip that ships: focused **25/25**, full **353/353**, `test:static` **8/8** |
 
 Two test-side bugs of the slice's own were found by the first GREEN run and fixed before this record was
 written, both in `schema.test.ts`: the `thread_history` vocabulary rows had no parent `threads` row
@@ -3159,7 +3160,50 @@ focused **24/24**, full **352/352** (328 before the slice), `test:static` **8/8*
 
 **`JUDGMENT: APPROVED`** for `3534739..4951fc6`.
 
+### The RDD independent verification, and the three defects it found
+
+The ordinary native review for this candidate was **declined**
+(`consent-declined-this-candidate`, `lineage_created: false`, no mutation, `correction_budget: 0`), so this
+candidate is never re-reviewed and the risk-gated path applied. `assess` reported **high** risk with one
+signal — `process_boundary` on `src/ledger/schema.ts` (`shell_process`) — which is a **false positive**,
+measured rather than argued: that file has no imports at all and its only `exec` occurrences are
+`node:sqlite`'s `db.exec` named in prose, with the same API called in the sibling module and both test
+files. The plan it returned: `writerSelfVerification: true`, `structuralReadbackOnly: false`,
+`independentVerifier: true`, `writerProfile: large`.
+
+**Writer self-verification** (the author, on the frozen tree): the full suite, `test:static`, the focused
+suites, the DDL's byte-identity, and the 21-mutant sweep below.
+
+**A separate independent verifier** (fresh context, read-only, no part in writing the code) reproduced every
+claim of this record — build from scratch, the DDL byte-identity with its own controls, the budget figure
+and its movement, seven behaviour claims measured against the built module rather than against the tests,
+and the document claims — and then found **three defects the record did not disclose**:
+
+| # | Defect | Why it mattered | Disposition |
+|---|---|---|---|
+| `F1` | a generator callback bypassed both refusals: `function*` and `async function*` passed the `AsyncFunction` pre-flight and carry no `then`, so `withTransaction` committed an empty transaction and returned the iterator, whose body then ran with `isTransaction === false` and autocommitted | the same hazard the module doc claims to prevent, and the doc's "it is refused at both points where a refusal is possible" was therefore false | **fixed**: the pre-flight set covers `GeneratorFunction`/`AsyncGeneratorFunction`, `ASYNC_CALLBACK_MESSAGE` became `DEFERRED_CALLBACK_MESSAGE`, and one test refuses both generator shapes |
+| `F2` | the settling guarantee's rejection half was unpinned: the test asserted assimilation, which a fulfilment-only settle also satisfies, so replacing `.catch(…)` with `.then(…)` left the suite green while a rejecting callback produced an unhandled rejection | ADR-12: a documented guarantee no test can fail — and Node's default policy for an unhandled rejection is a process exit | **fixed**: the test uses a *rejecting* thenable, observes `unhandledRejection` directly, and that mutant is now killed |
+| `F3` | `tasks.md`'s *Size.* paragraph carried pre-correction figures with no marker of its own | a stale figure in a gated document, even though the block corrected it 33 lines below | **fixed**: the paragraph names itself as the pre-correction measurement and points at the tip's figures |
+
+The verifier re-checked its own findings at the corrected tip: **`F1` RESOLVED** (with a lock-based
+linearization proof that no `BEGIN` is attempted, and a grep showing no stale importer of the old constant
+name), **`F2` RESOLVED** (with a non-vacuity control: an uncaught rejection *did* fire its observer), and
+`F3` reported *not resolved at the frozen tip* — correctly, because that documentation edit was still
+uncommitted when it looked. It also reported one informational defect in the lines the fix touched: the
+renamed constant's own JSDoc still described a single shape. That is corrected in the same commit.
+
+**Sweep after the verifier's findings: 21 mutants, 21 killed, 0 survived, 0 skipped** — the seventeen of the
+main matrix, the two of round 2, and one per verifier finding (`M20` the generator shapes dropped from the
+pre-flight set, `M21` the settle reduced to fulfilment-only). Final state: focused **25/25**, full
+**353/353**, `test:static` **8/8**, both sources restored byte-identically.
+
+**Budget at the tip that ships: 1,357 authored lines, 957 over** (117 `schema.ts`, 169 `transaction.ts`,
+14 its `tsconfig.json`, 625 `schema.test.ts`, 432 `transaction.test.ts`). The whole movement is recorded
+rather than smoothed — 885 / 485 before any correction, 1,140 / 740 after round 1's batch, 1,285 / 885 after
+round 2's fix, 1,357 / 957 after the independent verifier's three findings — and every figure is measured
+at the tip it describes.
+
 ## Next
 
-- The ordinary native review, then push, PR and the CI matrix. The audit-path record goes to
+- Push, the PR and its CI matrix, then the close-out sweep. The audit-path record goes to
   `docs/05-tribunal/INDEX.md` at close as `bus-v2-f1-pr-10-audit-001`, with DN-05 unsatisfied.

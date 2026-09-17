@@ -317,10 +317,11 @@ Runtime harness: real `node:sqlite` against a `mkdtemp` temp file (design §15 "
 imports another unit) and `{ "path": "src/ledger" }` in the root `references` — which must arrive with
 the unit's first `.ts` file or `tsc -b` fails TS18003 (the omission PR-09a disclosed for the registry).
 
-*Size.* The block estimated ≈400; the measured diff is **885 authored lines**
-(`git diff --numstat -- src test`: `schema.ts` 109, `transaction.ts` 75, its `tsconfig.json` 14,
-`schema.test.ts` 495, `transaction.test.ts` 192; zero deletions), so this slice carries a **disclosed
-PR-10-scoped size exception, 485 over**, granted by the Director together with the commit authorization.
+*Size.* The block estimated ≈400; the measured diff is **885 authored lines** (`git diff --numstat -- src test`:
+`schema.ts` 109, `transaction.ts` 75, its `tsconfig.json` 14, `schema.test.ts` 495, `transaction.test.ts` 192;
+zero deletions) — **the pre-correction measurement**, kept here because it is the figure the Director
+authorized, with the tip that ships re-measured in the paragraph after task 10.6. On this measurement the
+slice carries a **disclosed PR-10-scoped size exception, 485 over**, granted by the Director together with the commit authorization.
 Grounds: the DDL is one artifact whose constraints are pinned one assertion per constraint — the object
 inventory, `STRICT` plus the control that proves it bites, the eight accepted `apply_outcome` values and
 every other closed vocabulary (completeness and strictness), both unique keys PT-10's replay needs, both
@@ -359,9 +360,10 @@ violate; the over-general spike sentence above; and a promise of a control the s
 not have) and five pins that were missing (`AUTOINCREMENT`'s monotonicity across the retention delete, the
 per-table `NOT NULL` inventory, the DDL's refusal of a second application, SQLite's auto-rollback class,
 and the thenable refusal). The figures above are the pre-correction measurement; at the tip that ships the
-slice measures **1,285 authored lines, 885 over** (`src test`, 0 deleted), with **24** focused tests —
-1,140 / 740 after round 1, 1,285 / 885 after round 2's bounded fix. The round-1 and round-2 records and
-every re-measurement are in `apply-progress.md` §PR-10.
+slice measures **1,357 authored lines, 957 over** (`src test`, 0 deleted), with **25** focused tests —
+1,140 / 740 after round 1, 1,285 / 885 after round 2's bounded fix, 1,357 / 957 after the independent
+verifier's three findings. The round-1, round-2 and independent-verification records, and every
+re-measurement, are in `apply-progress.md` §PR-10.
 
 #### PR-11 — ledger open sequence + migrations (D-21)
 Branch `f1/11-ledger-open-migrations` → `main`. Depends: PR-10. Size: ≈350 lines, no exception.
