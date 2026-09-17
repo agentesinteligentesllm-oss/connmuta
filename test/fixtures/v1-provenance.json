@@ -36,6 +36,12 @@
     "verdict": "SEAM"
   },
   {
+    "v2Path": "src/shared/protocol-select.ts",
+    "v1Path": "src/protocol.ts:335-478",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
+  },
+  {
     "v2Path": "src/shared/fence.ts",
     "v1Path": "src/tools/fetch.ts:43-63",
     "commit": "bf8f365",
