@@ -2357,7 +2357,7 @@ Branch `f1/09-registry` from `main` @ `e177c58` (the block's original branch; PR
 | Correction commit | `d5d73a0` (the `M4` mutant's fix in `test/registry/schema.test.ts`; see the mutant matrix below) |
 | Requirements | `project-binding › Machine registry schema and invariants` (PT-18; PT-25's half lands in PR-09b) |
 | Provenance | none — no v1 range is vendored; the fixture stays at **11** entries, and all three new modules carry no `Provenance:` header |
-| Budget | **1,256 authored lines / 400** — an **856-line PR-09a-scoped exception**. It was 663 when the Director granted it (1,063 authored, measured before Judgment Day); round 1's mandated corrections, its informational folds and the correction of the two defects that correction itself introduced added **+193**, every line of them a fix the CRITICAL required, a boundary a judge asked to be pinned, the test that pins the fix, or the record of either. Re-measured in the same pass as the edits, which is the lesson HANDOFF §2.4 draws from PR-08a/PR-08b — and re-measured **again** after the independent verifier's `F4`, which caught this table carrying a pair of rows (110 and 368) whose two errors cancelled while the total stayed right |
+| Budget | **1,266 authored lines / 400** — an **866-line PR-09a-scoped exception**. It was 663 when the Director granted it (1,063 authored, measured before Judgment Day); round 1's mandated corrections, its informational folds, the correction of the two defects that correction introduced, and the two lines the independent verifier's `F10` added to the referential-integrity pin took it to 1,266 (1,256 + 10). Re-measured in the same pass as the edits and again at the tip that ships, which is the lesson HANDOFF §2.4 draws from PR-08a/PR-08b — and the verifier's `F4` caught this table carrying a pair of rows whose two errors cancelled while the total stayed right |
 
 ## Scope and budget (measured)
 
@@ -2368,9 +2368,9 @@ Branch `f1/09-registry` from `main` @ `e177c58` (the block's original branch; PR
 | `src/registry/tsconfig.json` (new compile unit, counted in `src`) | 14 |
 | `test/registry/fixtures.ts` | 88 (`100` at the code tip; round 1 re-pinned `VALID_ROSTER_HASH`, made `activeBinding` derive the field, and removed `addSecondBinding` — 12 lines fewer, not more) |
 | `test/registry/schema.test.ts` | 390 (`280` at the code tip, `277` after `M4`'s first fix; round 1 added the four snapshot cases and the informational pins, and `010ed85` added the two that pin its own correction) |
-| `test/registry/invariants.test.ts` | 267 |
+| `test/registry/invariants.test.ts` | 277 (`267` before the verifier's `F10` widened the referential-integrity pin from one dimension to three) |
 | `src/shared/project-file.ts` | +55 / −20 (the `rosterEntrySchema` export, then round 1's extracted `applyRosterUniqueness`) |
-| **budget total** (`git diff --numstat e177c58..010ed85 -- src test`, loader half excluded) | **1,256 / 20** — 856-line exception |
+| **budget total** (`git diff --numstat e177c58..2279c15 -- src test`, loader half excluded) | **1,266 / 20** — 866-line exception |
 | `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** |
 
 **Why the shared export, and why it is not drift.** `bindings[].roster_snapshot` is a *copy* of
@@ -2419,9 +2419,9 @@ uncommitted loader files, and a run there would report figures this half cannot 
 | `d5d73a0` (the tip the slice reached before Judgment Day; the docs commits after it change no code until `3508243`) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **298/298** |
 | `d5d73a0` | `node --test "dist/test/security/*.test.js"` | **8/8** |
 | `d5d73a0` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js"` | **30/30** |
-| `010ed85` (the frozen tip, and the tip the audit's verdict covers) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **304/304** |
-| `010ed85` | `node --test "dist/test/security/*.test.js"` | **8/8** |
-| `010ed85` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/shared/project-file.test.js"` | **75/75** |
+| `2279c15` (the frozen tip, and the tip the audit's verdict covers) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **304/304** |
+| `2279c15` | `node --test "dist/test/security/*.test.js"` | **8/8** |
+| `2279c15` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/shared/project-file.test.js"` | **75/75** |
 
 The worktree is removed as soon as the run finishes, and an empty `telegram_bus_agent-worktrees`
 directory is the expected end state (HANDOFF §8). One harness defect was found and fixed while doing this:
@@ -2641,14 +2641,15 @@ sits inside round 1's own batch.
 
 ### Final verification and verdict
 
-Clean detached worktree at `010ed85` (`../telegram_bus_agent-worktrees/verify-09a-final`), `dist/` rebuilt
+Clean detached worktree at `2279c15` (`../telegram_bus_agent-worktrees/verify-09a-final`), `dist/` rebuilt
 from scratch: **304/304** tests (PR-08's 268 + `schema` 20 + `invariants` 16), `test:static` **8/8**, and the
 focused set over the three suites this half owns — `schema`, `invariants` and the shared `project-file` —
-**75/75**.
+**75/75**. The verdict below was first reached at `010ed85` and re-measured at `2279c15`, which adds only the
+verifier's `F10` pin and this record.
 
 With no severe row surviving and the final verification passing:
 
-**`JUDGMENT: APPROVED`** for `e177c58..010ed85`.
+**`JUDGMENT: APPROVED`** for `e177c58..2279c15`.
 
 ### The ordinary native review — DECLINED for this candidate
 
