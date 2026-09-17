@@ -207,10 +207,12 @@ Tasks 8.1 and 8.2 flipped to `[x]` in the **PR-08a** commit; 8.3–8.6 stay open
 
 - [x] 8.1 RED: write `test/shared/project-file.test.ts` covering the three spec scenarios (valid file loads, unknown key rejected, future `schema_version` refused) and `test/shared/token-shape.test.ts` (seeded token-shaped match caught, clean file passes).
 - [x] 8.2 GREEN: implement `src/shared/token-shape.ts` (`findTokenShapes`/`assertNoTokenShape`, PEM/`.env`/marker detection) and `src/shared/project-file.ts` (`z.strictObject` schema per DATA-MODEL §1, `PROJECT_ID_PATTERN` slug, path-separator/`Authorization` rejection).
-- [ ] 8.3 RED: write `test/shared/roster-hash.test.ts` (sorted `[agent_id, user_id]` pairs, `username` excluded, D-27) and `test/cli/validate.test.ts` (`conmuta validate --stdin` exits non-zero on a token-shaped match, never echoes it).
-- [ ] 8.4 GREEN: implement `src/shared/roster-hash.ts`, `src/cli/validate.ts`, and the `src/cli/main.ts` dispatcher skeleton (single `bin` entry, `validate` subcommand wired; `mcp`/`daemon stop`/`migrate-v1` added in PR-17/PR-35/PR-37).
-- [ ] 8.5 Verify: `npm run build && node --test "dist/test/shared/token-shape.test.js" "dist/test/shared/roster-hash.test.js" "dist/test/shared/project-file.test.js" "dist/test/cli/validate.test.js"`.
-- [ ] 8.6 Docs: update the file-name cell(s) of PT-05, PT-06 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 8.3 RED: write `test/shared/roster-hash.test.ts` (sorted `[agent_id, user_id]` pairs, `username` excluded, D-27) and `test/cli/validate.test.ts` (`conmuta validate --stdin` exits non-zero on a token-shaped match, never echoes it).
+- [x] 8.4 GREEN: implement `src/shared/roster-hash.ts`, `src/cli/validate.ts`, and the `src/cli/main.ts` dispatcher skeleton (single `bin` entry, `validate` subcommand wired; `mcp`/`daemon stop`/`migrate-v1` added in PR-17/PR-35/PR-37).
+- [x] 8.5 Verify: `npm run build && node --test "dist/test/shared/token-shape.test.js" "dist/test/shared/roster-hash.test.js" "dist/test/shared/project-file.test.js" "dist/test/cli/validate.test.js"`.
+- [x] 8.6 Docs: update the file-name cell(s) of PT-05, PT-06 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+Tasks 8.3–8.6 flipped to `[x]` in the **PR-08b** commit: the slice is complete only once both halves are in, so PR-08a merged with them still open (unfinished work is never checked off). 8.5's focused command reported **75/75** and 8.6 filled PT-06's cell in PR-08a and completed PT-05's here.
 
 #### PR-09 — machine registry (schema, invariants, hot-reload)
 Branch `f1/09-registry` → `main`. Depends: PR-08. Size: ≈380 lines, no exception.

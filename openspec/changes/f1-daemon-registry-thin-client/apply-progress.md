@@ -2091,3 +2091,100 @@ authorization either: commit, push, PR and merge stay ordinary repository policy
   wiring and the twins) is prepared afterwards on top of the merged `main`, with its own verification,
   its own Judgment Day audit and its own review lifecycle.
 
+---
+
+# PR-08b — `shared/roster-hash.ts` + the CLI (`conmuta validate`, `cli/main.ts`) — the second half of the re-sliced PR-08
+
+**Slice status:** implemented and verified at the code tip `d0eac03`, stacked on PR-08a (merged as PR #11,
+`1770f84`). Awaiting its Judgment Day audit; DN-05 is unsatisfied for it too, for the same reason as the
+rest of F1 (Arena bridge down).
+
+| Field | Value |
+|---|---|
+| Branch | `f1/08b-roster-cli` from `main` @ `72e09c0` (the PR-08a audit-path record) |
+| Code commits | `7c6657b` (`roster-hash.ts` + its twin), `d0eac03` (the CLI unit, `EXIT_VALIDATION_FAILED` and the build wiring) |
+| Requirements | `project-binding › Name-bearing identifiers derive from one constant`; the roster fingerprint of `ipc-handshake`/D-27, computed here and consumed in PR-30; `project-binding › Token-shape validator`'s callable surface (PT-05, D-29) |
+| Provenance | none — no v1 range is vendored; the fixture stays at 11 entries |
+
+## Scope and budget (measured)
+
+| Path | Authored lines |
+|---|---|
+| `src/shared/roster-hash.ts` | 39 |
+| `test/shared/roster-hash.test.ts` | 86 |
+| `src/cli/validate.ts` | 63 |
+| `test/cli/validate.test.ts` | 189 |
+| `src/cli/main.ts` | 125 |
+| `test/cli/main.test.ts` | 150 |
+| `src/shared/constants.ts` | +14 / −1 (`EXIT_VALIDATION_FAILED`) |
+| `tsconfig.json`, `src/cli/tsconfig.json` | +6 / −2 (the build wiring below) |
+| **budget total** | **672 / 400** — **272-line PR-08b-scoped exception** |
+
+The exception follows the same grounds as PR-08a's: the CLI's value is in its contract — argument
+handling, exit codes, never echoing, not executing on import — and `test/cli/validate.test.ts` exercises
+it at the **process boundary** (a real child process, the design §15 "Integration" layer), which is the
+only place a token could leak into a message. Trimming those cases is exactly what the budget rule
+forbids.
+
+## The three carried findings this slice closes
+
+1. **`test/cli/main.test.ts`, the twin PR-08's scope omitted** (HANDOFF §4): `test/twins.test.ts` requires
+a twin for every non-declaration `src/**/*.ts`, so the slice would have failed its own merge. Added, and
+it pins a real property: importing the module must not run the CLI.
+2. **The root `tsconfig.json` `references`** now includes `{ "path": "src/cli" }` (an empty composite unit
+is TS18003), which is what makes `test/cli/**` compilable at all.
+3. **`src/cli/tsconfig.json` referenced `../client` and `../daemon`, neither of which has a single `.ts`
+file**, so the first build that reached it would have failed TS18003. Both references are deferred to the
+slices that write their first source file (PR-32, PR-15), with that instruction written in the file.
+
+## TDD cycle evidence
+
+| Step | Command | Observed |
+|---|---|---|
+| 8.3 RED | `node node_modules/typescript/bin/tsc -b` | `TS2307: Cannot find module '../../src/cli/main.js'` / `'../../src/cli/validate.js'` and `TS2305: … has no exported member 'EXIT_VALIDATION_FAILED'` — the RED for these modules was taken while the slice was still one tree, before PR-08a was split out, and is recorded here rather than replayed |
+| 8.4 GREEN | focused run over the three new suites + `roster-hash` | **34/34** |
+| 8.5 Verify | the exact command task 8.5 names | **75/75** (the four suites it lists) |
+
+## Mutants bound to this candidate
+
+Three, all killed, each built first on a cleaned `dist/` in the clean worktree at `d0eac03` and restored
+byte-identically with a `sha256` check:
+
+| # | Mutant | Test that killed it |
+|---|---|---|
+| N1 | The roster hash includes the display-only `username` | `roster-hash.test.ts` — the exclusion case and both known-answer vectors |
+| N2 | **PROCESS BOUNDARY**: the refusal line echoes the document | `validate.test.ts` — the child-process case that asserts the fixture never reaches stdout or stderr |
+| N3 | The CLI runs on import | `main.test.ts` — the probe that imports the module and asserts no output and no exit code |
+
+## Verification from a clean detached worktree
+
+`git worktree add --detach ../telegram_bus_agent-worktrees/verify-08b d0eac03`, then
+`npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` and the static set:
+
+| Tree | Tests | `test:static` |
+|---|---|---|
+| `d0eac03` (PR-08b code tip) | **263 / 263** | **8 / 8** |
+
+That is PR-08a's 229 plus this slice's **34**: `test/shared/roster-hash.test.ts` (8),
+`test/cli/validate.test.ts` (13) and `test/cli/main.test.ts` (13).
+
+## Reportable contradictions resolved or carried
+
+1. **Resolved — the exit code `conmuta validate` had nowhere to come from.** PR-08a reported that
+   `design.md:126` enumerates codes 2–7 and reserves 1 for uncaught errors, leaving D-29's command with
+   none. This slice adds `EXIT_VALIDATION_FAILED = 8` to `constants.ts` with its reasoning and **appends**
+   a row to design §11's table naming it as an apply-time addition; the rows above it are untouched, so
+   what was designed and what shipped both stay on the record. A content refusal is neither a usage error
+   nor a runtime fault, and a pre-commit hook and (F2) `doctor` branch on that difference.
+2. **Carried — `design.md:124` lists `TELEGRAM_BOT_TOKEN_RE` under `constants.ts`** while the exported
+   regex ships in `shared/secrets.ts:24`. Not rewritten here; reported by PR-08a and still reported.
+3. **Carried — the `Authorization` literal is matched case-insensitively**, which is wider than the
+   requirement's literal spelling. Disclosed in PR-08a's record as a fail-closed hardening (RFC 9110
+   §5.1); `cli/validate.ts` inherits it because it shares the definition rather than restating it.
+
+## Next
+
+- Judgment Day over `72e09c0..<this tip>`, a bounded correction round, and a scoped re-judgment.
+- Then the ordinary native review for this candidate, and only after that: push, PR-08b, CI, and the
+  Director's merge decision.
+
