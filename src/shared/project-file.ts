@@ -80,7 +80,16 @@ const DRIVE_PREFIX_RE = /^[A-Za-z]:/;
  */
 const PATH_SEPARATORS = ["/", "\\"] as const;
 
-const rosterEntrySchema = z.strictObject({
+/**
+ * One roster entry of a project file — the shape `conmuta.json`'s `roster[]` carries.
+ *
+ * Exported because the registry's `bindings[].roster_snapshot` is a **copy** of this array (D-07, the
+ * admission source while no client is connected), and `roster_hash` is computed over both by the same
+ * `shared/roster-hash.ts` rule: two declarations of the entry shape would let the snapshot accept
+ * something the file it was copied from refuses, with no test able to see the divergence.
+ * `test/registry/schema.test.ts` pins the equivalence by running both verdicts over one table.
+ */
+export const rosterEntrySchema = z.strictObject({
 	agent_id: z.string().regex(AGENT_ID_PATTERN),
 	user_id: z.number().int().positive(),
 	username: z.string(),
