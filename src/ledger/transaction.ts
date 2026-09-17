@@ -59,8 +59,12 @@ export const NESTED_TRANSACTION_MESSAGE =
 	"withTransaction: this connection is already inside a transaction, and F1 has no savepoints (design §5.3).";
 
 /**
- * The refusal {@link withTransaction} raises when `fn` returns a thenable — an `async` callback, which
- * is the one shape that would break the write-ahead ordering silently.
+ * The refusal {@link withTransaction} raises for a callback that would defer its own body — an `async` or
+ * generator function, or a thenable such a callback returned — because every one of those shapes would run
+ * statements outside the transaction, after it had committed.
+ *
+ * One constant covers all three shapes because the caller's mistake is one mistake in three shapes, and the
+ * message names them together; {@link DEFERRED_CALLBACK_SHAPES} is the set the pre-flight checks.
  *
  * Exported for the same reason as {@link NESTED_TRANSACTION_MESSAGE}: the caller and its test pin one
  * spelling of the refusal rather than matching prose.
