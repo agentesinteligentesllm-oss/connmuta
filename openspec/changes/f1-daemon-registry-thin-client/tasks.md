@@ -303,12 +303,68 @@ Scope: `src/ledger/schema.ts`, `src/ledger/transaction.ts`, `test/ledger/transac
 Requirements: risk mitigation for design §5.3 ("`node:sqlite` transaction idiom unconfirmed on the pinned build"); underlies `durable-inbox › Write-ahead before offset confirmation` (PT-10, consumed in PR-12).
 Runtime harness: real `node:sqlite` against a `mkdtemp` temp file (design §15 "Ledger" layer) — this is the in-phase spike the risk register calls for, run **before** PR-12's inbox transaction task.
 
-- [ ] 10.1 RED (spike): write `test/ledger/transaction.test.ts` on the pinned Node build asserting `db.isTransaction` flips true on `BEGIN IMMEDIATE`, a throw inside the transaction callback leaves no row, and a nested `withTransaction` call throws (no savepoints in F1) — fails because `withTransaction` does not exist yet.
-- [ ] 10.2 GREEN: implement `src/ledger/transaction.ts` (`withTransaction(db, fn)`: `BEGIN IMMEDIATE` … `COMMIT`, `ROLLBACK` on throw) — 10.1 passes, closing the spike with no ADR needed.
-- [ ] 10.3 RED: write `test/ledger/schema.test.ts` asserting every DDL table from design §5.2 (`offsets`, `updates`, `threads`, `thread_history`, `needs_action` VIEW, `client_cursors`, `client_surfaced`, `audit_log`, `unknown_senders`, `binding_state`, `conditions`) exists with its `STRICT`/`CHECK` constraints.
-- [ ] 10.4 GREEN: implement `src/ledger/schema.ts` with the full DDL from design §5.2 verbatim.
-- [ ] 10.5 Verify: `npm run build && node --test "dist/test/ledger/transaction.test.js" "dist/test/ledger/schema.test.js"`.
-- [ ] 10.6 Docs: update the file-name cell(s) of PT-10 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 10.1 RED (spike): write `test/ledger/transaction.test.ts` on the pinned Node build asserting `db.isTransaction` flips true on `BEGIN IMMEDIATE`, a throw inside the transaction callback leaves no row, and a nested `withTransaction` call throws (no savepoints in F1) — fails because `withTransaction` does not exist yet.
+- [x] 10.2 GREEN: implement `src/ledger/transaction.ts` (`withTransaction(db, fn)`: `BEGIN IMMEDIATE` … `COMMIT`, `ROLLBACK` on throw) — 10.1 passes, closing the spike with no ADR needed.
+- [x] 10.3 RED: write `test/ledger/schema.test.ts` asserting every DDL table from design §5.2 (`offsets`, `updates`, `threads`, `thread_history`, `needs_action` VIEW, `client_cursors`, `client_surfaced`, `audit_log`, `unknown_senders`, `binding_state`, `conditions`) exists with its `STRICT`/`CHECK` constraints.
+- [x] 10.4 GREEN: implement `src/ledger/schema.ts` with the full DDL from design §5.2 verbatim.
+- [x] 10.5 Verify: `npm run build && node --test "dist/test/ledger/transaction.test.js" "dist/test/ledger/schema.test.js"`.
+- [x] 10.6 Docs: update the file-name cell(s) of PT-10 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+10.1–10.6 flipped to `[x]` in the **PR-10** commit. **Apply-time note.**
+
+*Scope.* The block names four files; the unit also lands its build wiring — `src/ledger/tsconfig.json`
+(14 lines, `rootDir: ../..`, its own `tsBuildInfoFile`, and no `references` yet because neither module
+imports another unit) and `{ "path": "src/ledger" }` in the root `references` — which must arrive with
+the unit's first `.ts` file or `tsc -b` fails TS18003 (the omission PR-09a disclosed for the registry).
+
+*Size.* The block estimated ≈400; the measured diff is **885 authored lines** (`git diff --numstat -- src test`:
+`schema.ts` 109, `transaction.ts` 75, its `tsconfig.json` 14, `schema.test.ts` 495, `transaction.test.ts` 192;
+zero deletions) — **the pre-correction measurement**, kept here because it is the figure the Director
+authorized, with the tip that ships re-measured in the **Round 1 (Judgment Day)** paragraph below and in
+`apply-progress.md` §PR-10's budget table. On this measurement the
+slice carries a **disclosed PR-10-scoped size exception, 485 over**, granted by the Director together with the commit authorization.
+Grounds: the DDL is one artifact whose constraints are pinned one assertion per constraint — the object
+inventory, `STRICT` plus the control that proves it bites, the eight accepted `apply_outcome` values and
+every other closed vocabulary (completeness and strictness), both unique keys PT-10's replay needs, both
+cascades, both hand-written indexes, the bodiless tables and the VIEW's four branches — and trimming that
+list is what the budget rule forbids. The figure covers the rule's own unit (`src test`); the root
+`tsconfig.json` and PT-10's cell in `THREAT-MODEL.md` fall outside it.
+
+*Spike verdict.* The idiom holds on the pinned build (Node 24.16.0, SQLite 3.53.0): `isTransaction`
+flips on `BEGIN IMMEDIATE`, `ROLLBACK` outside a transaction throws, and a nested `BEGIN` is refused by
+SQLite itself — so **no ADR is needed**, as design §5.3 expected. Two boundaries the first record of this
+slice stated wrongly and Judgment Day round 1 corrected: a failed *constraint* statement leaves the
+transaction open, but SQLite's auto-rollback classes (`SQLITE_FULL`, `SQLITE_IOERR`, …) close it
+themselves (measured: errcode 13 leaves `isTransaction` false), which is why the catch rolls back only a
+transaction that is still open; and the nested refusal is checked *before* `BEGIN` runs, because SQLite's
+own refusal would otherwise reach the outer call's `ROLLBACK` and roll back the batch it never opened.
+The suite pins both, and it pins the synchronous-callback boundary too: an `async` callback is refused
+before it runs, so such a caller gets an error instead of a partial commit (round 1 refused it only after
+calling it, and a tail after an `await` then autocommitted — the regression round 2 corrected).
+
+*PT-10's cell.* PR-10 fills the half it pins — the rollback boundary and the
+`UNIQUE (bot_id, update_id)` dedup — and names `ledger/inbox` (PR-12) as the scenario's owner per
+`design.md:551`, the same split PT-25's row states (B-26).
+
+*Discovered, and disclosed rather than silent:* `test/security/provenance.test.ts` reads a file's
+**leading** `/**` block as a vendor header, so a non-vendored module that begins with its doc comment
+(one with no imports) must not contain that header's first token. The first draft of `schema.ts` did,
+and the static gate reported the file as a malformed vendored module until the wording changed. `schema.ts`
+now states the constraint in its header — its doc comment *is* the leading block that gate reads — and
+`transaction.ts` points at it instead of claiming the same hazard for itself.
+
+*Round 1 (Judgment Day).* **0 BLOCKER, 0 CRITICAL** from either judge (13 informational rows). The
+Director authorized the full batch, which is folded in the correction commit: six statements of the
+slice's own that were false (the §12 premise above; the async boundary declared unpinnable; a wrong
+`PT-27` citation where ADR-0027 is meant; a data-hygiene claim about digit runs that the file's own ids
+violate; the over-general spike sentence above; and a promise of a control the second text-level check did
+not have) and five pins that were missing (`AUTOINCREMENT`'s monotonicity across the retention delete, the
+per-table `NOT NULL` inventory, the DDL's refusal of a second application, SQLite's auto-rollback class,
+and the thenable refusal). The figures above are the pre-correction measurement; at the tip that ships the
+slice measures **1,357 authored lines, 957 over** (`src test`, 0 deleted), with **25** focused tests —
+1,140 / 740 after round 1, 1,285 / 885 after round 2's bounded fix, 1,357 / 957 after the independent
+verifier's three findings. The round-1, round-2 and independent-verification records, and every
+re-measurement, are in `apply-progress.md` §PR-10.
 
 #### PR-11 — ledger open sequence + migrations (D-21)
 Branch `f1/11-ledger-open-migrations` → `main`. Depends: PR-10. Size: ≈350 lines, no exception.

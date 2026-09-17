@@ -6,5 +6,5 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo/test.tsbuildinfo"
   },
   "include": ["test/**/*.ts"],
-  "references": [{ "path": "src/shared" }, { "path": "src/cli" }, { "path": "src/registry" }]
+  "references": [{ "path": "src/shared" }, { "path": "src/cli" }, { "path": "src/registry" }, { "path": "src/ledger" }]
 }

@@ -2882,3 +2882,328 @@ The exact acknowledgement was executed and its envelope reports **`authority: bu
 (`gentle-ai.review-acknowledged/v1`), so the lifecycle is closed: no correction transition was offered, none
 is taken, and this candidate is never re-reviewed. Review approval is informational and authorizes no
 delivery — commit, push, PR and merge stay under ordinary repository policy.
+---
+
+# PR-10 — ledger schema + `node:sqlite` transaction spike (`src/ledger/{schema,transaction}.ts` + build wiring)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branch | `f1/10-ledger-schema-spike` → `main` (base `3534739`, the PR-09b docs commit) |
+| Mode | Strict TDD (RED observed once per module, before its implementation existed) |
+| Status | Implemented and verified; tasks 10.1–10.6 marked `[x]`; **Judgment Day audit and the ordinary native review pending** |
+
+## Scope and budget (measured)
+
+| File | Authored lines (re-measured at the tip that ships) |
+|---|---|
+| `src/ledger/schema.ts` | 117 |
+| `src/ledger/transaction.ts` | 169 |
+| `src/ledger/tsconfig.json` (build wiring, not named in the block's Scope line) | 14 |
+| `test/ledger/schema.test.ts` | 625 |
+| `test/ledger/transaction.test.ts` | 432 |
+| **Total, `git diff --numstat -- src test`** | **1,357 added, 0 deleted** |
+
+Outside the budget rule's own unit (`src test`): `tsconfig.json` (+1/−1, the root `references` entry) and
+`docs/02-architecture/THREAT-MODEL.md` (+1/−1, PT-10's cell). The block estimated ≈400, so the slice
+carries a **disclosed PR-10-scoped size exception, 957 over**, granted by the Director with the commit
+authorization and re-confirmed for the round-1 batch. The movement is recorded rather than smoothed —
+885 / 485 before any correction, **1,140 / 740** after round 1's batch (`+284 / −29`), **1,285 / 885** after
+round 2's fix (`+169 / −24`), **1,357 / 957** after the independent verifier's three findings (`+118 / −50`
+and a doc fix) — and the growth past the authorized batch is the cost of correcting defects of this
+slice's own making, disclosed rather than absorbed. Every figure is measured at the tip it describes.
+Grounds: the DDL
+and its twin pin one property per constraint rather than a sample of them — the object inventory, `STRICT`
+plus the control that proves it bites, the `NOT NULL` inventory, the completeness *and* strictness of every
+closed vocabulary, both unique keys PT-10's replay needs, `seq`'s monotonicity, both cascades, both
+hand-written indexes, the bodiless tables, the VIEW's four branches and the DDL's refusal of a second
+application — and trimming that list is what the budget rule forbids.
+
+## Where the code came from
+
+No vendoring: design §12's only row naming `ledger/*` is the **REPLACED** row
+(`v1:src/state.ts:89-186, 217-250, 252-456` → `ledger/*`), so there is no v1 text to reuse and neither
+module carries a provenance header; `test/fixtures/v1-provenance.json` stays at **11 entries** (unchanged
+since PR-07b). *(Corrected in round 1: the first record said no §12 row names `ledger/*` at all, which
+`design.md:452` contradicts. The conclusion was right; the premise was not.)* The DDL is authored in design
+§5.2 and this slice is that text; the transaction module is new code for an idiom design §5.3 settles as an
+implementation detail.
+
+**The DDL is verbatim, and that is a measurement rather than a claim.** The `sql` block was extracted
+programmatically from `design.md` §5.2, spliced into `schema.ts` by a script, and compared back:
+`sha256 9e9bb65545df29ce5871bea095a6d5457a8865a1a739abda9feb62058915b506`, **74 lines / 4,123 bytes**,
+**0 differing lines**, with two failing controls (one byte appended; `STRICT` stripped) proving the
+comparison can say "different".
+
+## TDD cycle evidence
+
+| Task | RED (observed) | GREEN |
+|---|---|---|
+| 10.1 | `npm run build` → `test/ledger/transaction.test.ts(8,61): error TS2307: Cannot find module '../../src/ledger/transaction.js'` (exit 2) | `test/ledger/transaction.test.ts` **5/5** |
+| 10.3 | `npm run build` → `test/ledger/schema.test.ts(8,35): error TS2307: Cannot find module '../../src/ledger/schema.js'` (exit 2) | `test/ledger/schema.test.ts` **11/11** |
+| 10.5 | — | focused **16/16**; full suite **344/344** (328 → 344); `test:static` **8/8**. Re-measured after round 1: focused **21/21**, full **349/349**, `test:static` **8/8**. After round 2: focused **24/24**, full **352/352**. At the tip that ships: focused **25/25**, full **353/353**, `test:static` **8/8** |
+
+Two test-side bugs of the slice's own were found by the first GREEN run and fixed before this record was
+written, both in `schema.test.ts`: the `thread_history` vocabulary rows had no parent `threads` row
+(`FOREIGN KEY constraint failed`, errcode 787), and the strictness case deleted that parent before the
+invalid insert. The fix inserts one parent thread and gives the two rows distinct keys, which also removes
+the chance that a unique-key refusal is mistaken for the CHECK's.
+
+## The spike (design §5.3's risk-register row, closed)
+
+Measured on the pinned build — Node **24.16.0**, SQLite **3.53.0** — before any file was written:
+
+| Question | Answer |
+|---|---|
+| Does `DatabaseSync.isTransaction` exist? | Yes: `false` → `true` on `BEGIN IMMEDIATE` → `false` on `ROLLBACK` |
+| Does a throw inside the callback roll the batch back? | Yes for a failed statement, which leaves the transaction open so the catch still owns the rollback. **Corrected in round 1:** SQLite's auto-rollback classes (`SQLITE_FULL`, `SQLITE_IOERR`, …) close the transaction themselves — measured, errcode 13 leaves `isTransaction` false — which is why the catch guards on `isTransaction` instead of rolling back unconditionally |
+| Is a nested call refused? | Yes, by SQLite itself (`cannot start a transaction within a transaction`) — and `ROLLBACK` with no transaction throws `cannot rollback - no transaction is active` |
+| Can `exec()` run the whole DDL at once? | Yes (multi-statement), which is why `schema.ts` exports one string |
+| Is `PRAGMA foreign_keys` on by default? | Yes (`node:sqlite` opens with `enableForeignKeyConstraints`) |
+
+**Verdict: the idiom holds, so no ADR is needed** — design §5.3's own expectation. One deliberate addition
+is part of `transaction.ts`'s contract: the nested refusal is checked **before** `BEGIN` runs. SQLite
+refuses the nested `BEGIN`, but a nested call whose own `catch` then ran `ROLLBACK` would roll back the
+*outer* call's transaction — the batch it never opened. That is `M4`/`M5` below, and the suite pins the
+refusal leaving the outer transaction intact and committable.
+
+## Mutant matrix — each built on a cleaned `dist/` in an isolated worktree, each restored byte-identically
+
+Run in `../telegram_bus_agent-worktrees/verify-10` (detached at `3534739`, the candidate applied as a patch
+and proved sha256-identical to the working tree for all seven files, `npm ci --ignore-scripts`, `dist/`
+rebuilt from scratch before each mutant).
+
+| # | Mutant | Verdict | Killed by |
+|---|---|---|---|
+| `M1` | `BEGIN IMMEDIATE` → `BEGIN` (deferred) | KILLED | the write-lock test: with no writes made yet, the second connection's write would have succeeded |
+| `M2` | the `ROLLBACK` call removed | KILLED | a throw inside the callback leaves no row |
+| `M3` | `COMMIT` moved before the callback runs | KILLED | five tests, including the rollback boundary and every transaction-state assertion |
+| `M4` | the nested-call refusal removed | KILLED | the nested call is refused **and** the outer transaction survives |
+| `M5` | the catch's still-open guard removed | KILLED | a callback that ends the transaction itself must not mask the caller's error |
+| `M6` | `STRICT` dropped from one table (`conditions`) | KILLED | every ledger table declares STRICT |
+| `M7` | one `apply_outcome` value dropped (`noted`) | KILLED | the vocabulary is complete, not merely strict |
+| `M8` | `UNIQUE (bot_id, update_id)` removed | KILLED | a redelivered update is refused, naming the key |
+| `M9` | the VIEW's `awaiting IS NOT NULL` removed | KILLED | the waiting turn only |
+| `M10` | a window-sized literal introduced (`DEFAULT 0` → `DEFAULT 7`) | KILLED | the DDL's executable text carries no window constant |
+| `M11` | `ON DELETE CASCADE` dropped from the `thread_history` key | KILLED | both foreign keys cascade |
+| `M12` | a `body` column added to `audit_log` | KILLED | the tables that must never hold a body have none |
+
+**12 of 12 killed, 0 survived**, and each died on the test that owns the property (no collateral). Both
+source files were restored byte-identically (sha256 control) and the restored tree re-verified green:
+focused **16/16**, full **344/344**, `test:static` **8/8**, `npm test` **344/344**.
+
+**The corrected tree was then swept again — the original twelve re-run from scratch (their sources changed)
+plus five new ones, one per pin round 1 introduced: 17/17 killed, 0 survived.** `M13` the thenable refusal
+removed, `M14` the thenable check moved after the `COMMIT`, `M15` every `NOT NULL` removed from the DDL,
+`M16` both `AUTOINCREMENT` clauses removed, `M17` `IF NOT EXISTS` added to one table. Each died on the test
+that owns the property: `M13`/`M14` on the async refusal, `M15` on the `NOT NULL` inventory, `M16` on
+`seq`'s monotonicity, `M17` on the second-application refusal.
+
+**`M17` survived the first corrected sweep, and that is disclosed rather than quietly repaired.** Adding
+`IF NOT EXISTS` to `offsets` moves the failure to `updates`, and the assertion as first written only checked
+that *something* was refused with "already exists", so it stayed green. The pin was strengthened — the
+refusal must name `table offsets already exists`, plus a text check that no statement carries
+`IF NOT EXISTS`, because the behavioural half alone can only ever see the first statement — and the mutant
+then died. The scratch sweep script also had two stale anchors after the correction rewrote the lines they
+matched; both were rebuilt with a guard that rejects a substitution which changes nothing, the same
+silent-no-op class as the invalid AUTOINCREMENT probe in the round-1 record above.
+
+Final state after the sweep: sources restored byte-identically (sha256 control), focused **21/21**, full
+**349/349**, `test:static` **8/8**. Round 2 then added `M18`/`M19` and re-ran the whole matrix: **19 mutants,
+19 killed, 0 survived, 0 skipped**, focused **24/24**, full **352/352**, `test:static` **8/8** — see the
+round-2 section below.
+
+## Reportable items (reported, not silently resolved)
+
+1. **A leading doc comment must not spell `test/security/provenance.test.ts`'s header token.** That gate
+   reads a file's leading `/**` block as a vendor header whenever the block carries the header's first
+   token, and reports the file as a *malformed vendored module* otherwise. `src/ledger/schema.ts` has no
+   imports, so its doc comment *is* the leading block, and the first draft stated the fact with the token
+   spelled out — the static suite failed with `malformed Provenance header(s) in: src/ledger/schema.ts`.
+   Both new modules now state the constraint without the token, and that gate is the pin. Every earlier
+   non-vendored module was safe only because its imports came first.
+2. **PT-10's cell is filled by two slices.** `design.md:551` sends PT-10 to `ledger/inbox`; task 10.6 asks
+   PR-10 to fill the cell. PR-10 fills the half it pins (the rollback boundary and the
+   `UNIQUE (bot_id, update_id)` dedup) and names `ledger/inbox` (PR-12) as the scenario's owner — the split
+   PT-25's row states, per B-26. No document contradicts another, so no new backlog row is claimed here.
+3. **PT-20's cell is deliberately *not* claimed.** The schema's `audit_log`/`unknown_senders` have no body
+   column at all, which is PT-20's precondition rather than its assertion — the assertion is about rows the
+   write paths append, and task 13.6 gives PR-13 that cell. Disclosed so the omission reads as a decision
+   rather than an oversight.
+4. **A boundary that is now pinned rather than stated.** `withTransaction`'s callback must be synchronous,
+   and `() => T` cannot forbid `T = Promise<void>`, so the value is checked before `COMMIT`: a thenable is
+   refused and the callback's synchronous part is rolled back. Round 1's `JD-B-007` pointed out that the
+   earlier claim — "stated rather than pinned, no test could pin it" — was itself questionable, and the
+   refusal is the stronger answer: a misuse the caller sees instead of a partial write it does not.
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept one frozen tree,
+`../telegram_bus_agent-worktrees/verify-10`, detached at the audited tip **`0c9d239`** with
+`git status --porcelain` empty before and after, under identical scope, criteria and skill paths, with no
+contact between them. Skill resolution: `paths-injected`.
+
+**Ledger: 0 BLOCKER, 0 CRITICAL — 13 informational rows** (judge A: 4 WARNING + 1 SUGGESTION; judge B:
+3 WARNING + 4 SUGGESTION), two of them reached independently by both judges.
+
+| Row | Judge | Severity | Claim | Reproduced by the parent | Disposition |
+|---|---|---|---|---|---|
+| `JD-A-001` | A | WARNING | "design §12 has no row naming `ledger/*`" is false | yes — `design.md:452` names it, verdict **REPLACED** | **folded** |
+| `JD-A-002` | A | WARNING | `transaction.ts`'s rationale claims a hazard that cannot apply to a module beginning with an import | yes — the gate inspects only a *leading* `/**` block | **folded** |
+| `JD-A-003` + `JD-B-001` | both | WARNING | the hygiene claim about 8–10 digit runs is false | yes — `grep -oE '[0-9]{8,10}'` prints `100000001`, `1700000000` | **folded** |
+| `JD-A-004` + `JD-B-003` | both | WARNING / SUGGESTION | "PT-27's rule" is the client-bundle row; the rule is ADR-0027 | yes — `THREAT-MODEL.md:150` | **folded** |
+| `JD-A-005` | A | WARNING | `NOT NULL` and `AUTOINCREMENT` are unobserved by any assertion | yes — stripped `AUTOINCREMENT` and measured `seq` falling **3 → 1** after a full delete | **folded (two pins)** |
+| `JD-A-006` | A | SUGGESTION | the suite promises a control for both text-level checks; the second has none | yes, by reading the suite | **folded** |
+| `JD-B-002` | B | WARNING | the `updates.body` message implies a coupling the DDL does not enforce | yes — a `rejected` row carrying a body is accepted | **folded (message + module boundary)** |
+| `JD-B-004` | B | WARNING | the recorded spike verdict is false for SQLite's auto-rollback classes | yes — `PRAGMA max_page_count = 8`, bulk insert → errcode **13**, `isTransaction` **false** | **folded (claim + pin)** |
+| `JD-B-005` | B | SUGGESTION | "a second application is an error" has no pin | yes — errcode 1, `table offsets already exists` | **folded** |
+| `JD-B-006` | B | SUGGESTION | the "durable" test observes nothing beyond its own connection | yes, by reading the test | **folded** |
+| `JD-B-007` | B | SUGGESTION | the async boundary is not unpinnable, as the docstring claimed | yes, by reading the signature | **folded (thenable refusal)** |
+
+Nothing was accepted on the judges' authority in either direction. Every consequential claim was
+reproduced before it was folded, and one of the parent's own probes was rebuilt when its first form proved
+invalid: the AUTOINCREMENT replacement string did not match the DDL (`AUTOINCREMENT,` has no trailing
+space), so the "without" variant was silently identical to the original and reported `3 → 4` for both. The
+corrected probe — with the substitution asserted to have changed the text — measured `3 → 1` without the
+clause and `3 → 4` with it, which is the judge's own scenario.
+
+### The correction batch (round 1), Director-authorized
+
+Six statements the slice made about itself were false, and five pins were missing. All eleven were folded
+in one correction commit, in keeping with the precedent that a correction is itself unaudited until
+something re-checks it (the scoped re-judgment below, plus the extended mutant sweep):
+
+**Corrected claims.** (1) the §12 premise in both modules and in *Where the code came from* above;
+(2) `transaction.ts`'s self-referential provenance-token rationale; (3) the digit-run hygiene claim in
+`schema.test.ts`'s header, now stating the scan's real shape; (4) the `PT-27` citation, now ADR-0027 plus
+the durable-inbox spec; (5) the spike verdict in `tasks.md` and in *The spike* above, narrowed to the
+constraint-failure case it was measured on; (6) the promise of a control for the window scan — the control
+was written rather than the promise withdrawn.
+
+**Added pins.** (7) the per-table `NOT NULL` inventory against `design §5.2`; (8) `updates.seq`'s
+monotonicity across the full delete retention performs, which is what `AUTOINCREMENT` buys and what a
+redelivered update below a client's cursor would break; (9) the DDL's refusal of a second application;
+(10) SQLite's auto-rollback class, where the catch guard is the only thing keeping the caller's own error;
+(11) the thenable refusal, which makes the synchronous-callback boundary a guarantee instead of a warning.
+
+**A boundary the correction disclosed instead of coding:** the `updates.body` /
+`apply_outcome IN ('rejected','ignored')` coupling is D-20's writer rule and is enforced nowhere in the
+DDL — SQLite accepts a `rejected` row carrying a body — so `schema.ts`'s module comment now says so, and
+that coupling stays with `ledger/inbox.ts` (PR-12).
+
+### Scoped re-judgment over the fix delta — and the regression it found
+
+Both judges re-judged `0c9d239..aa65b25`, resolving the eleven folded IDs and nothing else. **Ten resolved
+`verified` on judge A and six on judge B; `JD-B-007` came back `regression` from both, independently** —
+the only row neither judge would accept, and the row whose fix this slice had written itself.
+
+Substantiated by both judges after the resolution (the graph-v1 resolution shape carries no claim field, and
+a first attempt to obtain the substance went to the wrong sessions — the two discovery judges correctly
+refused to invent substance for an ID they had not produced):
+
+> the refusal only rolls back the pre-`await` part: statements the callback runs after an `await` still
+> execute on the same live connection with `isTransaction === false` and autocommit, so the misuse yields an
+> error **and** a silently half-applied batch — the worst case being only the later statements persisted,
+> which is the batch-coherence loss PT-10's replay/offset design exists to prevent.
+
+Reproduced by the parent before believing it (a scratch probe outside the frozen tree, against the module
+built from `aa65b25`): `withTransaction(db, async () => { insert(1); await …; insert(2); })` surfaced
+`ASYNC_CALLBACK_MESSAGE` **and** left row 2 committed, row 1 rolled back. The parent's own probe found a
+second defect in the same fix: the abandoned promise was never settled, so a *rejecting* async callback
+produced an unhandled rejection after the misuse had been reported — which Node's default policy turns into
+a process crash.
+
+### Round 2 — the final bounded fix round
+
+The refusal moved to where it can actually prevent the work. `withTransaction` now checks the callback's
+own shape **before `BEGIN`** (`isAsyncFunction`, read structurally):
+
+- an `async` callback is refused **before it runs**, so nothing it would have written exists at all —
+  including a tail after an `await`, which no later rollback could reach. This is the shape a caller
+  actually writes; a bound or proxied `async` function whose constructor identity does not survive falls
+  through to the value check, and the module doc says so rather than claiming otherwise.
+- a thenable *returned* by a callback that is not itself `async` is still refused before `COMMIT` and rolled
+  back, and the abandoned promise is now **settled** on the way out. What that promise's continuation does
+  afterwards is the caller's code on the caller's connection and outside this module's reach — stated as a
+  limitation, not as a guarantee.
+- `isThenable` now covers **functions** as well as objects, because Promises/A+ §1.1 defines a thenable as
+  "an object or function that defines a then method" and both are assimilated by `await` and by
+  `Promise.resolve`. The narrower object-only check was itself a claim the docstring could not support (it
+  said the check caught all of them), found by the discovery judge whose session was asked to substantiate
+  the regression.
+
+Three tests pin the corrected behaviour, and one of them is written to fail against the old shape: the async
+tail test drains the macrotask queue before asserting, so a tail that did run would have landed, and it
+asserts the callback never *started*.
+
+**Sweep after round 2: 19 mutants, 19 killed, 0 survived, 0 skipped** — the seventeen re-run from scratch
+(two of their anchors went stale when round 2 rewrote the lines they matched, and both were rebuilt before
+the sweep was reported, so no gap was left silent) plus `M18` (the pre-flight refusal removed) and `M19`
+(the abandoned promise left unsettled). Each died on the test that owns the property. Final state at the
+round-2 tip: sources restored byte-identically, focused **24/24**, full **352/352**, `test:static` **8/8**.
+
+**Budget after round 2: 1,285 authored lines, 885 over** the 400-line budget — 117 `schema.ts`, 150
+`transaction.ts`, 14 its `tsconfig.json`, 625 `schema.test.ts`, 379 `transaction.test.ts`. The movement is
+recorded rather than smoothed: 885 / 485 before any correction, 1,140 / 740 after round 1's batch, 1,285 /
+885 here, with round 2's own delta at **+169 / −24**. The growth beyond the authorized batch is the cost of
+correcting a defect that batch introduced, and it is disclosed to the Director rather than absorbed.
+
+### Final verification and verdict (round 2, terminal)
+
+Both judges resolved `JD-B-007 → verified` at `4951fc6`, independently. One authorized correction batch and
+one final bounded fix round were used, with both scoped re-judgments spent and **no severe row outstanding
+at any point** — no BLOCKER and no CRITICAL was raised in either round.
+
+Final verification at the frozen tip `4951fc6`, `dist/` rebuilt from scratch in the isolated worktree:
+focused **24/24**, full **352/352** (328 before the slice), `test:static` **8/8**, and the 19-mutant sweep
+19/19 killed with both sources restored byte-identically.
+
+**`JUDGMENT: APPROVED`** for `3534739..4951fc6`.
+
+### The RDD independent verification, and the three defects it found
+
+The ordinary native review for this candidate was **declined**
+(`consent-declined-this-candidate`, `lineage_created: false`, no mutation, `correction_budget: 0`), so this
+candidate is never re-reviewed and the risk-gated path applied. `assess` reported **high** risk with one
+signal — `process_boundary` on `src/ledger/schema.ts` (`shell_process`) — which is a **false positive**,
+measured rather than argued: that file has no imports at all and its only `exec` occurrences are
+`node:sqlite`'s `db.exec` named in prose, with the same API called in the sibling module and both test
+files. The plan it returned: `writerSelfVerification: true`, `structuralReadbackOnly: false`,
+`independentVerifier: true`, `writerProfile: large`.
+
+**Writer self-verification** (the author, on the frozen tree): the full suite, `test:static`, the focused
+suites, the DDL's byte-identity, and the 21-mutant sweep below.
+
+**A separate independent verifier** (fresh context, read-only, no part in writing the code) reproduced every
+claim of this record — build from scratch, the DDL byte-identity with its own controls, the budget figure
+and its movement, seven behaviour claims measured against the built module rather than against the tests,
+and the document claims — and then found **three defects the record did not disclose**:
+
+| # | Defect | Why it mattered | Disposition |
+|---|---|---|---|
+| `F1` | a generator callback bypassed both refusals: `function*` and `async function*` passed the `AsyncFunction` pre-flight and carry no `then`, so `withTransaction` committed an empty transaction and returned the iterator, whose body then ran with `isTransaction === false` and autocommitted | the same hazard the module doc claims to prevent, and the doc's "it is refused at both points where a refusal is possible" was therefore false | **fixed**: the pre-flight set covers `GeneratorFunction`/`AsyncGeneratorFunction`, `ASYNC_CALLBACK_MESSAGE` became `DEFERRED_CALLBACK_MESSAGE`, and one test refuses both generator shapes |
+| `F2` | the settling guarantee's rejection half was unpinned: the test asserted assimilation, which a fulfilment-only settle also satisfies, so replacing `.catch(…)` with `.then(…)` left the suite green while a rejecting callback produced an unhandled rejection | ADR-12: a documented guarantee no test can fail — and Node's default policy for an unhandled rejection is a process exit | **fixed**: the test uses a *rejecting* thenable, observes `unhandledRejection` directly, and that mutant is now killed |
+| `F3` | `tasks.md`'s *Size.* paragraph carried pre-correction figures with no marker of its own | a stale figure in a gated document, even though the block corrected it 33 lines below | **fixed**: the paragraph names itself as the pre-correction measurement and points at the tip's figures |
+
+The verifier re-checked its own findings at the corrected tip: **`F1` RESOLVED** (with a lock-based
+linearization proof that no `BEGIN` is attempted, and a grep showing no stale importer of the old constant
+name), **`F2` RESOLVED** (with a non-vacuity control: an uncaught rejection *did* fire its observer), and
+`F3` reported *not resolved at the frozen tip* — correctly, because that documentation edit was still
+uncommitted when it looked. It also reported one informational defect in the lines the fix touched: the
+renamed constant's own JSDoc still described a single shape. That is corrected in the same commit.
+
+**Sweep after the verifier's findings: 21 mutants, 21 killed, 0 survived, 0 skipped** — the seventeen of the
+main matrix, the two of round 2, and one per verifier finding (`M20` the generator shapes dropped from the
+pre-flight set, `M21` the settle reduced to fulfilment-only). Final state: focused **25/25**, full
+**353/353**, `test:static` **8/8**, both sources restored byte-identically.
+
+**Budget at the tip that ships: 1,357 authored lines, 957 over** (117 `schema.ts`, 169 `transaction.ts`,
+14 its `tsconfig.json`, 625 `schema.test.ts`, 432 `transaction.test.ts`). The whole movement is recorded
+rather than smoothed — 885 / 485 before any correction, 1,140 / 740 after round 1's batch, 1,285 / 885 after
+round 2's fix, 1,357 / 957 after the independent verifier's three findings — and every figure is measured
+at the tip it describes.
+
+## Next
+
+- Push, the PR and its CI matrix, then the close-out sweep. The audit-path record goes to
+  `docs/05-tribunal/INDEX.md` at close as `bus-v2-f1-pr-10-audit-001`, with DN-05 unsatisfied.
