@@ -38,7 +38,7 @@ task touches schemas or security.
 | Debate outcomes | `docs/05-tribunal/INDEX.md` | Landing debate `bus-v2-landing-architecture-001`; reserved `bus-v2-referee-001` |
 | Architectural decisions | `docs/03-adr/` | One ADR per file; the index carries status and supersession |
 | Cross-session memory | Engram (persistent memory, outside the tree) | Decisions, conventions, bugs; SDD phases write to it but do not replace it |
-| SDD artifacts | `openspec/` (not created yet) | Opens with the F1 SDD change after the Director's SDD preflight |
+| SDD artifacts | `openspec/` — **in active use** | `openspec/config.yaml` plus `openspec/changes/f1-daemon-registry-thin-client/` (`proposal.md`, `exploration.md`, `specs/`, `design.md`, `tasks.md`, `state.yaml`, `apply-progress.md`). That change is mid-`apply`; read its `state.yaml`, or run `gentle-ai sdd-status f1-daemon-registry-thin-client --cwd .` |
 | Local tooling (not product) | `.claude/settings.json`, `.mcp.json` | See section 5 |
 
 When a live-state file and a design document disagree, apply the precedence rule in
@@ -53,7 +53,7 @@ When a live-state file and a design document disagree, apply the precedence rule
   `PATCH` diffs, and never commits.
 - **Never commit without the Director's authorization.** Writers produce files; the Director
   decides what is committed and when.
-- Alpha audits every unit **before** merge. Each phase F1–F8 is one SDD change; PRs are <= 400 lines.
+- Alpha audits every unit **before** merge. Each phase F1–F8 is one SDD change; PRs are <= 400 lines of authored src+test, and an over-budget PR requires a **disclosed, PR-scoped exception** (five so far: PR-06b, PR-07a, PR-07b, PR-08a, PR-08b — see the Status line above and `apply-progress.md`). While the Arena bridge is down, that audit is **Judgment Day**, as the Status line records.
 
 **Engineering.**
 - **Strict TDD**: red before green; every `src` file has a test counterpart. No exceptions.
@@ -93,8 +93,9 @@ to D11 in the tribunal record; SDD preflight (Automatic · hybrid · auto-chain)
 (`stacked-to-main`, DN-06); license Apache-2.0 (DN-04).
 
 Pending the Director: trademark screening of the product name (B-11), the B-16 remainder
-(SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright-holder line), macOS scope (B-12). Full board:
-[`docs/00-INDEX.md`](./docs/00-INDEX.md#pending-director-decisions).
+(SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright-holder line), macOS scope (B-12), and the
+PR-08 audit follow-ups only the Director can disposition (B-22 and B-26). Full board:
+[`docs/00-INDEX.md`](./docs/00-INDEX.md#pending-director-decisions) — see its row 9.
 
 Open spikes for F0: B-05 (gentle-ai installer study), B-07 (bot-to-bot group visibility for
 non-admin bots), B-08 (IPC handshake and named-pipe DACL on Windows), B-09 (MCP notification
