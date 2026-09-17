@@ -177,10 +177,20 @@ test("no R1–R6 row demands referential integrity, so a dangling reference stil
 	// `bindings[].bot_id`, `group_id` and `project_id` name entries of `bots[]`, `groups[]` and
 	// `projects[]` (DATA-MODEL §2.4), but no invariant row requires the entry to exist: this module
 	// refuses referential integrity rather than inventing a rule the gate does not carry, and the
-	// observation is reported with the slice (a later `doctor` check owns it).
-	const document = validRegistryDocument();
-	document.bindings[0] = { ...document.bindings[0], group_id: -1009999999999 };
-	assert.equal(parseRegistryDocument(document).ok, true);
+	// observation is reported with the slice (a later `doctor` check owns it). All three dimensions are
+	// exercised, because one case would leave the other two unpinned (the verifier's `F10`).
+	// The dangling `bot_id` carries its snapshot entry in lockstep, so R3 stays satisfied and the only
+	// thing under test is the missing `bots[]` entry.
+	const dangling: JsonObject[] = [
+		{ group_id: -1009999999999 },
+		{ bot_id: 100999999999, roster_snapshot: [rosterSnapshotEntry({ user_id: 100999999999 })] },
+		{ project_id: "prj-dangling" },
+	];
+	for (const overrides of dangling) {
+		const document = validRegistryDocument();
+		document.bindings[0] = { ...document.bindings[0], ...overrides };
+		assert.equal(parseRegistryDocument(document).ok, true, JSON.stringify(overrides));
+	}
 });
 
 // --- The refinement itself: the vocabulary, the tag and the value-free payload ---
