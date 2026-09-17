@@ -11,15 +11,16 @@ import {
 } from "../../src/shared/tool-schemas.js";
 
 // --- PT-02: the tool inputs carry no destination and no sender (schema-shape assertion, not just a
-// runtime check). v1 precedent: the `from` shape assertion at `v1:test/tools/send.test.ts:122-136`;
-// the destination half is new, because v2's wrong-room control (T01, PT-01) rests on a `send` call
-// that CANNOT express a chat. `chat_id` is Telegram's own field, `bot`/`group`/`to_chat` are the v1
-// bridge's vocabulary for the same thing, and `from` is always stamped from the daemon's binding
-// (ADR-07) — each is a way a caller could otherwise aim the message at another room.
+// runtime check). v1 precedent: the `from` and `to_user_id` assertions at
+// `v1:test/tools/send.test.ts:122-136` and `:295-303`. `chat_id` is Telegram's own field,
+// `bot`/`group`/`to_chat` are the v1 bridge's vocabulary for the same thing, and `from`/`to_user_id`
+// are the identity anchors the daemon derives instead (ADR-07; design §9 — "neither is an input").
 
-const FORBIDDEN_INPUT_KEYS = ["chat_id", "bot", "group", "to_chat", "from"];
+const FORBIDDEN_INPUT_KEYS = ["chat_id", "bot", "group", "to_chat", "from", "to_user_id"];
 
-/** Every `z.object` schema the four tools expose, including the un-refined base of `send`. */
+/** Every `z.object` schema the four tools expose, including the un-refined base of `send`. The refined
+ * `sendInputSchema` is pinned behaviourally below instead, because a shape-only read of the base would
+ * miss a key added to the exported schema (finding C1). */
 const ALL_SCHEMAS: Array<[string, { shape: Record<string, unknown> }]> = [
   ["send", sendInputBaseSchema],
   ["fetch", fetchInputSchema],
@@ -47,10 +48,16 @@ test("the `send` base schema declares exactly v1's six fields (v1:src/tools/send
   ]);
 });
 
-test("an extra destination key is stripped, not accepted, so it cannot reach the parsed input either", () => {
-  const parsed = sendInputSchema.safeParse({ type: "BROADCAST", body: "hi", chat_id: -1001234567890 });
-  assert.equal(parsed.success, true);
-  assert.ok(parsed.success && !("chat_id" in parsed.data), "`chat_id` must not survive validation");
+test("no forbidden key survives validation on the tool-visible, refined `send` schema", () => {
+  const values: Record<string, unknown> = {
+    chat_id: -1001234567890, bot: "@dev1-agent", group: "@dev1-agent",
+    to_chat: "@dev1-agent", from: "@dev1-agent", to_user_id: 8223456789,
+  };
+  for (const [key, value] of Object.entries(values)) {
+    const parsed = sendInputSchema.safeParse({ type: "BROADCAST", body: "hi", [key]: value });
+    assert.equal(parsed.success, true, `a stray \`${key}\` must not make a valid input invalid`);
+    assert.ok(parsed.success && !(key in parsed.data), `\`${key}\` must not survive validation`);
+  }
 });
 
 test("TypeScript's SendToolInput type structurally forbids a `from` field (compile-time excess-property check)", () => {
@@ -86,6 +93,10 @@ test("status takes no input at all and thread takes exactly one hex thread id", 
   assert.equal(threadInputSchema.safeParse({ thread_id: "A1B2C3D4E5F6" }).success, false, "uppercase hex is refused");
   assert.equal(threadInputSchema.safeParse({ thread_id: "a1b2c3" }).success, false, "a short id is refused");
   assert.equal(threadInputSchema.safeParse({}).success, false);
+  // The field SET of each read-only schema is pinned too, not just its accept/refuse behaviour
+  // (v1:src/index.ts:29-42; spec "the field set and validation rules are identical").
+  assert.deepEqual(Object.keys(fetchInputSchema.shape).sort(), ["force_full", "mark_seen", "max_batch", "timeout_s"]);
+  assert.deepEqual(Object.keys(threadInputSchema.shape), ["thread_id"]);
 });
 
 test("send accepts one well-formed input of each v1 type", () => {

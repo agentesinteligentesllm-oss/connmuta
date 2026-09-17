@@ -6,8 +6,11 @@
  * IPC re-validation (design §10 "it never trusts the client") read one definition of the four shapes; (2) imports relocated to `shared/envelope.js`; (3) the leading JSDoc restored from
  * `v1:src/tools/send.ts:36-46`, the comment block immediately above the vendored range, with the tool
  * name written as `send` because v2 derives it from `TOOL_PREFIX` (D-09), plus one added paragraph
- * stating the destination half of the same structural guarantee (`chat_id`/`bot`/`group`/`to_chat`
- * exist in no schema here — PT-02), which v1 stated only for `from`.
+ * stating the destination half of the same structural guarantee (`chat_id`/`bot`/`group`/`to_chat` exist
+ * in no schema here — PT-02) and the `to_user_id` half, which v1 pinned only in its own twin
+ * (`v1:test/tools/send.test.ts:295-303`); (4) `export type SendToolInput` carried from
+ * `v1:src/tools/send.ts:111`, one line past the cited range; (5) the three read-only schemas' JSDoc
+ * rewritten from `agentbus_fetch`/`agentbus_status`/`agentbus_thread` to `fetch`/`status`/`thread`.
  */
 
 import { z } from "zod";
