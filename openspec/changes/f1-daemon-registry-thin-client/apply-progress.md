@@ -777,16 +777,17 @@ the extracted v1 range body:
   attributed opening tag;
 - the body escape is byte-identical to v1: `body.replace(/</g, "&lt;")`.
 
-Attribute values are escaped `&` → `&amp;`, `<` → `&lt;`, `"` → `&quot;`, in that order. Rationale:
-PT-14 requires the origin label to be *trustworthy*, so a value carrying `"` must not be able to
-inject a second attribute (a forged `user_id`) and one carrying `<` must not be able to close the
-opening tag early. `escapeHtml` was deliberately **not** reused: it is module-local in
+Attribute values are escaped `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`, `"` → `&quot;`, in that
+order. Rationale: PT-14 requires the origin label to be *trustworthy*, so a value carrying `"` must
+not be able to inject a second attribute (a forged `user_id`), and one carrying `>` must not be able
+to close the opening tag early — `>` is the character that ENDS a tag and `<` only ever opens one, so
+escaping `<` alone would have left the label readable but closable. `escapeHtml` was deliberately **not** reused: it is module-local in
 `src/shared/envelope.ts:214` (not exported) and that file is AS-IS with a pinned hash.
 
 TDD: RED observed first (both new test files import modules that did not exist:
 `error TS2307: Cannot find module '../../src/shared/fence.js'` from `npm run build`, and
 `ERR_MODULE_NOT_FOUND` plus `tests 2 / pass 0 / fail 2` from the focused run), then GREEN.
-The 7 fence cases include v1's hostile payload (`v1:test/tools/fetch.test.ts:328-357`), an
+The 8 fence cases include v1's hostile payload (`v1:test/tools/fetch.test.ts:328-357`), an
 attribute-injection case (`agent_id` carrying `"` and an embedded `user_id=` attribute), a two-origin
 loop that defeats hardcoding, and an exact-output assertion pinning the whole format. The soundness
 helper is a containment invariant — starts with the label, ends with the closing delimiter, exactly
@@ -851,7 +852,7 @@ comment and PR-05's second stale comment were found. Neither would have failed a
 
 | Slice | `src` | `test` | fixture | docs | Authored total | Budget |
 |---|---|---|---|---|---|---|
-| PR-06a (`fence.ts` + twin) | 65 | 95 | 6 | 4 | **≈170** | inside 400 |
+| PR-06a (`fence.ts` + twin) | 74 | 110 | 6 | 2 | **192** | inside 400 |
 | PR-06b (`protocol-select.ts` + twin) | 160 | 240 | 6 | 0 | **406** | 6 over |
 | PR-06 as one slice (not taken) | 225 | 335 | 12 | 4 | 576 | 176 over |
 
