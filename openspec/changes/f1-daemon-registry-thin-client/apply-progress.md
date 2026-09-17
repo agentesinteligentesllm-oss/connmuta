@@ -2685,3 +2685,99 @@ assessment came back schema-incompatible — which the contract treats exactly l
   and re-verifying.
 
 ## Next
+
+---
+
+# PR-09b — the registry loader: `src/registry/loader.ts` (+ twin)
+
+Slice 12 of 45, the second half of row PR-09, which it closes (11 of the 45 rows done, delivered as 14
+PRs). Delivered under the settled route: ODD with every substantive SDD contract preserved, then Judgment
+Day as the audit substitute. The Arena bridge is down, so nothing was debated and **DN-05 is unsatisfied
+for PR-09b** as for the rest of F1. Branch `f1/09b-registry-loader` from `main` @ `11c6af4`.
+
+| Field | Value |
+|---|---|
+| Code commit | `3eba70d` (`loader.ts`, its twin, and `addSecondBinding` restored in `test/registry/fixtures.ts`) |
+| Requirements | `project-binding › Machine registry schema and invariants` — the loader-side half of the four spec scenarios; **PT-25**'s registry-side half (the daemon-side `migrate_to_chat_id` half stays with `daemon/send/send-path`, B-26) |
+| Provenance | none — no v1 range is vendored; the fixture stays at **11** entries |
+| Budget | **672 authored lines / 400** — a disclosed **272-line PR-09b-scoped exception** (same grounds and the same size as PR-08b's) |
+
+## Scope and budget (measured)
+
+| Path | Lines |
+|---|---|
+| `src/registry/loader.ts` | 237 |
+| `test/registry/loader.test.ts` | 403 |
+| `test/registry/fixtures.ts` | +32 (`addSecondBinding`, whose only caller this half is) |
+| **budget total** (`git diff --numstat HEAD -- src test` at the code tip) | **672 / 400** — 272-line exception |
+
+The exception's grounds are PR-08b's: one assertion per rule the gated rows state, plus the boundaries the
+rules imply — the fingerprint's **two** members (mtime and size, each pinned by its own case), the ordering
+between the stat and the read, the four spec scenarios, the deletion and directory states, and the R5
+exemption's soundness. Trimming those is what the budget rule forbids.
+
+## Where the code came from
+
+The loader was written during the PR-09a session and left **uncommitted, green and deliberately
+unreviewed** — the Director asked for PR-09a only — and the review preflight declined that draft twice
+(`9110d7de…` and `0bc4e9dd…`; handoff §0.1). This session reviewed it as a reviewer rather than as its
+author, completed it, and closed the tasks. Two findings of that review are **not** gate changes and are
+disclosed here instead:
+
+1. **The R5 mask had to become case-insensitive.** `sha256:<HEX>` matches the shared token regex exactly as
+   the lowercase form does, so a mask that recognised only lowercase reported a hand-typed uppercase hash as
+   `forbidden_content` — a false secret report that would send an operator hunting a leaked token that is
+   not there. The document is still refused; the verdict is now the truthful `schema_invalid`. The mask
+   stays sound: it is `sha256:` plus 64 hexadecimal characters, and a token's own colon cannot occur inside
+   that class. The *schema* keeps requiring the lowercase hex the shared hasher emits (B-27 is unchanged and
+   still open for the root cause).
+2. **An injectable `stat`/`read` seam was added** (`RegistryFileIo`, defaulting to `node:fs`). It is this
+   repository's own testing pattern (design §15 injects `telegramClientFactory`, `secretStore` and `now` the
+   same way), it keeps R6 structural — the interface has no write, rename, unlink or open — and it is the
+   only way to pin the stat-before-read ordering, which is otherwise unobservable through `node:fs` alone
+   (ADR-12). The daemon passes nothing and gets the real file system.
+3. **Deletion keeps the last good registry** (pinned by a test). Deletion is one more unloadable state, and
+   the last-good registry is only ever replaced by a successful load; what must hold *nothing* is a daemon
+   that starts against a file that never parsed, because an empty registry there would be
+   indistinguishable from a machine with no bindings. The alternative reading — a vanished file means "no
+   registry" and should deactivate pollers — is defensible but belongs to the reconciler (PR-21) and the
+   design states no rule for it.
+
+## TDD cycle evidence
+
+| Step | Command | Observed |
+|---|---|---|
+| 9.3/9.4 RED and GREEN | in the PR-09a session | the draft was written test-first there; this session's RED is the three additions below, each failing before its fix |
+| review findings | focused suite as each was fixed | the uppercase-hash case failed while the mask was case-sensitive (1 failure); the ordering test failed once the fingerprint was re-stated after the read (1 failure); the size case failed once `size` left the comparison (1 failure) |
+| 9.5 focused, clean worktree at `3eba70d` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/registry/loader.test.js"` | **56/56** (schema 20, invariants 16, loader 20) |
+| full suite, clean worktree at `3eba70d` | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **324/324** (PR-09a's 304 + 20 loader tests) |
+| `test:static`, same tree | `node --test "dist/test/security/*.test.js"` | **8/8** — the twin walk, the provenance registry (11 entries, no header on any new file) and the repo scan |
+
+## Mutant matrix — each built first on a cleaned `dist/`, each restored byte-identically
+
+| # | Mutant | Result | Test that killed it |
+|---|---|---|---|
+| `N1` | the R5 mask removed, so a canonical roster hash is scanned as a token (B-27 returns) | killed, 12 failures | every loader case that loads a valid registry, starting with *the first sync loads a valid file* |
+| `N2` | the mask case-sensitive again (`gi` → `g`) | killed, 1 failure | *the mask is case-insensitive, so an uppercase hash is the shape problem it is, not a secret report* |
+| `N3` | **NEVER-RENAME BOUNDARY**: a refused registry renamed to a `corrupt-<epoch>` sibling | killed, 1 failure | *a torn edit keeps the last good registry, raises `registry_invalid`, and never renames the file* |
+| `N4` | the fingerprint re-stated **after** the read | killed, 1 failure | *the fingerprint is taken before the read, so a write landing mid-read is not recorded as loaded* |
+| `N5` | the fingerprint compares mtime only, dropping `size` | killed, 1 failure | *the fingerprint includes size, not only mtime* |
+| `N6` | a successful load does not clear the condition | killed, 1 failure | *an invalid file at the first load leaves nothing loaded… the next sync loads the fix* |
+| `N7` | a failed load forgets the last good registry | killed, 4 failures | *a torn edit keeps the last good registry* + three more |
+
+`N3` is the never-rename/quarantine boundary the handoff asks a mutant for, and `N4` is the reason the io
+seam exists: before it, the stat-before-read ordering was a reasoned argument with no test that could fail.
+
+## Reportable items (reported, not silently resolved)
+
+1. **The R5 exemption is a workaround at the call site** (B-27, unchanged): the root cause is the shared
+   regex's unbounded `\d+`, which also reaches the send-path backstop. The mask is sound (proved above and
+   pinned), but the decision belongs to the Director.
+2. **The loader cannot name which R5 rule fired** without parsing `assertNoTokenShape`'s prose or
+   re-implementing the shape order — the same disclosure PR-09a made, still carried by B-27.
+3. **PT-25's cell names only the registry-side half**, and the split with `daemon/send/send-path` is stated
+   rather than resolved (B-26 stays open for the Director).
+
+## Next
+
+- PR-09b's Judgment Day audit and its ordinary native review, then the PR.
