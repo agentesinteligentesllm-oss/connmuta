@@ -474,6 +474,28 @@ The hash travels **in the header** (tribunal ruling `bus-v2-f1-design-001` item 
 | `test/fakes/telegram.ts` | SEAM | `test/fakes/telegram-client.ts` | (1) the default `identity` literal at `v1:test/fakes/telegram.ts:59` is a production-shaped bot username and id — replaced by placeholders (data hygiene, PT-22 deny-list) |
 | v1 `test/*.test.ts` for AS-IS modules | AS-IS (sliced) | twins | copied test-first; sliceable by test group for the PR budget |
 
+**Apply-time amendment (appended 2026-09-17 — the rows above stay as audited).** Three rows in the
+table above mark a **line-range extract** as `AS-IS`, which no module built that way can be: a module
+assembled or extracted from a v1 range differs from the v1 bytes by its re-authored header, its
+relocated imports and any added declaration, so `AS-IS` (which requires the body to hash *equal* to its
+pin) is unreachable. The verdicts the tribunal ratified are:
+
+| Row | Shipped verdict | Shipped v2 path |
+|---|---|---|
+| `src/tools/send.ts:47-109` | **SEAM** | `src/shared/tool-schemas.ts` (PR-07a) |
+| `src/index.ts:29-42` schemas | **SEAM** | `src/shared/tool-schemas.ts` (PR-07a) |
+| `src/tools/fetch.ts:65-348` types | **SEAM** | `src/shared/tool-output.ts` (PR-07b) |
+
+The authority is the tribunal ruling `bus-v2-f1-tasks-001` items 1–2 (a line-range extract is SEAM by
+construction), reinforced by `tasks.md` 7a.2 and 7b.2, which name the verdict explicitly; the registry
+settles it independently, because `test/security/provenance.test.ts` can only pass for a SEAM in these
+three cases. Reported rather than silently rewritten by PR-07a (`bus-v2-f1-pr-07a-audit-001`, item A4)
+and PR-07b (`bus-v2-f1-pr-07b-audit-001`), filed as backlog **B-20**, and applied here as an appended
+amendment under the Director's session-10 delegation. The rows above are left exactly as audited so the
+record of what was designed and what was shipped both survive; if the Director prefers to re-open the
+mapping, this note is the only part to revert. The whole-file copies (`src/envelope.ts`,
+`src/transport/*.ts`, `test/security.test.ts:25-101`) are unaffected and stay `AS-IS`.
+
 ---
 
 ## 13. v1 migration (B-13) — `conmuta migrate-v1`

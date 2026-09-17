@@ -190,8 +190,13 @@ Measured with `git diff HEAD --numstat` (staged + unstaged vs. the branch point 
    `constants.ts` already headered the "no vendored file" variant would also have failed (scanned
    set ≠ empty fixture) — recorded as a process deviation, not a correctness gap.
 5. **`constants.ts` header hash verified reproducible** by the orchestrator: `4ce5e514…` is the
-   SHA-256 of `v1:src/config.ts` lines 26–166 joined with `\n` and no trailing newline (LF), so the
-   registry's only SEAM entry is honest even though the test asserts only inequality for SEAMs.
+   SHA-256 of `v1:src/config.ts` lines 26–166 joined with `\n` and no trailing newline (LF). It was
+   therefore *reproducible* — but this record's next conclusion, that the value was therefore
+   "honest", was **wrong**: `bus-v2-f1-pr-04-001` fixes a pin as the exact byte range **including**
+   its terminating newline, so the correct value is `039d53a2…` and `4ce5e514…` is the strip
+   control. Corrected in place by the B-19 re-pin (see that section at the end of this file);
+   nothing else in this PR-04 record depended on the value, and the SEAM inequality assertion passed
+   either way, which is exactly why no gate could see it.
 6. **Re-verified from clean** after the edits: `rm -rf dist && npm run build` exit 0; full suite
    **89/89**; `npm run test:static` **8/8**; `provenance.test.ts` is 138 lines, authored total 215.
 
@@ -1417,6 +1422,13 @@ this slice; changing a pinned hash also invalidates the wrong-value-control tabl
 Recommended minimal fix for whoever takes it: re-pin `constants.ts:3` to `039d53a2…` and record the
 old value as the strip control. **Recommended backlog id for the Director.**
 
+**Closed by the B-19 re-pin (appended 2026-09-17, after this ledger was frozen; the rows above stay as
+recorded).** The Director filed it as backlog **B-19** and, in session 10's delegation, authorized the
+minimal fix. `src/shared/constants.ts:3` now pins `039d53a2…` and `4ce5e514…` is recorded as the strip
+control; PR-04's conclusion above is corrected in place, and this ledger's S1 row is left untouched
+because it was true when frozen. See the `## B-19 — provenance re-pin` section at the end of this file
+and the tribunal record `bus-v2-f1-b19-repin-001`.
+
 ### Note for PR-34 (raised by C2)
 
 `client/errors.ts` must implement **design §10's client taxonomy** itself — `DAEMON_DOWN`,
@@ -1729,16 +1741,6 @@ what was actually measured. This table is the authoritative one for the shipped 
 Every type-level row above is the assertion firing at its own line, and no pin was found vacuous: the
 fifteen of them were each mutated, not a sample. The complement is that no behavioural mutant survives.
 
-## Next
-
-The slice is at the PR boundary: **PR #10** (`f1/07b-tool-output` → `main`) is open with the 554-line
-exception disclosed in its body, and the CI matrix (`build-and-test` on Node 24.15 and 26) is green.
-**The merge is the Director's decision and is not taken.** What remains after it: the post-merge
-bookkeeping sweep — rewrite `HANDOFF.md`, prepend to `LOG.md`, and sweep the status lines in
-`AGENTS.md`, `README.md`, `docs/00-INDEX.md`, `openspec/config.yaml` and `state.yaml` — per
-`HANDOFF.md` §5 step 8. The ODD feature document for this slice is deleted at close, as PR-07a's was;
-its substance is this record and Engram.
-
 ## Round 2 (terminal) — scoped re-judgment of the round-1 fix delta
 
 Both judges received the same frozen ledger (SHA-256
@@ -1768,3 +1770,67 @@ fixes, and **DN-05 is explicitly unsatisfied for this slice** — no tribunal de
 Arena consensus exists and none is claimed. The record commits that followed the terminal re-judgment
 (the round-2 ledger above, the tribunal entry) are SDD bookkeeping, excluded from the review load and
 **not** re-audited.
+
+## Next
+
+**Merged as PR #10 (`bd3c6ed`) and swept.** Nothing is pending for this slice: `HANDOFF.md` was
+rewritten for PR-08, `LOG.md` prepended, the status lines swept in `AGENTS.md`, `README.md`,
+`docs/00-INDEX.md`, `openspec/config.yaml` and `state.yaml`, the audit-path record added to
+`docs/05-tribunal/INDEX.md`, and the three backlog rows this audit produced filed (B-19, B-20, B-21) and
+closed by the post-merge integrity sweep below. The ODD feature document was deleted at close, as
+PR-07a's was; its substance is this record and Engram.
+
+---
+
+# B-19 — provenance re-pin (`src/shared/constants.ts`), the post-merge integrity sweep
+
+Out of band with respect to the slice above: this closes a defect the PR-07a audit reported and PR-07b
+re-confirmed, under the Director's session-10 delegation ("toma las riendas … tienes toda mi
+autorización"). It is **not** a slice of `f1-daemon-registry-thin-client` and consumes no slice budget;
+it changes no behaviour.
+
+| Field | Value |
+|---|---|
+| Change | One token in one provenance header: `src/shared/constants.ts:3` |
+| Defect | The header pinned `4ce5e514…` for `v1:src/config.ts:26-166`. `bus-v2-f1-pr-04-001` fixes a pin as the exact byte range **including** its terminating newline, so the correct value is `039d53a2…`. No gate could see it: for a SEAM the registry asserts only *inequality* against the pin |
+| Why now | Reported by PR-07a's audit as S1 (`bus-v2-f1-pr-07a-audit-001`), re-confirmed by PR-07b's, filed as backlog **B-19**, and authorized by the Director in session 10's delegation |
+| Fix | `constants.ts:3` → `039d53a2b54f8c1a061c602f419e6272cd1f8a3fe260301d7fe36b4e892e15e`; `4ce5e514…` recorded as the strip control; PR-04's own conclusion corrected in place (it had called the wrong value "honest"), with its frozen S1 row left untouched |
+
+**Re-derived with two methods before the pin was touched, and the method validated against a ratified
+value** (the same two methods reproduce the fence's `68e241b2…`):
+
+```
+git -C ../telegram-agent-bus show bf8f365:src/config.ts | sed -n '26,166p' | sha256sum
+  -> 039d53a22b54f8c1a061c602f419e6272cd1f8a3fe260301d7fe36b4e892e15e   (pinned)
+python: '\n'.join(lines[25:166]) + '\n' over the same blob
+  -> 039d53a22b54f8c1a061c602f419e6272cd1f8a3fe260301d7fe36b4e892e15e   (agrees)
+control, the range joined with '\n' and NO trailing newline
+  -> 4ce5e514f95c4a73bbaa49e01d5fe41f707552e2928b204a148bf279b2a1b48a   (the superseded value)
+```
+
+**Verification.** `npm run build` clean; `node --test` over `constants.test.js` + `provenance.test.js`
+**8/8**; the full suite and `test:static` re-run in the same session (**175/175**, **8/8**) — the
+registry's SEAM inequality assertion passes either way, which is precisely why it could not have caught
+this. The superseded value occurred **11 times in 7 files** at `HEAD` (`git grep -n 4ce5e514 HEAD`) and
+each occurrence was dispositioned: the header itself (re-pinned to `039d53a2…`); PR-04's record
+(corrected in place, its conclusion recorded as wrong); PR-07a's frozen ledger row and its
+carried-forward cell, the PR-01b and PR-02 debate records and PR-07b's ledger (left exactly as recorded,
+with a closure note appended where they spoke in the present tense); and the live-state files and LOG
+entry that carried the defect itself (00-INDEX, CHECKLIST, HANDOFF). Every remaining occurrence is now
+labelled the **recorded strip control** or sits inside a frozen historical record; none presents
+`4ce5e514…` as the current pin.
+
+**Audit of this change — the review was declined, so the risk-gated path ran instead.** The ordinary
+native review was offered for this candidate and the host resolved consent as `declined_this_candidate`
+(`lineage_created: false`, `mutation_performed: false`, `reset_eligible: false`), so no review authority
+exists for it and none is claimed. Receipt-driven Development prescribes exactly this fallback: the
+candidate is treated as high risk, the writer self-verifies, and a separate independent verifier always
+runs. `gentle-ai-verify` ran read-only over this diff and reported: the pin re-derived with three
+independent methods plus the control confirmed; the 63 exported constants of `constants.ts` compared
+between `HEAD` and the candidate at runtime (identical); no other file moved and no hash-pinned body
+changed; the record's test figures reproduced. It also raised seven record defects — six real and
+corrected in this commit, one tested and rejected: it held that `apply.tribunal_state` never contained
+`": "` and needed no quoting, but the staged value does contain it, in this session's own appended
+sentence, and its unquoted form is rejected by a strict parser, so the quoting was required.
+**Judgment Day was deliberately not run**: there is no behavioural surface for a two-lens adversarial
+pass to attack, and inventing one would misrepresent what that instrument is for.

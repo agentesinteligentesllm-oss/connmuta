@@ -4,6 +4,73 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 10 (continuation): post-merge integrity sweep (B-19/B-20/B-21)
+
+**Closed**
+
+- **B-19 — the `constants.ts` provenance re-pin.** `src/shared/constants.ts:3` pinned `4ce5e514…`, the
+  value of `v1:src/config.ts:26-166` **without** its terminating newline; `bus-v2-f1-pr-04-001` fixes a
+  pin as the exact byte range *including* that newline, so the correct value is `039d53a2…`. Re-derived
+  with two independent methods, both validated against the ratified fence value `68e241b2…`, and the
+  control reproduces the superseded value exactly. PR-04's own conclusion — that the wrong value was
+  "honest" — was corrected in place; its frozen S1 row was left as recorded with a closure note
+  appended. No gate could have caught this: a SEAM pin is asserted only for *inequality*.
+- **B-20 — design §12's stale verdicts.** Three rows marked line-range extracts `AS-IS` although
+  `bus-v2-f1-tasks-001` items 1–2 (and `tasks.md` 7a.2/7b.2, and the registry itself) make such a
+  module SEAM by construction. Resolved by an **appended** apply-time amendment: the audited rows are
+  untouched, so what was designed and what shipped both stay on the record, and the amendment is the
+  only part to revert if the Director prefers to re-open the mapping.
+- **B-21 — the review's advisory finding.** Examined and left without a code change: the pin the
+  reliability lens pointed at (`test/shared/tool-output.test.ts:119-121`) is the *declared* key set,
+  complemented by a runtime witness for the mandatory fifteen two cases below (`:190-191`). Recorded as
+  `decided`, with the closure's own statement that it is never a reason to re-run review on that
+  candidate.
+- Evidence for all three: build clean; focused `constants` + `provenance` 8/8; full suite **175/175** and
+  `test:static` **8/8**; template/anchor review across every tracked Markdown file (0 broken links,
+  0 broken anchors). Audit path recorded as `bus-v2-f1-b19-repin-001` — the ordinary native review was
+  the instrument, and Judgment Day was deliberately **not** run because a two-lens adversarial pass has
+  no behavioural surface here.
+- Two self-inflicted record defects found and fixed while re-reading: the PR-07b section's `## Next`
+  block sat *before* its own round-2 ledger and still described the merge as untaken, and this session
+  initially mis-read `AGENTS.md`'s `#precedence-on-conflict` anchor as broken (it exists at
+  `docs/00-INDEX.md:159`; the first grep was case-sensitive).
+- **A pre-existing defect repaired on the way:** `openspec/changes/f1-daemon-registry-thin-client/state.yaml`
+  was **not valid YAML** at all — four values already carried `": "` inside a plain scalar, the oldest of
+  them introduced by the tasks phase (`0bdaf3e`), and a fifth acquired one from this session's own
+  appended sentence. Nothing caught it because no gate parses YAML strictly and `gentle-ai sdd-status`
+  tolerates it; a strict parser rejected the whole document, so every field in it was unreadable to any
+  tool but the one. All five values are now quoted, each checked against its own raw text and each
+  unquoted form confirmed rejected by a strict parser, and the consumer still reports `apply`, 41/210,
+  no blockers. `openspec/config.yaml` and `.github/workflows/ci.yml` validate — they were never affected.
+- **The ordinary native review was declined for this candidate**, so the change ran Receipt-driven
+  Development's risk-gated path instead: high risk, writer self-verification **plus** an independent
+  verifier. `gentle-ai-verify` ran read-only, re-derived the pin with three methods of its own, compared
+  all 63 exported constants of `constants.ts` between `HEAD` and the candidate (identical), confirmed no
+  other file moved, and reported seven record defects — six real and corrected before the commit
+  (stale B-19 sentences in the handoff, a false "`main` advanced" claim, a claim that the review had
+  *closed* when it had been declined, an imprecise gate citation, and an over-stated grep enumeration),
+  and one rejected after testing it: it held that `apply.tribunal_state` needed no quoting, while the
+  staged value demonstrably contains `": "` and its unquoted form fails to parse.
+
+**Opened**
+
+- Nothing new. PR-08 (`conmuta.json` schema, token-shape validator, `conmuta validate`, `src/cli/main.ts`
+  skeleton) remains the next slice, unchanged, under the settled route; the handoff is written for it and
+  carries its two `src/cli` traps.
+
+**How it knows**: the two re-derivation methods and the control, run in-session against
+`git -C ../telegram-agent-bus show bf8f365:src/config.ts`; the independent verifier's report
+(`gentle-ai-verify`, read-only, three methods of its own plus a runtime comparison of the module's 63
+exports and the blob ids of every hash-pinned file); the native review's own envelope for this candidate
+(`declined_this_candidate`, `lineage_created: false`) and `assess`'s plan, which named the verifier as
+required; `npm test` **175/175** and `npm run test:static` **8/8**; a scripted link/anchor check over
+`git ls-files '*.md'` (61 files, 508 links, 0 broken) and a strict YAML parse of every `*.y*ml`;
+`gentle-ai sdd-status` (`nextRecommended: apply`, 41/210, no blockers);
+`docs/05-tribunal/INDEX.md` (`bus-v2-f1-b19-repin-001`); `docs/06-backlog/CHECKLIST.md` (B-19/B-20/B-21);
+Engram observations #3280, #3283, #3284, #3285, #3287 and #3293, with this session's summaries at
+#3286 and #3289; an earlier draft of this line cited `#3290`, which belongs to another project and was
+removed.
+
 ## 2026-09-17 — Session 10: F1 apply, PR-07b merged (stopped at the PR-07b → PR-08 boundary)
 
 **Closed**

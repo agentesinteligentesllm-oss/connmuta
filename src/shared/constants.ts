@@ -1,6 +1,6 @@
 /**
  * Provenance: telegram-agent-bus src/config.ts:26-166 @ bf8f365 — verdict: SEAM (D-08).
- * v1 body sha256: 4ce5e514f95c4a73bbaa49e01d5fe41f707552e2928b204a148bf279b2a1b48a
+ * v1 body sha256: 039d53a22b54f8c1a061c602f419e6272cd1f8a3fe260301d7fe36b4e892e15e
  * Changes: (1) LOCK_STALE_SECONDS, STATE_VERSION dropped; (2) OPEN_THREAD_BACKLOG_THRESHOLD
  * derived; (3) design §3 additions.
  */

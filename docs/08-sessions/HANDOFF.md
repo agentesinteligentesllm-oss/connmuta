@@ -53,8 +53,9 @@ report instead of proceeding.
 | SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **41/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
 | Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) — **45 slices, 210 tasks**. In-place apply-time edits, each recording its own numbers: the PR-06 row (re-slice), the PR-07a block, the PR-07b carried-findings note (+ its D4 amendment), and the three checkboxes of each completed slice. No slice was ever re-numbered. | Engram under project **`connmuta`** |
 | Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**` for a leading `Provenance:` header; the scanned set must **equal** `test/fixtures/v1-provenance.json` — now **11 entries**: `constants`, `envelope`, `envelope.test`, `secrets`, `thread-record`, `protocol-apply`, `protocol-select`, `fence`, `tool-schemas`, `error-payload`, `tool-output`. Every vendored file needs a design §12 header **and** a fixture entry, or `test:static` fails | `test/security/provenance.test.ts` |
-| **The registry never validates a header hash against v1** | For a SEAM it asserts only that the body *differs* from the pinned value, so a wrongly-stripped or wrongly-copied pin is invisible to every gate. Correctness of a pin is proven **only** by independent re-derivation from the read-only v1 checkout. `src/shared/constants.ts:3` still carries a wrong one (backlog **B-19**) | `test/security/provenance.test.ts:113-119` |
-| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output}.ts` + twins, `test/fakes/delivered-text.ts`, `test/twins.test.ts`, `test/security/{pack,repo-scan,provenance}.test.ts`, fixtures — **175 tests**, `test:static` **8**, re-verified on merged `main` at `bd3c6ed` | PRs `#1`–`#10` |
+| **The registry never validates a header hash against v1** | For a SEAM it asserts only that the body *differs* from the pinned value, so a wrongly-stripped or wrongly-copied pin is invisible to every gate. Correctness of a pin is proven **only** by independent re-derivation from the read-only v1 checkout. `src/shared/constants.ts:3` carried a wrong one until 2026-09-17; it is now rule-conformant (backlog **B-19**, `done`) | `test/security/provenance.test.ts:120` (the SEAM inequality), `:113` (registry equality), `:118` (AS-IS equality) |
+| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output}.ts` + twins, `test/fakes/delivered-text.ts`, `test/twins.test.ts`, `test/security/{pack,repo-scan,provenance}.test.ts`, fixtures — **175 tests**, `test:static` **8**, re-verified on merged `main` | PRs `#1`–`#10` |
+| Post-merge integrity sweep | After PR-07b merged, the Director's session-10 delegation was used to close the two file-integrity items the audits had reported and to dispose of the review's advisory finding: `constants.ts`'s pin is now rule-conformant, design §12 carries an appended amendment note, and all three are `done`/`decided` in the backlog. The sweep lands on `main` as the commit carrying it; nothing about it changes how PR-08 is built | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-b19-repin-001` · [`CHECKLIST.md`](../06-backlog/CHECKLIST.md) B-19/B-20/B-21 |
 | Audit status of the last three slices | PR-06 was **waived** by the Director; PR-07a and PR-07b ran under the same substitute by explicit decision. All three were audited by Judgment Day. **DN-05 is not satisfied for any of them.** PR-07b's candidate *additionally* closed an ordinary native review — an independent lifecycle (see §2.5). | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-pr-06-waiver-001`, `bus-v2-f1-pr-07a-audit-001`, `bus-v2-f1-pr-07b-audit-001` |
 
 ---
@@ -148,7 +149,9 @@ Wrong-value controls (the value if the terminating newline is wrongly stripped):
 three pins include that newline. The method validates itself by reproducing two already-ratified values:
 the fence `68e241b2…` from `src/tools/fetch.ts:43-63` and `thread-record`'s `bd177372…` from
 `src/state.ts:15-87`. Older values (constants, envelope, secrets, protocol-apply, protocol-select) are in
-`apply-progress.md`; **`constants`' is wrong** — backlog B-19, not to be fixed inside another slice.
+`apply-progress.md`; **`constants`' was wrong and is fixed** — re-pinned to `039d53a2…` on 2026-09-17
+(backlog B-19, `bus-v2-f1-b19-repin-001`), with `4ce5e514…` now the recorded strip control. Treat that
+value as settled: do not re-report it, and do not "fix" it back.
 
 **Range-convention detail.** A module assembled from **two** v1 ranges can cite only one in its header
 and fixture, because the header grammar and the fixture's `v1Path` each hold a single token; PR-07a's
@@ -174,6 +177,7 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
 | **A SEAM's declared types are its whole guarantee** | The registry only asserts hash *inequality* for a SEAM, so a wrong body is invisible. Pin every declared shape with `SameShape` (key set **and** structure): mutual assignability alone tolerates a dropped optional member (M9t stayed green), and a key-set check alone tolerates a narrowed member type (M8t). One-line pins up to ~160 chars are stylistically fine here | `test/shared/tool-output.test.ts` |
 | **Windows line-ending trap** | `Path.read_text`/`write_text` translate line endings silently: a `"\r\n" in text` check never fires, and a "byte-identical" mutant restore rewrites the file as CRLF. Use `read_bytes`/`write_bytes`, or `newline=""` / `newline="\n"`; verify with `git ls-files --eol <path>` → `i/lf w/lf` after `git update-index --refresh` | session 9/10 EOL sweeps |
 | **Long shell heredocs can be truncated by the harness** | A `cat > file <<'EOF'` append was cut mid-content once in session 10, leaving a partial write. Use the `write`/`edit` tools for large file content, and when a chained command is blocked by the safety policy (`rm -rf <dir>` was), remove explicit single paths with `rm` + `rmdir` instead of chaining | session 10 |
+| **`state.yaml` is YAML, and a plain scalar cannot hold `": "`** | Four values in `openspec/changes/f1-daemon-registry-thin-client/state.yaml` were unquoted and contained one (the oldest since the tasks phase, `0bdaf3e`), which made the **whole document** unparseable to a strict reader while `gentle-ai sdd-status` — the only consumer — kept working. Repaired 2026-09-17; **no gate validates YAML**, so quote any value you write that contains a colon-space, and validate with a real parser after editing | `bus-v2-f1-b19-repin-001` · §7 |
 | **`node --test` output is ANSI-coloured, and `ℹ` breaks cp1252 decoding** | A grep anchored at `^ℹ` can find nothing while the suite is failing; strip escape codes and decode utf-8 in Python subprocesses, or trust the exit code | session 9/10 |
 | **`gentle-ai` is 3.0.2 and the attempt ledger is retired** | Only `sdd-attempt grant` remains (`Runtime attempt operations are retired`). Every older instruction about `--max-changed-lines`, `settle` or a ledger `reset` is obsolete. `gentle-pi` is 3.1.1 | `gentle-ai sdd-attempt --help` |
 | **Engram project key is `connmuta`** | The provider derives it from the git remote and **rejects** writes passed as `telegram_bus_agent`. Cross-project reads still work | `mem_current_project` |
@@ -237,7 +241,8 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
   gate's text; append a note.
 - Provenance hash rule, registry and range convention are ratified (`bus-v2-f1-pr-02-002`,
   `bus-v2-f1-pr-04-001`) — §3. Do not "fix" `constants.ts:3` inside another slice: it is backlog **B-19**
-  and needs its own audited change because it invalidates PR-04's wrong-value-control table.
+  and its re-pin invalidated PR-04's wrong-value-control table, which is why it needed its own audited
+  change — **done on 2026-09-17** (B-19), so do not re-open or re-report it.
 - **Doc-hygiene rule** (ratified `bus-v2-f1-pr-03-001`): never quote a matched-and-rejected
   secret-shaped literal in `apply-progress.md`; describe the shape. PT-22 scans every tracked file.
 - **THREAT-MODEL §4 rule** — §2.3. PT-02's cell correctly names `test/shared/tool-schemas.test.ts`;
@@ -246,6 +251,11 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
 - **PR-06, PR-07a and PR-07b are merged; do not re-slice, re-audit or re-open them.** In particular, the
   review closure's advisory finding (`R3-tool-output-shape`, backlog **B-21**) is explicitly **not** a
   reason to re-run review on that candidate, and it does not reopen PR-07b.
+- **The post-merge integrity sweep is closed: do not re-open it either.** `src/shared/constants.ts:3`
+  now pins the rule-conformant `039d53a2…` (B-19 `done`; `4ce5e514…` is the strip control), design §12
+  carries the appended amendment that resolves its three `AS-IS` line-range rows (B-20 `done`), and
+  B-21 is `decided` with no code change. All three are recorded in `bus-v2-f1-b19-repin-001`; a session
+  that "finds" any of them again has found a record, not a defect.
 - `test/fakes/delivered-text.ts` is the home of `deliveredText`; the PR-18 `telegram-client.ts` fake
   imports it, never redefines it.
 - TypeScript 7.0.2 needs `"types": ["node"]`; an empty composite unit is `TS18003` — see §4 for the
@@ -267,14 +277,13 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-19** (new) | `src/shared/constants.ts:3` pins the **blind-stripped** hash (`4ce5e514…`); the rule-conformant value for `src/config.ts:26-166` is `039d53a2…`. Pre-existing since PR-01b; a SEAM pin is never checked for correctness, only for inequality. Re-pinning invalidates PR-04's wrong-value-control table, so it needs its own audited change | Director → Kairo |
-| **B-20** (new) | design §12's reuse table marks three v1 line-range extracts **AS-IS** over modules that are SEAM by construction (`send.ts:47-109` and `index.ts:29-42` → `tool-schemas.ts`, reported by PR-07a; `fetch.ts:65-348` → `tool-output.ts`, reported by PR-07b). The tribunal ruling `bus-v2-f1-tasks-001` items 1–2 settles the verdict; the fix is a design amendment, and `design.md` is gated | Director |
-| **B-21** (new) | Ordinary native review of PR-07b left one advisory finding, `R3-tool-output-shape` (WARNING, disposition *informational*) at `test/shared/tool-output.test.ts:119-121`, the declared-key-set pin. Non-blocking on the closure's own terms; separate later work, never a reason to re-run review on that candidate. The reviewer's rationale is not carried in the closure envelope | Kairo → a later PR |
+| — | `B-19`, `B-20` and `B-21` — the three findings the PR-07a and PR-07b audits produced, which this session's post-merge integrity sweep **closed** — are finished in the backlog, not carried here. Read them there, or `bus-v2-f1-b19-repin-001`, rather than re-deriving them | closed |
 | carried (PR-06) | Digest blind spots incl. `MAX_THREAD_HISTORY = 50` saturation — proposed minimal fix: the last history entry's `eid` in the digest row | Director → Kairo |
 | carried (PR-06) | The fence's body escape does not neutralise `&`, so the fence is not injective; THREAT-MODEL §7 ratifies the fence as inherited unchanged, so it needs its own decision | Director |
 | B-16 / D-10 | `LICENSE` ships with `private: true`; SECURITY/CONTRIBUTING/CHANGELOG and the copyright-holder line open; a **real tenant deny-list** for PT-22 must live outside the tree (CI secret) — decide at PR-42 | Director |
 | B-11 | Trademark screening; `PRODUCT_NAME` is the single rename constant (`src/shared/constants.ts`) | Director |
 | B-12 | macOS scope; B-13 migration runbook closes when PR-38 merges | Director + Kairo |
+| — | **No gate validates the YAML in this tree.** `state.yaml` was unparseable to a strict reader for several sessions without anyone noticing; consider a cheap validity check over `git ls-files '*.y*ml'` in a later PR, audited, so the class cannot recur silently | Kairo → Alpha |
 | — | `npm test` runs whatever is in a stale `dist/`; consider a `clean` step in a later PR, audited | Kairo → Alpha |
 | — | GitHub Actions deprecation warning: `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 — bump majors in a later CI PR, audited | Kairo → Alpha |
 | — | T22 bytes-per-hour ceiling and the origin-label organisation marker: no backlog id (PR-42 close-out) | Director |
