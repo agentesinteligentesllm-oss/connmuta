@@ -2858,3 +2858,27 @@ With no severe row surviving and the final verification passing:
 ## Next
 
 - PR-09b's ordinary native review, then the PR.
+
+## The ordinary native review — APPROVED for this candidate
+
+The Receipt-driven Development switch is on and the Director never left this candidate unreviewed, so the
+preflight ran against the frozen worktree (`verify-09b` at `18ec622`). `inspect` returned `ready` with a
+committed-range START (`base-ref` `11c6af4`), and this time the host **granted** consent: lineage
+`review-c5a6b9c191154861`, risk tier **medium**, one lens (`review-reliability`), 7 changed files, 972
+changed lines, correction budget 200.
+
+The single slot materialized after its forecast (1 model run, Pi host relay — relayed and then
+acknowledged), and the closure was **`approved`** with four advisory findings, every one of them a
+SUGGESTION and explicitly non-blocking:
+
+| Finding | Location | Severity | Disposition |
+|---|---|---|---|
+| `R3-1` | `src/registry/loader.ts:109-113` | SUGGESTION | informational — backlog **B-32** |
+| `R3-2` | `src/registry/loader.ts:221-229` | SUGGESTION | informational — backlog **B-32** |
+| `R3-3` | `src/registry/loader.ts:241-244` | SUGGESTION | informational — backlog **B-32** |
+| `R3-4` | `test/registry/loader.test.ts:184-185` | SUGGESTION | informational — backlog **B-32** |
+
+The exact acknowledgement was executed and its envelope reports **`authority: burned`**
+(`gentle-ai.review-acknowledged/v1`), so the lifecycle is closed: no correction transition was offered, none
+is taken, and this candidate is never re-reviewed. Review approval is informational and authorizes no
+delivery — commit, push, PR and merge stay under ordinary repository policy.
