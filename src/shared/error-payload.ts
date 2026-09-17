@@ -11,7 +11,8 @@
  * rewritten, plus four additions v1 did not have: the closed-shape paragraph on `ToolErrorPayload`, the
  * paragraph recording that `RETRYABLE_TOOL_CODES` lost `BRIDGE_BUSY` and why, the new
  * `toolErrorPayload` (v1 kept that branch inline inside `toToolErrorPayload`; lifted out, the allowlist
- * stays the only place `retryable` is decided), and a first JSDoc for `errorResult`.
+ * stays the only place `retryable` is decided for a TOOL-LEVEL code — the client-local family keeps the
+ * separate classification design §10 gives it), and a first JSDoc for `errorResult`.
  */
 
 /**
@@ -47,13 +48,13 @@ export type ToolErrorPayload = {
 export const RETRYABLE_TOOL_CODES: ReadonlySet<string> = new Set(["TRANSPORT_ERROR"]);
 
 /**
- * The payload for a tool-level rejection the caller can act on, built without any Telegram
- * classification. The client-local constructor in `client/errors.ts` (PR-34) builds its payloads on
- * this function, and `daemon/ipc/routes.ts` (PR-31) falls back to it once the Telegram
- * classification of an error chain has been tried and yielded nothing.
+ * The payload for a TOOL-LEVEL rejection — v1's `toToolErrorPayload` fallback branch, lifted into its
+ * own export so the allowlist above stays the single place that decides `retryable` for the v1 tool
+ * codes. `daemon/ipc/routes.ts` (PR-31) falls back to it after the Telegram classification is tried.
  *
- * `retryable` is derived here rather than passed in, so the closed allowlist above stays the single
- * place that decides it and a caller cannot mark a permanent failure retryable.
+ * Client-local codes (`DAEMON_DOWN`, `IPC_ERROR`, `WRONG_ROOM`, …) are a DIFFERENT family, NOT built
+ * here: design §10's client taxonomy gives them their own `retryable` values — three of them `true` —
+ * so `client/errors.ts` (PR-34) implements that table rather than routing them through this allowlist.
  */
 export function toolErrorPayload(code: string, message: string): ToolErrorPayload {
   return { code, message, retryable: RETRYABLE_TOOL_CODES.has(code) };

@@ -12,13 +12,15 @@ import {
 
 // --- The payload shape is CLOSED (D3, `v1:src/index.ts:45-51`): five keys, of which only `code`,
 // `message` and `retryable` are mandatory. The optional two are the refinements a Telegram
-// classification can add — a rate limit's `retry_after_s` and a migrated chat's `new_chat_id` —
-// so they belong to the shape even though the client-local constructor never sets them.
+// classification adds — a rate limit's `retry_after_s`, a migrated chat's `new_chat_id`.
 
 const RATE_LIMITED: ToolErrorPayload = { code: "RATE_LIMITED", message: "slow down", retryable: true, retry_after_s: 30 };
 const CHAT_GONE: ToolErrorPayload = { code: "CHAT_GONE", message: "chat migrated", retryable: false, new_chat_id: -1009876543210 };
 
 test("the optional refinements are part of the shape and survive serialization", () => {
+  for (const payload of [RATE_LIMITED, CHAT_GONE]) {
+    assert.deepEqual(JSON.parse(errorResult(payload).content[0].text), payload);
+  }
   assert.equal(RATE_LIMITED.retry_after_s, 30);
   assert.equal(CHAT_GONE.new_chat_id, -1009876543210);
 });
