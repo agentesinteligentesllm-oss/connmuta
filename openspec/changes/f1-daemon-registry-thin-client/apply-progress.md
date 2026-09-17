@@ -1362,6 +1362,15 @@ and D4 (the contested-causality test pattern).
 
 ## Carried forward to PR-07b (re-verified here, as the handoff asked)
 
+**D4, first commit of PR-07b (Director decision).** `test/shared/error-payload.test.ts`'s `errorResult`
+case drives the client-taxonomy code `UNBOUND_PROJECT` through `toolErrorPayload`. Nothing behaves
+wrongly — the value the tool-level allowlist yields for it happens to equal design §10's client value —
+but it models the pattern C2/C4 exist to forbid, so change the example to a tool-level code when
+PR-07b touches that file. The round budget was exhausted when it was found (two fix rounds, two
+re-judgments) and the two judges disagreed on its causality (one called it introduced by the round-1
+correction, one pre-existing since the slice's first commit), so it was escalated and decided by the
+Director rather than fixed in a third round.
+
 The tasks-phase plan allows PR-07b to cover `shared/tool-output.ts` and, if its twin pushes it past
 400 lines, to ship the twin as a separate PR-07c. **That split is not CI-safe and must not be used.**
 `test/twins.test.ts` walks every `src/**/*.ts` and fails when the twin is missing, so a PR that lands
