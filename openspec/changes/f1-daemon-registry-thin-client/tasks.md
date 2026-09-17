@@ -267,12 +267,22 @@ it, and the twin rule forbids shipping a module without its test):
     rather than silently resolved (backlog **B-26**), following the PT-05/PT-06 precedent of one cell
     filled across two commits.
 
-- [ ] 9.1 RED: write `test/registry/invariants.test.ts` covering R1–R6's five spec scenarios (duplicate `bot_id` rejected, hot-reload without restart, malformed registry quarantined not defaulted, binding never rewritten from bus/API data) plus R3/R4 checks.
+- [x] 9.1 RED: write `test/registry/invariants.test.ts` covering R1–R6's five spec scenarios (duplicate `bot_id` rejected, hot-reload without restart, malformed registry quarantined not defaulted, binding never rewritten from bus/API data) plus R3/R4 checks.
 - [x] 9.2 GREEN: implement `src/registry/schema.ts` (`z.strictObject`, `roster_snapshot`/`roster_hash` required, `REGISTRY_VERSION`) and `src/registry/invariants.ts` (`superRefine` for R1–R3 — the refinement cannot decide R4, R5 or R6; see the note below).
-- [ ] 9.3 RED: write `test/registry/loader.test.ts` asserting the mtime/size fingerprint reload (D-12) and the never-renamed quarantine-on-invalid behavior.
-- [ ] 9.4 GREEN: implement `src/registry/loader.ts` (last-good-in-memory, `registry_invalid` condition, R5 pre-parse scan via `token-shape.ts` from PR-08).
-- [ ] 9.5 Verify: `npm run build && node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/registry/loader.test.js"`.
-- [ ] 9.6 Docs: update the file-name cell(s) of PT-18, PT-25 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 9.3 RED: write `test/registry/loader.test.ts` asserting the mtime/size fingerprint reload (D-12) and the never-renamed quarantine-on-invalid behavior.
+- [x] 9.4 GREEN: implement `src/registry/loader.ts` (last-good-in-memory, `registry_invalid` condition, R5 pre-parse scan via `token-shape.ts` from PR-08).
+- [x] 9.5 Verify: `npm run build && node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/registry/loader.test.js"`.
+- [x] 9.6 Docs: update the file-name cell(s) of PT-18, PT-25 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+9.1, 9.3, 9.4, 9.5 and 9.6 flipped to `[x]` in the **PR-09b** commit, which **closes row PR-09** (11 of the 45
+rows done, delivered as 14 PRs). 9.1's loader scenarios — hot-reload without restart, malformed registry
+kept as last-good and never renamed — are `test/registry/loader.test.ts`, and 9.6's PT-25 half names only
+the part this slice pins (the file is never renamed or rewritten, and the loader has no write path), because
+the row's assertion as written is the daemon-side `migrate_to_chat_id` that `design.md:551` sends to
+`daemon/send/send-path`; the split is stated rather than resolved, and **B-26** stays open for the Director.
+Two findings of this slice's own review are disclosed in `apply-progress.md` instead of being written into
+this gate: the R5 mask had to become case-insensitive (an uppercase hash was misreported as forbidden
+content), and a registry file deleted after a good load keeps the last-good registry.
 
 9.2 flipped to `[x]` in the **PR-09a** commit; **9.1 stays open with it** — two of the five scenarios it
 names (hot-reload without restart, malformed registry quarantined not defaulted) are the loader's and land
