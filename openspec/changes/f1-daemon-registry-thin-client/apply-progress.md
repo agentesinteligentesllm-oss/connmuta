@@ -2882,3 +2882,128 @@ The exact acknowledgement was executed and its envelope reports **`authority: bu
 (`gentle-ai.review-acknowledged/v1`), so the lifecycle is closed: no correction transition was offered, none
 is taken, and this candidate is never re-reviewed. Review approval is informational and authorizes no
 delivery — commit, push, PR and merge stay under ordinary repository policy.
+---
+
+# PR-10 — ledger schema + `node:sqlite` transaction spike (`src/ledger/{schema,transaction}.ts` + build wiring)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branch | `f1/10-ledger-schema-spike` → `main` (base `3534739`, the PR-09b docs commit) |
+| Mode | Strict TDD (RED observed once per module, before its implementation existed) |
+| Status | Implemented and verified; tasks 10.1–10.6 marked `[x]`; **Judgment Day audit and the ordinary native review pending** |
+
+## Scope and budget (measured)
+
+| File | Authored lines |
+|---|---|
+| `src/ledger/schema.ts` | 109 |
+| `src/ledger/transaction.ts` | 75 |
+| `src/ledger/tsconfig.json` (build wiring, not named in the block's Scope line) | 14 |
+| `test/ledger/schema.test.ts` | 495 |
+| `test/ledger/transaction.test.ts` | 192 |
+| **Total, `git diff --numstat -- src test`** | **885 added, 0 deleted** |
+
+Outside the budget rule's own unit (`src test`): `tsconfig.json` (+1/−1, the root `references` entry) and
+`docs/02-architecture/THREAT-MODEL.md` (+1/−1, PT-10's cell). The block estimated ≈400, so the slice
+carries a **disclosed PR-10-scoped size exception, 485 over**, granted by the Director with the commit
+authorization. Grounds: the DDL and its twin pin one property per constraint rather than a sample of them —
+the object inventory, `STRICT` plus the control that proves it bites, the completeness *and* strictness of
+every closed vocabulary, both unique keys PT-10's replay needs, both cascades, both hand-written indexes,
+the bodiless tables and the VIEW's four branches — and trimming that list is what the budget rule forbids.
+
+## Where the code came from
+
+No vendoring: design §12 has no row naming `ledger/*`, so neither module carries a provenance header and
+`test/fixtures/v1-provenance.json` stays at **11 entries** (unchanged since PR-07b). The DDL is authored in
+design §5.2 and this slice is that text; the transaction module is new code for an idiom design §5.3
+settles as an implementation detail.
+
+**The DDL is verbatim, and that is a measurement rather than a claim.** The `sql` block was extracted
+programmatically from `design.md` §5.2, spliced into `schema.ts` by a script, and compared back:
+`sha256 9e9bb65545df29ce5871bea095a6d5457a8865a1a739abda9feb62058915b506`, **74 lines / 4,123 bytes**,
+**0 differing lines**, with two failing controls (one byte appended; `STRICT` stripped) proving the
+comparison can say "different".
+
+## TDD cycle evidence
+
+| Task | RED (observed) | GREEN |
+|---|---|---|
+| 10.1 | `npm run build` → `test/ledger/transaction.test.ts(8,61): error TS2307: Cannot find module '../../src/ledger/transaction.js'` (exit 2) | `test/ledger/transaction.test.ts` **5/5** |
+| 10.3 | `npm run build` → `test/ledger/schema.test.ts(8,35): error TS2307: Cannot find module '../../src/ledger/schema.js'` (exit 2) | `test/ledger/schema.test.ts` **11/11** |
+| 10.5 | — | focused **16/16**; full suite **344/344** (328 → 344); `test:static` **8/8** |
+
+Two test-side bugs of the slice's own were found by the first GREEN run and fixed before this record was
+written, both in `schema.test.ts`: the `thread_history` vocabulary rows had no parent `threads` row
+(`FOREIGN KEY constraint failed`, errcode 787), and the strictness case deleted that parent before the
+invalid insert. The fix inserts one parent thread and gives the two rows distinct keys, which also removes
+the chance that a unique-key refusal is mistaken for the CHECK's.
+
+## The spike (design §5.3's risk-register row, closed)
+
+Measured on the pinned build — Node **24.16.0**, SQLite **3.53.0** — before any file was written:
+
+| Question | Answer |
+|---|---|
+| Does `DatabaseSync.isTransaction` exist? | Yes: `false` → `true` on `BEGIN IMMEDIATE` → `false` on `ROLLBACK` |
+| Does a throw inside the callback roll the batch back? | Yes; a failed statement leaves the transaction open, so the catch still owns the rollback |
+| Is a nested call refused? | Yes, by SQLite itself (`cannot start a transaction within a transaction`) — and `ROLLBACK` with no transaction throws `cannot rollback - no transaction is active` |
+| Can `exec()` run the whole DDL at once? | Yes (multi-statement), which is why `schema.ts` exports one string |
+| Is `PRAGMA foreign_keys` on by default? | Yes (`node:sqlite` opens with `enableForeignKeyConstraints`) |
+
+**Verdict: the idiom holds, so no ADR is needed** — design §5.3's own expectation. One deliberate addition
+is part of `transaction.ts`'s contract: the nested refusal is checked **before** `BEGIN` runs. SQLite
+refuses the nested `BEGIN`, but a nested call whose own `catch` then ran `ROLLBACK` would roll back the
+*outer* call's transaction — the batch it never opened. That is `M4`/`M5` below, and the suite pins the
+refusal leaving the outer transaction intact and committable.
+
+## Mutant matrix — each built on a cleaned `dist/` in an isolated worktree, each restored byte-identically
+
+Run in `../telegram_bus_agent-worktrees/verify-10` (detached at `3534739`, the candidate applied as a patch
+and proved sha256-identical to the working tree for all seven files, `npm ci --ignore-scripts`, `dist/`
+rebuilt from scratch before each mutant).
+
+| # | Mutant | Verdict | Killed by |
+|---|---|---|---|
+| `M1` | `BEGIN IMMEDIATE` → `BEGIN` (deferred) | KILLED | the write-lock test: with no writes made yet, the second connection's write would have succeeded |
+| `M2` | the `ROLLBACK` call removed | KILLED | a throw inside the callback leaves no row |
+| `M3` | `COMMIT` moved before the callback runs | KILLED | five tests, including the rollback boundary and every transaction-state assertion |
+| `M4` | the nested-call refusal removed | KILLED | the nested call is refused **and** the outer transaction survives |
+| `M5` | the catch's still-open guard removed | KILLED | a callback that ends the transaction itself must not mask the caller's error |
+| `M6` | `STRICT` dropped from one table (`conditions`) | KILLED | every ledger table declares STRICT |
+| `M7` | one `apply_outcome` value dropped (`noted`) | KILLED | the vocabulary is complete, not merely strict |
+| `M8` | `UNIQUE (bot_id, update_id)` removed | KILLED | a redelivered update is refused, naming the key |
+| `M9` | the VIEW's `awaiting IS NOT NULL` removed | KILLED | the waiting turn only |
+| `M10` | a window-sized literal introduced (`DEFAULT 0` → `DEFAULT 7`) | KILLED | the DDL's executable text carries no window constant |
+| `M11` | `ON DELETE CASCADE` dropped from the `thread_history` key | KILLED | both foreign keys cascade |
+| `M12` | a `body` column added to `audit_log` | KILLED | the tables that must never hold a body have none |
+
+**12 of 12 killed, 0 survived**, and each died on the test that owns the property (no collateral). Both
+source files were restored byte-identically (sha256 control) and the restored tree re-verified green:
+focused **16/16**, full **344/344**, `test:static` **8/8**, `npm test` **344/344**.
+
+## Reportable items (reported, not silently resolved)
+
+1. **A leading doc comment must not spell `test/security/provenance.test.ts`'s header token.** That gate
+   reads a file's leading `/**` block as a vendor header whenever the block carries the header's first
+   token, and reports the file as a *malformed vendored module* otherwise. `src/ledger/schema.ts` has no
+   imports, so its doc comment *is* the leading block, and the first draft stated the fact with the token
+   spelled out — the static suite failed with `malformed Provenance header(s) in: src/ledger/schema.ts`.
+   Both new modules now state the constraint without the token, and that gate is the pin. Every earlier
+   non-vendored module was safe only because its imports came first.
+2. **PT-10's cell is filled by two slices.** `design.md:551` sends PT-10 to `ledger/inbox`; task 10.6 asks
+   PR-10 to fill the cell. PR-10 fills the half it pins (the rollback boundary and the
+   `UNIQUE (bot_id, update_id)` dedup) and names `ledger/inbox` (PR-12) as the scenario's owner — the split
+   PT-25's row states, per B-26. No document contradicts another, so no new backlog row is claimed here.
+3. **PT-20's cell is deliberately *not* claimed.** The schema's `audit_log`/`unknown_senders` have no body
+   column at all, which is PT-20's precondition rather than its assertion — the assertion is about rows the
+   write paths append, and task 13.6 gives PR-13 that cell. Disclosed so the omission reads as a decision
+   rather than an oversight.
+4. **A boundary that is stated and not pinned.** `withTransaction`'s callback must be synchronous
+   (`node:sqlite` is); a Promise-returning callback would commit before the promise settled. Pinning it
+   would assert the footgun instead of a guarantee, so the doc comment states it and no test claims it.
+
+## Next
+
+- Judgment Day audit (substitute for the tribunal debate) over the frozen committed range, then the
+  ordinary native review, then push, PR and the CI matrix.
