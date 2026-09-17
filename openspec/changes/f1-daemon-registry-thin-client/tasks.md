@@ -329,12 +329,15 @@ list is what the budget rule forbids. The figure covers the rule's own unit (`sr
 `tsconfig.json` and PT-10's cell in `THREAT-MODEL.md` fall outside it.
 
 *Spike verdict.* The idiom holds on the pinned build (Node 24.16.0, SQLite 3.53.0): `isTransaction`
-flips on `BEGIN IMMEDIATE`, a failed statement inside a transaction leaves it open, `ROLLBACK` outside
-one throws, and a nested `BEGIN` is refused by SQLite itself — so **no ADR is needed**, as design §5.3
-expected. One deliberate addition to the idiom is in `transaction.ts`'s contract: the nested refusal is
-checked *before* `BEGIN` runs, because SQLite's own refusal would otherwise reach the outer call's
-`ROLLBACK` and roll back the batch it never opened; the suite pins that a refused nested call leaves the
-outer transaction intact and committable.
+flips on `BEGIN IMMEDIATE`, `ROLLBACK` outside a transaction throws, and a nested `BEGIN` is refused by
+SQLite itself — so **no ADR is needed**, as design §5.3 expected. Two boundaries the first record of this
+slice stated wrongly and Judgment Day round 1 corrected: a failed *constraint* statement leaves the
+transaction open, but SQLite's auto-rollback classes (`SQLITE_FULL`, `SQLITE_IOERR`, …) close it
+themselves (measured: errcode 13 leaves `isTransaction` false), which is why the catch rolls back only a
+transaction that is still open; and the nested refusal is checked *before* `BEGIN` runs, because SQLite's
+own refusal would otherwise reach the outer call's `ROLLBACK` and roll back the batch it never opened.
+The suite pins both, and it pins the synchronous-callback boundary too — a thenable is refused before
+`COMMIT`, so an `async` caller gets an error instead of a partial commit.
 
 *PT-10's cell.* PR-10 fills the half it pins — the rollback boundary and the
 `UNIQUE (bot_id, update_id)` dedup — and names `ledger/inbox` (PR-12) as the scenario's owner per
@@ -343,8 +346,20 @@ outer transaction intact and committable.
 *Discovered, and disclosed rather than silent:* `test/security/provenance.test.ts` reads a file's
 **leading** `/**` block as a vendor header, so a non-vendored module that begins with its doc comment
 (one with no imports) must not contain that header's first token. The first draft of `schema.ts` did,
-and the static gate reported the file as a malformed vendored module until the wording changed. Both new
-modules now state the constraint in their headers, and that gate is its pin.
+and the static gate reported the file as a malformed vendored module until the wording changed. `schema.ts`
+now states the constraint in its header — its doc comment *is* the leading block that gate reads — and
+`transaction.ts` points at it instead of claiming the same hazard for itself.
+
+*Round 1 (Judgment Day).* **0 BLOCKER, 0 CRITICAL** from either judge (13 informational rows). The
+Director authorized the full batch, which is folded in the correction commit: six statements of the
+slice's own that were false (the §12 premise above; the async boundary declared unpinnable; a wrong
+`PT-27` citation where ADR-0027 is meant; a data-hygiene claim about digit runs that the file's own ids
+violate; the over-general spike sentence above; and a promise of a control the second text-level check did
+not have) and five pins that were missing (`AUTOINCREMENT`'s monotonicity across the retention delete, the
+per-table `NOT NULL` inventory, the DDL's refusal of a second application, SQLite's auto-rollback class,
+and the thenable refusal). The figures above are the pre-correction measurement; at the corrected tip the
+slice measures **1,140 authored lines, 740 over** (`src test`, 0 deleted), with **21** focused tests. The
+round-1 record and the re-measurement are in `apply-progress.md` §PR-10.
 
 #### PR-11 — ledger open sequence + migrations (D-21)
 Branch `f1/11-ledger-open-migrations` → `main`. Depends: PR-10. Size: ≈350 lines, no exception.
