@@ -945,3 +945,36 @@ Dispositions:
 
 Note on method: the header lives outside the hashed body (`vendoredBody` strips it), so strengthening
 change (1) does not disturb either pinned hash — re-confirmed after the edit.
+
+## PR-06b — bookkeeping close and verification
+
+Both slices are now in the tree, so tasks 6.1–6.4 flip to `[x]` in this commit (PR-06a merged with
+them still open, which is the honest state for a partially completed task).
+
+`f1/06b-protocol-select` is **stacked on PR-06a's tip** (`4c83c29`), per the ratified
+`stacked-to-main` chain strategy: it is retargeted to `main` after PR-06a merges, so its own review
+surface is only its three files.
+
+Authored diff for this slice: `src/shared/protocol-select.ts` 160 + `test/shared/protocol-select.test.ts`
+240 + its `test/fixtures/v1-provenance.json` entry 6 = **406 lines**, the disclosed 6-line overage
+described above. The registry fixture now carries 8 entries (the 6 pre-existing plus one per slice).
+
+Verification for PR-06b (orchestrator-run, from clean):
+
+| Command | Result |
+|---|---|
+| `npm run build` (after `rm -rf dist`) | exit 0, no diagnostics |
+| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **23/23 pass** — this is task 6.3's exact command |
+| `rm -rf dist && npm test` | **151/151 pass** |
+| `npm run test:static` | **8/8 pass** (registry equality with all 8 entries) |
+| clean detached worktree at the PR-06b tip | full suite and static suite green, with only the committed files present |
+
+Provenance for this slice re-confirmed with the real `vendoredBody()` after every edit:
+`v1:src/protocol.ts:335-477` hashes to `29bcf0038187541d6448d5c68a554d77b0789fbdcfea77ce087de441d96621ce`,
+matching the header, and the module body hashes to
+`f1389e54dafe9cd523cc0b0b03003cf23d9a08e1a15b77b73365e78fe5160540`, which differs — the SEAM
+inequality the scanner asserts.
+
+One review-driven change to this module's test file after the delegated writer's first pass: the
+`reminders=` component test described under finding 2 above (that component had no failing test
+before it, which is exactly the gap the ADR-12 governing rule exists to catch).

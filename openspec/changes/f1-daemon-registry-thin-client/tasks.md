@@ -125,12 +125,12 @@ Scope (both slices): `src/shared/protocol-select.ts`, `src/shared/fence.ts`, `te
 Requirements: underlies `durable-inbox` digest computation; `thin-client-tools › Fence soundness and origin labels` (PT-13, PT-14) — the D-15 amendment fencing site.
 Runtime harness: N/A.
 
-Tasks 6.1–6.4 stay unchecked until **PR-06b** lands: the slice is complete only then, so PR-06a merges with them still open (unfinished work is never checked off).
+Tasks 6.1–6.4 flipped to `[x]` in the **PR-06b** commit: the slice is complete only once both modules are in, so PR-06a merged with them still open (unfinished work is never checked off).
 
-- [ ] 6.1 RED: write `test/shared/protocol-select.test.ts` (select-side slice of `telegram-agent-bus/test/protocol.test.ts`, read-only reference) and `test/shared/fence.test.ts` asserting the fence cannot be forged by a peer body containing `</UNTRUSTED-PEER-INPUT>` and that `<` is escaped to `&lt;`.
-- [ ] 6.2 GREEN: implement `src/shared/protocol-select.ts` (SEAM from `telegram-agent-bus/src/protocol.ts:335-478`, read-only source; `computeWorkDigest` takes the per-client surfaced set and checkpoint) and `src/shared/fence.ts` (SEAM from `telegram-agent-bus/src/tools/fetch.ts:43-63`, read-only source; origin attributes added per D-15).
-- [ ] 6.3 Verify: `npm run build && node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"`.
-- [ ] 6.4 Docs: update the file-name cell(s) of PT-13, PT-14 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 6.1 RED: write `test/shared/protocol-select.test.ts` (select-side slice of `telegram-agent-bus/test/protocol.test.ts`, read-only reference) and `test/shared/fence.test.ts` asserting the fence cannot be forged by a peer body containing `</UNTRUSTED-PEER-INPUT>` and that `<` is escaped to `&lt;`.
+- [x] 6.2 GREEN: implement `src/shared/protocol-select.ts` (SEAM from `telegram-agent-bus/src/protocol.ts:335-478`, read-only source; `computeWorkDigest` takes the per-client surfaced set and checkpoint) and `src/shared/fence.ts` (SEAM from `telegram-agent-bus/src/tools/fetch.ts:43-63`, read-only source; origin attributes added per D-15).
+- [x] 6.3 Verify: `npm run build && node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"`.
+- [x] 6.4 Docs: update the file-name cell(s) of PT-13, PT-14 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 #### PR-07a — `shared/tool-schemas.ts` (SEAM) + `shared/error-payload.ts` (SEAM)
 Branch `f1/07a-tool-schemas-errors` → `main`. Depends: PR-06. Size: ≈290 lines, no exception (`tool-schemas.ts` is a range extract of two v1 files, therefore SEAM — tribunal `bus-v2-f1-tasks-001` item 1).
