@@ -1178,7 +1178,7 @@ hash-pinned AS-IS file, and ran the suites themselves (`npm test` 152/152 at the
 | Branch | `f1/07a-tool-schemas-errors` → `main` (branched from `main` at `c971e25`) |
 | Mode | Strict TDD |
 | Workflow | **ODD for this slice only** — the Director chose it this session over the two alternatives below |
-| Status | Implemented and verified (Strict TDD); tasks 7a.1–7a.6 `[x]`; first audited range `c971e25..dbb7494`, corrected range `c971e25..05ba773` |
+| Status | Implemented and verified (Strict TDD); tasks 7a.1–7a.6 `[x]`; audited range `c971e25..dbb7494`, corrected code tip `53d5aad` (round 1 `05ba773`, round 2 `53d5aad`) |
 
 ## Audit path (Director decisions, session 9)
 
@@ -1207,10 +1207,10 @@ code tip measures 420.
 
 | Path | Lines | Kind |
 |---|---|---|
-| `src/shared/tool-schemas.ts` | 112 | SEAM (range extract of two v1 files) |
+| `src/shared/tool-schemas.ts` | 114 | SEAM (range extract of two v1 files) |
 | `src/shared/error-payload.ts` | 66 | SEAM |
 | `test/shared/tool-schemas.test.ts` | 146 | twin |
-| `test/shared/error-payload.test.ts` | 77 | twin |
+| `test/shared/error-payload.test.ts` | 80 | twin |
 | `test/fixtures/v1-provenance.json` | +12 | two SEAM registry entries |
 | `docs/02-architecture/THREAT-MODEL.md` | +1/−1 | PT-02 file-name cell |
 | **budget total** | **420 / 400** | **20-line disclosed PR-scoped exception** — see the correction rounds |
@@ -1219,7 +1219,7 @@ The tasks-phase estimate was ≈290 lines. That under-count is the one PR-01a al
 (`bus-v2-f1-pr-01-001`): a SEAM module's doc comments must be **re-authored**, never copied, and the
 estimate counted v1's lines instead. The first draft measured 402 and 2 lines were trimmed from the two
 `Changes:` blocks rather than taking an exception; the audited tip landed at 398, and the two bounded
-correction rounds below carry it to 420.
+correction rounds below carry it to 420 (`114 + 66 + 146 + 80 + 12` plus the 2-line cell).
 
 ## TDD cycle evidence
 
@@ -1336,14 +1336,29 @@ PR-06's round 2 produced — all fixed here:
 | C6 (one) | The claim that `git diff --name-status c971e25..05ba773` is "exactly the five code/test/fixture paths plus the THREAT-MODEL cell" omitted the two SDD bookkeeping files inside that range | Reworded below |
 | C7 (one) | `export type SendToolInput` is at v1:111 with line 110 blank, i.e. **two** lines past the cited range, not one | Corrected in the header |
 
-## Judgment Day verdict
+## Re-judgment 2 (terminal) and verdict
 
-**Target:** `c971e25..05ba773` plus the correction rounds; branch `f1/07a-tool-schemas-errors`.
-**Round 1:** 0 CRITICAL; 2 corroborated WARNINGs (both introduced), 4 single-judge suggestions, 1
-pre-existing suspect queued. **Round 2:** 0 CRITICAL, 0 WARNING, 5 fix-caused items (4 corroborated, 1
-single-judge), all fixed. **Confirmed severe findings: none.** `scoped_rejudgment: approved`.
-**`JUDGMENT: APPROVED`** — with S1 (pre-existing `constants.ts` pin) and A4 (design §12's stale AS-IS
-rows) carried to the Director rather than fixed here.
+The second and final scoped re-judgment ran over the round-2 fix delta `05ba773..53d5aad` plus the
+frozen round-2 ledger (C3–C7). It confirmed C3, C4 (the titled case), C6 and C7 fixed and their claims
+true, and found no CRITICAL and no behavioural regression. It found three defects my own record still
+carried plus one contested item:
+
+| Id | Judges | Item | Disposition |
+|---|---|---|---|
+| D1 | both, WARNING | The per-path budget table still held the pre-round-2 counts (`tool-schemas.ts` 112, `error-payload.test.ts` 77), so its rows summed to 415 while its own total row said 420 | **Fixed here** — rows corrected to 114 and 80, and the table now sums to 420 |
+| D2 | both, WARNING | The exception paragraph enumerated `115 + …`, one more than the file's 114, so it implied 421 | **Fixed here** — 114 |
+| D3 | one, SUGGESTION | The Status field still named round 1's tip as "corrected range" | **Fixed here** — Status names both tips |
+| D4 | **contradiction** | `test/shared/error-payload.test.ts:60` drives the client-taxonomy code `UNBOUND_PROJECT` through `toolErrorPayload`. Judge A called it introduced (the C4 fix left it); judge B called it pre-existing (present since the slice's first commit, `f3b3383`, and untouched by both rounds). Its asserted `retryable: false` happens to equal design §10's value for that code, so nothing behaves wrongly — the defect is the pattern a future reader copies | **Escalated to the Director.** The round budget is exhausted (two fix rounds, two re-judgments) and the judges disagree on causality, so the skill's rule is an explicit human decision rather than a third round |
+
+**Terminal verdict.** Three audit passes, two bounded fix rounds, two scoped re-judgments.
+**0 CRITICAL** and **no confirmed severe finding** in any round; `scoped_rejudgment: approved` on the
+reviewed range. The D1–D3 record fixes were applied after this re-judgment (they are SDD bookkeeping,
+excluded from the review load, and leaving a self-contradicting record is itself a defect class this
+repository has recorded twice) — disclosed here rather than presented as re-audited.
+
+**`JUDGMENT: APPROVED`** for the reviewed range `c971e25..53d5aad`, with three items carried to the
+Director: S1 (pre-existing `constants.ts` pin), A4 (design §12's stale AS-IS rows over a SEAM module),
+and D4 (the contested-causality test pattern).
 
 ## Carried forward to PR-07b (re-verified here, as the handoff asked)
 
@@ -1414,7 +1429,7 @@ report rather than a change; S1 is queued. Commits `aedd5d9`, `05ba773`.
 | B4 | The case serializes both payloads through `errorResult` and compares the round trip | The case can now fail |
 
 **Disclosed PR-scoped exception: 20 lines over the 400-line policy.** The slice measures **420**
-changed lines (`115 + 66 + 146 + 80 + 12` in `src`/`test`, plus the 2-line THREAT-MODEL cell). It was
+changed lines (`114 + 66 + 146 + 80 + 12` in `src`/`test`, plus the 2-line THREAT-MODEL cell). It was
 inside the policy at **398** before the audit; round 1 cost **+17** (415) and round 2, which fixed the
 defects round 1 itself created, cost **+5** (420). The Director authorized the correction round with a
 disclosed PR-scoped exception — the same instrument as PR-06b's 26-line one, distinct from DN-06's
