@@ -336,8 +336,9 @@ transaction open, but SQLite's auto-rollback classes (`SQLITE_FULL`, `SQLITE_IOE
 themselves (measured: errcode 13 leaves `isTransaction` false), which is why the catch rolls back only a
 transaction that is still open; and the nested refusal is checked *before* `BEGIN` runs, because SQLite's
 own refusal would otherwise reach the outer call's `ROLLBACK` and roll back the batch it never opened.
-The suite pins both, and it pins the synchronous-callback boundary too — a thenable is refused before
-`COMMIT`, so an `async` caller gets an error instead of a partial commit.
+The suite pins both, and it pins the synchronous-callback boundary too: an `async` callback is refused
+before it runs, so such a caller gets an error instead of a partial commit (round 1 refused it only after
+calling it, and a tail after an `await` then autocommitted — the regression round 2 corrected).
 
 *PT-10's cell.* PR-10 fills the half it pins — the rollback boundary and the
 `UNIQUE (bot_id, update_id)` dedup — and names `ledger/inbox` (PR-12) as the scenario's owner per
@@ -357,9 +358,10 @@ slice's own that were false (the §12 premise above; the async boundary declared
 violate; the over-general spike sentence above; and a promise of a control the second text-level check did
 not have) and five pins that were missing (`AUTOINCREMENT`'s monotonicity across the retention delete, the
 per-table `NOT NULL` inventory, the DDL's refusal of a second application, SQLite's auto-rollback class,
-and the thenable refusal). The figures above are the pre-correction measurement; at the corrected tip the
-slice measures **1,140 authored lines, 740 over** (`src test`, 0 deleted), with **21** focused tests. The
-round-1 record and the re-measurement are in `apply-progress.md` §PR-10.
+and the thenable refusal). The figures above are the pre-correction measurement; at the tip that ships the
+slice measures **1,285 authored lines, 885 over** (`src test`, 0 deleted), with **24** focused tests —
+1,140 / 740 after round 1, 1,285 / 885 after round 2's bounded fix. The round-1 and round-2 records and
+every re-measurement are in `apply-progress.md` §PR-10.
 
 #### PR-11 — ledger open sequence + migrations (D-21)
 Branch `f1/11-ledger-open-migrations` → `main`. Depends: PR-10. Size: ≈350 lines, no exception.

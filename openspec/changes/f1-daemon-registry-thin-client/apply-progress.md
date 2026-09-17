@@ -2895,22 +2895,23 @@ delivery — commit, push, PR and merge stay under ordinary repository policy.
 
 ## Scope and budget (measured)
 
-| File | Authored lines (re-measured after round 1) |
+| File | Authored lines (re-measured after round 2) |
 |---|---|
 | `src/ledger/schema.ts` | 117 |
-| `src/ledger/transaction.ts` | 110 |
+| `src/ledger/transaction.ts` | 150 |
 | `src/ledger/tsconfig.json` (build wiring, not named in the block's Scope line) | 14 |
 | `test/ledger/schema.test.ts` | 625 |
-| `test/ledger/transaction.test.ts` | 274 |
-| **Total, `git diff --numstat -- src test`** | **1,140 added, 0 deleted** |
+| `test/ledger/transaction.test.ts` | 379 |
+| **Total, `git diff --numstat -- src test`** | **1,285 added, 0 deleted** |
 
 Outside the budget rule's own unit (`src test`): `tsconfig.json` (+1/−1, the root `references` entry) and
 `docs/02-architecture/THREAT-MODEL.md` (+1/−1, PT-10's cell). The block estimated ≈400, so the slice
-carries a **disclosed PR-10-scoped size exception, 740 over**, granted by the Director with the commit
-authorization and re-confirmed for the round-1 batch. The pre-correction measurement was 885 / 485 over;
-round 1's own delta is **+284 / −29** in `src test`, and it moved the figure twice — to 1,132 / 732 with the
-first version of the second-application pin, and to 1,140 / 740 once `M17` showed that pin could only see
-the first statement and it was strengthened. Both movements are measured, not derived. Grounds: the DDL
+carries a **disclosed PR-10-scoped size exception, 885 over**, granted by the Director with the commit
+authorization and re-confirmed for the round-1 batch. The movement is recorded rather than smoothed —
+885 / 485 before any correction, **1,140 / 740** after round 1's batch (`+284 / −29`), **1,285 / 885** after
+round 2's fix (`+169 / −24`) — and the growth past the authorized batch is the cost of correcting a defect
+that batch introduced, disclosed rather than absorbed. Every figure is measured, never derived. Grounds: the
+DDL
 and its twin pin one property per constraint rather than a sample of them — the object inventory, `STRICT`
 plus the control that proves it bites, the `NOT NULL` inventory, the completeness *and* strictness of every
 closed vocabulary, both unique keys PT-10's replay needs, `seq`'s monotonicity, both cascades, both
@@ -2939,7 +2940,7 @@ comparison can say "different".
 |---|---|---|
 | 10.1 | `npm run build` → `test/ledger/transaction.test.ts(8,61): error TS2307: Cannot find module '../../src/ledger/transaction.js'` (exit 2) | `test/ledger/transaction.test.ts` **5/5** |
 | 10.3 | `npm run build` → `test/ledger/schema.test.ts(8,35): error TS2307: Cannot find module '../../src/ledger/schema.js'` (exit 2) | `test/ledger/schema.test.ts` **11/11** |
-| 10.5 | — | focused **16/16**; full suite **344/344** (328 → 344); `test:static` **8/8**. Re-measured after round 1: focused **21/21**, full **349/349**, `test:static` **8/8** |
+| 10.5 | — | focused **16/16**; full suite **344/344** (328 → 344); `test:static` **8/8**. Re-measured after round 1: focused **21/21**, full **349/349**, `test:static` **8/8**. Re-measured again after round 2: focused **24/24**, full **352/352**, `test:static` **8/8** |
 
 Two test-side bugs of the slice's own were found by the first GREEN run and fixed before this record was
 written, both in `schema.test.ts`: the `thread_history` vocabulary rows had no parent `threads` row
@@ -3007,7 +3008,9 @@ matched; both were rebuilt with a guard that rejects a substitution which change
 silent-no-op class as the invalid AUTOINCREMENT probe in the round-1 record above.
 
 Final state after the sweep: sources restored byte-identically (sha256 control), focused **21/21**, full
-**349/349**, `test:static` **8/8**.
+**349/349**, `test:static` **8/8**. Round 2 then added `M18`/`M19` and re-ran the whole matrix: **19 mutants,
+19 killed, 0 survived, 0 skipped**, focused **24/24**, full **352/352**, `test:static` **8/8** — see the
+round-2 section below.
 
 ## Reportable items (reported, not silently resolved)
 
@@ -3087,7 +3090,63 @@ redelivered update below a client's cursor would break; (9) the DDL's refusal of
 DDL — SQLite accepts a `rejected` row carrying a body — so `schema.ts`'s module comment now says so, and
 that coupling stays with `ledger/inbox.ts` (PR-12).
 
+### Scoped re-judgment over the fix delta — and the regression it found
+
+Both judges re-judged `0c9d239..aa65b25`, resolving the eleven folded IDs and nothing else. **Ten resolved
+`verified` on judge A and six on judge B; `JD-B-007` came back `regression` from both, independently** —
+the only row neither judge would accept, and the row whose fix this slice had written itself.
+
+Substantiated by both judges after the resolution (the graph-v1 resolution shape carries no claim field, and
+a first attempt to obtain the substance went to the wrong sessions — the two discovery judges correctly
+refused to invent substance for an ID they had not produced):
+
+> the refusal only rolls back the pre-`await` part: statements the callback runs after an `await` still
+> execute on the same live connection with `isTransaction === false` and autocommit, so the misuse yields an
+> error **and** a silently half-applied batch — the worst case being only the later statements persisted,
+> which is the batch-coherence loss PT-10's replay/offset design exists to prevent.
+
+Reproduced by the parent before believing it (a scratch probe outside the frozen tree, against the module
+built from `aa65b25`): `withTransaction(db, async () => { insert(1); await …; insert(2); })` surfaced
+`ASYNC_CALLBACK_MESSAGE` **and** left row 2 committed, row 1 rolled back. The parent's own probe found a
+second defect in the same fix: the abandoned promise was never settled, so a *rejecting* async callback
+produced an unhandled rejection after the misuse had been reported — which Node's default policy turns into
+a process crash.
+
+### Round 2 — the final bounded fix round
+
+The refusal moved to where it can actually prevent the work. `withTransaction` now checks the callback's
+own shape **before `BEGIN`** (`isAsyncFunction`, read structurally):
+
+- an `async` callback is refused **before it runs**, so nothing it would have written exists at all —
+  including a tail after an `await`, which no later rollback could reach. This is the shape a caller
+  actually writes; a bound or proxied `async` function whose constructor identity does not survive falls
+  through to the value check, and the module doc says so rather than claiming otherwise.
+- a thenable *returned* by a callback that is not itself `async` is still refused before `COMMIT` and rolled
+  back, and the abandoned promise is now **settled** on the way out. What that promise's continuation does
+  afterwards is the caller's code on the caller's connection and outside this module's reach — stated as a
+  limitation, not as a guarantee.
+- `isThenable` now covers **functions** as well as objects, because Promises/A+ §1.1 defines a thenable as
+  "an object or function that defines a then method" and both are assimilated by `await` and by
+  `Promise.resolve`. The narrower object-only check was itself a claim the docstring could not support (it
+  said the check caught all of them), found by the discovery judge whose session was asked to substantiate
+  the regression.
+
+Three tests pin the corrected behaviour, and one of them is written to fail against the old shape: the async
+tail test drains the macrotask queue before asserting, so a tail that did run would have landed, and it
+asserts the callback never *started*.
+
+**Sweep after round 2: 19 mutants, 19 killed, 0 survived, 0 skipped** — the seventeen re-run from scratch
+(two of their anchors went stale when round 2 rewrote the lines they matched, and both were rebuilt before
+the sweep was reported, so no gap was left silent) plus `M18` (the pre-flight refusal removed) and `M19`
+(the abandoned promise left unsettled). Each died on the test that owns the property. Final state at the
+round-2 tip: sources restored byte-identically, focused **24/24**, full **352/352**, `test:static` **8/8**.
+
+**Budget after round 2: 1,285 authored lines, 885 over** the 400-line budget — 117 `schema.ts`, 150
+`transaction.ts`, 14 its `tsconfig.json`, 625 `schema.test.ts`, 379 `transaction.test.ts`. The movement is
+recorded rather than smoothed: 885 / 485 before any correction, 1,140 / 740 after round 1's batch, 1,285 /
+885 here, with round 2's own delta at **+169 / −24**. The growth beyond the authorized batch is the cost of
+correcting a defect that batch introduced, and it is disclosed to the Director rather than absorbed.
+
 ## Next
 
-- The terminal scoped re-judgment over the round-1 fix delta, then the ordinary native review, then
-  push, PR and the CI matrix.
+- The ordinary native review, then push, PR and the CI matrix.
