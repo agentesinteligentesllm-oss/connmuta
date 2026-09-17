@@ -3,9 +3,11 @@
  * v1 body sha256: 68e241b22383bf6a9ec4a9d112b1960fe4c9c6d00fe2c6f03644f47a978be878   (SHA-256 of the v1 body at bf8f365, header and import block excluded)
  * Changes: (1) `wrapUntrusted` takes a required `origin: FenceOrigin` and the opening tag carries its
  * three D-15 origin attributes `project_id`/`agent_id`/`user_id`, so the single fencing site labels
- * who a body came from; (2) every attribute value is escaped, so it can neither close the opening tag
- * early nor inject a second attribute (PT-14); (3) the label's leading JSDoc restored verbatim from
- * `v1:src/tools/fetch.ts:35-42`, the comment block immediately above the vendored range.
+ * who a body came from; (2) every attribute value has `&`, `<`, `>` and `"` escaped, so it can neither
+ * close the opening tag early nor inject a second attribute (PT-14); (3) the label's leading JSDoc
+ * restored verbatim from `v1:src/tools/fetch.ts:35-42`, the comment block immediately above the
+ * vendored range; (4) `escapeAttribute` added, and `wrapUntrusted`'s JSDoc gains a D-15 paragraph
+ * while its invariant sentence is restated for an attributed opening tag.
  */
 
 /**
@@ -26,14 +28,20 @@ export interface FenceOrigin {
 }
 
 /**
- * Escapes one opening-tag attribute value: `&` first, then `<`, then `"`. The origin label is what
+ * Escapes one opening-tag attribute value: `&` first, then `<`, `>` and `"`. The origin label is what
  * tells a reading agent WHO a fenced body came from (PT-14), so it must be as unforgeable as the
  * fence itself: a value carrying `"` could otherwise inject a second attribute — a forged `user_id`
- * — and one carrying `<` could close the opening tag early, dressing the rest of the body up as
- * fence structure. `&` goes first, or the ampersands the other two introduce get escaped twice.
+ * — and one carrying `>` could close the opening tag early, dressing the rest of the body up as
+ * fence structure. **`>` is the character that ENDS a tag and `<` only ever opens one**, so escaping
+ * `<` alone would leave the label readable but closable. `&` goes first, or the ampersands the other
+ * three introduce get escaped twice.
  */
 function escapeAttribute(value: string | number): string {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /**
