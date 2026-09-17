@@ -1834,3 +1834,152 @@ corrected in this commit, one tested and rejected: it held that `apply.tribunal_
 sentence, and its unquoted form is rejected by a strict parser, so the quoting was required.
 **Judgment Day was deliberately not run**: there is no behavioural surface for a two-lens adversarial
 pass to attack, and inventing one would misrepresent what that instrument is for.
+
+---
+
+# PR-08a — `shared/token-shape.ts` + `shared/project-file.ts` (re-sliced at apply time from PR-08)
+
+**Slice status:** implemented, verified at the code tip `888c1ec`, re-sliced at apply time from PR-08
+into PR-08a/PR-08b. Awaiting its Judgment Day audit. The tribunal is **not** available (Arena bridge
+down), so this slice is audited by the substitute path and **DN-05 is unsatisfied** — the same
+disclosure PR-06, PR-07a and PR-07b carry.
+
+| Field | Value |
+|---|---|
+| Branch | `f1/08a-shared-validators` → `main`, from `main` @ `014f661` |
+| Code commits | `984c2f3` (`token-shape.ts` + its twin), `888c1ec` (`project-file.ts` + its twin) |
+| Requirements | `project-binding › Committed project file schema` (PT-06); `project-binding › Token-shape validator` (PT-05, D-29) |
+| Provenance | none — PR-08a vendors **no** v1 range; `test/fixtures/v1-provenance.json` stays at 11 entries |
+| tsconfig | untouched: both modules live in `src/shared/`, already referenced by the root project |
+
+## Why PR-08 was re-sliced (measured, not estimated)
+
+The tasks phase planned PR-08 at ≈370 authored lines against a 400-line budget. The realised slice is
+**1,400 authored lines** (`git diff --numstat` over the ten files: 983 code, 251 doc-comment, 166
+blank), i.e. **3.5× the budget and 2.3× the largest PR this repository has accepted** (PR-05, 609).
+That is not a rounding error, so it was escalated to the Director before any commit, with the four
+options (one PR with a 1,400-line exception / two stacked PRs / four file-boundary PRs / trim tests and
+comments). The Director chose the file-and-dependency boundary: **PR-08a** (the two shared validators)
+and **PR-08b** (roster hash + the CLI), each with its own disclosed, PR-scoped exception. Precedent:
+the same in-place re-slice as PR-01 → PR-01a/PR-01b and PR-06 → PR-06a/PR-06b. The split is not
+cosmetic: `cli/validate.ts` imports `project-file.ts`, so PR-08b's candidate stacks on PR-08a's and the
+review unit for each half is roughly half.
+
+Root cause, stated plainly: the tasks-phase estimate for this slice was **3.8× under** (≈370 vs 1,400),
+and the two halves are over budget *in the same way* — the test files carry one assertion per rule the
+gated documents state (DATA-MODEL §1's field table, the four content rules, the unknown-key path). The
+budget rule forbids trimming review context to fit, which is why an exception is declared rather than a
+smaller slice claimed.
+
+## Scope and budget (PR-08a)
+
+| Path | Authored lines |
+|---|---|
+| `src/shared/token-shape.ts` | 82 |
+| `test/shared/token-shape.test.ts` | 114 |
+| `src/shared/project-file.ts` | 247 |
+| `test/shared/project-file.test.ts` | 305 |
+| **budget total** | **748 / 400** — **348-line PR-08a-scoped exception** |
+
+Grounds for the exception, in the shape PR-06b's was granted: these are two modules that share one
+contract (`project-file.ts` applies `token-shape.ts` to the parsed document), so splitting them at the
+file boundary would put one module's consumer in a different PR than its provider for no review gain;
+and the test files carry one assertion per documented rule — uniqueness, `referee` membership, the four
+content rules, the unknown-key path per level, and the never-echo property — every one of which the
+mutation round below shows can fail. Trimming them is exactly what the budget rule forbids.
+The exception is **PR-08a-scoped** and distinct from DN-06 (which stays AS-IS-only and is not amended).
+
+## TDD cycle evidence
+
+Red before green, per module, both twins shipped in the same commit as the module they test.
+
+| Step | Command | Observed RED |
+|---|---|---|
+| 8.1 RED | `node node_modules/typescript/bin/tsc -b` | `TS2307: Cannot find module '../../src/shared/project-file.js'` and `…/token-shape.js` — the legitimate brand-new-module RED per `strict-tdd.md` |
+| 8.1 RED (first green attempt) | `node --test "dist/test/shared/project-file.test.js" "dist/test/shared/token-shape.test.js"` | 38/44 pass, **6 fail** — see the defect below |
+| 8.2 GREEN | same two commands | **44/44** pass |
+
+**The RED caught a real defect, which is the point of the order.** `parseProjectFile` returned
+`{ ok: true, file }` whenever the schema passed, discarding the content findings collected by the walk:
+a file with a valid shape and a token-shaped value in a schema-valid field was **accepted**. The six
+failures were the content-rule cases. Fixed by refusing when either the schema fails or content problems
+exist, and pinned by mutant M2 below. Two smaller corrections came from the same round: an assertion of
+mine expected the literal spelling `Authorization` where the message names the rule token
+`authorization_literal`, and one content case seeded `project_id` — which also violates the slug pattern,
+so the structural problem correctly came first; the case now seeds a schema-valid field.
+
+**One test-side defect the security gates caught, recorded because it is a reusable trap:** the first
+draft of `token-shape.test.ts` used the *synthetic deny-list markers* from
+`test/security/repo-scan.test.ts` as a fake operator marker. That test excludes only itself from the
+repository scan, so quoting its markers in any other file fails PT-22. Replaced with a marker invented
+for this test; `npm run test:static` then passed. The token fixtures keep the house 7-digit bot-id run
+so they exercise the shared shape while staying outside PT-22's 8–10 digit scan (documented in both
+test files).
+
+## Mutant matrix — each built first, each restored byte-identically
+
+Seven mutants were built during the slice against the pre-split working tree (all seven killed). Four of
+them attack PR-08a's files, and those four were **re-run bound to the actual candidate** `888c1ec` in the
+clean verification worktree, so this PR's evidence is not inherited from a tree that no longer exists:
+
+| # | Mutant | Test that killed it |
+|---|---|---|
+| M1 | Drive-prefix rule asked *after* the path-separator rule, so a Windows path is reported as the weaker rule | `test/shared/project-file.test.ts` — “reported as a drive prefix, not a separator” |
+| M2 | Content problems dropped on the success path — **the exact defect the RED caught** | `test/shared/project-file.test.ts` — the four content cases |
+| M3 | `z.strictObject` replaced by a stripping `z.object` | `test/shared/project-file.test.ts` — “unknown key is rejected, never stripped” |
+| M4 | `assertNoTokenShape` stops consulting the shared secret table | `test/shared/token-shape.test.ts` — the PEM, `.env`-style and configured-marker cases |
+
+The three remaining mutants (roster hash including `username`, the CLI echoing the document on a refusal,
+and the CLI running on import) attack PR-08b's files and are recorded there. Every mutant ran on a
+byte-restored copy and the restore was verified by `sha256` before the next one; the round ends with the
+candidate green again.
+
+## Verification from a clean detached worktree
+
+`git worktree add --detach ../telegram_bus_agent-worktrees/verify-08a 888c1ec`, then
+`npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"`, then
+the same worktree re-checked-out at `014f661` (with `rm -rf dist` first, because a stale `dist/`
+silently fakes results) to **measure** the baseline instead of citing it:
+
+| Tree | Tests | `test:static` |
+|---|---|---|
+| `014f661` (`main`, measured) | **175 / 175** | 8 / 8 |
+| `888c1ec` (PR-08a code tip) | **219 / 219** | **8 / 8** |
+
+PR-08a therefore adds **44 tests**: `test/shared/token-shape.test.ts` (14) +
+`test/shared/project-file.test.ts` (30). The 253-test figure recorded for the whole slice belongs to the
+pre-split tree (219 + the 34 tests of PR-08b's three suites), and is not claimed here. The focused command
+task 8.5 names passes on the 08a subset. Worktree removed; `git worktree list` shows only the main tree.
+
+## Reportable contradictions (reported, not resolved — AGENTS.md §2)
+
+1. **`conmuta validate` has no exit code anywhere in the gated documents.** `design.md:126` enumerates
+the other commands' codes 2–7 and reserves 1 for uncaught errors; the command D-29 introduces has none,
+yet the documented pre-commit one-liner has to branch on it. PR-08b resolves it by adding
+`EXIT_VALIDATION_FAILED = 8` to `constants.ts` with its reasoning, disclosed as an apply-time addition
+to design §11's table rather than a silent new literal.
+2. **`design.md:124` lists `TELEGRAM_BOT_TOKEN_RE` under `constants.ts`**, but the exported regex ships
+in `src/shared/secrets.ts:24`; `design.md:444` (the §12 reuse row) is the source of truth. PR-08a imports
+from `secrets.ts` and does **not** rewrite the design table — reported here instead.
+3. **PT-05 and PT-06 carried no file-name cell.** Both rows' second cell held only a scope phrase
+(`installer unit + hook`, `shared unit`), and `THREAT-MODEL.md:7` calls the PT identifiers proposed names
+rather than files, delegating the real names to the F1 spec (`design.md:550`). Task 8.6's “file-name
+cell” therefore means *filling a cell that did not exist*. Done in this slice for PT-06 and for PT-05's
+`token-shape` half; **PR-08b appends PT-05's `cli/validate` half**, so each PR names only the files it
+actually adds. The cell is touched twice on purpose: an over-claimed cell is the defect two judges
+caught in PR-06a.
+4. **`src/cli/tsconfig.json` referenced `../client` and `../daemon`, neither of which has a single `.ts`
+file**, so a `tsc -b` that reached it would fail `TS18003`. Deferring those two references to PR-32 and
+PR-15 is a PR-08b change (with the reason written next to them in the file); recorded here because it is
+a trap PR-08's own scope would have hit on its first build.
+5. **The twin `test/cli/main.ts`'s scope omitted is real**, as HANDOFF §4 predicted: `test/twins.test.ts`
+requires a twin for every non-declaration `.ts` under `src/`, so PR-08b adds
+`test/cli/main.test.ts`. Carried finding, not an invention of this record.
+
+## Next
+
+- Judgment Day over the frozen range (two blind read-only judges, graph-v1 shapes only), a bounded
+correction round, and at most one scoped re-judgment — appended to this record when it runs.
+- Then the ordinary native review for this candidate, and only after that: push, PR-08a, CI, and the
+Director's merge decision. PR-08b is prepared afterwards, on top of the merged `main`.
+
