@@ -80,11 +80,61 @@ const DRIVE_PREFIX_RE = /^[A-Za-z]:/;
  */
 const PATH_SEPARATORS = ["/", "\\"] as const;
 
-const rosterEntrySchema = z.strictObject({
+/**
+ * One roster entry of a project file — the shape `conmuta.json`'s `roster[]` carries.
+ *
+ * Exported because the registry's `bindings[].roster_snapshot` is a **copy** of this array (D-07, the
+ * admission source while no client is connected), and `roster_hash` is computed over both by the same
+ * `shared/roster-hash.ts` rule: two declarations of the entry shape would let the snapshot accept
+ * something the file it was copied from refuses, with no test able to see the divergence.
+ * `test/registry/schema.test.ts` pins the equivalence by running both verdicts over one table.
+ */
+export const rosterEntrySchema = z.strictObject({
 	agent_id: z.string().regex(AGENT_ID_PATTERN),
 	user_id: z.number().int().positive(),
 	username: z.string(),
 });
+
+/**
+ * The roster-level rules DATA-MODEL §1 attaches to the array itself: `agent_id` unique and
+ * `user_id` unique across its entries.
+ *
+ * Exported for the reason {@link rosterEntrySchema} already states, one level up: the registry's
+ * `bindings[].roster_snapshot` is a **copy** of this array (D-07, the admission source while no client
+ * is connected), so a snapshot that admitted two entries sharing one `agent_id` — or one `user_id` —
+ * would accept exactly what the file it was copied from refuses. Sharing only the entry shape cannot
+ * close that gap, because the rules are about the array and not about the entry: a first-match
+ * admission lookup over a snapshot with a duplicated `agent_id` returns a verdict that depends on
+ * entry order. One declaration, run by both documents, is what `test/registry/schema.test.ts` pins.
+ *
+ * The issue path keeps the project file's own naming (`roster[i].agent_id`, `roster[i].user_id`) so
+ * this document's problems keep naming the colliding entry. The registry's problem vocabulary is
+ * value-free by construction and discards every path rather than echoing it, so the same refinement
+ * serves both without making that module name a field.
+ *
+ * The `referee`-membership rule is deliberately **not** here: it is a rule about this document's
+ * `referee` field, not a rule any roster array carries, and no other document has a referee.
+ */
+export function applyRosterUniqueness(roster: readonly ProjectRosterEntry[], ctx: z.RefinementCtx): void {
+	const firstAgentUse = new Map<string, number>();
+	const firstUserUse = new Map<number, number>();
+	roster.forEach((entry, index) => {
+		const agentSeenAt = firstAgentUse.get(entry.agent_id);
+		if (agentSeenAt === undefined) {
+			firstAgentUse.set(entry.agent_id, index);
+		} else {
+			// No value in the message: it is rendered into operator output, and the problem type it
+			// becomes carries the path only.
+			ctx.addIssue({ code: "custom", path: ["roster", index, "agent_id"] });
+		}
+		const userSeenAt = firstUserUse.get(entry.user_id);
+		if (userSeenAt === undefined) {
+			firstUserUse.set(entry.user_id, index);
+		} else {
+			ctx.addIssue({ code: "custom", path: ["roster", index, "user_id"] });
+		}
+	});
+}
 
 const projectFileSchema = z
 	.strictObject({
@@ -95,25 +145,10 @@ const projectFileSchema = z
 		referee: z.string().optional(),
 	})
 	.superRefine((file, ctx) => {
-		const firstAgentUse = new Map<string, number>();
-		const firstUserUse = new Map<number, number>();
-		file.roster.forEach((entry, index) => {
-			const agentSeenAt = firstAgentUse.get(entry.agent_id);
-			if (agentSeenAt === undefined) {
-				firstAgentUse.set(entry.agent_id, index);
-			} else {
-				// No value in the message: it is rendered into operator output, and the problem type it
-				// becomes carries the path only.
-				ctx.addIssue({ code: "custom", path: ["roster", index, "agent_id"] });
-			}
-			const userSeenAt = firstUserUse.get(entry.user_id);
-			if (userSeenAt === undefined) {
-				firstUserUse.set(entry.user_id, index);
-			} else {
-				ctx.addIssue({ code: "custom", path: ["roster", index, "user_id"] });
-			}
-		});
-		if (file.referee !== undefined && !firstAgentUse.has(file.referee)) {
+		applyRosterUniqueness(file.roster, ctx);
+		// Membership, not uniqueness: the refinement above already refuses a repeated `agent_id`, so
+		// asking whether the referee appears at all is the whole rule.
+		if (file.referee !== undefined && !file.roster.some((entry) => entry.agent_id === file.referee)) {
 			ctx.addIssue({ code: "custom", path: ["referee"] });
 		}
 	});

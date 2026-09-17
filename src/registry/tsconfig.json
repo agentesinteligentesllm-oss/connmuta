@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../dist",
+    "tsBuildInfoFile": "../../dist/.tsbuildinfo/registry.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  // `../shared` is the only reference this unit needs: the registry validates against the shared
+  // named constants (`REGISTRY_VERSION`, `PROJECT_ID_PATTERN`), the wire agent-id regex and the
+  // roster-hash prefix. `../daemon` is deliberately absent — it is the consumer, not a dependency,
+  // and a reference to a unit with no `.ts` file yet is TS18003 (HANDOFF §4 "empty composite unit").
+  "references": [{ "path": "../shared" }]
+}

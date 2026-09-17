@@ -2341,3 +2341,347 @@ independent verifier always runs"*. So both halves ran:
 
 - Push, PR-08b, CI, and the Director's merge decision.
 
+
+---
+
+# PR-09a — machine registry document: `src/registry/{schema,invariants}.ts` (+ build wiring)
+
+Slice 11 of 45 (re-sliced at apply time from PR-09; see `tasks.md`). Delivered under the settled route:
+ODD with every substantive SDD contract preserved, then Judgment Day as the audit substitute. The Arena
+bridge is down, so nothing was debated and **DN-05 is unsatisfied for PR-09a** as for the rest of F1.
+Branch `f1/09-registry` from `main` @ `e177c58` (the block's original branch; PR-09b takes its own).
+
+| Field | Value |
+|---|---|
+| Code commit | `c9b4ee1` (`schema.ts`, `invariants.ts`, the unit wiring, the three test files and the shared `rosterEntrySchema` export) |
+| Correction commit | `d5d73a0` (the `M4` mutant's fix in `test/registry/schema.test.ts`; see the mutant matrix below) |
+| Requirements | `project-binding › Machine registry schema and invariants` (PT-18; PT-25's half lands in PR-09b) |
+| Provenance | none — no v1 range is vendored; the fixture stays at **11** entries, and all three new modules carry no `Provenance:` header |
+| Budget | **1,266 authored lines / 400** — an **866-line PR-09a-scoped exception**. It was 663 when the Director granted it (1,063 authored, measured before Judgment Day); round 1's mandated corrections, its informational folds, the correction of the two defects that correction introduced, and the two lines the independent verifier's `F10` added to the referential-integrity pin took it to 1,266 (1,256 + 10). Re-measured in the same pass as the edits and again at the tip that ships, which is the lesson HANDOFF §2.4 draws from PR-08a/PR-08b — and the verifier's `F4` caught this table carrying a pair of rows whose two errors cancelled while the total stayed right |
+
+## Scope and budget (measured)
+
+| Path | Lines |
+|---|---|
+| `src/registry/schema.ts` | 309 (`262` before round 1: the snapshot's roster-level rules + `collapseShapeProblems`) |
+| `src/registry/invariants.ts` | 133 |
+| `src/registry/tsconfig.json` (new compile unit, counted in `src`) | 14 |
+| `test/registry/fixtures.ts` | 88 (`100` at the code tip; round 1 re-pinned `VALID_ROSTER_HASH`, made `activeBinding` derive the field, and removed `addSecondBinding` — 12 lines fewer, not more) |
+| `test/registry/schema.test.ts` | 390 (`280` at the code tip, `277` after `M4`'s first fix; round 1 added the four snapshot cases and the informational pins, and `010ed85` added the two that pin its own correction) |
+| `test/registry/invariants.test.ts` | 277 (`267` before the verifier's `F10` widened the referential-integrity pin from one dimension to three) |
+| `src/shared/project-file.ts` | +55 / −20 (the `rosterEntrySchema` export, then round 1's extracted `applyRosterUniqueness`) |
+| **budget total** (`git diff --numstat e177c58..2279c15 -- src test`, loader half excluded) | **1,266 / 20** — 866-line exception |
+| `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** |
+
+**Why the shared export, and why it is not drift.** `bindings[].roster_snapshot` is a *copy* of
+`conmuta.json`'s roster (D-07 makes it the admission source while no client is connected) and
+`roster_hash` is computed over either by the same `shared/roster-hash.ts` rule. A second declaration of
+the entry shape in `registry/schema.ts` could accept an entry the project file refuses, with no test able
+to see the divergence, so the schema object is now exported and reused; `schema.test.ts` pins the
+equivalence by running both verdicts over one table of six entries. This is the only merged file the slice
+touches, it changes no behaviour (`rosterEntrySchema` was already the schema `parseProjectFile` used), and
+no hash-pinned file is involved.
+
+## TDD cycle evidence
+
+| Step | Command | Observed |
+|---|---|---|
+| 9.1/9.2 RED | `node node_modules/typescript/bin/tsc -b` | `TS2305` for every API the twins use, over modules that exist and export nothing (`parseRegistryDocument`, `Registry`, `REGISTRY_INVARIANTS`, `REGISTRY_INVARIANT_TAG`, `applyRegistryInvariants`, `RegistryInvariant`, `RegistryIssueSink`, `registryInvariantFromIssue`, `rosterEntrySchema`), plus the consequent `TS7006`/`TS18046`/`TS2578` inside the tests |
+| 9.2 GREEN (local tree) | `node node_modules/typescript/bin/tsc -b`, then the two suites | clean build; **30/30** in the two suites (`schema` 14, `invariants` 16), inside a local full run of 45/45 that also carried PR-09b's three loader suites — which are **not** part of this commit |
+| full suite (clean worktree at `d5d73a0`) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **298/298** (PR-08's 268 + `schema` 14 + `invariants` 16); at the final tip `010ed85` the same command reports **304/304**, because round 1 added six cases |
+| focused, task 9.5's half | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js"` | **30/30** at `d5d73a0`, **36/36** at `010ed85` |
+| `test:static` (clean worktree at `d5d73a0`) | `node --test "dist/test/security/*.test.js"` | **8/8** — pack (4), provenance (2) and repo-scan (2), with the new files staged (`git add -N` first, because those scanners read `git ls-files`). The **twin walk is not in this glob**: `test/twins.test.ts` compiles to `dist/test/twins.test.js`, so the twin rule for `src/registry/*` is proved by the full-suite row above, not here (this attribution was wrong in the first draft; both judges reached it independently as `JD-A-006`/`JD-B-006`) |
+
+**A figure in the first draft of this table was computed, not measured, and is corrected here.** It said
+`29/29` and `297/297` — `268 + 29`, written before the clean-worktree run existed. The measured numbers
+are **30** and **298**. The row now names where each was run, because a computed figure presented as a
+measured one is exactly the defect class this repository's records keep finding, and the only reason it
+was caught is that a clean worktree was built afterwards rather than trusted. It is recorded rather than
+silently edited.
+
+Four GREEN-cycle failures were real and were fixed as test defects, not as implementation conveniences:
+`R3` fires together with `min(1)` on an empty `roster_snapshot` (both true, both pinned); a strict key
+plus a discriminator can both complain about one `token_ref` field, so the table asserts "only shape
+problems, at least one" instead of an exact count; the `agent_id` case mutated alone refused the document
+for R3 rather than for the wire regex, so it now replaces agent, bot and snapshot entry in lockstep; and
+the drift table's entries had to be paired with a binding whose identity was derived from them — which the
+mutant sweep then proved was still the **wrong** construction (see `M4` below). Each is recorded because
+the *implementation* was right and the *expectation* was wrong.
+
+## Verification from a clean detached worktree
+
+`git worktree add --detach ../telegram_bus_agent-worktrees/verify-09a <tip>` from the repository root — a
+tree that contains only what this slice committed, which is the point: the local tree still holds PR-09b's
+uncommitted loader files, and a run there would report figures this half cannot claim.
+
+| Tree | Command | Result |
+|---|---|---|
+| `d5d73a0` (the tip the slice reached before Judgment Day; the docs commits after it change no code until `3508243`) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **298/298** |
+| `d5d73a0` | `node --test "dist/test/security/*.test.js"` | **8/8** |
+| `d5d73a0` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js"` | **30/30** |
+| `2279c15` (the frozen tip, and the tip the audit's verdict covers) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **304/304** |
+| `2279c15` | `node --test "dist/test/security/*.test.js"` | **8/8** |
+| `2279c15` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/shared/project-file.test.js"` | **75/75** |
+
+The worktree is removed as soon as the run finishes, and an empty `telegram_bus_agent-worktrees`
+directory is the expected end state (HANDOFF §8). One harness defect was found and fixed while doing this:
+the first mutant sweep invoked `npm run build` through `spawnSync` without a shell, which on Windows
+cannot execute `npm` at all, so all five mutants reported `build=FAILED` and looked killed when nothing had
+run. The sweep now calls `node node_modules/typescript/bin/tsc -b` directly, which is also what the handoff
+prescribes; the first sweep's output was discarded rather than reported.
+
+## Mutant matrix — each built first on a cleaned `dist/`, each restored byte-identically
+
+Run in the clean detached worktree (`../telegram_bus_agent-worktrees/verify-09a`, at `d5d73a0`), each
+mutant applied to the source, `dist/` removed, `tsc -b` rebuilt, the focused suite run, then
+`git checkout --` restore verified by `sha256sum` before and after (all five `restored=true`, and the
+worktree's `git status` clean apart from the harness script).
+
+| # | Mutant | Result | Test that killed it |
+|---|---|---|---|
+| `M1` | R1/R2 count **every** binding, not only the active ones (the `status !== "active"` guard dropped) | killed, 28/30 | *R1 counts active bindings only* + *R2 counts active bindings only, like R1* |
+| `M2` | R3 checks only that the agent is **present**, dropping `entry.user_id !== binding.bot_id` | killed, 29/30 | *R3: a binding whose agent is absent from its snapshot, or carries another user_id, is refused* |
+| `M3` | the version rule refuses **every** version but this build's (`!==` instead of `>`), so a lower version takes the upgrade path | killed, 29/30 | *a version that is not a future integer falls through to the schema, never to the upgrade path* |
+| `M4` | the snapshot entry is a **second, looser declaration** (`z.number()` for `user_id`) instead of the shared `rosterEntrySchema` | **survived the first sweep**, killed after the fix below, 29/30 | *the snapshot entry is the project file's roster entry, not a second declaration* |
+| `M5` | R2 checks `group_id` only, dropping the `project_id` dimension | killed, 29/30 | *R2: two active bindings sharing a group_id, or sharing a project_id, are refused* |
+
+**`M4` survived, and that is the sweep earning its cost.** The drift pin derived the binding's `agent_id`
+and `bot_id` from the entry under test, so an entry the project file refuses — a negative or fractional
+`user_id` — was refused a second time by the binding's own `bot_id` rule; the assertion
+"registry refuses === project file refuses" held as `false === false`, and a second, looser declaration of
+the snapshot shape changed no verdict. The pin now leads the snapshot with a known-good entry for the
+binding's own agent, so R3 is satisfied whatever the entry under test says and the entry's shape is the
+only thing that can move the verdict. Fixed in `d5d73a0` (its own commit, with the reasoning); `M4` dies on
+the re-run, and the four others were re-run on that same corrected tree and still die.
+
+The loader's never-rename/quarantine boundary — the mutant HANDOFF §5.5 asks for — belongs to **PR-09b**,
+where the loader lands: PR-09a has no code that touches the filesystem.
+
+### The round-1 sweep (`M6`, `M7`), and why the first matrix was not enough
+
+The independent verifier (`F5`) observed that the "`M1`–`M7` all killed" claim existed only in a commit
+message: `M6` and `M7` were defined nowhere in the record. They are defined here, with the same protocol
+as the table above — each applied to the source, `dist/` removed, `tsc -b` rebuilt, the focused suite run,
+then restored and verified by `sha256`:
+
+| # | Mutant | Result | Test that killed it |
+|---|---|---|---|
+| `M6` | `applyRosterUniqueness(binding.roster_snapshot, ctx)` replaced by `void ctx;` — the CRITICAL returns | killed, 3 failures | the three new snapshot cases (two duplicates refused, and the order-independence pin) |
+| `M7` | `collapseShapeProblems` call removed, so every zod issue becomes a row | killed, 1 failure | *a malformed document reports one shape problem, not one per bad member (JD-A-005)* |
+
+On the corrected tree at `010ed85` the whole set is killed: `M1`–`M5` as tabulated above (re-run there),
+plus `M6` and `M7`. The verifier reproduced `M4`, `M6` and `M7` kills independently in its own scratch copy,
+including `M6`'s "exactly three tests" count.
+
+## Discovered while writing PR-09b's tests, and resolved there
+
+The R5 pre-parse raw-text scan and the required `roster_hash` collide: `sha256:` ends in a digit run, so
+the shared `TELEGRAM_BOT_TOKEN_RE` (`\d+:[A-Za-z0-9_-]{35}`, an **unbounded** digit run) matches every
+canonical hash. PR-09b masks that one value before scanning — sound, because the mask is `sha256:` plus 64
+hexadecimal characters and a token's own colon is outside that class — and files the root cause as backlog
+**B-27**. Recorded here because it was found by this slice and because it is the kind of cross-module
+contradiction a raw-text scanner discovers only when the second module exists.
+
+## Reportable items (reported, not silently resolved)
+
+1. **A problem does not name the offending field.** `ProjectFileProblem` names a field path; the registry's
+   vocabulary deliberately has no free-text member at all, so `schema_invalid` names no field. The reason
+   is the PR-08a CRITICAL: a document-derived *key* echoed into a problem field is document text too, and
+   this vocabulary is the one that reaches a log line and a condition. The narrowing is disclosed here;
+   F2's `doctor` can name the field from the schema path without ever round-tripping the value.
+2. **No R1–R6 row demands referential integrity.** `bindings[].bot_id`/`group_id`/`project_id` name
+   entries of `bots[]`/`groups[]`/`projects[]` (DATA-MODEL §2.4), but no invariant row requires the entry
+   to exist, so a dangling reference still loads. The boundary is pinned by a test rather than left
+   implicit, and filed as backlog **B-28** for a `doctor` check — inventing a rule the gate does not carry
+   would make a hand-edited file invalid for a reason the design never stated.
+3. **The R5 rule that fired is not named** (the loader's half, PR-09b): naming it would mean parsing
+   `assertNoTokenShape`'s message prose or writing a second copy of the shape order it applies — two
+   implementations of one rule. The problem stays value-free; naming the rule is part of **B-27**'s
+   follow-up.
+4. **Nothing at load time ties `roster_hash` to its own snapshot.** Both judges reached this independently
+   in round 1 (`JD-A-001`, `JD-B-002`), and the slice's first draft made it visible by accident: the
+   fixture pinned the *two-entry* known answer into a document whose snapshot has *one* entry — an
+   internally inconsistent "valid registry" that loaded clean. The fixture now derives the field with
+   `computeRosterHash`, so a fixture cannot disagree with its snapshot, but the underlying boundary holds:
+   DATA-MODEL §2.4 calls `roster_hash` "derived", yet no R1–R6 row requires it to describe the snapshot the
+   binding admits from, and this schema cannot decide the rule without inventing one. Reported and filed as
+   **B-29** (a load-time consistency check, or a session handshake that recomputes from the snapshot
+   instead of trusting the stored field) rather than silently added.
+5. **`projects[].path` is not required to be absolute** (`JD-A-004`, `JD-B-003`). DATA-MODEL §2.3 calls it
+   an "absolute local path" while the schema accepts any non-empty string — which is deliberate (an
+   absolute-path test differs per platform, the value chooses no authorization decision, and the data model
+   itself calls it informational) but was disclosed only in a code comment. It is now a pinned boundary
+   (a relative path, a POSIX path and an empty path are exercised) and reported here; a later tightening
+   needs its own decision rather than a silent test change.
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the frozen tree
+(`../telegram_bus_agent-worktrees/jd-09a`, detached at `b096b65`) in one exhaustive pass each, graph-v1
+rows only, with the slice's own record in scope. The Arena bridge is down, so nothing was debated and
+**DN-05 is unsatisfied for PR-09a** as for the rest of F1.
+
+Result: **13 rows — 1 CRITICAL, 4 WARNING, 8 SUGGESTION**, of which four pairs are the same defect reached
+independently (`JD-A-001`/`JD-B-002`, `JD-A-002`/`JD-B-001`, `JD-A-004`/`JD-B-003`, `JD-A-006`/`JD-B-006`).
+Judge A's `JD-A-002` arrived with `status_reference: null` instead of the canonical
+`status_at_freeze`; the controller canonicalized that one field before freezing, which is recorded because
+the frozen ledger's hash is computed over the canonical rows.
+
+| Judge | Row | Severity | Disposition |
+|---|---|---|---|
+| B | `JD-B-001` | **CRITICAL** | the snapshot inherits only the *entry* shape, not the roster-level uniqueness rules of `conmuta.json`; fixed in round 1, and **`verified` in the terminal scoped re-judgment** |
+| A | `JD-A-002` | WARNING | the same defect at `schema.ts:183`, independently reached; closed by the same patch |
+| A | `JD-A-001` | WARNING | the fixture's `roster_hash` was the two-entry known answer inside a one-entry snapshot (also `JD-B-002`); folded |
+| B | `JD-B-002` | WARNING | same defect as `JD-A-001`, independently reached; folded — and the underlying boundary reported as **B-29** |
+| A | `JD-A-003` | WARNING | `tasks.md` checked 9.1 while the same block admitted its loader half was outstanding; folded (9.1 is open again) |
+| A | `JD-A-004` | SUGGESTION | `projects[].path`'s absoluteness is documented but unpinned and unreported (also `JD-B-003`); folded |
+| B | `JD-B-003` | SUGGESTION | same as `JD-A-004`, independently reached; folded |
+| A | `JD-A-005` | SUGGESTION | shape problems were not collapsed, so a malformed document reported up to nine identical rows; folded |
+| A | `JD-A-006` | SUGGESTION | the record credited the twin walk to the `test:static` glob, which cannot run it (also `JD-B-006`); folded |
+| B | `JD-B-006` | SUGGESTION | same as `JD-A-006`, independently reached; folded |
+| A | `JD-A-007` | SUGGESTION | "3.9×" conflated "under the estimate" (4.1×) with "over the budget" (3.9×) in the row that justifies the exception; folded |
+| B | `JD-B-004` | SUGGESTION | the "strict at every level" guarantee had no unknown-key case for `groups[0]`, `projects[0]` or `token_ref`; folded |
+| B | `JD-B-005` | SUGGESTION | `addSecondBinding` shipped unexercised in this tree (its only caller is PR-09b's loader suite); folded |
+
+**The judges disagreed on severity, not on the defect.** `JD-B-001` is CRITICAL and `JD-A-002` is the same
+defect as a WARNING; the higher severity governs, so the batch was dispatched as severe. This is recorded
+plainly because the skill's own gate says a severity contradiction is a human decision: the Director
+authorized round 1 in full (severe batch plus the informational folds) before anything was changed.
+
+### The CRITICAL, and why it is a real one
+
+`bindings[].roster_snapshot` is a **copy** of `conmuta.json`'s `roster[]` (D-07 makes it the admission
+source while no client is connected), and the slice reused the project file's *entry* schema for it —
+which is exactly the reuse the slice's own export rationale claimed prevented a copy from accepting what
+its source refuses. It did not: DATA-MODEL §1's roster-level rules (`agent_id` unique, `user_id` unique)
+lived in `projectFileSchema.superRefine`, not in `rosterEntrySchema`, so a snapshot with two entries
+sharing one `agent_id` — or two different agents under one `user_id` — loaded clean. Judge B's impact
+claim is the sharp end: design resolves `message.from.id` by reverse lookup in the snapshot, so a
+hand-edited registry (permitted by R6 until F2) could map a second numeric id to a binding's `agent_id`,
+and R3's first-match `find` made the verdict depend on entry *order* (Judge A reproduced the same
+construction and rated it WARNING).
+
+**Round 1's authorized batch** (`jd-fix-agent`, round 1 of 2, one authorized ID `JD-B-001`, frozen ledger
+SHA-256 `664687b3…`, canonical lowercase): the uniqueness logic was extracted from
+`projectFileSchema.superRefine` into an exported `applyRosterUniqueness` in `src/shared/project-file.ts`
+(running over any roster array, keeping the project file's own issue paths so its 39 tests are unchanged)
+and applied to `bindings[].roster_snapshot` in `src/registry/schema.ts`. Its issue is deliberately
+**untagged**, so it maps to `schema_invalid` rather than naming an invariant: R3's gated row does not carry
+a roster-level uniqueness rule and naming it there would claim a gate that never evaluated it. Fix evidence:
+focused 74/74 (schema 19, invariants 16, project-file 39) — the fix actor's own report said 73/73 with
+schema 18, and the independent verifier re-measured the same commit at 74, so the figure recorded here is
+the verifier's. (`317/317` for a full local run is the actor's figure too and is *not* reproducible in this
+tree, which excludes PR-09b's loader suites; what this record relies on is the measured focused run above
+and the final clean-worktree verification at the end of this section.) A temporary
+neutralization of the new call failed exactly the three new cases, so the rule is load-bearing.
+
+Two earlier attempts at this dispatch were rejected by the runtime, and the reason is worth recording:
+the first listed `JD-A-002` (a WARNING) among the "authorized severe IDs", and the validator requires that
+section's rows to be exactly the BLOCKER/CRITICAL rows; the second used a ledger hash computed over the
+two-row batch instead of the one authorized row. HANDOFF §2.2 calls this out, and it did indeed cost two
+attempts.
+
+### Corrections applied (round 1, informational folds)
+
+Disclosed as author decisions, not as part of the authorized severe batch — the same shape PR-08a and
+PR-08b used, under the Director's standing preference for folding informational rows before the re-judgment
+so the re-judged tree is the shipped tree:
+
+| Row(s) | Change | Why |
+|---|---|---|
+| `JD-A-001`/`JD-B-002` | `test/registry/fixtures.ts`: `VALID_ROSTER_HASH` is now the **single-entry** known answer and `activeBinding()` **derives** the field with `computeRosterHash` unless a case supplies its own; `schema.test.ts` ties the fixture to that vector | a fixture that spells the hash out drifts from the snapshot silently — and this one had, so every "valid registry" in the suite was internally inconsistent. Deriving it removes the class instead of the instance |
+| `JD-A-003` | `tasks.md`: 9.1 back to `[ ]`, with the close-out note and the block's own text aligned | the file admitted in the same commit that two of 9.1's five scenarios land in PR-09b; "unfinished work is never checked off" |
+| `JD-A-004`/`JD-B-003` | `schema.test.ts`: a pinned boundary (Windows, POSIX, relative and empty `projects[].path`) plus reportable item 5 | the documented rule was enforced nowhere and pinned nowhere; the boundary is now explicit and reversible |
+| `JD-A-005` | `schema.ts`: `collapseShapeProblems` reports at most one `schema_invalid` per document | nine byte-identical rows carry no information an operator can act on, and the invariant vocabulary already collapsed per document |
+| `JD-A-006`/`JD-B-006` | this record's `test:static` row names what the glob actually runs | the twin walk lives in `dist/test/twins.test.js`, outside `dist/test/security/`, so the row credited a leg that cannot execute |
+| `JD-A-007` | this record and `tasks.md`: 4.1× against the estimate, 3.9× against the budget | the row justifying a 663-line exception has to be reproducible from its own numbers |
+| `JD-B-004` | `schema.test.ts`: unknown-key cases for `groups[0]`, `projects[0]` and `bots[0].token_ref` | the module docstring claims the strictness is *pinned*, and three of the four levels it names had no case |
+| `JD-B-005` | `test/registry/fixtures.ts`: `addSecondBinding` removed from this half | its only caller is PR-09b's loader suite; shipping it here would be an unexercised helper this tree cannot fail on |
+
+One of those folds is itself a lesson worth keeping: `JD-B-005`'s removal means the local build needed the
+helper back while PR-09b's suite stayed in the working tree, so the removal had to be verified in the clean
+worktree rather than locally. That is the same reason the clean worktree exists.
+
+## Next
+
+- The ordinary native review of this candidate, then push, PR and the Director's merge decision.
+- **PR-09b** (`f1/09b-registry-loader`, stacked on this slice): `src/registry/loader.ts` +
+  `test/registry/loader.test.ts`, tasks 9.1's loader scenarios, 9.3–9.6, PT-25's registry-side cell,
+  `addSecondBinding` back where it is used, and the R5/`roster_hash` resolution described above.
+- The audit path is recorded in the tribunal index as the five earlier slices' are, with **DN-05
+  unsatisfied** for PR-09a as for the rest of F1.
+
+### Scoped re-judgment (round 1) — a contradiction, diagnosed by measurement
+
+The two judges received only `JD-B-001`, its exact hash-bound row and the fix delta `b096b65..89a53ed`, with
+the folded rows disclosed for fix-line regression purposes only. They **contradicted**: Judge A resolved
+`verified`, Judge B resolved `regression`, and the shape carries no reason field to read.
+
+The cause was therefore measured rather than argued — a full mutant sweep on the corrected tree, which is
+the instrument that produced the contradiction's answer: **two mutants survived, both introduced by the fix
+itself.**
+
+| # | Mutant | What the correction had done |
+|---|---|---|
+| `M4` | a looser, locally declared snapshot entry schema | survived **again**: the new uniqueness rule refuses a two-entry snapshot whose entries repeat the leading entry's `agent_id` whatever their own shape is, and every rejected entry in the drift table repeated `@alice-agent` — so the array refused first and the entry declaration changed nothing |
+| `M7` | `collapseShapeProblems` removed | survived: round 1 added the collapse with no test that could fail when it was deleted |
+
+Both were corrected in `010ed85`: every entry in that drift table is now distinct in `agent_id` from the
+known-good entry the document leads with, and a new test pins the collapse (two independent shape defects
+report exactly one row) with its per-kind non-vacuity (a document that also violates an invariant still
+reports both kinds). Sweep on the corrected tree: **`M1`–`M7` all killed**, each built first on a cleaned
+`dist/` and restored byte-identically (`restored=true` for all seven).
+
+### Scoped re-judgment (round 2, terminal)
+
+Both judges received `JD-B-001`, its row, the complete delta `b096b65..010ed85` and the disclosure of what
+round 1 produced. **Both resolved `verified`.** No severe row survives, and the round budget is exhausted
+with the second re-judgment spent rather than the second fix round — the correction of a fix-caused defect
+sits inside round 1's own batch.
+
+### Final verification and verdict
+
+Clean detached worktree at `2279c15` (`../telegram_bus_agent-worktrees/verify-09a-final`), `dist/` rebuilt
+from scratch: **304/304** tests (PR-08's 268 + `schema` 20 + `invariants` 16), `test:static` **8/8**, and the
+focused set over the three suites this half owns — `schema`, `invariants` and the shared `project-file` —
+**75/75**. The verdict below was first reached at `010ed85` and re-measured at `2279c15`, which adds only the
+verifier's `F10` pin and this record.
+
+With no severe row surviving and the final verification passing:
+
+**`JUDGMENT: APPROVED`** for `e177c58..2279c15`.
+
+### The ordinary native review — DECLINED for this candidate
+
+The Receipt-driven Development switch is on and the Director never left this candidate unreviewed, so the
+preflight ran against the frozen worktree (`workspaceRoot`), which binds the candidate to this slice exactly.
+`inspect` returned `ready` with a committed-range START — `base-ref` the full `e177c58` SHA; the short SHA was
+rejected as `native-start-base-ref-unresolvable`, and a failed START creates no lineage, so the retry was
+safe. The START resolved consent as **`declined_this_candidate`**: `lineage_created: false`,
+`mutation_performed: false`, risk tier **medium** on 12 changed files and 1,587 changed lines, correction
+budget 0.
+
+It is recorded as a decline, **never as a closure**, and the same candidate is not re-reviewed. The
+documented fallback then ran: `assess` with the decline stated returned risk **unassessable** — the native
+assessment came back schema-incompatible — which the contract treats exactly like high risk, so the plan was
+*writer self-verification plus a separate independent verifier*.
+
+- **Writer self-verification**: the clean-worktree runs, the seven mutants, and the two scoped re-judgments
+  above.
+- **Independent verifier** (`gentle-ai-verify`, read-only, over `e177c58..010ed85`): reproduced **304/304**,
+  `test:static` **8/8**, the focused **75/75**, the budget as **1,256 / 20** with `src/registry/tsconfig.json`
+  inside the counted scope and the root one outside, the twin rule, the provenance registry at 11 entries with
+  no header on any new file, the behavioural claims, and the `M4`/`M6`/`M7` kills in its own scratch copy
+  (including `M6`'s "exactly three tests").
+- It found **eleven record defects** (`F1`–`F11`), all corrected before the commit that claims they are: two
+  of the writer's own figures were **computed rather than measured** (a pair of per-file rows whose errors
+  cancelled while the total stayed right, and a test count no revision ever had); the round-1 row count
+  contradicted its own table (5/7 against a table of 4/8); the "`M1`–`M7` all killed" claim existed only in a
+  commit message, so `M6` and `M7` are now defined in the matrix; the branch name named a branch that does
+  not exist; the verification table still called `d5d73a0` the code tip; one pair count was wrong (four pairs,
+  not two); the 9.2 checkbox still advertised "R1–R6"; the referential-integrity pin covered one dimension of
+  three; the record's own round-1 and round-2 sections were missing from the tree the verifier was handed
+  because they were still uncommitted when it ran — the writer's sequencing error, fixed by committing them
+  and re-verifying.
+
+## Next
