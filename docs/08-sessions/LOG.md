@@ -4,6 +4,56 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 8: F1 apply, PR-06 delivered as two slices (PR-06a + PR-06b) and merged
+
+**Closed**
+
+- PR-06 (`shared/protocol-select.ts` + `shared/fence.ts`, both SEAM, D-15) implemented, reviewed and
+  merged **as two slices**, because the real authored diff was 618 lines against a 400-line review
+  budget and — unlike PR-05 — these are two independent modules with no cohesion argument. PR-06a
+  (`f1/06a-fence`, 192 authored lines, inside budget) and PR-06b (`f1/06b-protocol-select`, 426 lines
+  with a disclosed 26-line PR-scoped exception distinct from DN-06) are `main` at `9053908` and
+  `cf19561`. `tasks.md`'s PR-06 row was amended in place to record the re-slice and the final numbers.
+- Both pinned SEAM hashes re-derived with four independent methods before being trusted
+  (`protocol-select` `29bcf003…21ce`, `fence` `68e241b2…be878`), with the wrongly-stripped controls
+  recorded so the trailing-newline rule cannot be re-litigated.
+- **The SDD phase dispatcher proved unreachable and the slice ran under ODD instead.** `sdd-apply`
+  dispatch is refused by a host-owned native confirmation dialog the agent cannot satisfy or
+  fabricate, so the slice kept every substantive SDD contract and the orchestrator owned the SDD
+  bookkeeping, disclosed as a deviation. Also found: gentle-ai's CLI is 3.0.2 and has **retired the
+  `sdd-attempt` ledger**, and Engram now rejects the old `telegram_bus_agent` project key in favour
+  of `connmuta`.
+- **The Director waived the tribunal audit for this mission** (the Arena Orion bridge was down) and
+  directed that it finish with internal capability. The waiver is recorded as a waiver
+  (`bus-v2-f1-pr-06-waiver-001`), not as a silent skip; DN-05 is not satisfied for PR-06.
+- **Judgment Day ran as the adversarial substitute**: two blind read-only judges over the frozen range,
+  then a scoped re-judgment over the fix delta. Round 1 `APPROVED` (no CRITICAL) with 6 ledger items,
+  4 corroborated by both judges; round 2 confirmed the fixes and found no CRITICAL and no behavioral
+  regression. Real defects were found that no automated gate caught, including a provenance header
+  asserting something **false and unfalsifiable** (attribute values escaped `<` but not `>`, so a
+  value with `>` closed the opening tag early while the soundness helper still reported sound) and a
+  threat-model cell that over-claimed a security guarantee as pinned.
+- Four test cases whose fixtures a wrong implementation could luck into were made adversarial and the
+  change proved with mutants: a global sort now fails the `selectTiered` ordering and reachability
+  cases, and each digest component fails exactly one named case when removed.
+- Verified from clean detached worktrees at every tip (136/136 then 153/153, `test:static` 8/8) and
+  again on merged `main` at `cf19561`: **153/153**, **8/8**.
+
+**Opened**
+
+- Two pre-existing defects queued with recommended backlog ids for the Director: the digest's discrete
+  blind spots (including `history.length` saturating at `MAX_THREAD_HISTORY = 50`, which lets a peer
+  reply leave a byte-identical digest) and the fence's non-injective body escape that leaves `&`
+  unescaped. Neither was fixed here: both would change documented, ratified behaviour outside this
+  slice's change list.
+- The next slice is **PR-07a** (`shared/tool-schemas.ts` + `shared/error-payload.ts`, both SEAM), and
+  the audit path for it must be decided with the Director first.
+
+**How it knows**: `git log`/`git diff` on `main` (`9053908`, `cf19561`); `gh pr checks` green on both
+matrix entries for PRs #7 and #8; clean detached worktree runs; `gentle-ai sdd-status`
+(`nextRecommended: apply`, 32/210, `blockedReasons: []`); the two judges' JSON verdicts; the mutant
+matrices and hashes recorded in `apply-progress.md`.
+
 ## 2026-09-16 — Session 7: F1 apply, PR-05 merged (stopped at the PR-05 → PR-06 boundary)
 
 **Closed**

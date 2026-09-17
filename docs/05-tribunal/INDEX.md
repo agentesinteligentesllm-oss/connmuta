@@ -386,6 +386,23 @@ Outcome: round 1 `APPROVE_WITH_CHANGES`; round 2 (after Kairo's `COUNTER` fixing
 1's evidence) `CONSENSUS`, `APPROVE`, objections `[]`. `HANDOFF.md` ratified as unambiguous and
 self-sufficient for a zero-context PR-04 start.
 
+## `bus-v2-f1-pr-06-waiver-001` — record (a WAIVER, not a debate)
+
+**This is deliberately not a row in the Debates table above**, because no debate happened: the table
+requires a `CONSENSUS` or `ESCALATED` outcome from an Arena exchange, and none occurred. Recording it
+here keeps the governance debt visible instead of leaving it as a silent omission.
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-17 |
+| Subject | PR-06 (`shared/protocol-select.ts` + `shared/fence.ts`, both SEAM, D-15), delivered as PR-06a (#7 `9053908`) and PR-06b (#8 `cf19561`) |
+| Authority | **The Director**, who owns DN-05 |
+| What was waived | DN-05's "Alpha audits every unit before it opens". The Arena bridge that hosts the Alpha collaborator was unreachable for the whole session (`http://127.0.0.1:8766/mcp` → `ECONNREFUSED`; the bridge is the Arena Orion Electron app and was not running). The Director stated the audit would not be applied for this mission, that the mission was to be completed with internal capability, and that the bridge must not become a blocker. |
+| What was used instead | **Judgment Day** (`~/.agents/skills/judgment-day/SKILL.md`): two blind read-only judges (`jd-judge-a`, `jd-judge-b`) over the frozen range `ef58020..98ca9ef` with identical scope and criteria, a merged frozen ledger, one bounded correction round, and one scoped re-judgment over the immutable fix delta. Round 1 verdict `APPROVED` (no CRITICAL) with 6 ledger items, 4 corroborated by both judges; round 2 found no CRITICAL and no behavioral regression. |
+| Defects it caught | A provenance header asserting something **false and unfalsifiable** (`escapeAttribute` escaped `<` but not `>`, so an attribute value containing `>` closed the opening tag early while the soundness helper still reported the fence sound — `>` ends a tag, `<` only opens one); a THREAT-MODEL §4 cell that credited `test/shared/fence.test.ts` with pinning PT-14, whose clause is daemon-scoped (`design.md:528`); stale first-pass figures inside the record that was written to reconcile them; and an under-powered `Changes:` list. All four were corrected; the fix for the first is pinned by a case that fails without it (mutant evidence recorded). |
+| Left open, queued to the Director | Two **pre-existing** defects with recommended backlog ids: the digest's discrete blind spots, including `history.length` saturating at `MAX_THREAD_HISTORY = 50` so a further peer reply can leave a byte-identical digest; and the fence body escape leaving `&` unescaped, so the fence is not injective. Both would change documented, ratified behaviour outside PR-06's change list, so neither was fixed inside a vendoring slice. |
+| Consequence | **DN-05 is not satisfied for PR-06.** It is waived for this mission by the authority that owns it. The audit path for PR-07a and later slices is an open decision for the Director, recorded in `HANDOFF.md`. |
+
 ## Reserved: `bus-v2-referee-001`
 
 Scope fixed by amendment A3 and backlog B-01–B-03: one optional referee per group with an explicit

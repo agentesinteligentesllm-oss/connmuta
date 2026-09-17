@@ -9,7 +9,7 @@ project (decision D5 of the landing debate, phase F2) is a different document, p
 template. v1's equivalent of that end-user document is `docs/AGENT-GUIDE-using-the-bus.md` in the
 `telegram-agent-bus` repository.
 
-**Status.** F1 `apply` in progress: PR-01a, PR-01b, PR-02, PR-03, PR-04 and PR-05 merged (`main` = scaffold, CI, static gates, `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply}.ts` with twins, `test/security/provenance.test.ts` + registry). Next slice PR-06 of 45 in `openspec/changes/f1-daemon-registry-thin-client/tasks.md`. Every PR is audited by Alpha before it opens (DN-05).
+**Status.** F1 `apply` in progress: PR-01a, PR-01b, PR-02, PR-03, PR-04, PR-05 and both re-sliced PR-06 slices (PR-06a `shared/fence.ts` SEAM D-15, PR-06b `shared/protocol-select.ts` SEAM) merged (`main` = scaffold, CI, static gates, `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence}.ts` with twins, `test/security/provenance.test.ts` + its 8-entry registry; 153 tests, 32/210 tasks). Next slice PR-07a of 45 in `openspec/changes/f1-daemon-registry-thin-client/tasks.md`. Every PR is audited by Alpha before it opens (DN-05) — **waived by the Director for the PR-06 mission** because the Arena bridge was down (`bus-v2-f1-pr-06-waiver-001`); the audit path for PR-07a is an open decision for the Director.
 
 ## 1. Reading order
 

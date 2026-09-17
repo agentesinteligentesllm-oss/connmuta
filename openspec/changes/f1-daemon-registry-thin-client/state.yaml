@@ -53,13 +53,13 @@ phases:
   apply:
     status: in_progress
     started_at: "2026-09-16"
-    completed_slices: PR-01a (#1 1369886), PR-01b (#2 5798bab), PR-02 (#3 2083d7a), PR-03 (#4 77855b9), PR-04 (#5 f0097f0), PR-05 (#6 fec730b) -- 28/210 tasks, CI green on every merge
-    tribunal_debate: bus-v2-f1-pr-01-001, bus-v2-f1-pr-02-002 (bus-v2-f1-pr-02-001 ESCALATED by the broker watchdog on a turn timeout, re-run in-band), bus-v2-f1-pr-03-001, bus-v2-f1-pr-04-001, bus-v2-f1-pr-05-001
-    tribunal_state: consensus
+    completed_slices: PR-01a (#1 1369886), PR-01b (#2 5798bab), PR-02 (#3 2083d7a), PR-03 (#4 77855b9), PR-04 (#5 f0097f0), PR-05 (#6 fec730b), PR-06a (#7 9053908), PR-06b (#8 cf19561) -- 32/210 tasks, CI green on every merge; PR-06 was re-sliced at apply time into PR-06a/PR-06b at the file boundary (real diff 618 vs the 400-line budget; PR-06a 192 lines inside budget, PR-06b 426 with a disclosed 26-line PR-scoped exception distinct from DN-06)
+    tribunal_debate: bus-v2-f1-pr-01-001, bus-v2-f1-pr-02-002 (bus-v2-f1-pr-02-001 ESCALATED by the broker watchdog on a turn timeout, re-run in-band), bus-v2-f1-pr-03-001, bus-v2-f1-pr-04-001, bus-v2-f1-pr-05-001, bus-v2-f1-pr-06-waiver-001
+    tribunal_state: consensus for PR-01..PR-05; PR-06 WAIVED by the Director (the Arena bridge was down) and audited instead by a Judgment Day dual-judge round plus a scoped re-judgment -- see the waiver record; DN-05 is not satisfied for PR-06
     apply_progress: apply-progress.md (engram sdd/f1-daemon-registry-thin-client/apply-progress)
-    attempt_ledger: PR-01 attempt passed; objective reset by the Director on 2026-09-16; PR-02 attempt settled passed (state complete) on 2026-09-16; PR-03 attempt settled passed (state complete) on 2026-09-16; PR-04 attempt settled passed (state complete) on 2026-09-16; PR-05 attempt passed (825 changed_lines vs 500 objective -- ledger counts full diff incl. SDD bookkeeping, review-load is 609; objective reset by the Director, delegated to Kairo, on 2026-09-16, same gap as the PR-01 reset)
+    attempt_ledger: **retired** -- gentle-ai 3.0.2 removed the runtime attempt operations (only `sdd-attempt grant` remains, `Runtime attempt operations are retired`), so the PR-01..PR-05 ledger entries below are historical and no further attempt can be acquired or settled. History: PR-01 attempt passed; objective reset by the Director on 2026-09-16; PR-02 attempt settled passed (state complete) on 2026-09-16; PR-03 attempt settled passed (state complete) on 2026-09-16; PR-04 attempt settled passed (state complete) on 2026-09-16; PR-05 attempt passed (825 changed_lines vs 500 objective -- ledger counts full diff incl. SDD bookkeeping, review-load is 609; objective reset by the Director, delegated to Kairo, on 2026-09-16, same gap as the PR-01 reset)
   verify:
     status: pending
   archive:
     status: pending
-next_recommended: apply (new session; start at PR-06; see docs/08-sessions/HANDOFF.md)
+next_recommended: apply (new session; start at PR-07a; read docs/08-sessions/HANDOFF.md first, and decide the audit path with the Director given the PR-06 waiver)
