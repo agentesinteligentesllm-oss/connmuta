@@ -852,16 +852,16 @@ comment and PR-05's second stale comment were found. Neither would have failed a
 | Slice | `src` | `test` | fixture | docs | Authored total | Budget |
 |---|---|---|---|---|---|---|
 | PR-06a (`fence.ts` + twin) | 65 | 95 | 6 | 4 | **≈170** | inside 400 |
-| PR-06b (`protocol-select.ts` + twin) | 160 | 240 | 6 | 0 | **406** | 6 over |
-| PR-06 as one slice (not taken) | 225 | 335 | 12 | 4 | 576 | 176 over |
+| PR-06b (`protocol-select.ts` + twin) | 160 | 260 | 6 | 0 | **426** | 26 over |
+| PR-06 as one slice (not taken) | 225 | 355 | 12 | 4 | 596 | 196 over |
 
-`tasks.md` estimated ≈315. The real diff is 576. Unlike PR-05 (609, approved as one PR), these are two
+`tasks.md` estimated ≈315. The real diff is 596. Unlike PR-05 (609, approved as one PR), these are two
 **independent** modules with no cohesion argument, and the split is at a clean file boundary, so the
 file boundary was used instead of one large exception: PR-06a lands inside budget and carries the
 D-15 security control with its own focused review; PR-06b needs a **6-line** PR-scoped exception
 distinct from DN-06 (which stays AS-IS-only and is not amended). Grounds for those 6 lines: 143 of
-the module's 160 lines are the byte-faithful v1 body the SEAM requires, and 16 behavioral cases plus
-a shared `ThreadRecord` fixture helper cannot shed 6 lines without deleting review context — which
+the module's 160 lines are the byte-faithful v1 body the SEAM requires, and 17 behavioral cases plus
+a shared `ThreadRecord` fixture helper cannot shed 26 lines without deleting review context — which
 the budget rule forbids. Not taken: the implementation/test-twin split across two PRs, which
 `test/twins.test.ts:29-44` makes CI-unsafe on the first PR's own merge (the same finding that
 carried PR-05).
@@ -871,8 +871,8 @@ carried PR-05).
 | Command | Result |
 |---|---|
 | `npm run build` (after `rm -rf dist`) | exit 0, no diagnostics |
-| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **23/23 pass** |
-| `rm -rf dist && npm test` | **151/151 pass** (up from 128; +23) |
+| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **24/24 pass** (23/23 before the review-driven strengthening added one case) |
+| `rm -rf dist && npm test` | **152/152 pass** (up from 128; +24) |
 | `npm run test:static` | **8/8 pass** (provenance registry equality + repo scan + pack) |
 | `node --test "dist/test/twins.test.js"` | 1/1 (both new modules have their twin) |
 | SEAM delta diff vs the v1 range bodies | matches the declared `Changes:` lists exactly |
@@ -956,16 +956,18 @@ them still open, which is the honest state for a partially completed task).
 surface is only its three files.
 
 Authored diff for this slice: `src/shared/protocol-select.ts` 160 + `test/shared/protocol-select.test.ts`
-240 + its `test/fixtures/v1-provenance.json` entry 6 = **406 lines**, the disclosed 6-line overage
-described above. The registry fixture now carries 8 entries (the 6 pre-existing plus one per slice).
+260 + its `test/fixtures/v1-provenance.json` entry 6 = **426 lines**. The first pass measured 406
++6 over the ceiling; the review-driven strengthening of four under-powered cases (see the validator
+findings below) added 20 more, so the final disclosed overage is **26 lines** over the 400-line review
+budget. The registry fixture now carries 8 entries (the 6 pre-existing plus one per slice).
 
 Verification for PR-06b (orchestrator-run, from clean):
 
 | Command | Result |
 |---|---|
 | `npm run build` (after `rm -rf dist`) | exit 0, no diagnostics |
-| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **23/23 pass** — this is task 6.3's exact command |
-| `rm -rf dist && npm test` | **151/151 pass** |
+| `node --test "dist/test/shared/protocol-select.test.js" "dist/test/shared/fence.test.js"` | **24/24 pass** — this is task 6.3's exact command |
+| `rm -rf dist && npm test` | **152/152 pass** |
 | `npm run test:static` | **8/8 pass** (registry equality with all 8 entries) |
 | clean detached worktree at the PR-06b tip | full suite and static suite green, with only the committed files present |
 
