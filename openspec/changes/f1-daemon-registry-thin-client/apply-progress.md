@@ -978,3 +978,71 @@ inequality the scanner asserts.
 One review-driven change to this module's test file after the delegated writer's first pass: the
 `reminders=` component test described under finding 2 above (that component had no failing test
 before it, which is exactly the gap the ADR-12 governing rule exists to catch).
+
+## Independent validator for PR-06b (fresh-context, read-only) — findings and disposition
+
+A second fresh-context read-only verifier (no implementation context) reviewed `4c83c29..262eee2` on
+its own and ran `npm run build`, the focused suites, `npm test` and `npm run test:static` (151/151 and
+8/8 observed), plus read-only git and v1-checkout reads.
+
+1. **Pinned hash re-derived independently — MATCH.** `git -C ../telegram-agent-bus show
+   bf8f365:src/protocol.ts | sed -n '335,477p' | sha256sum` →
+   `29bcf0038187541d6448d5c68a554d77b0789fbdcfea77ce087de441d96621ce`, equal to the header, and
+   reproduced a second way from the full-line split (7389 chars, same hash; the 16-byte difference the
+   two methods report is multibyte UTF-8, not content). It independently confirmed line 477 is the
+   file's last line, that it contains `}`, and that the file's final bytes are `;\n}\n` — so **no line
+   478 exists** and the `478` in the citation is the array-slice convention, as recorded above.
+2. **SEAM inequality holds.** `vendoredBody(v2)` = `f1389e54dafe9cd523cc0b0b03003cf23d9a08e1a15b77b73365e78fe5160540`
+   versus the pinned v1 value — differs, which is what the scanner asserts. Matches the value derived
+   independently by the orchestrator.
+3. **No undeclared delta.** The real diff is exactly three hunks / eight lines, each covered by
+   `Changes:` (1) or (2). It noted that change (1) is a *summary* rather than an itemized list — it
+   does not spell out that the two replaced expressions are `first_surfaced_at` and
+   `state.last_checkpoint.at`. Accepted at the same granularity the tribunal ratified for PR-05's
+   header, which likewise summarizes; no undeclared difference exists, which is what DN-06 requires.
+4. **Four cases promised more than their assertions could detect — accepted, actioned.** This was the
+   substantive finding. Before the fix, a mutant that replaced tier ordering with a *global sort* — the
+   exact thing the module's own comment rejects — passed both ordering and reachability, and the
+   digest's clock handling was not pinned as its name claimed. Two of the four needed only different
+   fixture literals (no added lines); the other two are now pinned by one additional case. The
+   `ThreadRecord` fixture keeps both ids and expectations deliberate: the backlog ids now sort *before*
+   `"brand-new"`, and the within-tier orders are deliberately non-lexicographic.
+5. **Registry.** The entry matches the header identity line exactly on `v1Path`, `commit` and
+   `verdict`; the fixture holds 8 entries and the scanner's set-equality assertion passes.
+6. **`tasks.md` 6.1–6.4** are flipped and every artefact exists. The verifier could not run 6.3's
+   two-file command verbatim under its authorized command set, so the orchestrator's own run of that
+   exact command (24/24, from a clean rebuild) is the evidence of record for 6.3.
+7. **Commit scopes** are exactly as intended, and `src/shared/fence.ts` / `test/shared/fence.test.ts`
+   are not modified relative to `4c83c29` (no double-touch across the two slices).
+8. **No other statement is made stale** by the new signature; every reference to
+   `computeWorkDigest(threads, agentId, windowHours, now, surfaced, checkpointAt)` agrees with the code.
+9. **Traceability gap — reported to the tribunal, deliberately not fixed here.** No scenario in any
+   spec of this change mentions the digest, the quiet tick or `unchanged`; the module's behaviour is
+   pinned only by its unit twin, while `durable-inbox` covers only the per-client `client_surfaced`
+   input the SEAM signature serves. Specs are gated and audited and unchanged since
+   `bus-v2-f1-pr-01-001`, so this is a ruling for the tribunal, not an edit for this slice.
+10. **`next_update_id` v1 sentence** is flagged as slightly misleading — a reader who has not read v1
+    will look for a field that does not exist in this module. It is kept for SEAM fidelity and was
+    already recorded above as accepted residue; note that the guarantee it describes ("pure human
+    chatter must not flip the digest") *is* pinned, by the third-party-exclusion case.
+
+### Mutant matrix (observed, each with a clean rebuild and a byte-identical restore)
+
+| Mutant applied to `src/shared/protocol-select.ts` | `pass/fail` | Caught by |
+|---|---|---|
+| digest hashes the raw clock (`now.getTime()`) | 16/1 | the clock case (new in this commit) |
+| digest row carries the thread's `opened_at` | 16/1 | the clock case (new in this commit) |
+| the checkpoint stops contributing to the digest | 16/1 | the checkpoint case |
+| the digest ignores the passed `surfaced` set | 16/1 | the surfaced-set case |
+| the digest row drops the `reminders=` term | 16/1 | the reminder-window case |
+| `selectTiered` returns a global sort instead of tier order | 15/2 | the F3 reachability case **and** the within-tier ordering case (both strengthened in this commit) |
+
+The first attempt at the checkpoint mutant produced invalid syntax and a broken build; it was
+discarded and re-run in a syntactically valid form rather than reported, so the table above contains
+no result that came from a failed build.
+
+**Method note for future slices:** restoring a mutated source with `cp` and then running `tsc -b` can
+leave stale compiled output in `dist/` when the timestamps fall inside the same granularity, which
+reported a phantom failure during this session. Every mutant run above therefore removed `dist/`
+first. A phantom failure that survives a source restore should be re-checked from a clean `dist/`
+before it is believed.
