@@ -57,13 +57,17 @@ test("an unrecognised code is not retryable, while a listed one is", () => {
 });
 
 test("errorResult serializes the payload as the single text block of an isError result", () => {
-  const result = errorResult(toolErrorPayload("UNBOUND_PROJECT", "no binding"));
+  // A tool-level code on purpose, for the same reason the constructor case above uses one: this
+  // module BUILDS tool-level payloads only, so driving a client-taxonomy code (`UNBOUND_PROJECT`)
+  // through it would model the routing the JSDoc on `toolErrorPayload` forbids — design §10 gives
+  // that family its own `retryable` values, which `client/errors.ts` (PR-34) implements.
+  const result = errorResult(toolErrorPayload("UNKNOWN_THREAD", "no such thread"));
   assert.equal(result.isError, true);
   assert.equal(result.content.length, 1);
   assert.equal(result.content[0].type, "text");
   assert.deepEqual(JSON.parse(result.content[0].text), {
-    code: "UNBOUND_PROJECT",
-    message: "no binding",
+    code: "UNKNOWN_THREAD",
+    message: "no such thread",
     retryable: false,
   });
 });
