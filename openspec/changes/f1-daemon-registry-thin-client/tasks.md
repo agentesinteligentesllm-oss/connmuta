@@ -161,9 +161,26 @@ the `Changes:` line because the registry's `v1Path` is a single token.
 
 #### PR-07b — `shared/tool-output.ts` (SEAM)
 Branch `f1/07b-tool-output` → `main`. Depends: PR-07a. Size: ≈385 lines (≈284 extracted body + ≈100 twin), no exception (range extract of `tools/fetch.ts`, therefore SEAM). If the twin exceeds ≈115 authored lines, ship the twin as PR-07c (`f1/07c-tool-output-tests`) so PR-07b stays ≤ 400.
-Scope: `src/shared/tool-output.ts`, `test/shared/tool-output.test.ts`, `test/fixtures/v1-provenance.json` (append one SEAM entry).
+Scope: `src/shared/tool-output.ts`, `test/shared/tool-output.test.ts`, `test/fixtures/v1-provenance.json` (append one SEAM entry). Carried findings add `test/shared/error-payload.test.ts` — see below.
 Requirements: `thin-client-tools › Four tool input schemas port unchanged` (output shapes half); `durable-inbox` digest rendering consumed by PR-23.
 Runtime harness: N/A.
+
+**Carried findings from PR-07a (session 9) — read before opening this slice.**
+
+1. **The PR-07c split this block allows is NOT CI-safe and must not be used.** `test/twins.test.ts` walks
+every `src/**/*.ts` and fails when `test/**/<same>.test.ts` is missing **in the same tree**, so a PR that
+lands `tool-output.ts` without its twin fails its own merge — the same finding that carried PR-05.
+Decide **before** opening: trim the twin to fit, or take a **disclosed** PR-scoped exception like
+PR-06b's 26 lines and PR-07a's 20. Never split a module from its twin. Budget accordingly: PR-07a's
+≈290-line estimate measured 398 at audit open, because a SEAM module's doc comments must be
+re-authored, never copied.
+2. **D4, the first correction of this slice (Director decision).** `test/shared/error-payload.test.ts`
+still drives the client-taxonomy code `UNBOUND_PROJECT` through `toolErrorPayload`. Nothing behaves
+wrongly — the value the tool-level allow-list yields for it coincides with design §10's client value —
+but it models the pattern that module's own JSDoc forbids, so change the example to a tool-level code
+while this slice is open. It was escalated rather than fixed in PR-07a because that slice's Judgment
+Day round budget was exhausted and its two judges disagreed on whether the earlier correction
+introduced it.
 
 - [ ] 7b.1 RED: write `test/shared/tool-output.test.ts` (rendering of the fetch digest, `body_omitted` marker, fence-safe output) against a not-yet-present module.
 - [ ] 7b.2 GREEN: implement `src/shared/tool-output.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/fetch.ts:65-348` (read-only source, ≈284 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/fetch.ts`, and `Changes: (1) extracted lines 65-348; (2) imports relocated`.

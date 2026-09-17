@@ -189,6 +189,11 @@ header (design §12; PR-02), as ruled in `bus-v2-f1-design-001` item 5 and DN-06
 Outcome: CONSENSUS in one round; re-slices (1), (2), (4), (5) and the cleanup (6) applied to
 `tasks.md` before the session closed: 44 PR slices, 2 with `size:exception`, 207 tasks.
 
+> Later superseded in part at apply time: PR-01 was re-sliced into PR-01a/PR-01b on real diff evidence
+> (≈790 authorized lines against a ≈350 estimate, and DN-06's `size:exception` does not cover new code),
+> which makes the plan **45 slices / 210 tasks**. That amendment is ratified in `bus-v2-f1-pr-01-001` and
+> recorded in `state.yaml`; no other slice was re-numbered. The `size:exception` count stays 2.
+
 ## `bus-v2-session-2-closure-001` — record
 
 Audit of everything written in session 2 before the `apply` session uses it: the three commits
@@ -401,7 +406,7 @@ here keeps the governance debt visible instead of leaving it as a silent omissio
 | What was used instead | **Judgment Day** (`~/.agents/skills/judgment-day/SKILL.md`): two blind read-only judges (`jd-judge-a`, `jd-judge-b`) over the frozen range `ef58020..98ca9ef` with identical scope and criteria, a merged frozen ledger, one bounded correction round, and one scoped re-judgment over the immutable fix delta. Round 1 verdict `APPROVED` (no CRITICAL) with 6 ledger items, 4 corroborated by both judges; round 2 found no CRITICAL and no behavioral regression. |
 | Defects it caught | A provenance header asserting something **false and unfalsifiable** (`escapeAttribute` escaped `<` but not `>`, so an attribute value containing `>` closed the opening tag early while the soundness helper still reported the fence sound — `>` ends a tag, `<` only opens one); a THREAT-MODEL §4 cell that credited `test/shared/fence.test.ts` with pinning PT-14, whose clause is daemon-scoped (`design.md:528`); stale first-pass figures inside the record that was written to reconcile them; and an under-powered `Changes:` list. All four were corrected; the fix for the first is pinned by a case that fails without it (mutant evidence recorded). |
 | Left open, queued to the Director | Two **pre-existing** defects with recommended backlog ids: the digest's discrete blind spots, including `history.length` saturating at `MAX_THREAD_HISTORY = 50` so a further peer reply can leave a byte-identical digest; and the fence body escape leaving `&` unescaped, so the fence is not injective. Both would change documented, ratified behaviour outside PR-06's change list, so neither was fixed inside a vendoring slice. |
-| Consequence | **DN-05 is not satisfied for PR-06.** It is waived for this mission by the authority that owns it. The audit path for PR-07a and later slices is an open decision for the Director, recorded in `HANDOFF.md`. |
+| Consequence | **DN-05 is not satisfied for PR-06.** It is waived for this mission by the authority that owns it. The audit path was subsequently decided per slice by the same authority: PR-07a ran under the same substitute, recorded in `bus-v2-f1-pr-07a-audit-001`, and the path for PR-07b onward is planned in `HANDOFF.md` under the Director's session-9 delegation. |
 
 ## `bus-v2-f1-pr-07a-audit-001` — record (an audit-path decision, not a debate)
 
