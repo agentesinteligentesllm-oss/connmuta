@@ -238,15 +238,12 @@ test("the snapshot entry is the project file's roster entry, not a second declar
 
 	for (const entry of entries) {
 		const acceptedByProjectFile = rosterEntrySchema.safeParse(entry).success;
-		// The binding's identity fields are derived from the entry, so R3 holds whenever the entry is
-		// itself usable and the only remaining reason to refuse the document is the entry's own shape —
-		// which is the declaration under test. The registry must agree with the project file's schema
-		// entry by entry: if either declaration drifted, one of these two verdicts would move alone.
-		const document = withBinding({
-			agent_id: entry["agent_id"],
-			bot_id: entry["user_id"],
-			roster_snapshot: [entry],
-		});
+		// The snapshot leads with a known-good entry for the binding's own agent, so R3 is satisfied
+		// whatever the entry under test says and the only thing that can move the verdict is that
+		// entry's shape — the declaration under test. Deriving the binding's identity from the entry
+		// instead would hide the pin: a `user_id` the entry rule refuses is refused a second time by
+		// the binding's own `bot_id` rule, so a second, looser snapshot declaration would survive.
+		const document = withBinding({ roster_snapshot: [rosterSnapshotEntry(), entry] });
 		assert.equal(
 			parseRegistryDocument(document).ok,
 			acceptedByProjectFile,
