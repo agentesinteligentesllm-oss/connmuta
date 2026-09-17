@@ -2341,3 +2341,92 @@ independent verifier always runs"*. So both halves ran:
 
 - Push, PR-08b, CI, and the Director's merge decision.
 
+
+---
+
+# PR-09a — machine registry document: `src/registry/{schema,invariants}.ts` (+ build wiring)
+
+Slice 11 of 45 (re-sliced at apply time from PR-09; see `tasks.md`). Delivered under the settled route:
+ODD with every substantive SDD contract preserved, then Judgment Day as the audit substitute. The Arena
+bridge is down, so nothing was debated and **DN-05 is unsatisfied for PR-09a** as for the rest of F1.
+Branch `f1/09a-registry-document` from `main` @ `e177c58`.
+
+| Field | Value |
+|---|---|
+| Code commit | `c9b4ee1` (`schema.ts`, `invariants.ts`, the unit wiring, the three test files and the shared `rosterEntrySchema` export) |
+| Requirements | `project-binding › Machine registry schema and invariants` (PT-18; PT-25's half lands in PR-09b) |
+| Provenance | none — no v1 range is vendored; the fixture stays at **11** entries, and all three new modules carry no `Provenance:` header |
+| Budget | **1,056 authored lines / 400** — a **656-line PR-09a-scoped exception**, disclosed in `tasks.md` and granted by the Director when the 1,570-line whole was measured (3.9× the ≈380 estimate) |
+
+## Scope and budget (measured)
+
+| Path | Lines |
+|---|---|
+| `src/registry/schema.ts` | 262 |
+| `src/registry/invariants.ts` | 133 |
+| `src/registry/tsconfig.json` (new compile unit, counted in `src`) | 14 |
+| `test/registry/fixtures.ts` | 100 |
+| `test/registry/schema.test.ts` | 280 |
+| `test/registry/invariants.test.ts` | 267 |
+| `src/shared/project-file.ts` | +10 / −1 (`export` on the shared roster-entry schema) |
+| **budget total** (`git diff --numstat -- src test`) | **1,056 / 400** — 656-line exception |
+| `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** |
+
+**Why the shared export, and why it is not drift.** `bindings[].roster_snapshot` is a *copy* of
+`conmuta.json`'s roster (D-07 makes it the admission source while no client is connected) and
+`roster_hash` is computed over either by the same `shared/roster-hash.ts` rule. A second declaration of
+the entry shape in `registry/schema.ts` could accept an entry the project file refuses, with no test able
+to see the divergence, so the schema object is now exported and reused; `schema.test.ts` pins the
+equivalence by running both verdicts over one table of six entries. This is the only merged file the slice
+touches, it changes no behaviour (`rosterEntrySchema` was already the schema `parseProjectFile` used), and
+no hash-pinned file is involved.
+
+## TDD cycle evidence
+
+| Step | Command | Observed |
+|---|---|---|
+| 9.1/9.2 RED | `node node_modules/typescript/bin/tsc -b` | `TS2305` for every API the three twins use, over modules that exist and export nothing (`parseRegistryDocument`, `Registry`, `REGISTRY_INVARIANTS`, `REGISTRY_INVARIANT_TAG`, `applyRegistryInvariants`, `RegistryInvariant`, `RegistryIssueSink`, `registryInvariantFromIssue`, `REGISTRY_INVALID_CONDITION`, `createRegistryLoader`, `parseRegistryText`, `rosterEntrySchema`), plus the consequent `TS7006`/`TS18046`/`TS2578` inside the tests |
+| 9.2 GREEN | `node node_modules/typescript/bin/tsc -b` then the two suites | clean build; `test/registry/schema.test.js` + `test/registry/invariants.test.js` **29/29** |
+| full suite (PR-09a tree) | `npm run build && node --test "dist/test/**/*.test.js"` | **297/297** (PR-08's 268 + these 29) |
+| `test:static` | `node --test "dist/test/security/*.test.js"` | **8/8** — the twin walk, the provenance registry (still 11 entries) and the repo scan all pass with the new files staged (`git add -N` first, because those scanners read `git ls-files`) |
+
+Four GREEN-cycle failures were real and were fixed as test defects, not as implementation conveniences:
+`R3` fires together with `min(1)` on an empty `roster_snapshot` (both true, both pinned); `agent_id`
+mutated alone refuses the document for R3 rather than for the wire regex, so the case now replaces agent,
+bot and snapshot entry in lockstep; a strict key plus a discriminator can both complain about one
+`token_ref` field, so the table asserts "only shape problems, at least one" instead of an exact count; and
+the drift table's entries had to be paired with a binding whose identity was derived from them. Each is
+recorded because the *implementation* was right and the *expectation* was wrong.
+
+## Discovered while writing PR-09b's tests, and resolved there
+
+The R5 pre-parse raw-text scan and the required `roster_hash` collide: `sha256:` ends in a digit run, so
+the shared `TELEGRAM_BOT_TOKEN_RE` (`\d+:[A-Za-z0-9_-]{35}`, an **unbounded** digit run) matches every
+canonical hash. PR-09b masks that one value before scanning — sound, because the mask is `sha256:` plus 64
+hexadecimal characters and a token's own colon is outside that class — and files the root cause as backlog
+**B-27**. Recorded here because it was found by this slice and because it is the kind of cross-module
+contradiction a raw-text scanner discovers only when the second module exists.
+
+## Reportable items (reported, not silently resolved)
+
+1. **A problem does not name the offending field.** `ProjectFileProblem` names a field path; the registry's
+   vocabulary deliberately has no free-text member at all, so `schema_invalid` names no field. The reason
+   is the PR-08a CRITICAL: a document-derived *key* echoed into a problem field is document text too, and
+   this vocabulary is the one that reaches a log line and a condition. The narrowing is disclosed here;
+   F2's `doctor` can name the field from the schema path without ever round-tripping the value.
+2. **No R1–R6 row demands referential integrity.** `bindings[].bot_id`/`group_id`/`project_id` name
+   entries of `bots[]`/`groups[]`/`projects[]` (DATA-MODEL §2.4), but no invariant row requires the entry
+   to exist, so a dangling reference still loads. The boundary is pinned by a test rather than left
+   implicit, and filed as backlog **B-28** for a `doctor` check — inventing a rule the gate does not carry
+   would make a hand-edited file invalid for a reason the design never stated.
+3. **The R5 rule that fired is not named** (the loader's half, PR-09b): naming it would mean parsing
+   `assertNoTokenShape`'s message prose or writing a second copy of the shape order it applies — two
+   implementations of one rule. The problem stays value-free; naming the rule is part of **B-27**'s
+   follow-up.
+
+## Next
+
+- PR-09a's Judgment Day audit and its ordinary native review, then the PR.
+- **PR-09b** (`f1/09b-registry-loader`, stacked on this slice): `src/registry/loader.ts` +
+  `test/registry/loader.test.ts`, tasks 9.3–9.6, PT-25's registry-side cell, and the R5/`roster_hash`
+  resolution described above.
