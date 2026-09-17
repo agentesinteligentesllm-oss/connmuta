@@ -819,7 +819,7 @@ therefore kept byte-faithful instead of expanding the SEAM delta with an unaudit
 TDD: RED observed first (`TS2307` for `../../src/shared/protocol-select.js`; the `TS7006`
 `implicitly has an 'any' type` errors in the same run had the same cause — with the import
 unresolved, `Tiers<string>` inference is lost and the filter callbacks fall back to `any`), then
-GREEN, then TRIANGULATE. The 16 cases cover the digest's turn/history/surfaced/checkpoint/reminder
+GREEN, then TRIANGULATE. The 17 cases cover the digest's turn/history/surfaced/checkpoint/reminder
 components, the third-party exclusion, all seven F3 `selectTiered` properties, the exact reminder
 boundary built from `REQUEST_REMINDER_WINDOW_HOURS`, and the turn-based `isNeedsAction` rule
 (including a resolved-thread case that kills a naive `awaiting === caller` implementation).
@@ -858,8 +858,8 @@ comment and PR-05's second stale comment were found. Neither would have failed a
 `tasks.md` estimated ≈315. The real diff is 596. Unlike PR-05 (609, approved as one PR), these are two
 **independent** modules with no cohesion argument, and the split is at a clean file boundary, so the
 file boundary was used instead of one large exception: PR-06a lands inside budget and carries the
-D-15 security control with its own focused review; PR-06b needs a **6-line** PR-scoped exception
-distinct from DN-06 (which stays AS-IS-only and is not amended). Grounds for those 6 lines: 143 of
+D-15 security control with its own focused review; PR-06b needs a **26-line** PR-scoped exception
+distinct from DN-06 (which stays AS-IS-only and is not amended). Grounds for those 26 lines: 143 of
 the module's 160 lines are the byte-faithful v1 body the SEAM requires, and 17 behavioral cases plus
 a shared `ThreadRecord` fixture helper cannot shed 26 lines without deleting review context — which
 the budget rule forbids. Not taken: the implementation/test-twin split across two PRs, which
@@ -1048,3 +1048,121 @@ leave stale compiled output in `dist/` when the timestamps fall inside the same 
 reported a phantom failure during this session. Every mutant run above therefore removed `dist/`
 first. A phantom failure that survives a source restore should be re-checked from a clean `dist/`
 before it is believed.
+
+## Judgment Day audit (substitute for the tribunal debate, on the Director's explicit waiver)
+
+The Arena bridge that hosts the Alpha collaborator was unavailable for this mission
+(`127.0.0.1:8766` → `ECONNREFUSED`), and **the Director explicitly waived the tribunal audit for it**,
+directing that the mission be completed with the internal gentle-ai capability instead. That waiver
+is recorded here and in `docs/05-tribunal/INDEX.md` rather than left as a silent skip: DN-05's
+"Alpha audits every unit before it opens" is not satisfied, it is **waived for this slice by the
+authority that owns it**, and replaced by the method below.
+
+Judgment Day ran as the adversarial substitute, not as a re-run of the native RDD review (that
+lifecycle is a different authority and had already closed `approved` for this candidate). Frozen
+target: `ef58020..98ca9ef`, the 8 declared paths, working tree clean. Two blind read-only judges
+(`jd-judge-a`, `jd-judge-b`) swept it in parallel with identical scope and criteria — correctness,
+edge cases, error handling, security, project conventions — against `design.md` §11/§12/§15/§18 D-15,
+the constitution's invariants and wire policy, THREAT-MODEL T06/PT-13/PT-14 and the budget rule.
+Neither judge was told any prior finding, and neither was given the other's.
+
+### Ledger (round 1)
+
+| Id | Location | Severity | Causality | Confirmed by both? |
+|---|---|---|---|---|
+| JD-1 | `src/shared/fence.ts` `escapeAttribute` | WARNING | introduced | **yes** (A: `:39-43`, B: `:35-36`) |
+| JD-2 | `docs/02-architecture/THREAT-MODEL.md:137` (PT-14 cell) | WARNING | introduced | **yes** (A and B independently) |
+| JD-3 | `openspec/.../apply-progress.md` stale figures | SUGGESTION | introduced | **yes** (A and B independently) |
+| JD-4 | `src/shared/protocol-select.ts:61` digest blind spots | WARNING (B) / SUGGESTION (A) | **pre_existing** | yes, same location |
+| JD-5 | `src/shared/fence.ts` body escape does not neutralise `&` | WARNING | **pre_existing** | one judge (A) |
+| JD-6 | `src/shared/fence.ts:4-8` `Changes:` list breadth | SUGGESTION | introduced | one judge (A) |
+
+Confirmed/suspect/contradiction counts: **3 confirmed by both judges**, 2 single-judge, 0
+contradictions, 0 CRITICAL.
+
+**JUDGMENT: APPROVED** — no CRITICAL finding existed, so the protocol required no correction round.
+The orchestrator nonetheless applied a bounded correction round to the three *introduced* defects
+JD-1, JD-2 and JD-3 (see below), because merging a security register and a provenance header that
+state something demonstrably false is worse than correcting them. Disclosed rather than dressed up:
+the protocol did not *require* those fixes; the deliverable's owner chose them.
+
+### Corrections applied (round 1)
+
+- **JD-1.** `escapeAttribute` now escapes `&`, `<`, `>` and `"`. Both judges verified the hole the
+  same way: an origin value carrying `>` ended the opening tag early
+  (`project_id="proj-a>"` produced a tag that stopped before `agent_id`), while `assertFenceIsSound`
+  still reported sound because it counts raw `<` and the closing delimiter only. Judge B's framing is
+  the one that matters: the header's own change (2) claimed a value "can neither close the opening
+  tag early nor inject a second attribute", and that claim was **false and unfalsifiable** for `>`.
+  Judge A's parallel note that `<` cannot close a tag is correct and the helper's comment now says
+  so: `>` ends a tag, `<` only ever opens one. Pinned by a new case; **mutant evidence:** with the
+  `>` escape removed, `npm run build` succeeds and the focused run reports 7 pass / 1 fail, failing
+  exactly "an attribute value carrying `>` cannot close the opening tag early (PT-14)" and nothing
+  else; restored byte-identically, 8/8.
+- **JD-2.** The PT-14 cell in THREAT-MODEL §4 is **reverted to `daemon unit`** (PR-06a had appended
+  `test/shared/fence.test.ts`). Both judges found the same over-claim from opposite directions: the
+  fence twin builds its own `FenceOrigin` literal and asserts only that the wrapper reproduces the
+  caller's values, so PT-14's actual claim — values taken from *the binding and the verified sender,
+  never from the envelope's own claim* — is pinned nowhere by this slice. The authoritative mapping
+  agrees: `design.md:528` assigns PT-14 to `daemon/serve/fetch.ts`, `tasks.md`'s PT→PR map sends it
+  to PR-23, and task 25.4 updates the same cells again. A register that credits an unpinned security
+  guarantee is worse than a register with a blank cell, so the cell is blank again until PR-23/PR-25
+  pins it for real. PT-13's cell keeps `test/shared/fence.test.ts`, which is correct.
+  **Consequence for task 6.4:** its checkbox stays `[x]` for PT-13, and PT-14 is deliberately *not*
+  updated — the task's instruction was boilerplate applied to a PT whose pinning test this slice does
+  not contain. PR-25's task 25.4 inherits it.
+- **JD-3.** The stale first-pass figures are corrected: "6-line exception" → 26, "The 16 cases" → 17.
+  Both judges caught that the very commit whose subject was "reconcile the recorded PR-06b figures"
+  had left two contradictory pairs behind. A record that contradicts itself is a defect in its own
+  right.
+- **JD-6.** The fence header's `Changes:` now also names the added `escapeAttribute` and the two
+  modified vendored comment blocks, so a header-only reviewer — which `design.md:439` explicitly
+  contemplates — sees the full delta. The header is outside the hashed body, so the pinned value is
+  unaffected (re-confirmed).
+
+### Queued, deliberately not fixed here
+
+- **JD-4 (pre_existing).** The digest has discrete blind spots: `opened_type` (which flips
+  `isNeedsAction`), a same-length replacement of a history entry, `closure_delivered`, `to_user_id`
+  and a `from`/`to` swap that keeps the turn all leave it unchanged. Judge B found the sharpest
+  instance: `MAX_THREAD_HISTORY = 50` **saturates** `history.length`, so once a thread holds 50
+  messages a further peer REPLY appends and caps back to 50 while `awaiting`, `ack_count`, `status`
+  and the surfaced bit stay identical — a byte-identical digest, so the quiet tick answers "nothing
+  changed" while an unread reply waits. That is precisely the "follow-up vanishes" failure the
+  module's own comment says the history-length component exists to prevent, and the new test uses
+  1-vs-2 entries so it cannot fail on the capped case. **Not fixed here** on purpose: it is v1
+  behavior carried unchanged by the SEAM, the ratified change list for this row is fixed, and
+  amending a documented "nothing changed" algorithm inside a vendoring slice would ship an
+  unreviewed behavioral change to a change detector. Proposed minimal fix for whoever takes it:
+  include the last history entry's `eid` in the row (discrete, and it also closes the same-length
+  replacement). **Recommended backlog id for the Director.**
+- **JD-5 (pre_existing).** The fence body escape neutralises `<` but not `&`, so the fence is not
+  injective: `wrapUntrusted("&lt;")` and `wrapUntrusted("<")` are the same string, and a body of
+  `&lt;/UNTRUSTED-PEER-INPUT&gt;` decodes to a closing tag for any consumer that entity-decodes
+  before reading. Judge A also notes the module's comment justifies the substitution with "`&lt;` …
+  so peers read a familiar form", while v1's design chose to escape `<` rather than enumerate tags.
+  **Not fixed here** on purpose: THREAT-MODEL §7 ratifies the fence as *inherited unchanged*, the
+  design's change list for this row is "(1) origin attributes", and F1 has no entity-decoding
+  consumer. Changing a documented, deliberate control needs its own decision and its own tests, not a
+  drive-by edit inside a vendoring slice. **Recommended backlog id for the Director**, together with
+  the observation that `escapeHtml` in `envelope.ts:214-216` escapes `&` first and is therefore
+  injective where this fence is not.
+- Judge A's remaining note on JD-1's neighbourhood — a newline or `>` in an attribute value makes the
+  opening tag multi-line, which a line-oriented reader could mistake for a second label line — is
+  closed for `>` by the correction above; the newline part cannot break the label's *structure* (a
+  newline cannot terminate a quoted attribute) and belongs to upstream identifier validation, which
+  `PROJECT_ID_PATTERN` (`constants.ts:285`, currently unreferenced) and the registry slices own.
+
+### What the judges verified as sound
+
+Both judges independently re-derived the two pinned hashes from the v1 checkout (including the
+wrongly-stripped controls `6ef490b8…` and `110b6496…`), confirmed both module bodies differ from
+their pinned values, confirmed the registry's 8 entries equal the scanned set, confirmed the fence's
+body-escape cases are failable, brute-forced `selectTiered` (judge B: 1,417,176 cases across sizes
+and floors including negatives and empty tiers — zero invariant violations and zero overfills; judge
+A: 11 sizes × 7 floor sets, same result), confirmed no continuous quantity leaks into the digest (a
+30-hour sweep produces exactly two distinct digests, i.e. only the window crossing), confirmed the
+range touches exactly the 8 declared paths with no dependency, no wire change and no edit to a
+hash-pinned AS-IS file, and ran the suites themselves (`npm test` 152/152 at the time of judging,
+`npm run test:static` 8/8). Judge A additionally confirmed the `Changes:` delta of
+`protocol-select.ts` is exactly the five declared substitutions and nothing else.
