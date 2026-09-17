@@ -89,10 +89,8 @@ export interface RegistryLoader {
  * binding, and its value is `sha256:<64 hex>` — which the shared token regex
  * (`\d+:[A-Za-z0-9_-]{35}`, an unbounded digit run) matches by accident, because `sha256` ends in
  * digits. Scanning the raw text unchanged would therefore refuse *every* valid registry, so the
- * canonical hash value is masked out first ({@link withoutRosterHashes}). The mask cannot hide a real
- * token: it matches exactly `sha256:` followed by 64 characters of `[0-9a-f]`, and a token needs a
- * colon inside that run, which the hexadecimal class cannot contain. Everything else in the file is
- * scanned untouched.
+ * canonical hash value is masked out first ({@link withoutRosterHashes}), and the mask is bounded so a
+ * token cannot hide inside it. Everything else in the file is scanned untouched.
  *
  * The rule that fired is deliberately **not** reported. `assertNoTokenShape` rejects the same shape
  * table the rest of this repository uses (the two shapes of `shared/token-shape.ts` plus the shared
@@ -102,15 +100,21 @@ export interface RegistryLoader {
  * instead; naming the rule is a backlog row for the slice that renders the condition.
  */
 export function parseRegistryText(text: string): RegistryParseResult {
+	// A UTF-8 byte-order mark is what PowerShell's `Set-Content -Encoding UTF8` writes, and `JSON.parse`
+	// rejects it: without this the Windows-first hand-edit path (R6 permits it until F2's wizards exist)
+	// would refuse a byte-identical document as `invalid_json`. Stripped once, before both the scan and
+	// the parse, so the two see the same text. UTF-16 is deliberately not accommodated: a `utf8` decode
+	// cannot tell it from binary, and the refusal names the parse, which is the honest answer.
+	const source = text.startsWith("\uFEFF") ? text.slice(1) : text;
 	try {
-		assertNoTokenShape(withoutRosterHashes(text));
+		assertNoTokenShape(withoutRosterHashes(source));
 	} catch {
 		return { ok: false, problems: [{ kind: "forbidden_content" }] };
 	}
 
 	let raw: unknown;
 	try {
-		raw = JSON.parse(text);
+		raw = JSON.parse(source);
 	} catch {
 		return { ok: false, problems: [{ kind: "invalid_json" }] };
 	}
@@ -127,11 +131,20 @@ export function parseRegistryText(text: string): RegistryParseResult {
  * `sha256:<64 hex>` the shared hasher emits, but this mask has to recognise the *shape* a human can
  * type: an uppercase `sha256:<HEX>` also matches the token regex, and without the `i` flag it would be
  * reported as `forbidden_content` — a false secret report — instead of the `schema_invalid` it really
- * is. The mask stays sound either way: it is `sha256:` followed by 64 hexadecimal characters, and a
- * token's own colon cannot occur inside that class, so no token can ride in a masked region.
+ * is.
+ *
+ * The trailing boundary is load-bearing, and it is what makes the mask sound. A mask that simply took
+ * `sha256:` plus 64 hex characters could be *completed* by a token's own digit run: a value of
+ * `sha256:` + 55 hex + `<9-digit bot id>:<secret>` supplies exactly the 64 hexadecimal characters the
+ * mask is looking for, so the mask would swallow the digits and leave `:<secret>`, which no longer
+ * matches `\d+:` — and a real token would load. Round 1's `JD-A-001` found that, and this repository's own
+ * reproduction confirmed it. Requiring the character after the run to be **neither hexadecimal nor a
+ * colon** closes it: a token's colon can never be inside a hex-only region and never immediately after
+ * one, so the digits that precede it are always left outside the mask and the token stays visible to the
+ * scan. The schema still accepts only the exact canonical value.
  */
 function withoutRosterHashes(text: string): string {
-	return text.replace(new RegExp(ROSTER_HASH_VALUE_PATTERN, "gi"), ROSTER_HASH_PLACEHOLDER);
+	return text.replace(new RegExp(`${ROSTER_HASH_VALUE_PATTERN}(?![0-9a-fA-F:])`, "gi"), ROSTER_HASH_PLACEHOLDER);
 }
 
 /** Whether two fingerprints describe the same file state (both members, D-12). */
@@ -173,8 +186,9 @@ const NODE_FILE_IO: RegistryFileIo = {
  * The last good registry is held **in memory**: an invalid or torn file keeps it, raises
  * `registry_invalid` and changes nothing on disk, and the next `sync` picks the file up as soon as the
  * human fixes it. A daemon that starts against a file that never parsed holds nothing at all and
- * activates no binding — design §6's flow ("invalid ⇒ empty last-good + `registry_invalid`"), never a
- * defaulted empty registry, which would be indistinguishable from a machine with no bindings.
+ * activates no binding — design §7.1's boot flow (design.md:280, "invalid ⇒ empty last-good +
+ * `registry_invalid`"), never a defaulted empty registry, which would be indistinguishable from a
+ * machine with no bindings.
  */
 export function createRegistryLoader(options: { readonly path: string; readonly io?: RegistryFileIo }): RegistryLoader {
 	const path = options.path;
@@ -205,6 +219,12 @@ export function createRegistryLoader(options: { readonly path: string; readonly 
 			}
 
 			if (lastGood !== undefined && isSameFingerprint(lastGood.fingerprint, fingerprint)) {
+				// The file agrees with the registry we hold, so whatever the last failed attempt was about is
+				// over. Without this line a timestamp-preserving restore (`cp -p`, `robocopy /DCOPY:T`, a
+				// backup tool) would latch `registry_invalid` forever: the fingerprint never moves again, so
+				// no later sync could ever clear it and `status` would report a broken registry on a healthy
+				// machine. Both judges reached this in round 1 (`JD-A-002`, `JD-B-001`).
+				condition = undefined;
 				return { status: "unchanged" };
 			}
 

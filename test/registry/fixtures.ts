@@ -106,7 +106,7 @@ export function addSecondBinding(document: ReturnType<typeof validRegistryDocume
 		added_at: "2026-09-16T00:00:00Z",
 	});
 	document.groups.push({ group_id: -1001234567891, added_at: "2026-09-16T00:00:00Z" });
-	document.projects.push({ project_id: "prj-second", path: "C:\work\second" });
+	document.projects.push({ project_id: "prj-second", path: "C:\\work\\second" });
 	document.bindings.push(
 		activeBinding({
 			project_id: "prj-second",

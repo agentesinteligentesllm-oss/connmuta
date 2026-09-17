@@ -2721,7 +2721,7 @@ exemption's soundness. Trimming those is what the budget rule forbids.
 The loader was written during the PR-09a session and left **uncommitted, green and deliberately
 unreviewed** — the Director asked for PR-09a only — and the review preflight declined that draft twice
 (`9110d7de…` and `0bc4e9dd…`; handoff §0.1). This session reviewed it as a reviewer rather than as its
-author, completed it, and closed the tasks. Two findings of that review are **not** gate changes and are
+author, completed it, and closed the tasks. Three findings of that review are **not** gate changes and are
 disclosed here instead:
 
 1. **The R5 mask had to become case-insensitive.** `sha256:<HEX>` matches the shared token regex exactly as
@@ -2751,7 +2751,7 @@ disclosed here instead:
 | review findings | focused suite as each was fixed | the uppercase-hash case failed while the mask was case-sensitive (1 failure); the ordering test failed once the fingerprint was re-stated after the read (1 failure); the size case failed once `size` left the comparison (1 failure) |
 | 9.5 focused, clean worktree at `3eba70d` | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/registry/loader.test.js"` | **56/56** (schema 20, invariants 16, loader 20) |
 | full suite, clean worktree at `3eba70d` | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **324/324** (PR-09a's 304 + 20 loader tests) |
-| `test:static`, same tree | `node --test "dist/test/security/*.test.js"` | **8/8** — the twin walk, the provenance registry (11 entries, no header on any new file) and the repo scan |
+| `test:static`, same tree | `node --test "dist/test/security/*.test.js"` | **8/8** — the provenance registry (11 entries, no header on any new file), the repo scan and `pack`. The **twin walk is not in this glob**: `test/twins.test.ts` compiles to `dist/test/twins.test.js`, so the twin rule is proved by the full-suite row above, not here (this attribution was wrong in the first draft of this record — the same defect PR-09a's round 1 corrected, regressed; round 1's `JD-B-003`) |
 
 ## Mutant matrix — each built first on a cleaned `dist/`, each restored byte-identically
 
@@ -2778,6 +2778,67 @@ seam exists: before it, the stat-before-read ordering was a reasoned argument wi
 3. **PT-25's cell names only the registry-side half**, and the split with `daemon/send/send-path` is stated
    rather than resolved (B-26 stays open for the Director).
 
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the frozen tree
+(`../telegram_bus_agent-worktrees/jd-09b`, detached at `88a0c52`) in one exhaustive pass each, graph-v1 rows
+only, with the slice's own record in scope. **12 rows — 1 CRITICAL, 6 WARNING, 5 SUGGESTION**, with two pairs
+reached independently. The Director authorized the full round-1 batch (the severe fix plus the informational
+folds), the same shape as PR-09a's round.
+
+| Judge | Row | Severity | Disposition |
+|---|---|---|---|
+| A | `JD-A-001` | **CRITICAL** | the R5 mask could be completed by a token's own digit run; **reproduced by the writer**, fixed in round 1 |
+| A | `JD-A-002` | WARNING | `registry_invalid` latched on the `unchanged` path (also `JD-B-001`); folded |
+| B | `JD-B-001` | WARNING | same defect as `JD-A-002`, independently reached; folded |
+| A | `JD-A-003` | WARNING | R5's strictness refuses a free-form `title` containing `Authorization` or `KEY=`; **reported, not fixed** (a design decision, **B-30**) |
+| A | `JD-A-004` | WARNING | a UTF-8 BOM (PowerShell's `Set-Content -Encoding UTF8`) made a valid registry `invalid_json`; folded |
+| B | `JD-B-002` | WARNING | the "fingerprint only for a file that parsed" guarantee was unpinned and two mutants survived it; pinned by a test |
+| B | `JD-B-003` | WARNING | this record credited the twin walk to the `test:static` glob — PR-09a's corrected wording, regressed; folded |
+| A | `JD-A-005` | SUGGESTION | the restored fixture wrote `C:\work\second` with single backslashes, so the value was `C:worksecond` (also `JD-B-004`); folded |
+| B | `JD-B-004` | SUGGESTION | same as `JD-A-005`, independently reached; folded |
+| B | `JD-B-005` | SUGGESTION | a docstring cited design §6 for a flow that is §7.1; folded |
+| B | `JD-B-006` | SUGGESTION | a JSON-escaped colon (`\u003a`) bypasses the raw-text scan; **reported, not fixed** (**B-31**) |
+| B | `JD-B-007` | SUGGESTION | the record said "two findings" above a list of three; folded |
+
+**The CRITICAL was found by one judge, and the writer reproduced it before touching anything.** Judge B did
+not see it, and the skill's rule is to record a single-judge severe row as *suspect* rather than auto-fix it —
+so the mechanism was verified against the built module first: `sha256:` + hex + `<bot id>:<secret>` supplies
+exactly the 64 hexadecimal characters the mask looked for, so the mask swallowed the digits and left
+`:<secret>`, which no longer matches `\d+:`; the document **loaded** with a real token inside, while the bare
+token was refused. The module's own proof — "a token's own colon cannot occur inside that class" — was
+wrong: the colon was never inside the class, it was left dangling just outside it. The fix requires the
+character after the 64-hex run to be **neither hexadecimal nor a colon**, which makes the proof hold: a
+token's `\d+:` can never be swallowed, so the digits preceding it stay visible to the scan. The finding's own
+construction is now a test, with its 9-digit bot id replaced by this suite's 7-digit fixture — the finding's
+literal trips the repository's own PT-22 scan, a false positive of the family this slice is about. The
+Director authorized the batch explicitly, on the record that the row is single-judge.
+
+### Corrections applied (round 1)
+
+| Row(s) | Change | Why |
+|---|---|---|
+| `JD-A-001` | `withoutRosterHashes` bounds the mask with `(?![0-9a-fA-F:])`, and its docstring carries the corrected proof | the exemption could hide a real token: R5 failed open |
+| `JD-A-002`/`JD-B-001` | the `unchanged` fast path clears the condition when the file agrees with the registry we hold | a timestamp-preserving restore latched `registry_invalid` for the daemon's whole life |
+| `JD-A-004` | `parseRegistryText` strips a leading `\uFEFF` before both the scan and the parse | PowerShell's default UTF-8 output was refused as `invalid_json` on the Windows-first hand-edit path |
+| `JD-B-002` | a new test holds content length, mtime **and** size fixed across a failed load, so a fingerprint recorded for the failure is observable | the module's stated guarantee had no test that could fail (ADR-12) |
+| `JD-A-005`/`JD-B-004` | `addSecondBinding` writes `C:\\work\\second`, and the loader test asserts it | the shared fixture modelled a path no disk ever had |
+| `JD-B-003` | this record's `test:static` row now names what the glob really runs | it credited a leg outside the glob |
+| `JD-B-005` | the docstring cites design §7.1 (design.md:280) | the quoted boot flow is not in §6 |
+| `JD-B-007` | "three findings" | the count contradicted its own list |
+
+### Mutants re-run on the corrected tree
+
+Nine, all killed, each built first on a cleaned `dist/` and restored byte-identically (`restored=true` for
+all nine): `N3` the never-rename boundary, `N4` the post-read fingerprint, `N5` `size` dropped from the
+comparison, `N6` the success path not clearing the condition, `N7` a failed load forgetting the last good
+registry, `N8` **the mask's boundary dropped again** (the CRITICAL returning), `N9` the `unchanged` path not
+clearing the condition, `N10` the BOM strip removed, `N11` a failed parse refreshing the fingerprint.
+`N8`–`N11` exist because of this round, and each dies on the test written for its row. The round-1 sweep
+first failed here for an unrelated reason worth recording: the finding's own 9-digit literal tripped PT-22,
+so the repository's own scan failed until the fixture moved to the 7-digit shape this suite uses — the trap
+the handoff documents, hit exactly as documented.
+
 ## Next
 
-- PR-09b's Judgment Day audit and its ordinary native review, then the PR.
+- PR-09b's Judgment Day round 1's scoped re-judgment, its ordinary native review, then the PR.

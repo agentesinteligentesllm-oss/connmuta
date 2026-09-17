@@ -144,6 +144,65 @@ test("a human edit adding a binding is picked up without a restart (project-bind
 		assert.equal(loader.sync().status, "loaded");
 		assert.equal(loader.current()?.bindings.length, 2);
 		assert.equal(loader.current()?.bindings[1]?.project_id, "prj-second");
+		// `JD-A-005` / `JD-B-004`: the restored helper wrote the path with single backslashes, so the
+		// value was `C:worksecond` — the suite's own "valid registry" modelled a path no disk ever had.
+		assert.equal(loader.current()?.projects[1]?.path, "C:\\work\\second");
+	});
+});
+
+test("a timestamp-preserving restore clears the condition instead of latching it", () => {
+	// `JD-A-002` / `JD-B-001`, reached independently by both judges in round 1: the `unchanged` fast path
+	// returned before anything could reconsider the condition, so a restore that preserves mtime and size
+	// (what `cp -p`, `robocopy /DCOPY:T` or a backup tool produces) left `registry_invalid` raised for the
+	// rest of the daemon's life while the registry on disk was the good one.
+	withRegistry((path) => {
+		const good = JSON.stringify(validRegistryDocument());
+		writeAt(path, good, FIXED_TIME);
+		const loader = createRegistryLoader({ path });
+		assert.equal(loader.sync().status, "loaded");
+
+		writeAt(path, '{"registry_version":1,"bots":[', new Date(FIXED_TIME.getTime() + 1000));
+		assert.equal(loader.sync().status, "invalid");
+		assert.equal(loader.condition(), REGISTRY_INVALID_CONDITION);
+
+		writeAt(path, good, FIXED_TIME);
+
+		assert.equal(loader.sync().status, "unchanged");
+		assert.equal(loader.condition(), undefined, "the file agrees with the registry we hold: no fault");
+		assert.equal(loader.current()?.bindings.length, 1);
+	});
+});
+
+test("a failed load records no fingerprint, so a same-size fix at the same mtime is still picked up", () => {
+	// `JD-B-002`: the guarantee `loader.ts` states twice — the fingerprint is only recorded for a file
+	// that actually parsed — was unpinned, and two mutants that break it survived the whole suite
+	// (ADR-12). A torn document of exactly the same length is what makes it observable: with a
+	// fingerprint recorded for the failure, the next `sync` would report "unchanged" and the daemon would
+	// never retry until the file's mtime or size moved.
+	withRegistry((path) => {
+		const good = JSON.stringify(validRegistryDocument());
+		const torn = `{"oops":1}${" ".repeat(good.length - 10)}`;
+		assert.equal(torn.length, good.length);
+
+		writeAt(path, torn, FIXED_TIME);
+		const loader = createRegistryLoader({ path });
+		assert.equal(loader.sync().status, "invalid");
+
+		writeAt(path, good, FIXED_TIME);
+		assert.equal(loader.sync().status, "loaded", "the failed attempt must not have been recorded");
+		assert.equal(loader.current()?.bindings.length, 1);
+	});
+});
+
+test("a UTF-8 byte-order mark is tolerated: what PowerShell writes is still a registry", () => {
+	// `JD-A-004`: `Set-Content -Encoding UTF8` on PowerShell 5.1 writes `EF BB BF`, and `JSON.parse`
+	// rejects the decoded `\uFEFF`, so a byte-identical document was refused as `invalid_json` on the
+	// Windows-first hand-edit path that R6 sanctions. UTF-16 stays unsupported and is disclosed.
+	withRegistry((path) => {
+		writeAt(path, `\uFEFF${JSON.stringify(validRegistryDocument())}`, FIXED_TIME);
+		const loader = createRegistryLoader({ path });
+		assert.equal(loader.sync().status, "loaded");
+		assert.equal(loader.current()?.bindings.length, 1);
 	});
 });
 
@@ -340,6 +399,30 @@ test("the R5 exemption cannot hide a real token: only the exact hash value is ma
 	assert.deepEqual(result.problems, [{ kind: "forbidden_content" }]);
 
 	// Non-vacuity: the same scan accepts a document whose only hash-shaped value is a canonical one.
+	assert.equal(parseRegistryText(JSON.stringify(validRegistryDocument())).ok, true);
+});
+
+test("the exemption's boundary is load-bearing: a token completed into the mask's hex run is still caught", () => {
+	// `JD-A-001` (CRITICAL, round 1). A mask that took `sha256:` plus 64 hex characters could be
+	// *completed* by a token's own digit run — `sha256:` + 57 hex + `<7-digit bot id>:<secret>` supplies
+	// exactly those 64 — so the mask swallowed the digits and left `:<secret>`, which no longer matches
+	// `\d+:`, and a real token loaded. The trailing boundary refuses to mask that run, so the token stays
+	// visible. The construction is the finding's own, with its 9-digit bot id replaced by this suite's
+	// 7-digit fixture so the repository's own PT-22 scan stays clean (the finding's original literal would
+	// trip it).
+	const crafted = `sha256:${"a".repeat(57)}${FIXTURE_TOKEN}`;
+	const document = validRegistryDocument();
+	document.groups[0] = { ...document.groups[0], title: crafted };
+	const result = parseRegistryText(JSON.stringify(document));
+	if (result.ok) {
+		assert.fail("a token completed into the mask's hex run must not load");
+	}
+	assert.deepEqual(result.problems, [{ kind: "forbidden_content" }]);
+
+	// Non-vacuity on both sides: the bare token is caught too, and the canonical hash is still exempt.
+	const bare = validRegistryDocument();
+	bare.groups[0] = { ...bare.groups[0], title: FIXTURE_TOKEN };
+	assert.equal(parseRegistryText(JSON.stringify(bare)).ok, false);
 	assert.equal(parseRegistryText(JSON.stringify(validRegistryDocument())).ok, true);
 });
 
