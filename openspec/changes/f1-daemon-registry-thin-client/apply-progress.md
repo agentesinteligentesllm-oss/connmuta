@@ -2095,11 +2095,10 @@ authorization either: commit, push, PR and merge stay ordinary repository policy
 
 # PR-08b — `shared/roster-hash.ts` + the CLI (`conmuta validate`, `cli/main.ts`) — the second half of the re-sliced PR-08
 
-**Slice status:** implemented; **both independent lifecycles closed** at the corrected tip `a464a66` (code) /
-`03c2231` (record), stacked on PR-08a (merged as PR #11, `1770f84`). Judgment Day returned **approved** for
-`72e09c0..a464a66`; the ordinary native review was **declined for this candidate**, so its risk-gated
-fallback ran instead. DN-05 is unsatisfied for it too, for the same reason as the rest of F1 (Arena bridge
-down).
+**Slice status:** implemented; **Judgment Day closed approved** for `72e09c0..a464a66`, and the ordinary
+native review was **declined for this candidate** — which is *not* a closure — so its risk-gated fallback
+ran instead. Both are recorded below. Stacked on PR-08a (merged as PR #11, `1770f84`). DN-05 is unsatisfied
+for it too, for the same reason as the rest of F1 (Arena bridge down).
 
 | Field | Value |
 |---|---|
@@ -2116,12 +2115,12 @@ down).
 | `test/shared/roster-hash.test.ts` | 120 | 86 |
 | `src/cli/validate.ts` | 68 | 63 |
 | `test/cli/validate.test.ts` | 212 | 189 |
-| `src/cli/main.ts` | 132 | 125 |
-| `test/cli/main.test.ts` | 164 | 150 |
+| `src/cli/main.ts` | 139 | 125 |
+| `test/cli/main.test.ts` | 170 | 150 |
 | `src/shared/constants.ts` | +14 / −1 (`EXIT_VALIDATION_FAILED`) | same |
 | `src/cli/tsconfig.json` | +5 / −1 (the build wiring below) | same |
 | `src/shared/token-shape.ts`, `test/shared/token-shape.test.ts` | +4 / −4, +1 / −1 | comment-only |
-| **budget total** (`git diff --numstat -- src test`) | **759 / 400** — **359-line PR-08b-scoped exception** | 671 / 400 |
+| **budget total** (`git diff --numstat -- src test`) | **772 / 400** — **372-line PR-08b-scoped exception** | 671 / 400 |
 | `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** | same |
 
 The exception follows the same grounds as PR-08a's: the CLI's value is in its contract — argument
@@ -2130,7 +2129,7 @@ it at the **process boundary** (a real child process, the design §15 "Integrati
 only place a token could leak into a message. Trimming those cases is exactly what the budget rule
 forbids.
 
-The correction round grew the slice from **671 to 759** in that same `src`/`test` scope — **+88** — and two of
+The correction rounds grew the slice from **671 to 772** in that same `src`/`test` scope — **+101** — and two of
 its files are **PR-08a's**, touched comment-only: `src/shared/token-shape.ts` and
 `test/shared/token-shape.test.ts` carried `design.md` citations that this slice's own appended design row
 invalidated, so leaving them stale would have shipped a trace that cannot be followed (AGENTS.md §3). No
@@ -2319,11 +2318,13 @@ independent verifier always runs"*. So both halves ran:
   exit-code contract (8 for content, 2 for usage); the nine re-pointed citations each resolving to the
   paragraph they name; and that the `JD-A-002` narrowing is disclosed as a deviation rather than as the
   requirement's own wording.
-- **It also found five record defects, all corrected in the commit that carries this section** — see the
-  correction note below. That is the instrument working: the writer's own verification had passed over
-  every one of them.
+- **It found five record defects and one observation** — all corrected — and then a **focused re-check of that
+  very correction found two more defects that the correction itself had introduced**: a budget table measured
+  before its own companion change, and a status line that called a declined review a closed lifecycle. Both
+  are corrected too; see the correction note below. That is the instrument working twice over: the writer's
+  own verification had passed over all of them, and so had the first correction pass.
 
-### Correction note — the verifier's five record defects
+### Correction note — the verifier's five record defects, its one observation, and the two this fix itself introduced
 
 | # | Defect | Correction |
 |---|---|---|
@@ -2333,6 +2334,8 @@ independent verifier always runs"*. So both halves ran:
 | 4 | ADR-0012's document-level `Status` was presented as remediation row 2's status | reworded: the status is the ADR's, the prescription is row 2's |
 | 5 | The TDD table's `34/34` and `75/75` were pre-correction and unlabelled | both tip-labelled, with the frozen-tip figures (`39/39`, `79/79`) recorded |
 | 6 | *(its separate observation, not one of the five)*: the emitted usage text advertised the requirement's optional target (`[<path> | --stdin]`) while this build refuses a bare invocation with `EXIT_USAGE`, so the program's own text promised a form that exits 2 | the usage text now states the accepted forms and a test pins it, so the text cannot drift back into advertising an optional target |
+| 7 | *(this pass)* The budget table was corrected for the tip *before* the change in row 6: that fix added 13 `src`/`test` lines, so the table and its prose describe `03c2231` while the tree they ship on measures **772** | re-measured here to **772 / 400**, exception **372**, growth **+101**; the class is the one this repository keeps recording — after a correction edits a file, every figure about that file is suspect |
+| 8 | *(this pass)* The slice-status line said "both independent lifecycles closed", reusing PR-08a's phrase where both genuinely closed, while the section below records a **decline** — and a decline is not a closure | the status line now says Judgment Day closed `approved` and the review was **declined**, with the fallback named |
 
 ## Next
 
