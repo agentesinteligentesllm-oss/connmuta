@@ -182,9 +182,16 @@ while this slice is open. It was escalated rather than fixed in PR-07a because t
 Day round budget was exhausted and its two judges disagreed on whether the earlier correction
 introduced it.
 
-- [ ] 7b.1 RED: write `test/shared/tool-output.test.ts` (rendering of the fetch digest, `body_omitted` marker, fence-safe output) against a not-yet-present module.
-- [ ] 7b.2 GREEN: implement `src/shared/tool-output.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/fetch.ts:65-348` (read-only source, ≈284 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/fetch.ts`, and `Changes: (1) extracted lines 65-348; (2) imports relocated`.
-- [ ] 7b.3 Verify: `npm run build && node --test "dist/test/shared/tool-output.test.js" "dist/test/security/provenance.test.js"`.
+   **Apply-time amendment (appended — the note above stays as audited).** D4 was closed by this slice's
+   first commit, `27100ce`: `test/shared/error-payload.test.ts` now drives `UNKNOWN_THREAD`, a v1
+   tool-level code, through `toolErrorPayload`. Judgment Day round 1 found that a session reading the
+   gated artifacts in the order `AGENTS.md` §1 prescribes still saw the defect described above in the
+   present tense (finding JD-B-002), so the closure is recorded at the gate and not only in
+   `apply-progress.md`.
+
+- [x] 7b.1 RED: write `test/shared/tool-output.test.ts` (rendering of the fetch digest, `body_omitted` marker, fence-safe output) against a not-yet-present module.
+- [x] 7b.2 GREEN: implement `src/shared/tool-output.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/fetch.ts:65-348` (read-only source, ≈284 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/fetch.ts`, and `Changes: (1) extracted lines 65-348; (2) imports relocated`.
+- [x] 7b.3 Verify: `npm run build && node --test "dist/test/shared/tool-output.test.js" "dist/test/security/provenance.test.js"`.
 
 ### Unit 3 — `project-binding`
 
