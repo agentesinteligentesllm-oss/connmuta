@@ -117,11 +117,15 @@ Runtime harness: N/A — unit test over `applyEnvelope`/`isAddressee`/`classifyR
 - [x] 5.3 Verify: `npm run build && node --test "dist/test/shared/protocol-apply.test.js"`.
 - [x] 5.4 Docs: update the file-name cell(s) of PT-16, PT-17 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
-#### PR-06 — `shared/protocol-select.ts` + `shared/fence.ts` (SEAM, D-15)
-Branch `f1/06-protocol-select-fence` → `main`. Depends: PR-05. Size: ≈315 lines, no exception.
-Scope: `src/shared/protocol-select.ts`, `src/shared/fence.ts`, `test/shared/protocol-select.test.ts`, `test/shared/fence.test.ts`.
+#### PR-06 — `shared/protocol-select.ts` + `shared/fence.ts` (SEAM, D-15) — **re-sliced at apply time into PR-06a/PR-06b**
+Two serial branches from `main`: `f1/06a-fence` → `main`, then `f1/06b-protocol-select` → `main`. Depends: PR-05. Size: ≈315 estimated; the real authored diff is **576 lines**, re-sliced at the file boundary instead of granted one large exception, because — unlike PR-05 — these are two *independent* modules with no cohesion argument (apply-time decision, Director-authorized this session; same in-place re-slice precedent as PR-01 → PR-01a/PR-01b, tribunal `bus-v2-f1-pr-01-001`).
+  - **PR-06a** (`f1/06a-fence`): `src/shared/fence.ts` (65) + `test/shared/fence.test.ts` (95) + its fixture entry (6) + the PT-13/PT-14 cells in THREAT-MODEL §4 (4) ≈ 170 authored lines — **inside** the 400-line budget. Owns the D-15 fence amendment and PT-13/PT-14.
+  - **PR-06b** (`f1/06b-protocol-select`): `src/shared/protocol-select.ts` (160) + `test/shared/protocol-select.test.ts` (240) + its fixture entry (6) = **406 authored lines, 6 over** the 400-line review budget; granted a one-time, PR-06b-scoped size exception distinct from DN-06 (DN-06 stays AS-IS-only and is not amended). Grounds: 143 of the module's 160 lines are the byte-faithful v1 body the SEAM requires, and the 16 behavioral cases plus the shared `ThreadRecord` fixture helper cannot shed 6 lines without deleting review context — which the budget rule explicitly forbids.
+Scope (both slices): `src/shared/protocol-select.ts`, `src/shared/fence.ts`, `test/shared/protocol-select.test.ts`, `test/shared/fence.test.ts`, `test/fixtures/v1-provenance.json`.
 Requirements: underlies `durable-inbox` digest computation; `thin-client-tools › Fence soundness and origin labels` (PT-13, PT-14) — the D-15 amendment fencing site.
 Runtime harness: N/A.
+
+Tasks 6.1–6.4 stay unchecked until **PR-06b** lands: the slice is complete only then, so PR-06a merges with them still open (unfinished work is never checked off).
 
 - [ ] 6.1 RED: write `test/shared/protocol-select.test.ts` (select-side slice of `telegram-agent-bus/test/protocol.test.ts`, read-only reference) and `test/shared/fence.test.ts` asserting the fence cannot be forged by a peer body containing `</UNTRUSTED-PEER-INPUT>` and that `<` is escaped to `&lt;`.
 - [ ] 6.2 GREEN: implement `src/shared/protocol-select.ts` (SEAM from `telegram-agent-bus/src/protocol.ts:335-478`, read-only source; `computeWorkDigest` takes the per-client surfaced set and checkpoint) and `src/shared/fence.ts` (SEAM from `telegram-agent-bus/src/tools/fetch.ts:43-63`, read-only source; origin attributes added per D-15).
