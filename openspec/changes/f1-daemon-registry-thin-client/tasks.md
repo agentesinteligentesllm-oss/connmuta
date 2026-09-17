@@ -138,12 +138,12 @@ Scope: `src/shared/tool-schemas.ts`, `src/shared/error-payload.ts`, `test/shared
 Requirements: `send-path › Send input carries no destination` (PT-02); `thin-client-tools › Four tool input schemas port unchanged`; `thin-client-tools › Client-local error payload constructor` (PT-07, shape only).
 Runtime harness: N/A.
 
-- [ ] 7a.1 RED: write `test/shared/tool-schemas.test.ts` (shape assertion: no `chat_id`/`bot`/`group`/`to_chat`/`from` key; the four schemas parse v1's documented inputs) against a not-yet-present module.
-- [ ] 7a.2 GREEN: implement `src/shared/tool-schemas.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/send.ts:47-109` + `src/index.ts:29-42` (read-only source, ≈77 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/send.ts`, and `Changes: (1) extracted lines 47-109 and index.ts:29-42 into one module; (2) imports relocated`.
-- [ ] 7a.3 RED: write `test/shared/error-payload.test.ts` asserting the closed `{code, message, retryable, retry_after_s?, new_chat_id?}` shape and `RETRYABLE_TOOL_CODES` allow-list.
-- [ ] 7a.4 GREEN: implement `src/shared/error-payload.ts` (SEAM from `telegram-agent-bus/src/index.ts:45-103`, read-only source; the client side drops the `telegram.ts` dependency, kept only in `daemon/ipc/routes.ts`'s `toTelegramErrorPayload`, PR-31).
-- [ ] 7a.5 Verify: `npm run build && node --test "dist/test/shared/tool-schemas.test.js" "dist/test/shared/error-payload.test.js" "dist/test/security/provenance.test.js"`.
-- [ ] 7a.6 Docs: update the file-name cell(s) of PT-02, PT-07 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 7a.1 RED: write `test/shared/tool-schemas.test.ts` (shape assertion: no `chat_id`/`bot`/`group`/`to_chat`/`from` key; the four schemas parse v1's documented inputs) against a not-yet-present module.
+- [x] 7a.2 GREEN: implement `src/shared/tool-schemas.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/send.ts:47-109` + `src/index.ts:29-42` (read-only source, ≈77 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/send.ts`, and `Changes: (1) extracted lines 47-109 and index.ts:29-42 into one module; (2) imports relocated`.
+- [x] 7a.3 RED: write `test/shared/error-payload.test.ts` asserting the closed `{code, message, retryable, retry_after_s?, new_chat_id?}` shape and `RETRYABLE_TOOL_CODES` allow-list.
+- [x] 7a.4 GREEN: implement `src/shared/error-payload.ts` (SEAM from `telegram-agent-bus/src/index.ts:45-103`, read-only source; the client side drops the `telegram.ts` dependency, kept only in `daemon/ipc/routes.ts`'s `toTelegramErrorPayload`, PR-31).
+- [x] 7a.5 Verify: `npm run build && node --test "dist/test/shared/tool-schemas.test.js" "dist/test/shared/error-payload.test.js" "dist/test/security/provenance.test.js"`.
+- [x] 7a.6 Docs: update the file-name cell(s) of PT-02, PT-07 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 #### PR-07b — `shared/tool-output.ts` (SEAM)
 Branch `f1/07b-tool-output` → `main`. Depends: PR-07a. Size: ≈385 lines (≈284 extracted body + ≈100 twin), no exception (range extract of `tools/fetch.ts`, therefore SEAM). If the twin exceeds ≈115 authored lines, ship the twin as PR-07c (`f1/07c-tool-output-tests`) so PR-07b stays ≤ 400.
