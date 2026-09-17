@@ -3147,6 +3147,19 @@ recorded rather than smoothed: 885 / 485 before any correction, 1,140 / 740 afte
 885 here, with round 2's own delta at **+169 / −24**. The growth beyond the authorized batch is the cost of
 correcting a defect that batch introduced, and it is disclosed to the Director rather than absorbed.
 
+### Final verification and verdict (round 2, terminal)
+
+Both judges resolved `JD-B-007 → verified` at `4951fc6`, independently. One authorized correction batch and
+one final bounded fix round were used, with both scoped re-judgments spent and **no severe row outstanding
+at any point** — no BLOCKER and no CRITICAL was raised in either round.
+
+Final verification at the frozen tip `4951fc6`, `dist/` rebuilt from scratch in the isolated worktree:
+focused **24/24**, full **352/352** (328 before the slice), `test:static` **8/8**, and the 19-mutant sweep
+19/19 killed with both sources restored byte-identically.
+
+**`JUDGMENT: APPROVED`** for `3534739..4951fc6`.
+
 ## Next
 
-- The ordinary native review, then push, PR and the CI matrix.
+- The ordinary native review, then push, PR and the CI matrix. The audit-path record goes to
+  `docs/05-tribunal/INDEX.md` at close as `bus-v2-f1-pr-10-audit-001`, with DN-05 unsatisfied.
