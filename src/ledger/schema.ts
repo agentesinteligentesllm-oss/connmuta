@@ -1,13 +1,15 @@
 /**
  * The ledger's schema, version 1 (`ledger/schema.ts`, design §5.2).
  *
- * New code, not vendored: design §12 has no row naming `ledger/*`, so this file carries no provenance
- * header and `test/fixtures/v1-provenance.json` stays at its eleven entries. That header's own first
- * token — a capitalised `Provenance` with a colon — is what `test/security/provenance.test.ts` keys on
- * when it decides whether a file is a vendored copy, so this comment states the fact without spelling
- * the token: a *leading* block that carries it must also parse as a complete header, and this module
- * has no imports to put in front of its doc comment. That gate is exactly what caught the first draft,
- * which spelled the token out and was reported as a malformed vendored module.
+ * New code, not vendored: design §12's only row naming `ledger/*` is the **REPLACED** row
+ * (`v1:src/state.ts:89-186, 217-250, 252-456` → `ledger/*`), and a replaced v1 module is not reused line
+ * by line, so there is nothing to pin against: this file carries no provenance header and
+ * `test/fixtures/v1-provenance.json` stays at its eleven entries. That header's own first token — a
+ * capitalised `Provenance` with a colon — is what `test/security/provenance.test.ts` keys on when it
+ * decides whether a file is a vendored copy, so this comment states the fact without spelling the token:
+ * a *leading* block that carries it must also parse as a complete header, and this module has no imports
+ * to put in front of its doc comment. That gate is exactly what caught the first draft, which spelled the
+ * token out and was reported as a malformed vendored module.
  *
  * The DDL is authored in the design and this file is that text, so the suite in
  * `test/ledger/schema.test.ts` checks what a database does with it rather than reading it back. It is
@@ -24,6 +26,12 @@
  *   the per-agent filter and the reminder math in TypeScript — no window constant appears in the DDL;
  * - `audit_log` and `unknown_senders` have no body column at all, so PT-20's "no body of a rejected or
  *   foreign message" is a property of the schema and not only of the writers.
+ *
+ * **A boundary the DDL does not enforce, so that the inline comments are not read as one.** The
+ * `-- NULL for apply_outcome IN ('rejected','ignored')` beside `updates.body` is a *destination* for
+ * D-20's writer rule, not a constraint: SQLite accepts a `rejected` row carrying a body (measured on the
+ * pinned build), because coupling two columns is not something this DDL does. `ledger/inbox.ts` (PR-12)
+ * is where the coupling is enforced, and the durable-inbox requirement is what it answers to.
  */
 
 /**

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { NESTED_TRANSACTION_MESSAGE, withTransaction } from "../../src/ledger/transaction.js";
+import { ASYNC_CALLBACK_MESSAGE, NESTED_TRANSACTION_MESSAGE, withTransaction } from "../../src/ledger/transaction.js";
 
 /**
  * The `node:sqlite` transaction spike (design §5.3): the idiom `withTransaction` relies on, confirmed
@@ -36,6 +36,26 @@ const PROBE_DDL = "CREATE TABLE probe (id INTEGER PRIMARY KEY, value TEXT NOT NU
  * `BEGIN IMMEDIATE` and not later — and a bare `5` in an assertion is a number nobody can check.
  */
 const SQLITE_BUSY = 5;
+
+/**
+ * SQLite's own result code for "database or disk is full" (`sqlite3.h`, `SQLITE_FULL`).
+ *
+ * Named because this suite's auto-rollback test is about one error *class* — the failures SQLite answers
+ * by rolling the whole transaction back itself — and that is what makes the caller's own error the one
+ * that must survive.
+ */
+const SQLITE_FULL = 13;
+
+/**
+ * A page ceiling low enough that a bulk insert reaches `SQLITE_FULL` on the pinned build.
+ *
+ * This is how the suite reaches SQLite's automatic-rollback class without a full disk: the failure is the
+ * real one, raised by SQLite, rather than a simulation of it.
+ */
+const MAX_PROBE_PAGES = 8;
+
+/** Rows enough to exceed {@link MAX_PROBE_PAGES} many times over before the insert loop would end. */
+const BULK_INSERT_ROWS = 100_000;
 
 /** Opens a fresh temp-file ledger, runs `operation`, and removes the directory even on failure. */
 function withDatabase(operation: (db: DatabaseSync, path: string) => void): void {
@@ -77,8 +97,8 @@ function refusalOf(operation: () => void): { readonly errcode: number; readonly 
 	assert.fail("expected the operation to be refused");
 }
 
-test("a committed callback's writes are durable, its value survives, and no transaction is left open", () => {
-	withDatabase((db) => {
+test("a committed callback's write reaches the database file, its value survives, and no transaction is left open", () => {
+	withDatabase((db, path) => {
 		assert.equal(db.isTransaction, false, "a fresh connection holds no transaction");
 
 		const value = withTransaction(db, () => {
@@ -90,6 +110,19 @@ test("a committed callback's writes are durable, its value survives, and no tran
 		assert.equal(value, "committed", "the callback's value reaches the caller (PR-12's writer returns counts)");
 		assert.equal(rowCount(db), 1, "the row committed with the transaction");
 		assert.equal(db.isTransaction, false, "the connection must be reusable for the next poll batch");
+
+		// A second connection reads the row out of the file rather than out of this connection's memory, so
+		// the commit is observable from outside the writer. Durability in the fsync sense is a different claim
+		// with a different owner — `PRAGMA synchronous = FULL` in the open sequence (design §5.1, PR-11) — and
+		// this suite does not assert it.
+		const reader = new DatabaseSync(path);
+		try {
+			const row = reader.prepare("SELECT count(*) AS c FROM probe").get();
+			assert.ok(row !== undefined, "count(*) always returns exactly one row");
+			assert.equal(Number(row.c), 1, "the committed row is in the file, visible to a second connection");
+		} finally {
+			reader.close();
+		}
 	});
 });
 
@@ -158,6 +191,55 @@ test("a callback that ends the transaction itself never replaces the caller's er
 
 		assert.equal(caught, failure, "the caller's error must survive: a second ROLLBACK would mask it");
 		assert.equal(db.isTransaction, false, "the callback closed the transaction, so nothing is left open");
+	});
+});
+
+test("an async callback is refused before the commit, and the part that already ran is rolled back", () => {
+	// `() => T` accepts `T = Promise<void>`, so the type cannot forbid this; the value check before `COMMIT`
+	// can, and turning the misuse into a refusal is what keeps a partial batch from being committed silently.
+	withDatabase((db) => {
+		assert.throws(
+			() =>
+				withTransaction(db, async () => {
+					insert(db, 1);
+				}),
+			{ message: ASYNC_CALLBACK_MESSAGE },
+			"a promise-returning callback must be refused rather than committed early",
+		);
+
+		assert.equal(rowCount(db), 0, "the synchronous part of the callback was rolled back, not committed");
+		assert.equal(db.isTransaction, false, "the connection is left clean for the next batch");
+	});
+});
+
+test("the guard keeps the caller's error when SQLite rolls the transaction back by itself", () => {
+	// Measured on the pinned build: a statement failing with SQLITE_FULL leaves `isTransaction` false, so an
+	// unconditional `ROLLBACK` in the catch would replace this error with "cannot rollback - no transaction is
+	// active". The assertion is about the error that reaches the caller, not about SQLite's internal choice,
+	// so a build that kept the transaction open would satisfy it just the same.
+	withDatabase((db) => {
+		db.exec(`PRAGMA max_page_count = ${MAX_PROBE_PAGES}`);
+		const bulk = db.prepare("INSERT INTO probe (id, value) VALUES (?, ?)");
+
+		let caught: unknown;
+		try {
+			withTransaction(db, () => {
+				for (let id = 0; id < BULK_INSERT_ROWS; id += 1) {
+					bulk.run(id, "x".repeat(100));
+				}
+			});
+		} catch (error) {
+			caught = error;
+		}
+
+		const refusal = caught as { errcode?: unknown; message?: unknown };
+		assert.equal(refusal.errcode, SQLITE_FULL, `expected the statement's own failure, got: ${String(refusal.message)}`);
+		assert.equal(
+			String(refusal.message).includes("no transaction is active"),
+			false,
+			"the caller must not be told about a rollback it did not ask for",
+		);
+		assert.equal(db.isTransaction, false, "whatever SQLite did, no transaction is left open");
 	});
 });
 

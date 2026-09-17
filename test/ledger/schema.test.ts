@@ -16,9 +16,11 @@ import { LEDGER_SCHEMA_DDL } from "../../src/ledger/schema.js";
  * absence of a window constant are properties of the text itself, and each is checked together with a
  * control that proves the check can fail.
  *
- * Every value here is a placeholder (AGENTS.md §3): synthetic bot, group, chat and user ids, none of
- * them shaped like a credential, and the digit runs stay outside the 8–10 digit window
- * `test/security/repo-scan.test.ts` scans for (PT-22).
+ * Every value here is a placeholder (AGENTS.md §3): synthetic bot, group, chat and user ids, none of them
+ * shaped like a credential. The PT-22 scan is `\b\d{8,10}:[A-Za-z0-9_-]{35}\b`, so its 8–10 digit window
+ * only matters when a colon and 35 token characters follow the digits: the ids below (9 and 10 digits) sit
+ * inside that window and are safe for exactly that reason, while a fixture that puts a colon after a digit
+ * run must keep the run short — which is why `test/shared/secrets.test.ts` uses a 7-digit one.
  */
 
 /**
@@ -58,6 +60,9 @@ const SQLITE_CONSTRAINT_UNIQUE = 2067;
 const SQLITE_CONSTRAINT_FOREIGNKEY = 787;
 const SQLITE_CONSTRAINT_DATATYPE = 3091;
 
+/** SQLite's generic error code (`SQLITE_ERROR`), which a refused schema statement answers with. */
+const SQLITE_ERROR = 1;
+
 /**
  * Every closed vocabulary a CHECK in design §5.2 declares, with the values the design names.
  *
@@ -89,6 +94,56 @@ const VOCABULARIES: ReadonlyArray<{
 function outsideVocabulary(sample: SQLInputValue): SQLInputValue {
 	return typeof sample === "number" ? 99 : "OUT_OF_VOCABULARY";
 }
+
+/**
+ * design §5.2's NOT NULL columns, per table, authored from the DDL's own declarations.
+ *
+ * The three `INTEGER PRIMARY KEY` rowid aliases (`offsets.bot_id`, `updates.seq`, `audit_log.id`) are
+ * deliberately absent: `pragma_table_info` reports the *declaration*, and a NULL cannot reach those columns
+ * anyway — the value is the rowid SQLite assigns. Everything listed here is a column whose absence the
+ * writers would otherwise have to defend against statement by statement, so a dropped `NOT NULL` is a data
+ * -integrity hole and not a cosmetic edit.
+ */
+const LEDGER_NOT_NULL_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+	audit_log: ["direction", "outcome", "ts"],
+	binding_state: ["project_id"],
+	client_cursors: ["client_id", "inbox_seq", "last_seen_at", "project_id", "started_at"],
+	client_surfaced: ["client_id", "first_surfaced_at", "thread_id"],
+	conditions: ["name", "scope", "since"],
+	offsets: ["next_update_id"],
+	thread_history: ["at", "body", "eid", "from_agent_id", "project_id", "thread_id", "type", "via"],
+	threads: [
+		"ack_count",
+		"body",
+		"closure_delivered",
+		"from_agent_id",
+		"opened_at",
+		"opened_eid",
+		"opened_message_id",
+		"opened_type",
+		"project_id",
+		"status",
+		"thread_id",
+		"updated_at",
+		"via",
+	],
+	unknown_senders: ["bot_id", "count", "first_seen_at", "last_seen_at", "user_id"],
+	updates: [
+		"apply_outcome",
+		"bot_id",
+		"chat_id",
+		"eid",
+		"envelope_json",
+		"from_agent_id",
+		"from_user_id",
+		"message_date",
+		"message_id",
+		"project_id",
+		"received_at",
+		"update_id",
+		"via",
+	],
+};
 
 /**
  * A fresh temp-file ledger with the DDL applied, removed when `operation` returns.
@@ -158,6 +213,18 @@ function rowCount(db: DatabaseSync, table: string): number {
 	const row = db.prepare(`SELECT count(*) AS c FROM ${table}`).get();
 	assert.ok(row !== undefined, "count(*) always returns exactly one row");
 	return Number(row.c);
+}
+
+/** The distinct numeric literals in `ddl`'s executable text, with its comment lines removed. */
+function literalsOf(ddl: string): string[] {
+	return [...new Set(ddl.replace(/--[^\n]*/gu, "").match(/\d+/gu) ?? [])].sort();
+}
+
+/** The highest `updates.seq` in the ledger — the position `client_cursors.inbox_seq` advances over. */
+function highestSeq(db: DatabaseSync): number {
+	const row = db.prepare("SELECT max(seq) AS m FROM updates").get();
+	assert.ok(row !== undefined, "max() always returns exactly one row");
+	return Number(row.m);
 }
 
 /** One `updates` row — PT-10's inbox, where the replay dedup and the outcome vocabulary live. */
@@ -304,6 +371,24 @@ test("every ledger table declares STRICT, and STRICT is load-bearing rather than
 	});
 });
 
+test("every NOT NULL column design §5.2 declares is NOT NULL, table by table", () => {
+	withDatabase((db) => {
+		for (const table of LEDGER_TABLES) {
+			const expected = LEDGER_NOT_NULL_COLUMNS[table];
+			assert.ok(expected !== undefined, `${table} must appear in the expectation table`);
+			const notNull = columnsOf(db, table)
+				.filter((column) => column.notNull)
+				.map((column) => column.name)
+				.sort();
+			assert.deepEqual(notNull, [...expected], `${table}: the NOT NULL columns must be exactly the design's`);
+		}
+
+		// Non-vacuity: the expectation covers every table this suite knows about, so the loop above cannot be
+		// short an entry, and the assertion has something to compare against.
+		assert.equal(Object.keys(LEDGER_NOT_NULL_COLUMNS).length, LEDGER_TABLES.length);
+	});
+});
+
 // --- The closed vocabularies ---
 
 test("every value design §5.2 names in a CHECK vocabulary is accepted, so each vocabulary is complete", () => {
@@ -361,6 +446,26 @@ test("`updates` refuses a redelivered update on both unique keys, naming each ke
 			errcode: SQLITE_CONSTRAINT_UNIQUE,
 			names: "updates.project_id, updates.eid",
 		});
+	});
+});
+
+test("`updates.seq` stays monotonic across the full delete retention performs (AUTOINCREMENT)", () => {
+	// `client_cursors.inbox_seq` is a position over this order, so a redelivered update written *below* a
+	// client's cursor would never be surfaced again — the I-3 loss PT-10 exists to prevent. Without
+	// `AUTOINCREMENT`, SQLite assigns `max(rowid) + 1` and a full `DELETE` resets the high-water mark:
+	// measured on the pinned build, the next insert takes `seq` 1 instead of 4. Retention empties `updates`
+	// on an idle binding, which is exactly that state, and no other assertion in this suite can see it.
+	withDatabase((db) => {
+		insertRow(db, "updates", updatesRow({ update_id: 5001, eid: "eid-seq-1" }));
+		insertRow(db, "updates", updatesRow({ update_id: 5002, eid: "eid-seq-2" }));
+		insertRow(db, "updates", updatesRow({ update_id: 5003, eid: "eid-seq-3" }));
+		const highWater = highestSeq(db);
+		assert.equal(highWater, 3, "the first three rows are 1, 2, 3");
+
+		db.prepare("DELETE FROM updates").run();
+
+		insertRow(db, "updates", updatesRow({ update_id: 5004, eid: "eid-seq-4" }));
+		assert.equal(highestSeq(db), highWater + 1, "the sequence continues past the rows retention removed");
 	});
 });
 
@@ -428,7 +533,7 @@ test("the tables that must never hold a body have none, and `updates.body` is th
 
 		const body = columnsOf(db, "updates").find((column) => column.name === "body");
 		assert.ok(body !== undefined, "`updates` carries the peer body");
-		assert.equal(body.notNull, false, "`updates.body` is NULL exactly for the outcomes v1 never surfaced (design §5.2)");
+		assert.equal(body.notNull, false, "`updates.body` is the nullable column; the NULL-for-rejected coupling is a writer rule (D-20, PR-12), not something this DDL enforces");
 		assert.equal(body.type, "TEXT");
 
 		// The three tables that legitimately hold a peer body, named so a fourth cannot appear unnoticed.
@@ -463,8 +568,9 @@ test("`needs_action` projects the waiting turn only, and projects raw columns on
 		const projected = () => db.prepare("SELECT thread_id FROM needs_action").all().map((row) => String(row.thread_id)).sort();
 		assert.deepEqual(projected(), ["th-waiting"]);
 
-		// The anchor is what makes a REQUEST waiting, so setting it brings the row in (PT-27's rule:
-		// the view describes the turn that waits, not the thread's opening).
+		// The anchor is what makes a REQUEST waiting, so setting it brings the row in: ADR-0027's rule that
+		// `needs_action` describes the turn that is waiting rather than the thread's opening, which here is the
+		// VIEW's predicate (design §5.2 ruling (d), `specs/durable-inbox/spec.md`).
 		db.prepare("UPDATE threads SET awaiting = ? WHERE thread_id = ?").run("@alice-agent", "th-no-anchor");
 		assert.deepEqual(projected(), ["th-no-anchor", "th-waiting"]);
 
@@ -485,11 +591,35 @@ test("the DDL stamps no schema version: the open sequence owns `PRAGMA user_vers
 	});
 });
 
+test("the DDL refuses a second application, so a migration cannot silently no-op", () => {
+	withDatabase((db) => {
+		// `CREATE TABLE` is not idempotent, and the first table the executor reaches is the one that refuses.
+		assertRefused(() => db.exec(LEDGER_SCHEMA_DDL), { errcode: SQLITE_ERROR, names: "table offsets already exists" });
+
+		// The text check is what makes this complete rather than partial: the assertion above can only see the
+		// *first* statement, so an `IF NOT EXISTS` added to a later table would leave it failing on `offsets`
+		// while the rest of the DDL silently no-opped. Measured: exactly that mutation (adding it to `offsets`)
+		// kept the behavioural assertion above green, which is why this line exists.
+		assert.equal(
+			LEDGER_SCHEMA_DDL.includes("IF NOT EXISTS"),
+			false,
+			"no statement may be a no-op on a second application",
+		);
+	});
+});
+
 test("the DDL's executable text carries no window constant, so the retention math cannot drift into SQL", () => {
 	// design §5.2: "the per-agent filter (`awaiting = ?`) and the reminder math ... stay in TypeScript
 	// so no window constant appears in DDL". Comments are stripped first because they cite `PT-10`,
 	// `PT-20` and `ADR-0028` by id, and those ids are not constants.
-	const executable = LEDGER_SCHEMA_DDL.replace(/--[^\n]*/gu, "");
-	const literals = [...new Set(executable.match(/\d+/gu) ?? [])].sort();
-	assert.deepEqual(literals, ["0", "1"], `the DDL's executable text must hold no other numeric literal, found: ${literals.join(", ")}`);
+	assert.deepEqual(literalsOf(LEDGER_SCHEMA_DDL), ["0", "1"]);
+
+	// The control this suite promises for its second text-level check: the same scan has to flag a mutated
+	// DDL, so "no window constant" is a property of the text rather than of a scan that cannot see one.
+	const withWindow = LEDGER_SCHEMA_DDL.replace(
+		"next_update_id INTEGER NOT NULL DEFAULT 0",
+		"next_update_id INTEGER NOT NULL DEFAULT 7",
+	);
+	assert.notEqual(withWindow, LEDGER_SCHEMA_DDL, "the control document must actually differ");
+	assert.deepEqual(literalsOf(withWindow), ["0", "1", "7"]);
 });
