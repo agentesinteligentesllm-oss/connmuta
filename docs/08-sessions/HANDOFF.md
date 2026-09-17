@@ -7,27 +7,22 @@
 > context. A handoff that repeats a decision instead of pointing at it is a defect.
 >
 > **Reading order for a zero-context session:** §0 → §1 → §2 → §5. Then §3 (pins), §4 (traps),
-> §6 (do not redo) and §7 (open points) as the task needs, and §8 for the environment. §0 and §5 are
-the operational core; nothing else is required before the first command.
+> §6 (do not redo) and §7 (open points) as the task needs, and §8 for the environment.
 
 ---
 
 ## §0 — Quick start
 
-§0 and §5 together are the operational core of this file; §1–§4 and §6–§8 are reference.
+**Plan settled across sessions 9–11 — do not re-open it.** The Arena Orion debate arena
+(`http://127.0.0.1:8766/mcp`, the Electron app) is **not available**: assume it stays down, so **no slice
+is audited by the tribunal and nothing may wait for a debate**. The Pi-native SDD preflight gate is also
+closed and only a human can open it (§2), so slices run **ODD with the full SDD contract preserved** and
+are audited by **Judgment Day**. Both were proven on PR-06, PR-07a, PR-07b, PR-08a and PR-08b.
 
-**Plan settled in session 9 under the Director's delegation — do not re-open it.** The Arena Orion
-debate arena (`http://127.0.0.1:8766/mcp`, the Electron app) is **not available**: assume it stays down,
-so **no slice is audited by the tribunal and nothing may wait for a debate**. If the Director ever
-relaunches it, a tribunal debate becomes possible again but is not planned and changes nothing before
-then. The Pi-native SDD preflight gate is also closed and only a human can open it (§2), so slices run
-**ODD with the full SDD contract preserved** and are audited by **Judgment Day**. All three were proven
-on PR-06, PR-07a and PR-07b.
-
-**Copy-paste prompt to start the next session (2 lines):**
+**Copy-paste prompt to start the next session:**
 
 ```text
-Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-08 (`conmuta.json` schema + validador de token-shape + `conmuta validate` + esqueleto de `src/cli/main.ts`, ≈370 líneas): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
+Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-09 (registro de máquina: `src/registry/{schema,invariants,loader}.ts` con sus tres gemelos, ≈380 líneas): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
 La ruta ya está decidida (ODD con el contrato SDD preservado + auditoría Judgment Day); la Arena de debate no está disponible, así que nada depende de un debate ni de una acción en la TUI.
 ```
 
@@ -40,8 +35,7 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 ```
 
 `git pull --ff-only` must be a no-op or a fast-forward. The status command must print
-`nextRecommended: apply`, `completed: 41` of `210`, `blockedReasons: []`. Anything else: stop and
-report instead of proceeding.
+`nextRecommended: apply`, `completed: 47` of `210`, `blockedReasons: []`. Anything else: stop and report.
 
 ---
 
@@ -49,14 +43,12 @@ report instead of proceeding.
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F1 `apply` in progress. PR-01a…PR-05, PR-06a/PR-06b, PR-07a and PR-07b merged to `main`** (`#1`–`#6`, `#7` `9053908`, `#8` `cf19561`, `#9` `535ce67`, `#10` `bd3c6ed`); next slice **PR-08**. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **41/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
-| Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) — **45 slices, 210 tasks**. In-place apply-time edits, each recording its own numbers: the PR-06 row (re-slice), the PR-07a block, the PR-07b carried-findings note (+ its D4 amendment), and the three checkboxes of each completed slice. No slice was ever re-numbered. | Engram under project **`connmuta`** |
-| Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**` for a leading `Provenance:` header; the scanned set must **equal** `test/fixtures/v1-provenance.json` — now **11 entries**: `constants`, `envelope`, `envelope.test`, `secrets`, `thread-record`, `protocol-apply`, `protocol-select`, `fence`, `tool-schemas`, `error-payload`, `tool-output`. Every vendored file needs a design §12 header **and** a fixture entry, or `test:static` fails | `test/security/provenance.test.ts` |
-| **The registry never validates a header hash against v1** | For a SEAM it asserts only that the body *differs* from the pinned value, so a wrongly-stripped or wrongly-copied pin is invisible to every gate. Correctness of a pin is proven **only** by independent re-derivation from the read-only v1 checkout. `src/shared/constants.ts:3` carried a wrong one until 2026-09-17; it is now rule-conformant (backlog **B-19**, `done`) | `test/security/provenance.test.ts:120` (the SEAM inequality), `:113` (registry equality), `:118` (AS-IS equality) |
-| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output}.ts` + twins, `test/fakes/delivered-text.ts`, `test/twins.test.ts`, `test/security/{pack,repo-scan,provenance}.test.ts`, fixtures — **175 tests**, `test:static` **8**; current tip **`08067f3`** | PRs `#1`–`#10` |
-| Post-merge integrity sweep | After PR-07b merged, the Director's session-10 delegation was used to close the two file-integrity items the audits had reported and to dispose of the review's advisory finding: `constants.ts`'s pin is now rule-conformant, design §12 carries an appended amendment note, and all three are `done`/`decided` in the backlog. Landed on `main` as **`08067f3`**, one line of source; nothing about it changes how PR-08 is built | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-b19-repin-001` · [`CHECKLIST.md`](../06-backlog/CHECKLIST.md) B-19/B-20/B-21 |
-| Audit status of the last three slices | PR-06 was **waived** by the Director; PR-07a and PR-07b ran under the same substitute by explicit decision. All three were audited by Judgment Day. **DN-05 is not satisfied for any of them.** PR-07b's candidate *additionally* closed an ordinary native review — an independent lifecycle (see §2.5). | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-pr-06-waiver-001`, `bus-v2-f1-pr-07a-audit-001`, `bus-v2-f1-pr-07b-audit-001` |
+| Phase | **F1 `apply` in progress. PR-01a…PR-05, PR-06a/PR-06b, PR-07a, PR-07b, PR-08a and PR-08b merged to `main`** (`#1`–`#12`; `#11` `1770f84`, `#12` `c345049`); next slice **PR-09**. **33 of 45 slices remain.** | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **47/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
+| Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) — 45 slices, 210 tasks. Apply-time edits so far: the PR-01 re-slice, the PR-06 row (re-slice), the PR-07a block, the PR-07b carried-findings note (+ its D4 amendment), the **PR-08 re-slice block** (two halves, their real figures and their exceptions), and the checkbox flips. No slice was ever re-numbered. | Engram under project **`connmuta`** |
+| Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**` for a leading `Provenance:` header; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **11 entries, unchanged since PR-07b**. PR-08a and PR-08b vendor **no** v1 range; three new authored files (`token-shape.ts`, `project-file.ts`, `roster-hash.ts`) must therefore carry **no** `Provenance:` header | `test/security/provenance.test.ts` |
+| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output,token-shape,project-file,roster-hash}.ts`, `src/cli/{main,validate}.ts`, all with twins — **268 tests**, `test:static` **8**; `main` tip `c345049` | PRs `#1`–`#12` |
+| **Audit status of the last five slices** | PR-06 **waived**; PR-07a, PR-07b, **PR-08a and PR-08b** ran under the same **Judgment Day substitute** by explicit Director decision. **DN-05 is unsatisfied for all five.** PR-07b's and PR-08a's candidates *additionally* closed an ordinary native review (independent lifecycles); PR-08b's was **declined** and its RDD fallback ran (§2.5). | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-pr-06-waiver-001`, `bus-v2-f1-pr-07a-audit-001`, `bus-v2-f1-pr-07b-audit-001`, `bus-v2-f1-pr-08a-audit-001`, `bus-v2-f1-pr-08b-audit-001` |
 
 ---
 
@@ -67,78 +59,80 @@ before the child launches with
 
 > `SDD dispatch refused before child launch: SDD preflight cancelled or invalid; no session consent recorded.`
 
-That gate is host-owned and, by design, not satisfiable by an agent: `extensions/gentle-ai.ts` ~L9255
-calls `runSddPreflight`, which needs a native `ctx.ui.select` confirmation and refuses while
-`prefs.prompted` is false (`lib/sdd-preflight.ts:896-926`). Answering the canonical
-`Gentle AI SDD preflight 1/3:`–`3/3:` questionnaire through the agent's own question tool does **not**
-create consent, and manufacturing it would be the "model-authored preflight cannot create
-parent-confirmed authority" defect this repository has recorded twice.
+That gate is host-owned and not satisfiable by an agent: `extensions/gentle-ai.ts` calls
+`runSddPreflight`, which needs a native `ctx.ui.select` confirmation and refuses while `prefs.prompted` is
+false. **Re-verified independently in session 11, by evidence rather than by quoting this file:** the
+durable preference path is `<cwd>/.pi/gentle-ai/sdd-preflight.json` (`lib/sdd-preflight.ts:564`) and **it
+does not exist in this workspace**, and the session carried no `## SDD Session Preflight` block, which
+`isParentConfirmedSddPreflightContext` requires verbatim. Answering the questionnaire through the agent's
+own question tool does not create consent, and manufacturing it would be the recorded defect class.
 
-Consequences, all binding on the next session:
+Consequences, all binding:
 
-- **ODD is the default because it cannot block.** Planning around a TUI action would stall step 1 of a
-  zero-context session. The slice still honours: the same design §12 rows, the same `tasks.md`
-  sub-tasks and their ids, Strict TDD (red before green, twins), the same pinned hashes and provenance
-  fixture, the same THREAT-MODEL §4 discipline, the same 400-line review budget, and a tribunal-grade
-  audit.
+- **ODD is the default because it cannot block.** The slice still honours: the same design §12 rows, the
+  same `tasks.md` sub-tasks and ids, Strict TDD (red before green, twins), the same pinned hashes and
+  provenance fixture, the same THREAT-MODEL §4 discipline, the same 400-line review budget, and a
+  tribunal-grade audit.
 - **The orchestrator owns the SDD bookkeeping** (checkbox flips, `apply-progress.md`, `state.yaml`) and
   discloses that no `sdd-apply` phase envelope exists for the slice.
 - **The only permitted variant:** if a human has already run `/gentle:sdd-preflight` in the TUI, or the
-  Director explicitly asks for it, the slice may instead run through `sdd-apply`. This is **not a
-  question to put** — state the default once and continue (see §5 step 2). Never wait on the TUI and
-  never treat the agent's own questionnaire as consent. A third possibility — the tribunal, if the
-  Director relaunches the Arena bridge — is outside the plan and would simply supersede the audit step.
-- Switching later costs nothing: ODD and SDD share the same artifacts, so the plan is reversible.
+  Director explicitly asks for it, the slice may instead run through `sdd-apply`. State the default once
+  and continue; never wait on the TUI.
 
 **2. Audit: Judgment Day.** Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) in parallel over the
-same frozen range, then a bounded correction round and at most two scoped re-judgments. The installed
-agents and the current skill mandate the graph-v1 shape: discovery returns **only**
-`{"rows":[{"id","lens","location","severity","status_at_freeze","evidence_class","evidence_claim"}]}`,
-a scoped re-judgment returns **only** `{"resolutions":[{"id","outcome":verified|c corroborated|regression}]}`,
-with no prose beside either. (PR-07a's record used `{"findings":…,"evidence":…}`; that drift is
-disclosed in `apply-progress.md` and here.) `review-risk`/`review-*` agents are **not** dispatchable
-outside the native review lifecycle. At close, record the audit-path decision in the tribunal index the
-way `bus-v2-f1-pr-07a-audit-001` and `bus-v2-f1-pr-07b-audit-001` do, and state plainly that DN-05 is
-unsatisfied.
+same frozen tree, then a bounded correction round and at most two scoped re-judgments. The installed
+agents and the skill mandate the graph-v1 shape: discovery returns **only**
+`{"rows":[{"id","lens","location","severity","status_at_freeze","evidence_class","evidence_claim"}]}`, a
+scoped re-judgment returns **only** `{"resolutions":[{"id","outcome":verified|corroborated|regression}]}`,
+with no prose beside either. `review-risk`/`review-*` agents are **not** dispatchable outside the native
+review lifecycle. Record the audit path in the tribunal index the way the five existing records do, and
+state plainly that DN-05 is unsatisfied.
+
+- **Write the record's correction note as a log, not as a claim.** In session 11 the correction note grew
+  a row per pass (five verifier-found defects, one observation, then two defects the correction itself had
+  introduced), because the first pass was not complete. That is the honest shape.
+- **`jd-fix-agent` accepts only the canonical bounded dispatch**, and its `Frozen ledger SHA-256` is
+  `canonicalHash(frozenRows)` = SHA-256 of the rows JSON with **object keys sorted alphabetically** (the
+  runtime's `canonicalize` sorts keys). Computing it in template field order is rejected with a generic
+  message; this cost two attempts in session 11.
 
 **3. PT-cell discipline.** A PR updates the file-name cell of the PT rows it **actually pins**, and only
-those. An over-claimed cell is a defect: PR-06a had to revert PT-14 and PR-07a deliberately skipped
-PT-07's half of task 7a.6 because its assertion is bundle-level (PR-34/PR-40). PR-07b changed **no**
-cell, because no PT row names `shared/tool-output.ts` — that is a rule check, not an omission. **PR-08
-is the first slice since PR-05 where the gated tasks ask for cells it really pins: PT-05 and PT-06**
-(task 8.6).
+those. An over-claimed cell is a defect (PR-06a had to revert PT-14; PR-07a skipped PT-07's half). PT-05
+and PT-06 were filled by PR-08a/PR-08b across two commits on purpose, each naming only the files it added.
+**PR-09's tasks ask for PT-18 and PT-25** (task 9.6), and both rows must name `test/registry/*.test.ts`
+files this slice really adds.
 
-**4. Budget policy.** 400 lines of *authored* src+test, disclosed PR-scoped exceptions for the rest.
-Three precedents now: PR-06b took 26, PR-07a took 20, **PR-07b took 154** — and PR-07b is the lesson:
-a SEAM module whose design-mandated vendored range is large (284 of its 554 lines) cannot fit, because
-its doc comments must be re-authored and its twin must ship in the same PR (`test/twins.test.ts` fails
-a `src` file whose twin is missing **in the same tree**, which is why the PR-07c split `tasks.md`
-allowed was refused). **Measure the real diff before promising the Director a figure, and expect a
-correction round to grow it** (PR-07a: 398→420; PR-07b: 495→554). PR-08 is planned at ≈370 with no
-exception, and it is the first slice to touch `src/cli/`, so check §4's two `src/cli` traps early.
+**4. Budget policy, and the lesson that keeps repeating.** 400 lines of *authored* src+test, measured as
+`git diff --numstat -- src test`, with disclosed PR-scoped exceptions otherwise. Six precedents now:
+PR-06b 26, PR-07a 20, PR-07b 154, **PR-08a 348 → 554**, **PR-08b 272 → 372**. Two lessons are now
+first-class:
 
-**5. The ordinary native review is a separate, independent lifecycle (RDD switch: on).** After
-authorized implementation is complete and normalized, and **before** reporting it complete, determine
-whether the user explicitly left that candidate unreviewed; if not, call
-`gentle_review` with `{"operation":"inspect"}` and follow only the transition it returns. On PR-07b the
-flow was: inspect `ready` → START (the inspect envelope offered a **committed-range** START,
-`--base-ref=<base> --committed-only=true`, because a clean worktree has an empty workspace projection)
-→ STATUS `collect` → one materialize slot → a **forecast that runs nothing** (`model_runs`, `lenses`,
-transport `pi_host_relay`) which must be relayed losslessly and then re-submitted with
-`reviewerRunAcknowledged: true` → closure `approved` → the exact acknowledgement continuation, which
-**burns** authority (`burn_evidence: gentle-ai.review-acknowledged/v1`). Never compose provider tokens;
-never answer consent from model prose. Review approval **never** authorizes delivery: commit, push, PR
-and merge stay ordinary repository policy.
+- **Measure after the correction, in the same pass as the edit.** PR-08a's correction cost +206 and
+  PR-08b's +101. Worse: PR-08b's budget table was corrected for the tip *before* the change that shared
+  its commit, so it said 759 while the shipped tree measured 772 — the independent verifier caught it.
+- **PR-08's own estimate was 3.8× under** (≈370 planned, 1,400 realised), which is why it was re-sliced.
+  Estimate from the file sizes the design names, not from the slice count.
 
-**A candidate can also be DECLINED, and that must be recorded as a decline — never as a review that
-closed.** On the post-merge integrity sweep the host resolved consent as `declined_this_candidate`
-(`status: skipped`, `lineage_created: false`, `mutation_performed: false`, `reset_eligible: false`): no
-lineage existed and nothing was approved. The prescribed fallback is Receipt-driven Development's
-risk-gated path — `gentle_review` with `{"operation":"assess"}` returns the plan, and with the outcome
-passed as `declined` it returns the RDD-off plan with risk treated as high if the native assessment is
-unavailable, which means **the writer self-verifies and a separate independent verifier always runs**
-(`gentle-ai-verify` was that verifier). Do not soften a decline in the record, and do not re-run review
-on the same candidate.
+**5. The ordinary native review is a separate, independent lifecycle (RDD switch: on).** After authorized
+implementation is complete and normalized, and **before** reporting it complete, call `gentle_review` with
+`{"operation":"inspect"}` and follow only the transition it returns. Three outcomes are now precedented:
+
+- **approved** (PR-07b, PR-08a): relay any forecast losslessly (it runs nothing), re-submit with
+  `reviewerRunAcknowledged: true`, then execute the exact acknowledgement continuation, which **burns**
+  authority. Review approval never authorizes delivery.
+- **declined** (PR-08b): the host resolved `declined_this_candidate` with `lineage_created: false` and no
+  mutation. **A decline is not a closure** — never re-run review on that candidate, and follow the RDD
+  risk-gated fallback: `gentle_review` `{"operation":"assess"}` with the decline stated returns the plan,
+  which for risk `high` is *writer self-verification plus a separate independent verifier always runs*.
+  **That verifier earned its cost twice over in session 11**: it reproduced every figure, then found five
+  record defects and one observation, and a focused re-check found two more the correction had introduced.
+- **the start can also fail before authority access** (`mode` missing, or a wrong `lineageId`): START
+  supports only `{"mode":"ordinary","baseRef":…,"committedOnly":true}` plus the `lineageId` that
+  `inspect` returned, and a failed START creates no lineage.
+
+**6. Run the review against a frozen worktree, not the live one.** Pass `workspaceRoot` naming a clean
+`git worktree add --detach` checkout of the candidate, so the provider binds the review to exactly that
+slice and not to whatever else the working tree holds.
 
 ---
 
@@ -150,24 +144,17 @@ newline** — except when the range runs to EOF, where the file's own final newl
 
 | v2 path | v1 source | verdict | v1 body sha256 |
 |---|---|---|---|
+| `src/shared/constants.ts` | `src/config.ts:26-166` @ `bf8f365` | SEAM | `039d53a22b54f8c1a061c602f419e6272cd1f8a3fe260301d7fe36b4e892e15e` |
 | `src/shared/tool-output.ts` | `src/tools/fetch.ts:65-348` @ `bf8f365` | SEAM | `25d39d9ceb07e585c0b6d9a12510fe445c9e81e78e401f2e3feb30c230ba0607` |
 | `src/shared/tool-schemas.ts` | `src/tools/send.ts:47-109` @ `bf8f365` | SEAM | `84aae049e711e5ec6725007d561e65cebcf3ca3b9035333ae9b2b734494d42e6` |
 | `src/shared/error-payload.ts` | `src/index.ts:45-103` @ `bf8f365` | SEAM | `1f59f8f8fa186e22ab1281f4ca9a2dded1f559eb9f9e43b6c7494c8c01a3d948` |
 
-Wrong-value controls (the value if the terminating newline is wrongly stripped): `01c35ebf…` (fetch
-65-348), `c16ce5a5…a6e1` (send) and `b8990a6a…ef76` (index). All three ranges are **interior**, so all
-three pins include that newline. The method validates itself by reproducing two already-ratified values:
-the fence `68e241b2…` from `src/tools/fetch.ts:43-63` and `thread-record`'s `bd177372…` from
-`src/state.ts:15-87`. Older values (constants, envelope, secrets, protocol-apply, protocol-select) are in
-`apply-progress.md`; **`constants`' was wrong and is fixed** — re-pinned to `039d53a2…` on 2026-09-17
-(backlog B-19, `bus-v2-f1-b19-repin-001`), with `4ce5e514…` now the recorded strip control. Treat that
-value as settled: do not re-report it, and do not "fix" it back.
+Older values (envelope, secrets, protocol-apply, protocol-select, thread-record, fence) are in
+`apply-progress.md`. `constants.ts`' pin was wrong until 2026-09-17 (`4ce5e514…` was the blind-stripped
+value; `039d53a2…` is rule-conformant) and is now settled (backlog **B-19**, `done`): do not re-report it.
 
-**Range-convention detail.** A module assembled from **two** v1 ranges can cite only one in its header
-and fixture, because the header grammar and the fixture's `v1Path` each hold a single token; PR-07a's
-`tool-schemas.ts` cites the larger range (`src/tools/send.ts:47-109`) and names the second
-(`src/index.ts:29-42`) inside its `Changes:` line. That is the accepted form, and it is also where
-design §12's reuse table disagrees with the shipped verdict (backlog B-20).
+**PR-09 vendors nothing.** The registry is new code (`src/registry/*`), so the fixture stays at 11 entries
+and a `Provenance:` header on any new file is a defect.
 
 ---
 
@@ -175,116 +162,92 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
 
 | Item | State | Pointer |
 |---|---|---|
-| **PR-08's scope omits the twin for `src/cli/main.ts`** | `test/twins.test.ts` requires `test/**/<same>.test.ts` for **every** `src/**/*.ts` (only `*.d.ts` is exempt). PR-08's block lists `src/cli/main.ts` but no `test/cli/main.test.ts`, and `test/cli/` does not exist yet — the next session must add that twin (or the slice fails its own merge), the same class of carried finding as PR-05 and PR-07b | `test/twins.test.ts` · `tasks.md` PR-08 scope |
-| **`src/cli/` must join the root `references`** | An empty composite unit is `TS18003`, so `src/{cli,client,daemon}/tsconfig.json` enter the root `tsconfig.json` `references` when their first `.ts` lands: **PR-08 cli**, PR-15 daemon, PR-32 client. `src/cli/tsconfig.json` already exists; the root still references only `src/shared` | `tsconfig.json` |
-| **PR-07b's src/twin split was NOT CI-safe** | Re-verified by reading the test: a module/twin split fails the first PR's own merge. The exception was taken instead, at 154 lines | `test/twins.test.ts` · §2.4 |
-| **The SDD dispatcher is closed, and only a human can open it** | See §2.1 for the exact refusal string and the code path. Do not spend a turn trying to satisfy it from inside the agent | §2 |
-| **A correction round can push a slice over the budget it was protecting** | PR-07a opened at 398 and closed at 420; PR-07b opened at 495 and closed at **554**. Budget a correction pass before promising a reviewer a figure | `apply-progress.md` |
-| **A Judgment Day `regression` carries no reason** | The native `{"resolutions":[…]}` shape has only `id` + `outcome`, so a `regression` cannot be read off the verdict. Diagnose it by **finishing the evidence sweep by hand** — that is how PR-07b found the two defects its own fix round had left (an unsupported universal in a JSDoc, and a mutant table still presenting pre-audit counts and stale line numbers). Never soften the row and never guess | `apply-progress.md` PR-07b round 2 |
-| **After a correction round edits a file, every figure about that file is suspect** | Pass counts, diagnostic line/column numbers and file sizes all move. Grep the whole record for every other place that repeated the old number — this is a defect class the repository has now recorded three times | `apply-progress.md` |
-| **A `Changes:` header is all a header-only reviewer sees** | Three defects in PR-07a and one in PR-07b were clauses that did not match the code (a claim citing a design section that mandates nothing of the kind). Write the full delta, then make a diff or test able to falsify each clause | `src/shared/tool-output.ts:1-18` |
-| **Mutation testing is what proves a test can fail** | A mutant whose build fails is not evidence *for a behavioural assertion*, but for a **compile-time** assertion the diagnostic at the assertion's own line *is* the assertion firing — label it as a mechanism proof, not a test kill. Mutants ran on byte-restored copies every time in PR-07b | `apply-progress.md` mutant matrices |
-| **A SEAM's declared types are its whole guarantee** | The registry only asserts hash *inequality* for a SEAM, so a wrong body is invisible. Pin every declared shape with `SameShape` (key set **and** structure): mutual assignability alone tolerates a dropped optional member (M9t stayed green), and a key-set check alone tolerates a narrowed member type (M8t). One-line pins up to ~160 chars are stylistically fine here | `test/shared/tool-output.test.ts` |
-| **Windows line-ending trap** | `Path.read_text`/`write_text` translate line endings silently: a `"\r\n" in text` check never fires, and a "byte-identical" mutant restore rewrites the file as CRLF. Use `read_bytes`/`write_bytes`, or `newline=""` / `newline="\n"`; verify with `git ls-files --eol <path>` → `i/lf w/lf` after `git update-index --refresh` | session 9/10 EOL sweeps |
-| **Long shell heredocs can be truncated by the harness** | A `cat > file <<'EOF'` append was cut mid-content once in session 10, leaving a partial write. Use the `write`/`edit` tools for large file content, and when a chained command is blocked by the safety policy (`rm -rf <dir>` was), remove explicit single paths with `rm` + `rmdir` instead of chaining | session 10 |
-| **`state.yaml` is YAML, and a plain scalar cannot hold `": "`** | Four values in `openspec/changes/f1-daemon-registry-thin-client/state.yaml` were unquoted and contained one (the oldest since the tasks phase, `0bdaf3e`), which made the **whole document** unparseable to a strict reader while `gentle-ai sdd-status` — the only consumer — kept working. Repaired 2026-09-17; **no gate validates YAML**, so quote any value you write that contains a colon-space, and validate with a real parser after editing | `bus-v2-f1-b19-repin-001` · §7 |
-| **`node --test` output is ANSI-coloured, and `ℹ` breaks cp1252 decoding** | A grep anchored at `^ℹ` can find nothing while the suite is failing; strip escape codes and decode utf-8 in Python subprocesses, or trust the exit code | session 9/10 |
-| **`gentle-ai` is 3.0.2 and the attempt ledger is retired** | Only `sdd-attempt grant` remains (`Runtime attempt operations are retired`). Every older instruction about `--max-changed-lines`, `settle` or a ledger `reset` is obsolete. `gentle-pi` is 3.1.1 | `gentle-ai sdd-attempt --help` |
-| **Engram project key is `connmuta`** | The provider derives it from the git remote and **rejects** writes passed as `telegram_bus_agent`. Cross-project reads still work | `mem_current_project` |
-| **The ODD feature doc stays out of the repository** | Each slice's `odd/tasks/<feature>.md` is created (ODD requires it) and **deleted at close** by Director decision: AGENTS.md §2 names where live state lives and does not include an ODD tree. Track in `odd/` locally, fold the substance into `apply-progress.md` + Engram, do not commit it | Engram `odd/*/tasks` |
-| **`gh` refuses `--force-with-lease`** | The tooling blocks destructive git even when the Director authorizes it. Do not plan a force-push. `gh pr merge N --merge --delete-branch` does work and returns the local tree to a pulled `main` | PR #8/#9/#10 history |
+| **A `bin` entry needs a shebang, and no gate here can catch its absence** | `src/cli/main.ts` line 1 is `#!/usr/bin/env node` (ADR-0012 remediation row 2, "pinned by an assertion over the built bundle"). CI runs `windows-latest` only, where npm's shim invokes node explicitly, so the failure mode — *exit 0 with zero bytes on both streams* — is invisible here. The test reads the **built** file, not the source. Any future `bin` addition needs the same treatment | `src/cli/main.ts:1`, `test/cli/main.test.ts` |
+| **Appending a row to a gated document shifts every later `file:line` citation** | PR-08b's appended `EXIT_VALIDATION_FAILED` row moved `design.md` by one, invalidating nine citations in files PR-08a had already merged. Re-point citations **in the same commit** that appends the row | `src/shared/token-shape.ts`, `src/shared/roster-hash.ts`, `src/cli/validate.ts` |
+| **A correction is itself unaudited until something re-checks it** | Two of PR-08b's defects were introduced *by* its correction. Run the focused re-check after a correction, and re-measure every figure the correction could have moved | `apply-progress.md` §PR-08b correction note |
+| **`dist/` staleness fakes results, and `tsc -b` is incremental** | A confusing result was traced to the emitted JS behaving as the pre-fix code while `grep` showed the fix present; `rm -rf dist` resolved it. Always purge before believing a surprising run, and restore mutants byte-for-byte (`read_bytes`/`write_bytes`, never text mode — CRLF) | session 11 mutant rounds |
+| **PT-22's deny-list markers are reserved** | `test/security/repo-scan.test.ts` defines two *synthetic* tenant markers (its `TENANT_DENY_LIST`) and excludes only itself from the scan, so reusing either as a fake operator marker in another file fails the scan — **including in documentation: quoting them here failed `test:static` while this very file was being written**. Invent a fresh marker. Token fixtures use a **7-digit** bot-id run, outside PT-22's `\d{8,10}` scan | `test/security/repo-scan.test.ts` |
+| **zod v4's `unrecognized_keys` puts the key names in `issue.keys`, not `issue.path`** | The path is empty, so naming an unknown field requires reading `keys` and appending each to the rendered parent (`roster[0].role`). One issue can carry several keys | `src/shared/project-file.ts` |
+| **`ProfileFileProblem`-style result types should be value-free by construction** | PR-08a's CRITICAL was a document-derived **key** echoed into a problem's `field`. A "cannot leak" claim is only as strong as its weakest string field, including field names; a forbidden key is now redacted (`<redacted>`) | `src/shared/project-file.ts` |
+| **`state.yaml` is YAML, and a plain scalar cannot hold `": "`** | Four values were once unquoted and contained one, making the whole document unparseable while `gentle-ai sdd-status` kept working. Session 11 validated the file with PyYAML after editing; **no gate does this for you**, so parse it after any edit | `bus-v2-f1-b19-repin-001` |
+| **`node --test` output is ANSI-coloured, and `ℹ` breaks cp1252 decoding** | A grep anchored at `^ℹ` can find nothing while the suite is failing; strip escape codes and decode utf-8, or trust the exit code | sessions 9–11 |
+| **`gentle-ai` is 3.0.2 and the attempt ledger is retired** | Only `sdd-attempt grant` remains. `gentle-pi` is 3.1.1 | `gentle-ai sdd-attempt --help` |
+| **The ODD feature doc stays out of the repository** | Each slice's `odd/tasks/<feature>.md` is created (ODD requires it) and **deleted at close**; AGENTS.md §2 does not list an ODD tree. Fold the substance into `apply-progress.md` + Engram | Engram `odd/*/tasks` |
+| **Remote branches of merged PRs are still on `origin`** (`f1/06a`, `06b`, `07a`, `07b`, `08a`, `08b`) | `gh pr merge --delete-branch` did not remove all of them (two merges hit transient network failures). Deleting them is a destructive git operation: **ask the Director first** | `git branch -a` |
+| **`gh` refuses `--force-with-lease`** | Do not plan a force-push. `gh pr merge N --merge --delete-branch` works and returns the local tree to a pulled `main`; a transient `getaddrinfo` failure can leave the remote merged while the local `main` lags — re-check with `git fetch && git merge --ff-only origin/main` | PR #11/#12 history |
 
 ---
 
 ## §5 — Next session, exact sequence
 
 1. **§0**: confirm `main`, `git pull --ff-only`, `rm -rf dist`, read the SDD status. Then read
-   [`../../AGENTS.md`](../../AGENTS.md) §1 and §2, this file's §2, `apply-progress.md`'s PR-07b section
-   (its round-2 ledger and terminal verdict), `tasks.md`'s **PR-08** block, and `design.md` §11/§12's
-   rows for `src/index.ts:29-42`, `src/config.ts:26-166` and the `shared/` modules PR-08 touches
-   (`project-file`, `token-shape`, `roster-hash`).
+   [`../../AGENTS.md`](../../AGENTS.md) §1–§2, this file's §2, `apply-progress.md`'s PR-08b section (the
+   correction note included), `tasks.md`'s **PR-09** block, and design §4's registry section
+   (`design.md` around the schema/invariants/reload paragraphs) plus design §12's rows for the registry.
 2. **State the plan in one line and proceed — this is not a question and there is no waiting turn:**
-   ODD + Judgment Day (§2), with the two `src/cli` traps in §4 handled up front: add
-   `test/cli/main.test.ts` and add `src/cli` to the root `references`. Do **not** ask the Director to
-   choose a workflow and do **not** wait for the TUI: the default cannot block. The only thing that
-   changes it is the human volunteering `/gentle:sdd-preflight` (then the slice may run through
-   `sdd-apply`) or an explicit Director instruction — if neither happens, continue.
-3. **Branch** `f1/08-project-file-token-validate` from `main`. Strict TDD for four modules and one CLI
-   command: RED `test/shared/project-file.test.ts` + `test/shared/token-shape.test.ts` (task 8.1), GREEN
-   `src/shared/token-shape.ts` + `src/shared/project-file.ts` (8.2), then RED
-   `test/shared/roster-hash.test.ts` + `test/cli/validate.test.ts` (8.3, the CLI invoked as a **real
-   child process** with `--stdin` — design §15's integration layer), GREEN `src/shared/roster-hash.ts` +
-   `src/cli/validate.ts` + the `src/cli/main.ts` dispatcher skeleton (8.4), plus `test/cli/main.test.ts`
-   (§4). **Every new `src` file ships with its twin in the same PR.**
-4. **Doc hygiene in the same PR**: run `npm run test:static`, and update
-   `docs/02-architecture/THREAT-MODEL.md` §4's **PT-05 and PT-06** file-name cells with the test files
-   this slice adds (task 8.6) — this is the first slice in a while where the cells are genuinely
-   pinned, so the over-claim rule (§2.3) still applies to every *other* PT row.
-5. **Verify** from a clean detached worktree, not the working tree:
-   `git worktree add --detach ../telegram_bus_agent-worktrees/verify-08 <sha>`, then
-   `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js" && npm run test:static`,
-   then remove the worktree. Run the focused command too (task 8.5). Also run at least four mutants on a
-   cleaned `dist/` to prove the new assertions can fail — including one at the `conmuta validate` process
-   boundary, which is the only place a token could leak into a message.
-6. **Measure the real diff before committing** (`git diff --numstat`), read every new file in full, and
-   ask the Director for commit authorization. Commit as work units (code+its test+its fixture entry
-   together), then the docs/bookkeeping commit. If the diff exceeds 400, see §2.4 — do not open the PR
-   silently over budget, and expect a correction round to grow it.
+   ODD + Judgment Day (§2). Do **not** ask the Director to choose a workflow and do **not** wait for the
+   TUI.
+3. **Branch** `f1/09-registry` from `main`, and follow `tasks.md`'s PR-09 block exactly (it names the
+   modules, the requirements PT-18/PT-25, and the six sub-tasks). Strict TDD, twins in the same PR,
+   `src/registry/tsconfig.json` joining the root `references` when its first `.ts` lands (**check that
+   against the same TS18003 trap that bit `src/cli`** — a referenced composite project with no inputs
+   fails the build).
+4. **Docs in the same PR**: PT-18/PT-25 cells with the tests this slice adds (task 9.6).
+5. **Verify** from a clean detached worktree, not the working tree: `git worktree add --detach … <sha>`,
+   then `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js" && npm run test:static`,
+   then remove the worktree. Run the focused command too, and at least four mutants on a cleaned `dist/`
+   — including one at the loader's quarantine/never-rename boundary, which is where this slice's promise
+   lives.
+6. **Measure the real diff** (`git diff --numstat -- src test`), read every new file in full, and ask the
+   Director for commit authorization. Commit as work units (code + its twin + its fixture entry together),
+   then the docs/bookkeeping commit. If the diff exceeds 400, see §2.4 — do not open the PR silently over
+   budget.
 7. **Audit** (§2.2) over the frozen range, fix only what the ledger confirms, and record the ledger, the
-   corrections and the verdict in `apply-progress.md`. Re-judge once; the skill allows a second scoped
-   re-judgment, but spend it **only** on defects the correction round itself introduced — that is exactly
-   what consumed PR-07a's second round and PR-07b's.
-8. **The ordinary native review runs too** (§2.5): after the implementation is complete and before
-   reporting it complete, inspect/START/follow. Its approval does not authorize delivery. If the host
-   **declines** it for the candidate, run the risk-gated fallback (`assess` with the decline stated →
-   writer self-verification plus an independent verifier) and record the decline as a decline. If that
-   fallback's independent verifier returns findings, correct them and re-verify **before** the commit
-   that claims they are corrected — on the post-merge integrity sweep this is exactly where six record
-   defects were caught, and the first draft's claim that the review had "closed" was false.
-9. **Stop at a PR boundary.** Push, open the PR with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)" gh …` (never `gh auth switch`), wait for the CI matrix, merge only with the
-   Director's authorization, then: rewrite this file, prepend to [`LOG.md`](./LOG.md), add the
-   audit-path record to [`INDEX.md`](../05-tribunal/INDEX.md), sweep every status line in `AGENTS.md`,
-   `README.md`, `docs/00-INDEX.md`, `openspec/config.yaml` and `state.yaml`, add any backlog row the
-   audits recommended, run `mem_session_summary`, commit the docs on `main`, and push.
+   corrections and the verdict in `apply-progress.md` — correction note as a **log**. Re-judge once.
+8. **The ordinary native review runs too** (§2.5), against a frozen worktree. Approval does not authorize
+   delivery; a decline is recorded as a decline and triggers the fallback, whose independent verifier's
+   findings are corrected **before** the commit that claims they are corrected.
+9. **Stop at a PR boundary.** Push, open the PR with
+   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)" gh …` (never `gh auth switch`),
+   wait for the CI matrix, merge only with the Director's authorization, then: rewrite this file, prepend
+   to [`LOG.md`](./LOG.md), add the audit-path record to [`INDEX.md`](../05-tribunal/INDEX.md), sweep every
+   status line in `AGENTS.md`, `README.md`, `docs/00-INDEX.md`, `openspec/config.yaml` and `state.yaml`
+   (**parse the YAML after editing**), add any backlog row the audits recommended, run `mem_session_summary`,
+   commit the docs on `main`, and push.
 
 ---
 
 ## §6 — Do not redo
 
-- Spec, design and tasks are gated and audited. Apply-time edits so far: PR-06's row, the PR-07a block,
-  the PR-07b carried-findings note plus its D4 amendment, and the checkbox flips. Do not rewrite a
-  gate's text; append a note.
-- Provenance hash rule, registry and range convention are ratified (`bus-v2-f1-pr-02-002`,
-  `bus-v2-f1-pr-04-001`) — §3. Do not "fix" `constants.ts:3` inside another slice: it is backlog **B-19**
-  and its re-pin invalidated PR-04's wrong-value-control table, which is why it needed its own audited
-  change — **done on 2026-09-17** (B-19), so do not re-open or re-report it.
-- **Doc-hygiene rule** (ratified `bus-v2-f1-pr-03-001`): never quote a matched-and-rejected
-  secret-shaped literal in `apply-progress.md`; describe the shape. PT-22 scans every tracked file.
-- **THREAT-MODEL §4 rule** — §2.3. PT-02's cell correctly names `test/shared/tool-schemas.test.ts`;
-  PT-13's names `test/shared/fence.test.ts`; PT-14 and PT-07 stay unannotated (daemon- and bundle-scoped
-  tests own them). PR-07b changed no cell.
-- **PR-06, PR-07a and PR-07b are merged; do not re-slice, re-audit or re-open them.** In particular, the
-  review closure's advisory finding (`R3-tool-output-shape`, backlog **B-21**) is explicitly **not** a
-  reason to re-run review on that candidate, and it does not reopen PR-07b.
-- **The post-merge integrity sweep is closed: do not re-open it either.** `src/shared/constants.ts:3`
-  now pins the rule-conformant `039d53a2…` (B-19 `done`; `4ce5e514…` is the strip control), design §12
-  carries the appended amendment that resolves its three `AS-IS` line-range rows (B-20 `done`), and
-  B-21 is `decided` with no code change. All three are recorded in `bus-v2-f1-b19-repin-001`; a session
-  that "finds" any of them again has found a record, not a defect.
+- Spec, design and tasks are gated and audited. Apply-time edits so far: the PR-01/PR-06/PR-08 re-slice
+  notes, the PR-07a block, the PR-07b carried-findings note (+ D4 amendment), the **appended**
+  `EXIT_VALIDATION_FAILED` row in design §11, and the checkbox flips. Do not rewrite a gate's text; append
+  a note.
+- Provenance hash rule, registry and range convention are ratified — §3. `constants.ts:3` is settled
+  (B-19, `done`); do not re-open or re-report it.
+- **Doc-hygiene rule** (ratified `bus-v2-f1-pr-03-001`): never quote a matched-and-rejected secret-shaped
+  literal in `apply-progress.md`; describe the shape. PT-22 scans every tracked file — including the
+  judgment-day rows the writer freezes into the record.
+- **PR-06, PR-07a, PR-07b, PR-08a and PR-08b are merged; do not re-slice, re-audit or re-open them.** In
+  particular: PR-08b's native review was **declined**, so that candidate is never re-reviewed; the four
+  advisory findings of PR-08a's review are backlog **B-22** and are not a reason to re-run anything; and
+  `JD-A-003` is backlog **B-23**.
+- **Do not "fix" the bare `conmuta validate` refusal or the case-insensitive `Authorization` match** in a
+  later slice without a decision: both are disclosed deviations (a missing walk-up target that PR-33 owns,
+  and RFC 9110 §5.1 hardening) and the usage text now pins what the build accepts.
 - `test/fakes/delivered-text.ts` is the home of `deliveredText`; the PR-18 `telegram-client.ts` fake
   imports it, never redefines it.
-- TypeScript 7.0.2 needs `"types": ["node"]`; an empty composite unit is `TS18003` — see §4 for the
-  `src/{cli,client,daemon}` schedule.
-- `test:wrong-room` matches by glob until PR-41; `npm pack` in `pack.test.ts` spawns `npm-cli.js` on
-  win32. `repo-scan.test.ts` and `provenance.test.ts` exclude themselves by path; `git ls-files`-based
-  scanners see only tracked or staged files, so `git add` (or `git add -N`) before a local RED/GREEN.
-- `test/security/repo-scan.test.ts:13` intentionally keeps its own `TOKEN_SHAPE_RE` copy — orthogonal by
-  design (`bus-v2-f1-pr-03-001`), not a defect.
+- TypeScript 7.0.2 needs `"types": ["node"]`; an empty composite unit is `TS18003`. `src/cli` is now in the
+  root `references`; `src/{client,daemon}` join it in PR-32 and PR-15 — and `src/cli/tsconfig.json`
+  deliberately does **not** reference them yet, with the reason written in the file.
+- `test:wrong-room` executes 0 tests and exits 0 until PR-41 wires the job (its glob matches nothing yet);
+  that is by design, not a passing gate. `repo-scan.test.ts` and `provenance.test.ts` exclude themselves by
+  path; `git ls-files`-based scanners see only tracked or staged files, so `git add` (or `git add -N`)
+  before a local RED/GREEN.
 - Type-only modules satisfy Strict TDD's triangulation gate via the explicit type-only exception in
   `strict-tdd.md`; a missing-module `TS2307` from `tsc` is a legitimate RED for a brand-new module.
-- **Stale comments and stale records**: when a change alters behavior a prior comment describes, grep
-  that file for the OLD behavior's keywords rather than assuming one fix is enough; when you correct a
-  figure, grep the whole record for every other place that repeated it.
+- **Stale comments, stale figures and stale records**: after a correction edits a file, every figure about
+  that file is suspect — grep the whole record for the old number, and for the new one, before committing.
 
 ---
 
@@ -292,16 +255,18 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
 
 | Id | Point | Owner |
 |---|---|---|
-| — | `B-19`, `B-20` and `B-21` — the three findings the PR-07a and PR-07b audits produced, which this session's post-merge integrity sweep **closed** — are finished in the backlog, not carried here. Read them there, or `bus-v2-f1-b19-repin-001`, rather than re-deriving them | closed |
+| B-22 | The four advisory findings of PR-08a's ordinary native review, recorded not actioned (the closure forbids re-running that review) | Director |
+| B-23 | `JD-A-003`: the deliberate precedence of `unsupported_schema_version` over the content walk is documented but unpinned by a test (ADR-12) | Kairo → Alpha |
 | carried (PR-06) | Digest blind spots incl. `MAX_THREAD_HISTORY = 50` saturation — proposed minimal fix: the last history entry's `eid` in the digest row | Director → Kairo |
 | carried (PR-06) | The fence's body escape does not neutralise `&`, so the fence is not injective; THREAT-MODEL §7 ratifies the fence as inherited unchanged, so it needs its own decision | Director |
 | B-16 / D-10 | `LICENSE` ships with `private: true`; SECURITY/CONTRIBUTING/CHANGELOG and the copyright-holder line open; a **real tenant deny-list** for PT-22 must live outside the tree (CI secret) — decide at PR-42 | Director |
 | B-11 | Trademark screening; `PRODUCT_NAME` is the single rename constant (`src/shared/constants.ts`) | Director |
 | B-12 | macOS scope; B-13 migration runbook closes when PR-38 merges | Director + Kairo |
-| — | **No gate validates the YAML in this tree.** `state.yaml` was unparseable to a strict reader for several sessions without anyone noticing; consider a cheap validity check over `git ls-files '*.y*ml'` in a later PR, audited, so the class cannot recur silently | Kairo → Alpha |
+| — | **No gate validates the YAML in this tree.** Session 11 parsed `state.yaml` with PyYAML after editing it; consider a cheap validity check over `git ls-files '*.y*ml'` in a later PR, audited, so the class cannot recur silently | Kairo → Alpha |
+| — | **No POSIX CI leg**, so packaging/execution contracts (shebangs, file modes, bin-links) cannot fail here: the ADR-0012 shebang defect was found by an audit, not by a gate. A POSIX matrix entry (or a targeted assertion) is a candidate for a later CI PR | Kairo → Alpha |
 | — | `npm test` runs whatever is in a stale `dist/`; consider a `clean` step in a later PR, audited | Kairo → Alpha |
-| — | GitHub Actions deprecation warning: `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 — bump majors in a later CI PR, audited | Kairo → Alpha |
-| — | T22 bytes-per-hour ceiling and the origin-label organisation marker: no backlog id (PR-42 close-out) | Director |
+| — | GitHub Actions deprecation warning: `actions/checkout@v4` and `actions/setup-node@v4` target Node 20 — bump majors in a later CI PR, audited. Also: delete the stale remote branches of the six merged PRs (needs Director authorization) | Kairo → Alpha / Director |
+| — | T22 bytes-per-hour ceiling and the origin-label organisation marker (PR-42 close-out) | Director |
 | B-05, B-07, B-08, B-09 | gentle-ai installer study; Telegram bot-to-bot visibility; Windows IPC/DACL; MCP notification rendering per host — all F0 spikes, all still open | Director + Kairo |
 
 ---
@@ -312,21 +277,20 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
   pinned. Receipt-driven development is **on** (`gentle-ai review mode status`: global on, clone-local
   unset) — see §2.5.
 - Line endings: both repositories have `core.autocrlf=true`. This one forces `eol=lf` through
-  `.gitattributes`; the v1 checkout has none. Vendored bodies come from `git show bf8f365:<path>` (the
-  raw blob, always LF) and the provenance hash normalizes CRLF→LF. `.gitattributes` governs the
-  **committed** form, not the worktree's — check with `git ls-files --eol`.
+  `.gitattributes`; the v1 checkout has none. Vendored bodies come from `git show bf8f365:<path>` (the raw
+  blob, always LF) and the provenance hash normalizes CRLF→LF. Check with `git ls-files --eol`.
 - `node --test` prints `ℹ tests / ℹ pass / ℹ fail` (ANSI-coloured), not `# tests`.
 - GitHub Actions: the workflow lives on `main`, so `pull_request` runs fire on PR open (≈30–50 s per
   matrix entry, Node 24.15 and 26). `gh pr merge N --merge --delete-branch` also checks out `main` and
-  pulls, so the local tree is back on `main` afterwards.
+  pulls; a transient DNS failure can leave the remote merged and the local `main` behind — recover with
+  `git fetch && git merge --ff-only origin/main`.
 - v1 checkout beside this repository: `telegram-agent-bus` at `bf8f365` (tag `v1.0.2` + 2 commits),
-  **read-only**; cite as `path:line`. It carries one pre-existing untracked file,
-  `alpha_response.json` (an unrelated old Arena envelope) — harmless, not this project's state.
-- Verification worktrees live in `../telegram_bus_agent-worktrees/` and are removed as soon as their
-  run finishes; an empty directory is the expected end state.
-- Arena bridge: `.mcp.json` (gitignored) points at `http://127.0.0.1:8766/mcp` — the Arena Orion
-  Electron app (`electron .` in `../Arena_construccion/doble_ventana/Arena_Orion`), **down** unless the
-  Director launched it. Never quote `.mcp.json` and never commit it.
+  **read-only**; cite as `path:line`. It carries one pre-existing untracked file, `alpha_response.json`,
+  harmless and not this project's state.
+- Verification worktrees live in `../telegram_bus_agent-worktrees/` and are removed as soon as their run
+  finishes; **an empty directory is the expected end state** (session 11 ended with it empty).
+- Arena bridge: `.mcp.json` (gitignored) points at `http://127.0.0.1:8766/mcp` — the Arena Orion Electron
+  app, **down** unless the Director launched it. Never quote `.mcp.json` and never commit it.
 - GitHub auth is isolated from the machine-global `gh` account: this checkout's `.git/config` carries a
   local `credential.helper`; every `gh` call runs with
   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)" gh …`. **Never

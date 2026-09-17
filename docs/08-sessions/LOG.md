@@ -4,6 +4,56 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 11: PR-08 delivered in two audited halves (PR-08a #11, PR-08b #12)
+
+**Closed**
+
+- **PR-08 re-sliced and delivered.** The slice was planned at ≈370 authored lines and measured **1,400**
+  against the 400-line budget (3.8× under-estimated). Escalated to the Director with the measured figures
+  before anything was committed; the Director chose a cut at the file-and-dependency boundary, and both
+  halves are merged: **PR-08a** (`shared/token-shape.ts` + `shared/project-file.ts`; 954 authored after its
+  correction round, disclosed PR-scoped exception) as **PR #11**, and **PR-08b** (`shared/roster-hash.ts` +
+  the CLI `cli/{validate,main}.ts` + `EXIT_VALIDATION_FAILED` + the build wiring; 772 after its
+  corrections, disclosed exception) as **PR #12**. F1 now stands at **47/210 tasks**, 12 of 45 slices,
+  `main` `c345049`, **268 tests**, `test:static` 8/8.
+- **Two CRITICALs, both found by the substitute audit and both invisible to the writer's own evidence.**
+  PR-08a's: `ProjectFileProblem.field` was built from document-derived **key names**, so a token pasted
+  into key position was echoed into the problem list — the PT-05 channel itself — and the module's own
+  "value-free by construction" guarantee was true of values and false of keys; both judges reached it
+  independently. PR-08b's: the package's sole `bin` target carried **no shebang**, against ADR-0012's
+  constitution-level remediation table ("pinned by an assertion over the built bundle"), whose recorded
+  failure mode is *exit 0 with zero bytes on both streams* — and CI runs `windows-latest` only, where npm's
+  shim invokes node explicitly, so no gate in this repository could see it. Both were fixed in one bounded
+  round, re-judged `verified`, and closed **`JUDGMENT: APPROVED`** (`014f661..ddfa1c3` and
+  `72e09c0..a464a66`).
+- **The ordinary native review ran twice, with two different outcomes.** PR-08a's candidate was
+  **approved** (lineage `review-f644a39f445a2a0c`, authority burned; its four advisory findings are B-22).
+  PR-08b's was **declined** (`declined_this_candidate`, `lineage_created: false`, no mutation, risk high on
+  `process_boundary`), which is not a closure and is never re-reviewed, so the Receipt-driven Development
+  risk-gated fallback ran instead: writer self-verification plus a separate independent `gentle-ai-verify`
+  pass that found **five record defects and one observation**, and a focused re-check that found **two more
+  defects the correction itself had introduced** — all corrected, and the record's correction note carries
+  them as a log rather than as a claim that the first pass was complete.
+- **Backlog and records:** B-22 (PR-08a's four advisory findings, recorded not actioned) and B-23
+  (`JD-A-003`) filed; the audit-path entries `bus-v2-f1-pr-08a-audit-001` and `bus-v2-f1-pr-08b-audit-001`
+  added to the tribunal index. **DN-05 is unsatisfied for both halves**, exactly as for PR-06, PR-07a and
+  PR-07b.
+
+**Opened**
+
+- **PR-09** is the next slice (the machine registry: `src/registry/{schema,invariants,loader}.ts` with their
+  three twins, ≈380 planned, PT-18/PT-25, hot-reload by fingerprint). Route unchanged: ODD with the SDD
+  contract preserved, audited by Judgment Day.
+- Hygiene candidates for later audited PRs: a POSIX CI leg (the shebang class cannot fail here), a YAML
+  validity check over `git ls-files '*.y*ml'`, a pre-test `clean` step, and deletion of the stale remote
+  branches of the six merged PRs (needs the Director's authorization).
+
+**How it knows:** every figure is from `git diff --numstat -- src test` on frozen worktrees, from
+`gentle-ai sdd-status` (47/210, `blockedReasons: []`), or from the frozen-worktree test runs; the verdicts
+are from the two Judgment Day rounds and their scoped re-judgments; the review outcomes are from the
+returned envelopes (`gentle-ai.review-acknowledged/v1` for the two approvals, `declined_this_candidate`
+for the decline).
+
 ## 2026-09-17 — Session 10 (continuation): post-merge integrity sweep (B-19/B-20/B-21)
 
 **Closed**
