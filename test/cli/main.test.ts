@@ -60,6 +60,20 @@ test("package.json declares exactly one bin entry and it resolves to the built C
   assert.ok(existsSync(CLI_ENTRY), `expected the built CLI at ${CLI_ENTRY}: run 'npm run build' first`);
 });
 
+// ADR-0012 remediation 2 pins the shebang with an assertion over the built bundle, because the
+// failure mode is exit 0 with zero bytes on both streams. CI runs windows-latest only, where the
+// npm shim invokes node explicitly and masks the defect (`.github/workflows/ci.yml`), so this
+// assertion is the only thing that can fail: it reads the emitted file, not the source.
+test("the built CLI entry starts with a shebang so a POSIX bin invocation reaches the dispatcher", () => {
+  assert.ok(existsSync(CLI_ENTRY), `expected the built CLI at ${CLI_ENTRY}: run 'npm run build' first`);
+  const firstLine = readFileSync(CLI_ENTRY, "utf8").split("\n", 1)[0];
+  assert.equal(
+    firstLine,
+    "#!/usr/bin/env node",
+    "without it the `conmuta` bin exits 0 with no output on POSIX (ADR-0012)",
+  );
+});
+
 // --- Importing the module must never run the CLI ---
 
 test("importing the CLI module does not execute it", () => {

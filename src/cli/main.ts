@@ -1,3 +1,10 @@
+#!/usr/bin/env node
+// The shebang is line 1, and `tsc` copies it into `dist/src/cli/main.js` verbatim: ADR-0012
+// remediation 2. It is load-bearing, not decoration. `package.json` wires exactly one bin
+// (`conmuta` -> `dist/src/cli/main.js`), so without it a POSIX invocation never reaches the
+// dispatcher — the process exits 0 with zero bytes on both streams, the least diagnosable outcome,
+// and a pre-commit hook reads that silence as "clean" (PT-05). `test/cli/main.test.ts` pins the
+// emitted line so this can fail instead of regressing.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 

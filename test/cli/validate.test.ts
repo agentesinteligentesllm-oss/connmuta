@@ -120,6 +120,29 @@ test("validateText still catches a token shape inside a document that is not val
   assert.equal(report.exitCode, EXIT_VALIDATION_FAILED);
   assert.equal(report.err.join("\n").includes(FIXTURE_TOKEN), false);
   assert.match(report.err.join("\n"), /broken\.json/);
+  // The raw scan is the whole reason this path exists, so the two properties both judges found
+  // unpinned in round 1 are asserted here: that the forbidden line is present at all (deleting the
+  // scan left every other assertion above true, because `parseProjectFile` reports `invalid_json` on
+  // its own), and that it comes **before** the parse complaint, which is the order a hook reader sees.
+  assert.match(report.err.join("\n"), /forbidden content in <document>/);
+  assert.equal(report.err[0]?.includes("forbidden content in <document>"), true);
+  assert.equal(report.err[0]?.includes("not valid JSON"), false);
+});
+
+test("a malformed document whose only forbidden shape is an Authorization header is named as that rule", () => {
+  const report = validateText(`{ "h": "authorization: Bearer opaque", oops`, "broken.json");
+  assert.equal(report.exitCode, EXIT_VALIDATION_FAILED);
+  assert.match(report.err.join("\n"), /rule: authorization_literal/);
+  assert.equal(
+    report.err.join("\n").includes("telegram_bot_token_shape"),
+    false,
+    "the one API counts two shapes: the rule that fired has to be recovered, not assumed",
+  );
+});
+
+test("a malformed document carrying a token shape is named as the token shape", () => {
+  const report = validateText(`{ "project_id": "${FIXTURE_TOKEN}", oops`, "broken.json");
+  assert.match(report.err.join("\n"), /rule: telegram_bot_token_shape/);
 });
 
 test("validateText reports a clean but malformed document as invalid JSON", () => {

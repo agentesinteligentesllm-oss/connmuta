@@ -9,7 +9,7 @@ export const AUTHORIZATION_LITERAL = "Authorization";
 
 /**
  * The two shapes this module scans for by name — the bot-token shape and the `Authorization`
- * literal (design.md:150, PT-05).
+ * literal (design.md:151, PT-05).
  *
  * Deliberately narrower than {@link SecretRule}: the PEM / `.env` / operator-marker classes already
  * have an owner (`shared/secrets.ts`, the outbound backstop), and redeclaring them here would be the
@@ -17,7 +17,7 @@ export const AUTHORIZATION_LITERAL = "Authorization";
  */
 export type TokenShapeRule = "telegram_bot_token_shape" | "authorization_literal";
 
-/** What {@link findTokenShapes} reports: a count, never the match (design.md:150). */
+/** What {@link findTokenShapes} reports: a count, never the match (design.md:151). */
 export interface TokenShapeFindings {
 	readonly count: number;
 }
@@ -71,7 +71,7 @@ function firstTokenShapeRule(text: string): TokenShapeRule | undefined {
  *
  * Returns a count and nothing else, by construction: this result reaches logs, terminals and tool
  * outputs, so carrying the match would copy the very secret the scan exists to keep out
- * (DATA-MODEL §1 "Must never contain"; design.md:150).
+ * (DATA-MODEL §1 "Must never contain"; design.md:151).
  */
 export function findTokenShapes(text: string): TokenShapeFindings {
 	return { count: countTokenShapes(text) + countAuthorizationLiterals(text) };
@@ -82,7 +82,7 @@ export function findTokenShapes(text: string): TokenShapeFindings {
  *
  * Stricter than {@link findTokenShapes} on purpose, and documented as such: it first applies the two
  * shapes above, then delegates to the shared secret table ({@link checkForSecrets}) so a raw-text
- * scan — the registry's pre-parse R5 scan (design.md:143) and the CLI's non-JSON fallback — cannot
+ * scan — the registry's pre-parse R5 scan (design.md:144) and the CLI's non-JSON fallback — cannot
  * under-reject just because a PEM block or a `.env`-style assignment is not a bot token.
  *
  * Throws an `Error` whose message names the rule and never the matched text.

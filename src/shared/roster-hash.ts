@@ -11,7 +11,7 @@ export const ROSTER_HASH_PREFIX = "sha256:";
  *
  * `username` is deliberately absent: it is display-only and mutable, so including it would report
  * `roster_drift` for a rename that changes no authorization decision, while an *authority* change
- * (`user_id`) would hide behind it (D-27, design.md:588). The type says that, rather than leaving it
+ * (`user_id`) would hide behind it (D-27, design.md:589). The type says that, rather than leaving it
  * to a comment a caller could miss.
  */
 export interface RosterHashInput {
@@ -20,7 +20,7 @@ export interface RosterHashInput {
 }
 
 /**
- * The roster fingerprint a session handshake carries (design.md:148, `POST /session`): the SHA-256
+ * The roster fingerprint a session handshake carries (design.md:149, `POST /session`): the SHA-256
  * of the canonical JSON of `[agent_id, user_id]` pairs sorted by `agent_id`, prefixed `sha256:`.
  *
  * Sorted, because the hash must depend on the roster's *content* and not on the order a human
