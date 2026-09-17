@@ -2700,16 +2700,16 @@ for PR-09b** as for the rest of F1. Branch `f1/09b-registry-loader` from `main` 
 | Code commit | `3eba70d` (`loader.ts`, its twin, and `addSecondBinding` restored in `test/registry/fixtures.ts`) |
 | Requirements | `project-binding › Machine registry schema and invariants` — the loader-side half of the four spec scenarios; **PT-25**'s registry-side half (the daemon-side `migrate_to_chat_id` half stays with `daemon/send/send-path`, B-26) |
 | Provenance | none — no v1 range is vendored; the fixture stays at **11** entries |
-| Budget | **672 authored lines / 400** — a disclosed **272-line PR-09b-scoped exception** (same grounds and the same size as PR-08b's) |
+| Budget | **775 authored lines / 400** — a disclosed **375-line PR-09b-scoped exception**. It measured 672 (272 over) before Judgment Day; round 1's mandated corrections added **+103** (the CRITICAL's pin, the latched-condition test, the BOM test, the fingerprint-retention test, and the fixture-path fix), and every figure here is measured after the correction, at the tip that ships |
 
 ## Scope and budget (measured)
 
 | Path | Lines |
 |---|---|
-| `src/registry/loader.ts` | 237 |
-| `test/registry/loader.test.ts` | 403 |
-| `test/registry/fixtures.ts` | +32 (`addSecondBinding`, whose only caller this half is) |
-| **budget total** (`git diff --numstat HEAD -- src test` at the code tip) | **672 / 400** — 272-line exception |
+| `src/registry/loader.ts` | 257 (`237` before round 1) |
+| `test/registry/loader.test.ts` | 486 (`403` before round 1) |
+| `test/registry/fixtures.ts` | +32 (`addSecondBinding`, whose only caller this half is, with its path corrected in round 1) |
+| **budget total** (`git diff --numstat main -- src test` at `e11bfaa`) | **775 / 400** — 375-line exception |
 
 The exception's grounds are PR-08b's: one assertion per rule the gated rows state, plus the boundaries the
 rules imply — the fingerprint's **two** members (mtime and size, each pinned by its own case), the ordering
@@ -2839,6 +2839,22 @@ first failed here for an unrelated reason worth recording: the finding's own 9-d
 so the repository's own scan failed until the fixture moved to the 7-digit shape this suite uses — the trap
 the handoff documents, hit exactly as documented.
 
+## Scoped re-judgment (terminal) and the verdict
+
+Both judges received `JD-A-001`, its exact hash-bound row (frozen ledger SHA-256
+`89ea325eabae4333f69f2e8b9e20bf52d0f45bb20b46e442d8716b86ef5fcaf3`, the one authorized severe row) and the
+complete fix delta `88a0c52..e11bfaa`, with the folded rows disclosed for fix-line regression purposes only.
+**Both resolved `verified`.** No severe row survives; the round budget is exhausted with a single round used,
+and the second scoped re-judgment is unspent — as in PR-08a and PR-08b.
+
+One final verification, in a clean detached worktree at the corrected tip with `dist/` rebuilt from scratch:
+**328/328** tests (PR-09a's 304 + 24 loader tests), `test:static` **8/8**, and the focused command task 9.5
+names — over the three suites this slice owns — **60/60** (schema 20, invariants 16, loader 24).
+
+With no severe row surviving and the final verification passing:
+
+**`JUDGMENT: APPROVED`** for `11c6af4..e11bfaa`.
+
 ## Next
 
-- PR-09b's Judgment Day round 1's scoped re-judgment, its ordinary native review, then the PR.
+- PR-09b's ordinary native review, then the PR.
