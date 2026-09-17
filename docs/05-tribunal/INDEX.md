@@ -403,6 +403,24 @@ here keeps the governance debt visible instead of leaving it as a silent omissio
 | Left open, queued to the Director | Two **pre-existing** defects with recommended backlog ids: the digest's discrete blind spots, including `history.length` saturating at `MAX_THREAD_HISTORY = 50` so a further peer reply can leave a byte-identical digest; and the fence body escape leaving `&` unescaped, so the fence is not injective. Both would change documented, ratified behaviour outside PR-06's change list, so neither was fixed inside a vendoring slice. |
 | Consequence | **DN-05 is not satisfied for PR-06.** It is waived for this mission by the authority that owns it. The audit path for PR-07a and later slices is an open decision for the Director, recorded in `HANDOFF.md`. |
 
+## `bus-v2-f1-pr-07a-audit-001` — record (an audit-path decision, not a debate)
+
+Not a row in the Debates table above, for the same reason as the PR-06 waiver: no Arena exchange
+occurred, so there is no `CONSENSUS`/`ESCALATED` outcome to record. It is recorded so the governance
+debt stays visible.
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-17 |
+| Subject | PR-07a (`shared/tool-schemas.ts` + `shared/error-payload.ts`, both SEAM), merged as PR #9 (`535ce67`; code tip audited at `53d5aad`) |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | Two questions were put to the Director **before any write**, as the handoff required. (1) **Audit path:** ODD + Judgment Day again — the `bus-v2-f1-pr-06-waiver-001` substitute — rather than `sdd-apply` (still refused by the host-owned native preflight, `extensions/gentle-ai.ts` ~L9255 → `lib/sdd-preflight.ts:896-926`, which an agent can neither satisfy nor fabricate) or the Arena tribunal (bridge down). (2) **PT-07's cell stays unannotated**, despite `tasks.md` 7a.6 asking for it: PT-07's assertion is bundle-level (`security/client-bundle`, design §14/§528 → PR-34/PR-40) and this slice pins only the constructor's *shape* half, so annotating it would repeat the PT-14 over-claim two PR-06 judges caught. |
+| What was used instead | **Judgment Day** — two blind read-only judges over the frozen range `c971e25..dbb7494` with identical scope and criteria, a merged frozen ledger, a bounded correction round, a scoped re-judgment, a second bounded round for the defects the first round itself created, and a terminal re-judgment over `05ba773..53d5aad`. |
+| Outcome | Round 1: `APPROVED`, 0 CRITICAL, 2 corroborated WARNINGs (both introduced, both fixed) plus 4 single-judge suggestions. Re-judgment 1: 0 CRITICAL, 4 fix-caused defects, all fixed. Re-judgment 2 (terminal): 0 CRITICAL, no behavioural regression, 3 record-arithmetic defects fixed and **1 contested-causality item escalated to the Director** because the round budget was exhausted and the judges disagreed on whether the earlier correction introduced it; the Director queued it as PR-07b's first correction. Terminal verdict **`JUDGMENT: APPROVED`** for `c971e25..53d5aad`. |
+| Defects it caught | A PT-02 pin narrower than the threat-model cell credited it (it read the *base* schema, not the tool-visible refined one, and omitted `to_user_id` — proved with a deterministic zod probe that added `bot` to the refined schema and passed every assertion); a constructor JSDoc that contradicted design §10's client taxonomy and would have made PR-34 mark a transiently-down daemon permanent; a header claim its own paragraph did not support; and a record whose budget arithmetic was internally inconsistent twice over. |
+| Left open, carried to the Director | `src/shared/constants.ts:3` pins a blind-stripped hash (`4ce5e514…`; the rule-conformant value is `039d53a2…`) — pre-existing from the PR-01b lineage, one judge, outside this slice's range. And design §12's reuse table still marks both v1 ranges **AS-IS** → a module that is SEAM by construction (`bus-v2-f1-tasks-001` items 1–2); reported rather than silently resolved because `design.md` is gated and audited. |
+| Consequence | **DN-05 is not satisfied for PR-07a either.** The Director owns the audit path for PR-07b and later slices. |
+
 ## Reserved: `bus-v2-referee-001`
 
 Scope fixed by amendment A3 and backlog B-01–B-03: one optional referee per group with an explicit

@@ -7,7 +7,7 @@ This file is the **single entry point** of the repository (landing decision D10:
 documents claiming to be the entry point; v2 has one). If a document is not listed here, it is not
 part of the F0 landing.
 
-**Status: F0 closed; F1 `apply` in progress — PR-01a, PR-01b, PR-02, PR-03, PR-04, PR-05 and the two PR-06 slices (PR-06a `shared/fence.ts` SEAM D-15, PR-06b `shared/protocol-select.ts` SEAM) merged to `main` (scaffold, CI, static gates, `shared/constants.ts`, provenance mechanism, `shared/envelope.ts` AS-IS, `shared/secrets.ts` SEAM, `shared/thread-record.ts` SEAM, `shared/protocol-apply.ts` SEAM D-05; 32/210 tasks, 45 slices); next slice PR-07a.**
+**Status: F0 closed; F1 `apply` in progress — PR-01a, PR-01b, PR-02, PR-03, PR-04, PR-05, the two PR-06 slices (PR-06a `shared/fence.ts` SEAM D-15, PR-06b `shared/protocol-select.ts` SEAM) and PR-07a (`shared/tool-schemas.ts` SEAM, `shared/error-payload.ts` SEAM) merged to `main` (scaffold, CI, static gates, `shared/constants.ts`, provenance mechanism, `shared/envelope.ts` AS-IS, `shared/secrets.ts` SEAM, `shared/thread-record.ts` SEAM, `shared/protocol-apply.ts` SEAM D-05, 10-entry provenance registry; 169 tests, 38/210 tasks, 45 slices); next slice PR-07b.**
 Live position: [`08-sessions/HANDOFF.md`](./08-sessions/HANDOFF.md). Source of the architecture below: Arena debate
 `bus-v2-landing-architecture-001`, consensus after two rounds ([`05-tribunal/INDEX.md`](./05-tribunal/INDEX.md)).
 

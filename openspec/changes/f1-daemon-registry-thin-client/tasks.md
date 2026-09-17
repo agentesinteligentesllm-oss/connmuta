@@ -145,6 +145,20 @@ Runtime harness: N/A.
 - [x] 7a.5 Verify: `npm run build && node --test "dist/test/shared/tool-schemas.test.js" "dist/test/shared/error-payload.test.js" "dist/test/security/provenance.test.js"`.
 - [x] 7a.6 Docs: update the file-name cell(s) of PT-02, PT-07 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
+**Apply-time amendment (PR-07a, session 9).** Tasks 7a.1–7a.6 flipped to `[x]` in the PR-07a commits;
+PR #9, merge `535ce67`, audited code tip `53d5aad`. Final measured figures: **420 authored lines, 20 over**
+the 400-line review budget, granted a one-time PR-07a-scoped size exception distinct from DN-06 (DN-06
+stays AS-IS-only and is not amended). The slice was inside the budget at **398** when the audit opened;
+the two bounded Judgment Day correction rounds took it to 415 and then 420, and every added line is a
+test assertion or a documentation-accuracy correction (`apply-progress.md`'s PR-07a section,
+`bus-v2-f1-pr-07a-audit-001`). Two deliberate deviations from this block, both Director decisions and
+both disclosed rather than silent: **7a.6's PT-07 half was not executed** — PT-07's assertion is
+bundle-level (`security/client-bundle`, PR-34/PR-40) and annotating the cell would repeat the PT-14
+over-claim PR-06's judges caught — and the slice ran under **ODD + Judgment Day** because the SDD
+dispatcher is still refused by the host-owned native preflight. The module's provenance header cites the
+larger of its two v1 ranges (`src/tools/send.ts:47-109`); the second (`src/index.ts:29-42`) is named in
+the `Changes:` line because the registry's `v1Path` is a single token.
+
 #### PR-07b — `shared/tool-output.ts` (SEAM)
 Branch `f1/07b-tool-output` → `main`. Depends: PR-07a. Size: ≈385 lines (≈284 extracted body + ≈100 twin), no exception (range extract of `tools/fetch.ts`, therefore SEAM). If the twin exceeds ≈115 authored lines, ship the twin as PR-07c (`f1/07c-tool-output-tests`) so PR-07b stays ≤ 400.
 Scope: `src/shared/tool-output.ts`, `test/shared/tool-output.test.ts`, `test/fixtures/v1-provenance.json` (append one SEAM entry).

@@ -4,6 +4,56 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 9: F1 apply, PR-07a merged (stopped at the PR-07a → PR-07b boundary)
+
+**Closed**
+
+- PR-07a (`shared/tool-schemas.ts` + `shared/error-payload.ts`, both SEAM) implemented, reviewed and
+  merged as PR #9 (`535ce67`; audited code tip `53d5aad`). The slice extracts the four tool input
+  schemas from `v1:src/tools/send.ts:47-109` + `v1:src/index.ts:29-42` into the one definition the
+  client and the daemon share, and keeps the closed error-payload shape and the retryable allow-list
+  free of the `telegram.ts` classification the client closure must not contain.
+- Both pinned SEAM hashes re-derived by two independent methods and validated against PR-06's already
+  ratified fencing value (`84aae049…`, `1f59f8f8…`), with the blind-strip controls recorded.
+- **Audit path decided by the Director before any write**, because the handoff required it: ODD +
+  Judgment Day again (`bus-v2-f1-pr-07a-audit-001`) — `sdd-apply` is still refused by the host-owned
+  native preflight and the Arena bridge was down. The Director also ruled that **PT-07's cell stays
+  unannotated** although `tasks.md` 7a.6 asks for it: its assertion is bundle-level (PR-34/PR-40) and
+  this slice pins only the shape half, so annotating it would repeat the PT-14 over-claim PR-06's
+  judges caught. The divergence is disclosed in `apply-progress.md` and in the PR body.
+- **Judgment Day found real defects in three passes, two of them fixed in bounded rounds.** Round 1
+  (`APPROVED`, 0 CRITICAL): the PT-02 pin was narrower than the threat-model cell credited it — it read
+  the *base* schema, not the tool-visible refined one, and omitted `to_user_id`, proved with a zod probe
+  that added `bot` to the refined schema and passed every assertion; and the new constructor's JSDoc
+  contradicted design §10's client taxonomy, which would have made PR-34 mark a transiently-down daemon
+  permanent. Re-judgment 2 found only defects the first correction round had itself created (a header
+  claim its own paragraph did not support, a twin still modelling the forbidden pattern, and record
+  arithmetic that contradicted itself twice). One contested-causality item was escalated to the
+  Director — the round budget was exhausted and the judges disagreed — and queued as PR-07b's first
+  correction.
+- **First slice to run over the 400-line budget through a disclosed exception**, and the reason is
+  recorded rather than hidden: it was inside at 398 when the audit opened and the two correction rounds
+  took it to 420. Every line of the overage is a test assertion or a documentation-accuracy fix.
+- Budget evidence, mutant matrix (8 mutants, all killed on a cleaned `dist/`), provenance re-derivation
+  and the audit ledger are in `apply-progress.md`'s PR-07a section.
+- Verified from clean detached worktrees (`npm ci --ignore-scripts`) at the audited tip and at both
+  correction tips: **169/169** and `test:static` **8/8**, focused 18/18; then again on merged `main`.
+
+**Opened**
+
+- PR-07b (`shared/tool-output.ts`, SEAM) with two carried findings: its planned implementation/twin
+  split into PR-07b/PR-07c is **not CI-safe** (`test/twins.test.ts` fails a `src` file whose twin is
+  missing in the same tree, so that split would fail PR-07b's own merge), and the contested D4 test
+  example is its first correction.
+- For the Director: the pre-existing blind-stripped pin at `src/shared/constants.ts:3`, design §12's
+  stale AS-IS rows over a SEAM module, and the audit path for PR-07b onward.
+
+**How it knows**: `git log`/`git diff` and the merged PR #9 with its CI matrix; two blind judges'
+`{"findings":…,"evidence":…}` results in three passes; `npm test` 169/169 and `npm run test:static`
+8/8 on `main` and from clean worktrees; `gentle-ai sdd-status` (`nextRecommended: apply`, 38/210);
+`docs/05-tribunal/INDEX.md` (`bus-v2-f1-pr-07a-audit-001`); Engram observations #3273 and the
+session-9 summary.
+
 ## 2026-09-17 — Session 8: F1 apply, PR-06 delivered as two slices (PR-06a + PR-06b) and merged
 
 **Closed**
