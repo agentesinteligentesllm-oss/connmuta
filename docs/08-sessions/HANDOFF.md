@@ -58,6 +58,17 @@ It compiles and its suite is green locally (15/15 loader tests; 36/36 across the
 `test:static` 8/8 for the whole tree as committed). Read it critically — it is a draft, not a reviewed
 artifact — then treat it as PR-09b's first work unit: RED/GREEN evidence, its own mutants, its judgment.
 
+**This exact draft is already a declined review candidate, and the decline is not a closure.** At the close
+of session 12 the review preflight ran over precisely these three paths (target
+`sha256:9110d7de94e21768db4389a0f0bb96face82b8b9b4c2f7ffb0d07a85dc9543c0`, 3 files, 536 changed lines,
+risk **medium**) and the host resolved `declined_this_candidate`: `lineage_created: false`,
+`mutation_performed: false`, no lineage and no authority. **Do not re-review that identity**, and do not
+read the decline as a review that closed: the Receipt-driven Development fallback (*writer self-verification
+plus a separate independent verifier*) is owed by **PR-09b's own boundary**, once this half is complete and
+about to be reported — not by an unfinished draft the Director deferred to this session. Because the draft
+will change before then, PR-09b's own preflight is a fresh, independent candidate; this declined one is
+simply dead.
+
 ---
 
 ## §1 — Where the work stands
@@ -138,9 +149,9 @@ are first-class and were all re-confirmed by PR-09a:
 **5. The ordinary native review is a separate, independent lifecycle (RDD switch: on).** After authorized
 implementation is complete and normalized, and **before** reporting it complete, call `gentle_review` with
 `{"operation":"inspect"}` and follow only the transition it returns. Precedents: **approved** (PR-07b,
-PR-08a), **declined** (PR-08b, and **PR-09a**: `declined_this_candidate`, `lineage_created: false`, risk
+PR-08a), **declined** (PR-08b, **PR-09a**: `declined_this_candidate`, `lineage_created: false`, risk
 **medium**, no mutation, no lineage — a decline is *not* a closure, never re-review that candidate, and the
-RDD fallback runs). For PR-09a the fallback's `assess` returned risk **unassessable** (the native assessment
+RDD fallback runs; and **the PR-09b draft**, same outcome at the session-12 close, §0.1). For PR-09a the fallback's `assess` returned risk **unassessable** (the native assessment
 came back schema-incompatible — treated exactly like high risk) and the plan *"the writer self-verifies and
 a separate independent verifier always runs"*. **That verifier was the most valuable instrument of the
 session**: it reproduced every headline figure and found **eleven record defects**. Run it, and expect it to
