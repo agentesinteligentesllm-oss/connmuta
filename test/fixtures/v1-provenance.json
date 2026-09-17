@@ -46,5 +46,11 @@
     "v1Path": "src/tools/fetch.ts:43-63",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/shared/tool-schemas.ts",
+    "v1Path": "src/tools/send.ts:47-109",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
