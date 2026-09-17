@@ -320,7 +320,8 @@ the unit's first `.ts` file or `tsc -b` fails TS18003 (the omission PR-09a discl
 *Size.* The block estimated ≈400; the measured diff is **885 authored lines** (`git diff --numstat -- src test`:
 `schema.ts` 109, `transaction.ts` 75, its `tsconfig.json` 14, `schema.test.ts` 495, `transaction.test.ts` 192;
 zero deletions) — **the pre-correction measurement**, kept here because it is the figure the Director
-authorized, with the tip that ships re-measured in the paragraph after task 10.6. On this measurement the
+authorized, with the tip that ships re-measured in the **Round 1 (Judgment Day)** paragraph below and in
+`apply-progress.md` §PR-10's budget table. On this measurement the
 slice carries a **disclosed PR-10-scoped size exception, 485 over**, granted by the Director together with the commit authorization.
 Grounds: the DDL is one artifact whose constraints are pinned one assertion per constraint — the object
 inventory, `STRICT` plus the control that proves it bites, the eight accepted `apply_outcome` values and
