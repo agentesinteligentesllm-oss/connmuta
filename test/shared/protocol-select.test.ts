@@ -109,6 +109,22 @@ test("the digest depends on the passed checkpoint, and not on any thread-derived
   assert.notEqual(digest(threads, [], null), digest(threads, [], checkpointAt));
 });
 
+test("the clock enters only through the quantized reminder count, never as a continuous quantity", () => {
+  // The digest's own comment forbids continuous quantities: hashing `now` or a thread's age would make
+  // `unchanged` permanently false and the compact tick dead on arrival while appearing to work. Both
+  // comparisons below stay inside the reminder window, so the quantized count is identical in each pair.
+  const threads = { [THREAD]: thread({ awaiting: SELF }) };
+  const sameBucketLater = new Date(NOW.getTime() + 60_000);
+  const openedEarlier = { [THREAD]: thread({ awaiting: SELF, opened_at: "2026-08-14T17:00:00Z" }) };
+
+  assert.equal(
+    computeWorkDigest(threads, SELF, REQUEST_REMINDER_WINDOW_HOURS, NOW, new Set(), null),
+    computeWorkDigest(threads, SELF, REQUEST_REMINDER_WINDOW_HOURS, sameBucketLater, new Set(), null),
+    "a later clock inside the same window must not move the digest"
+  );
+  assert.equal(digest(threads), digest(openedEarlier), "`opened_at` is not part of the digest row");
+});
+
 test("crossing the reminder window flips the digest even though no other discrete state moved", () => {
   // `reminder_count` is clock-derived and mandatory: a thread going overdue changes nothing else
   // discrete about itself, so without this component the digest would keep answering `unchanged:
@@ -153,8 +169,10 @@ test("THE INVARIANT: while anything was withheld from fresh or reminder, no alre
 });
 
 test("twenty already-seen threads do NOT make a brand-new REQUEST unreachable — the defect F3 names", () => {
+  // The backlog ids sort BEFORE "brand-new", deliberately: with a backlog that sorted after it, a global
+  // sort would satisfy the assertion below without any tiering, so the test could not fail for its claim.
   const selection = selectTiered(
-    { fresh: ["brand-new"], reminder: [], rest: ids("s", 20) },
+    { fresh: ["brand-new"], reminder: [], rest: ids("a", 20) },
     MAX_SURFACED_THREADS,
     { fresh: FLOOR_NEW, reminder: FLOOR_REMINDER }
   );
@@ -203,13 +221,15 @@ test("floors that sum past the window are clamped rather than overfilling it", (
 });
 
 test("ordering within each tier is preserved untouched — oldest-first stays ADR-12's rule", () => {
+  // Deliberately not in lexicographic order, within a tier or across tiers: a fixture that happened to
+  // be sorted would let a global sort — the thing the module's own comment rejects — pass this assertion.
   const selection = selectTiered(
-    { fresh: ["n0", "n1", "n2"], reminder: ["r0", "r1"], rest: ["s0"] },
+    { fresh: ["n2", "n0", "n1"], reminder: ["r1", "r0"], rest: ["s1", "s0"] },
     MAX_SURFACED_THREADS,
     { fresh: FLOOR_NEW, reminder: FLOOR_REMINDER }
   );
 
-  assert.deepEqual(selection.selected, ["n0", "n1", "n2", "r0", "r1", "s0"]);
+  assert.deepEqual(selection.selected, ["n2", "n0", "n1", "r1", "r0", "s1", "s0"]);
 });
 
 // --- Reminder boundary on the injected clock, and the turn-based needs-action rule ---
