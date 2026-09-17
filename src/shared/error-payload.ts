@@ -37,13 +37,13 @@ export type ToolErrorPayload = {
  * Deliberately a closed allowlist rather than a denylist: an unrecognised code is NOT retryable, so
  * a future error type cannot become a hot loop just because nobody remembered to classify it.
  *
- * `TRANSPORT_ERROR` is the only genuinely transient one here — a socket or protocol failure on a
- * request that was otherwise well formed. Every other tool-level code is the caller's own input
- * being wrong, and repeating an identical wrong request produces an identical rejection.
+ * `TRANSPORT_ERROR` is the only genuinely transient one here — a socket or protocol failure on an
+ * otherwise well-formed request. Every other tool-level code is the caller's own input being wrong,
+ * and repeating an identical wrong request produces an identical rejection.
  *
- * v1 also listed `BRIDGE_BUSY`: another call on the same machine held the v1 bridge lock and would
- * release it. That code is deleted in v2 (design §10), because the daemon owns the ledger inside
- * one process and there is no cross-process lock left to be busy.
+ * v1 also listed `BRIDGE_BUSY`: another call held the v1 bridge lock and would release it. That code
+ * is deleted in v2 (design §10), because the daemon owns the ledger inside one process and there is no
+ * cross-process lock left to be busy.
  */
 export const RETRYABLE_TOOL_CODES: ReadonlySet<string> = new Set(["TRANSPORT_ERROR"]);
 

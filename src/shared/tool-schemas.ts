@@ -3,14 +3,14 @@
  * v1 body sha256: 84aae049e711e5ec6725007d561e65cebcf3ca3b9035333ae9b2b734494d42e6   (SHA-256 of the v1 body at bf8f365, header and import block excluded)
  * Changes: (1) the `send` input schema (`v1:src/tools/send.ts:47-109`) and the three read-only tool
  * schemas (`v1:src/index.ts:29-42`) are extracted into one module, so the thin client and the daemon's
- * IPC re-validation (design §10 "it never trusts the client") read one definition of the four shapes; (2) imports relocated to `shared/envelope.js`; (3) the leading JSDoc restored from
- * `v1:src/tools/send.ts:36-46`, the comment block immediately above the vendored range, with the tool
- * name written as `send` because v2 derives it from `TOOL_PREFIX` (D-09), plus one added paragraph
- * stating the destination half of the same structural guarantee (`chat_id`/`bot`/`group`/`to_chat` exist
- * in no schema here — PT-02) and the `to_user_id` half, which v1 pinned only in its own twin
+ * IPC re-validation (design §10 "it never trusts the client") read one definition of the four shapes;
+ * (2) imports relocated to `shared/envelope.js`; (3) the leading JSDoc restored from
+ * `v1:src/tools/send.ts:36-46`, the block immediately above the vendored range, its tool name written as
+ * `send` (v2 derives it from `TOOL_PREFIX`, D-09), plus one added paragraph stating the destination and
+ * `to_user_id` halves of the same structural guarantee — v1 pinned `to_user_id` only in its twin
  * (`v1:test/tools/send.test.ts:295-303`); (4) `export type SendToolInput` carried from
- * `v1:src/tools/send.ts:111`, one line past the cited range; (5) the three read-only schemas' JSDoc
- * rewritten from `agentbus_fetch`/`agentbus_status`/`agentbus_thread` to `fetch`/`status`/`thread`.
+ * `v1:src/tools/send.ts:111`, two lines past the cited range (line 110 is blank); (5) the three
+ * read-only schemas' JSDoc rewritten from `agentbus_*` to `fetch`/`status`/`thread`.
  */
 
 import { z } from "zod";
@@ -25,9 +25,11 @@ import { AGENT_ID_PATTERN, RESOLVED_BASIS_VALUES, THREAD_PATTERN } from "./envel
  * inferred directly from that schema, so TypeScript's excess-property check on a
  * `SendToolInput`-typed object literal independently rejects a stray `from` at compile time.
  *
- * The same structural argument covers the DESTINATION: no schema in this module declares `chat_id`,
- * `bot`, `group` or `to_chat`, so a caller cannot even express another room. Where the message goes
- * is fixed by the binding and asserted by the room guard (PT-02, PT-01; design §9).
+ * The same structural argument covers the DESTINATION and the other identity anchor: no schema here
+ * declares `chat_id`, `bot`, `group`, `to_chat` or `to_user_id` — the daemon derives the last from the
+ * binding's roster (design §9) — so a caller can neither aim the message at another room nor choose who
+ * it is attributed to. Where the message goes is fixed by the binding and asserted by the room guard
+ * (PT-02, PT-01).
  */
 export const sendInputBaseSchema = z.object({
   type: z.enum(["BROADCAST", "REQUEST", "REPLY", "ACK", "RESOLVED"]),

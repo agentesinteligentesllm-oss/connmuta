@@ -13,8 +13,8 @@ import {
 // --- PT-02: the tool inputs carry no destination and no sender (schema-shape assertion, not just a
 // runtime check). v1 precedent: the `from` and `to_user_id` assertions at
 // `v1:test/tools/send.test.ts:122-136` and `:295-303`. `chat_id` is Telegram's own field,
-// `bot`/`group`/`to_chat` are the v1 bridge's vocabulary for the same thing, and `from`/`to_user_id`
-// are the identity anchors the daemon derives instead (ADR-07; design §9 — "neither is an input").
+// `bot`/`group`/`to_chat` are the v1 bridge's vocabulary for it, and `from`/`to_user_id` are the
+// anchors the daemon derives instead (design §9 — "neither is an input").
 
 const FORBIDDEN_INPUT_KEYS = ["chat_id", "bot", "group", "to_chat", "from", "to_user_id"];
 
@@ -70,7 +70,7 @@ test("TypeScript's SendToolInput type structurally forbids a `from` field (compi
 });
 
 // --- The four schemas parse v1's documented inputs unchanged (spec: "Four tool input schemas port
-// unchanged"; `v1:src/index.ts:29-42` + `v1:src/tools/send.ts:47-109`).
+// unchanged").
 
 const THREAD_ID = "a1b2c3d4e5f6";
 const PEER = "@dev1-agent";

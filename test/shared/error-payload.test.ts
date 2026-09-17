@@ -31,11 +31,14 @@ test("the shape is closed — an arbitrary extra field is not representable", ()
   assert.ok(unexpected, "reached only if compilation succeeded despite the injected `chat_id` field");
 });
 
-test("the client-local constructor sets exactly `code`, `message` and `retryable`", () => {
-  const payload = toolErrorPayload("DAEMON_DOWN", "no daemon answered");
+test("the tool-level constructor sets exactly `code`, `message` and `retryable`", () => {
+  // A tool-level code on purpose: client-local codes (`DAEMON_DOWN` and friends) are NOT built here —
+  // design §10 gives them their own taxonomy and `client/errors.ts` (PR-34) implements it (finding C2).
+  const payload = toolErrorPayload("BODY_TOO_LONG", "the body exceeds the effective ceiling");
   assert.deepEqual(Object.keys(payload).sort(), ["code", "message", "retryable"]);
-  assert.equal(payload.code, "DAEMON_DOWN");
-  assert.equal(payload.message, "no daemon answered");
+  assert.equal(payload.code, "BODY_TOO_LONG");
+  assert.equal(payload.message, "the body exceeds the effective ceiling");
+  assert.equal(payload.retryable, false, "a permanent tool-level failure is not retryable");
 });
 
 // --- `RETRYABLE_TOOL_CODES` is a closed ALLOW-list, not a deny-list: an unrecognised code is NOT
