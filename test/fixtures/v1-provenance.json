@@ -52,5 +52,11 @@
     "v1Path": "src/tools/send.ts:47-109",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/shared/error-payload.ts",
+    "v1Path": "src/index.ts:45-103",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
