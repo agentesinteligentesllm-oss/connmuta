@@ -182,9 +182,9 @@ while this slice is open. It was escalated rather than fixed in PR-07a because t
 Day round budget was exhausted and its two judges disagreed on whether the earlier correction
 introduced it.
 
-- [ ] 7b.1 RED: write `test/shared/tool-output.test.ts` (rendering of the fetch digest, `body_omitted` marker, fence-safe output) against a not-yet-present module.
-- [ ] 7b.2 GREEN: implement `src/shared/tool-output.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/fetch.ts:65-348` (read-only source, ≈284 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/fetch.ts`, and `Changes: (1) extracted lines 65-348; (2) imports relocated`.
-- [ ] 7b.3 Verify: `npm run build && node --test "dist/test/shared/tool-output.test.js" "dist/test/security/provenance.test.js"`.
+- [x] 7b.1 RED: write `test/shared/tool-output.test.ts` (rendering of the fetch digest, `body_omitted` marker, fence-safe output) against a not-yet-present module.
+- [x] 7b.2 GREEN: implement `src/shared/tool-output.ts` as a SEAM extracted from `telegram-agent-bus/src/tools/fetch.ts:65-348` (read-only source, ≈284 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `src/tools/fetch.ts`, and `Changes: (1) extracted lines 65-348; (2) imports relocated`.
+- [x] 7b.3 Verify: `npm run build && node --test "dist/test/shared/tool-output.test.js" "dist/test/security/provenance.test.js"`.
 
 ### Unit 3 — `project-binding`
 

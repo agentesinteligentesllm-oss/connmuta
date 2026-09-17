@@ -1461,3 +1461,152 @@ npm run test:static                                   ->   8 tests,   8 pass, 0 
 ## Next
 
 Scoped re-judgment of the frozen ledger plus the fix delta (`dbb7494..HEAD`), then push and open the PR.
+
+---
+
+# Apply Progress: F1 — PR-07b (`shared/tool-output.ts`, SEAM)
+
+| Field | Value |
+|---|---|
+| Change | `f1-daemon-registry-thin-client` |
+| Branch | `f1/07b-tool-output` → `main` (branched from `main` at `a3b56c3`) |
+| Mode | Strict TDD |
+| Workflow | **ODD for this slice only** (handoff §2, the settled path). `sdd-apply` is still refused before child launch by the host-owned native preflight, so **no `sdd-apply` phase envelope exists for this slice**; the orchestrator owns the bookkeeping below |
+| Status | Implemented and verified (Strict TDD); tasks 7b.1–7b.3 `[x]`; audited range `a3b56c3..2a66fdc` |
+| Pre-slice status | read truthfully before any write: `nextRecommended: apply`, **38/210**, `blockedReasons: []` |
+
+## Scope and budget (measured, not estimated)
+
+| Path | Added | Deleted | Kind |
+|---|---|---|---|
+| `src/shared/tool-output.ts` | 337 | 0 | SEAM, range extract of `v1:src/tools/fetch.ts:65-348` (284 vendored lines) |
+| `test/shared/tool-output.test.ts` | 145 | 0 | twin (ships in the same PR — see below) |
+| `test/fixtures/v1-provenance.json` | 6 | 0 | one SEAM registry entry |
+| `test/shared/error-payload.test.ts` | 7 | 3 | D4 (own commit, `27100ce`) |
+| **budget total** | **495** | **3** | **disclosed PR-scoped exception of 95 lines over the 400-line policy** |
+
+The tasks phase estimated ≈385 (≈284 extracted + ≈100 twin). The gap is the one PR-01a recorded
+(`bus-v2-f1-pr-01-001`): a SEAM module's doc comments must be **re-authored**, and an estimate that
+counts v1's lines under-counts. The first draft measured **549**; a prose pass over both files brought
+it to **495** before the authorization request, and the Director authorized the remaining exception
+explicitly this session (options offered: disclose 495 · chain PR-07c for the shape half ≈449 · fit at
+≈405 by under-disclosing the header). Precedents: PR-06b 26 lines, PR-07a 20.
+
+**Why the PR-07c split the task block allows is not CI-safe** (re-verified by reading the test, handoff
+§2.4): `test/twins.test.ts:29-44` walks every `src/**/*.ts` and fails when `test/**/<same>.test.ts` is
+missing **in the same tree**, so a PR that lands the module without its twin fails its own merge. The
+twin therefore ships here, and the exception is taken instead of the split.
+
+## TDD cycle evidence
+
+| Task | Test file | Safety net | RED | GREEN | TRIANGULATE |
+|---|---|---|---|---|---|
+| 7b.1 | `test/shared/tool-output.test.ts` | N/A (new module) | ✅ `tsc` failed with `TS2307` at `(12,8)`, plus `TS2344` at `(127,3)` and `TS2578` at `(158,3)` — both secondary, both caused by the missing module | ✅ 7/7 | ✅ 7 cases: trim key set + marker, overdue verbatim, `trimWaiting` key set, the compact path cannot bypass the fence, the declared key set is exhaustive, `FetchToolInput` excess-property check, `Conditions` |
+| 7b.2 | `src/shared/tool-output.ts` | covered by 7b.1 | ✅ (7b.1's RED) | ✅ | ✅ seven mutants, none surviving (below) |
+| 7b.3 | focused + full + static | — | — | ✅ 16/16, 176/176, 8/8 | — |
+
+**The RED caught a twin author error, which is the point of writing it first.** The first draft asserted
+that the full-form fixture's own keys equal the declared eighteen; it failed, correctly — three of the
+eighteen are per-tick optional (`needs_action_summary`, `waiting_on_peer_summary`, `gap_warning`) and a
+full tick carries fifteen of them. The case now pins the fifteen at runtime and the eighteen by
+compilation. The RED run's line numbers above are from that draft; the numbers a reviewer can re-derive
+are the ones in the mutant matrix, which ran on the committed twin.
+
+## Pinned provenance — re-derived independently
+
+| v2 path | v1 source | verdict | v1 body sha256 (pinned) | wrong-value control |
+|---|---|---|---|---|
+| `src/shared/tool-output.ts` | `src/tools/fetch.ts:65-348` @ `bf8f365` | SEAM | `25d39d9ceb07e585c0b6d9a12510fe445c9e81e78e401f2e3feb30c230ba0607` | `01c35ebf62eb9c5e04d10f612484100d06f9d21c993a5e9ac4392587f7fbfdac` |
+
+Two methods, independent of each other: (a) shell `git show bf8f365:src/tools/fetch.ts | sed -n '65,348p' |
+sha256sum`; (b) `python` re-reading the blob and hashing the joined lines 65-348 plus the terminating
+newline. Both agree. **The method validates itself against two already-ratified pins**: the same two
+methods reproduce the fence's `68e241b2…` from `src/tools/fetch.ts:43-63` and `thread-record`'s
+`bd177372…` from `src/state.ts:15-87`. The control is what you get when the range's own terminating
+newline is wrongly stripped (`head -c -1`), used **only** to produce the control: 65-348 is an interior
+range, so the pinned value includes that newline (`bus-v2-f1-pr-04-001`).
+
+## Mutant matrix — each built first on a cleaned `dist/`, each restored byte-identically
+
+The four behavioural mutants are killed by named failing tests; the three type-level ones are reported
+as **mechanism proofs** (the build fails with the diagnostic at the assertion's own line), not as test
+kills, because for a compile-time assertion that diagnostic *is* the assertion firing.
+
+| # | Mutation | Observed | Killed by |
+|---|---|---|---|
+| M1 | `trimSurfaced` copies every field forward (`return { ...entry, body_omitted: true }`) | 6 pass / **1 fail** | "a trimmed needs_action entry is exactly the five carry-forward fields plus the marker" |
+| M2 | drop `trimSurfaced`'s overdue exemption | 6 pass / **1 fail** | "an OVERDUE entry is returned untouched" |
+| M3 | `trimWaiting` copies the body through (`...entry`) | 5 pass / **2 fail** | the `trimWaiting` key-set case **and** the fence case's `"body" in trimmed` assertion |
+| M4 | `trimWaiting` stops setting `body_omitted` | 6 pass / **1 fail** | the `trimWaiting` key-set case |
+| M5t | rename `Conditions.open_thread_backlog` | build fails `TS2561` ×2, at `tool-output.test.ts(116,62)` and `(141,30)` | the two `Conditions` literals — the shape is pinned by compilation |
+| M6t | `FetchToolInput` regains `chat_id?: number` | build fails `TS2578` at `tool-output.test.ts(131,3)` | the `@ts-expect-error` is load-bearing, not decorative |
+| M7t | `FetchToolOutput` gains an optional `extra_debug?: number` | build fails `TS2344` at `tool-output.test.ts(105,3)` | the two-way key-set exhaustiveness alias |
+
+## SEAM deltas, as a header-only reviewer sees them
+
+The header's `Changes:` lists six clauses — a superset of the two the task block prescribes, and
+deliberately so, because B3 in PR-07a was a header that under-disclosed its delta. The two a reviewer
+must not miss are:
+
+- `trimSurfaced`/`trimWaiting` are **exported** (v1 kept them module-private): they are the compact
+  tick's only rendering, and design §8.4 has the daemon serve it from here rather than re-deriving the
+  rule.
+- `Conditions` is **declared here**, carried from `v1:src/state.ts:89-111`: the response reports it and
+  no `shared/` module owns it (design §2 lists no `shared/conditions.ts`), while design §12 marks v1's
+  state container REPLACED by `ledger/*`. The type is therefore a wire shape; the raised set stays
+  ledger-side.
+
+## Verification from a clean detached worktree
+
+The tree verified is the one that was committed: the dangling tree built for verification hashes to
+`28472b09…`, identical to `2a66fdc^{tree}`, so the run transfers to the committed tip exactly.
+
+```
+git worktree add --detach ../telegram_bus_agent-worktrees/verify-07b <verified tree>
+npm ci --ignore-scripts && npm run build
+node --test "dist/test/**/*.test.js"                   -> 176 tests, 176 pass, 0 fail
+npm run test:static                                    ->   8 tests,   8 pass, 0 fail
+node --test (the three focused files)                  ->  16 tests,  16 pass, 0 fail
+git ls-files --eol src/shared/tool-output.ts test/shared/tool-output.test.ts -> i/lf w/lf
+```
+
+The worktree was removed as soon as the run finished (the directory is empty again), and only committed
+files were present in it. `git diff --name-status a3b56c3..2a66fdc` lists exactly the four paths in the
+budget table — **no** edit to any hash-pinned AS-IS file, no wire change, no dependency change.
+
+## Reportable contradictions (reported, not resolved — AGENTS.md §2)
+
+1. **design §12's row for this range says AS-IS over a SEAM module.** The row marks
+   `src/tools/fetch.ts:65-348` types **AS-IS** → `shared/tool-output.ts`, while `tasks.md` 7b.2 and the
+   tribunal ruling `bus-v2-f1-tasks-001` items 1-2 make a module extracted from a v1 line range a
+   **SEAM by construction**. The registry settles it independently: an AS-IS body must hash *equal* to
+   its pin, which a re-authored header and two exported functions cannot be, so only a SEAM verdict can
+   pass. This is the same A4-class contradiction PR-07a reported for `tool-schemas.ts`, and the handoff
+   predicted PR-07b would meet the same table shape. `design.md` is gated, so nothing is changed there.
+2. **`Conditions`' home.** Recorded above as SEAM change 4. `design.md` §2's file list has no
+   `shared/conditions.ts`, so declaring it in the one shared module that consumes it is the only
+   design-consistent option; a later daemon PR (PR-31's `ipc/routes.ts`, the ledger's
+   `conditions-store.ts`) can import it from here instead of re-declaring the wire shape.
+
+## Deviations from the gated task text (disclosed, not written into the gate)
+
+1. `Changes:` is a six-clause superset of the two clauses task 7b.2 names. No clause it names is
+   contradicted; the full delta is what the provenance rule and PR-07a's B3 finding require.
+2. The pinned `v1 body sha256` is the hash of the cited **range** (65-348, terminating newline
+   included), not of the whole `src/tools/fetch.ts`. That is the ratified convention (§3,
+   `bus-v2-f1-pr-04-001`) and exactly what PR-07a shipped for its own range rows.
+3. `docs/02-architecture/THREAT-MODEL.md` §4 is **unchanged**, and that is the rule check rather than an
+   omission: this slice's Requirements line names no PT id, no PT row names `shared/tool-output.ts`,
+   PT-13 is owned by `test/shared/fence.test.ts` (PR-06a) and PT-02 by `test/shared/tool-schemas.test.ts`
+   (PR-07a). Annotating a cell here would repeat the PT-14 over-claim two PR-06 judges caught.
+4. **Audit-tooling drift, disclosed:** handoff §2.2 says the judges return exactly
+   `{"findings":[…],"evidence":[…]}` (how PR-07a recorded them). The installed `jd-judge-a`/`jd-judge-b`
+   agents and the current Judgment Day skill mandate the graph-v1 shape `{"rows":[…]}` and forbid prose
+   beside it. The runtime contract wins; round 1 returned rows in that shape, canonicalized below.
+
+## Next
+
+Judgment Day round 1 over the frozen range (which is this record's own commit range), then the bounded
+correction round it authorizes, then push and open the PR. The ledger, the corrections and the terminal
+verdict are appended to this section once each round closes — as PR-07a recorded them, round by round,
+rather than in advance.
