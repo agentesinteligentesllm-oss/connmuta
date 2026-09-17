@@ -1,9 +1,10 @@
 /**
  * Provenance: telegram-agent-bus src/tools/fetch.ts:43-63 @ bf8f365 — verdict: SEAM (D-08).
  * v1 body sha256: 68e241b22383bf6a9ec4a9d112b1960fe4c9c6d00fe2c6f03644f47a978be878   (SHA-256 of the v1 body at bf8f365, header and import block excluded)
- * Changes: (1) the opening tag carries the D-15 origin attributes `project_id`/`agent_id`/`user_id`;
- * (2) every attribute value is escaped, so it can neither close the opening tag early nor inject a
- * second attribute (PT-14); (3) the label's leading JSDoc restored verbatim from
+ * Changes: (1) `wrapUntrusted` takes a required `origin: FenceOrigin` and the opening tag carries its
+ * three D-15 origin attributes `project_id`/`agent_id`/`user_id`, so the single fencing site labels
+ * who a body came from; (2) every attribute value is escaped, so it can neither close the opening tag
+ * early nor inject a second attribute (PT-14); (3) the label's leading JSDoc restored verbatim from
  * `v1:src/tools/fetch.ts:35-42`, the comment block immediately above the vendored range.
  */
 
