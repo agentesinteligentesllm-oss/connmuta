@@ -54,8 +54,8 @@ report instead of proceeding.
 | Artifacts | [`tasks.md`](../../openspec/changes/f1-daemon-registry-thin-client/tasks.md) — **45 slices, 210 tasks**. In-place apply-time edits, each recording its own numbers: the PR-06 row (re-slice), the PR-07a block, the PR-07b carried-findings note (+ its D4 amendment), and the three checkboxes of each completed slice. No slice was ever re-numbered. | Engram under project **`connmuta`** |
 | Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**` for a leading `Provenance:` header; the scanned set must **equal** `test/fixtures/v1-provenance.json` — now **11 entries**: `constants`, `envelope`, `envelope.test`, `secrets`, `thread-record`, `protocol-apply`, `protocol-select`, `fence`, `tool-schemas`, `error-payload`, `tool-output`. Every vendored file needs a design §12 header **and** a fixture entry, or `test:static` fails | `test/security/provenance.test.ts` |
 | **The registry never validates a header hash against v1** | For a SEAM it asserts only that the body *differs* from the pinned value, so a wrongly-stripped or wrongly-copied pin is invisible to every gate. Correctness of a pin is proven **only** by independent re-derivation from the read-only v1 checkout. `src/shared/constants.ts:3` carried a wrong one until 2026-09-17; it is now rule-conformant (backlog **B-19**, `done`) | `test/security/provenance.test.ts:120` (the SEAM inequality), `:113` (registry equality), `:118` (AS-IS equality) |
-| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output}.ts` + twins, `test/fakes/delivered-text.ts`, `test/twins.test.ts`, `test/security/{pack,repo-scan,provenance}.test.ts`, fixtures — **175 tests**, `test:static` **8**, re-verified on merged `main` | PRs `#1`–`#10` |
-| Post-merge integrity sweep | After PR-07b merged, the Director's session-10 delegation was used to close the two file-integrity items the audits had reported and to dispose of the review's advisory finding: `constants.ts`'s pin is now rule-conformant, design §12 carries an appended amendment note, and all three are `done`/`decided` in the backlog. The sweep lands on `main` as the commit carrying it; nothing about it changes how PR-08 is built | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-b19-repin-001` · [`CHECKLIST.md`](../06-backlog/CHECKLIST.md) B-19/B-20/B-21 |
+| Code on `main` | `src/shared/{constants,version,envelope,secrets,thread-record,protocol-apply,protocol-select,fence,tool-schemas,error-payload,tool-output}.ts` + twins, `test/fakes/delivered-text.ts`, `test/twins.test.ts`, `test/security/{pack,repo-scan,provenance}.test.ts`, fixtures — **175 tests**, `test:static` **8**; current tip **`08067f3`** | PRs `#1`–`#10` |
+| Post-merge integrity sweep | After PR-07b merged, the Director's session-10 delegation was used to close the two file-integrity items the audits had reported and to dispose of the review's advisory finding: `constants.ts`'s pin is now rule-conformant, design §12 carries an appended amendment note, and all three are `done`/`decided` in the backlog. Landed on `main` as **`08067f3`**, one line of source; nothing about it changes how PR-08 is built | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-b19-repin-001` · [`CHECKLIST.md`](../06-backlog/CHECKLIST.md) B-19/B-20/B-21 |
 | Audit status of the last three slices | PR-06 was **waived** by the Director; PR-07a and PR-07b ran under the same substitute by explicit decision. All three were audited by Judgment Day. **DN-05 is not satisfied for any of them.** PR-07b's candidate *additionally* closed an ordinary native review — an independent lifecycle (see §2.5). | [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-pr-06-waiver-001`, `bus-v2-f1-pr-07a-audit-001`, `bus-v2-f1-pr-07b-audit-001` |
 
 ---
@@ -129,6 +129,16 @@ transport `pi_host_relay`) which must be relayed losslessly and then re-submitte
 **burns** authority (`burn_evidence: gentle-ai.review-acknowledged/v1`). Never compose provider tokens;
 never answer consent from model prose. Review approval **never** authorizes delivery: commit, push, PR
 and merge stay ordinary repository policy.
+
+**A candidate can also be DECLINED, and that must be recorded as a decline — never as a review that
+closed.** On the post-merge integrity sweep the host resolved consent as `declined_this_candidate`
+(`status: skipped`, `lineage_created: false`, `mutation_performed: false`, `reset_eligible: false`): no
+lineage existed and nothing was approved. The prescribed fallback is Receipt-driven Development's
+risk-gated path — `gentle_review` with `{"operation":"assess"}` returns the plan, and with the outcome
+passed as `declined` it returns the RDD-off plan with risk treated as high if the native assessment is
+unavailable, which means **the writer self-verifies and a separate independent verifier always runs**
+(`gentle-ai-verify` was that verifier). Do not soften a decline in the record, and do not re-run review
+on the same candidate.
 
 ---
 
@@ -225,7 +235,12 @@ design §12's reuse table disagrees with the shipped verdict (backlog B-20).
    re-judgment, but spend it **only** on defects the correction round itself introduced — that is exactly
    what consumed PR-07a's second round and PR-07b's.
 8. **The ordinary native review runs too** (§2.5): after the implementation is complete and before
-   reporting it complete, inspect/START/follow. Its approval does not authorize delivery.
+   reporting it complete, inspect/START/follow. Its approval does not authorize delivery. If the host
+   **declines** it for the candidate, run the risk-gated fallback (`assess` with the decline stated →
+   writer self-verification plus an independent verifier) and record the decline as a decline. If that
+   fallback's independent verifier returns findings, correct them and re-verify **before** the commit
+   that claims they are corrected — on the post-merge integrity sweep this is exactly where six record
+   defects were caught, and the first draft's claim that the review had "closed" was false.
 9. **Stop at a PR boundary.** Push, open the PR with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)" gh …` (never `gh auth switch`), wait for the CI matrix, merge only with the
    Director's authorization, then: rewrite this file, prepend to [`LOG.md`](./LOG.md), add the
    audit-path record to [`INDEX.md`](../05-tribunal/INDEX.md), sweep every status line in `AGENTS.md`,
