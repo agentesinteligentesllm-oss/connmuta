@@ -24,7 +24,7 @@ test("the fixture really is the shared token shape this module scans for (non-va
   assert.equal(TELEGRAM_BOT_TOKEN_RE.test(SECOND_FIXTURE_TOKEN), true);
 });
 
-// --- findTokenShapes: the shape-only count, never the match (design.md:150) ---
+// --- findTokenShapes: the shape-only count, never the match (design.md:151) ---
 
 test("findTokenShapes counts a token-shaped string without returning any part of it", () => {
   const findings = findTokenShapes(`{"username":"${FIXTURE_TOKEN}"}`);

@@ -124,6 +124,7 @@ Every value below is a named export with the reasoning in its doc comment; deriv
 | `TELEGRAM_BOT_TOKEN_RE` | `\d+:[A-Za-z0-9_-]{35}` | confirmed | `v1:src/secrets.ts:16`, exported (§12) |
 | `CHECKPOINT_MARKER` | `[CHECKPOINT-ESTADO]` | confirmed | Wire-visible (CONSTITUTION §7) |
 | `EXIT_USAGE`, `EXIT_UNBOUND_PROJECT`, `EXIT_PROJECT_MISMATCH`, `EXIT_NODE_FLOOR`, `EXIT_DAEMON_ALREADY_RUNNING`, `EXIT_MIGRATION_REFUSED` | 2, 3, 4, 5, 6, 7 | new | 1 is reserved for uncaught errors; 2 is the conventional usage error; the rest are distinct so a host or runbook can branch (ADR-0029 pin "distinct code") |
+| `EXIT_VALIDATION_FAILED` | 8 | new (PR-08b) | **Appended at apply time.** `conmuta validate` (D-29) refuses a file's *content* — the invocation was well-formed — so it is neither a usage error (2) nor a runtime fault (1, which stays reserved). A pre-commit hook and, in F2, `doctor` both branch on that difference. The rows above are untouched |
 | `MIN_CLIENT_BUNDLE_FILES` / `MIN_DAEMON_BUNDLE_FILES` | 8 / 24 | new | The closures §2.1 enumerates; a scan over fewer files means an entry moved and the assertion went blind (non-vacuous rule) |
 
 Values marked "tuning" pin the invariant they serve, never the number (CONSTITUTION §5). `ARENA_LIGHT_MAX_ROUNDS` stays in F5.
