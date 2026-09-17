@@ -1731,6 +1731,36 @@ fifteen of them were each mutated, not a sample. The complement is that no behav
 
 ## Next
 
-Scoped re-judgment of the round-1 correction delta, then push and open the PR. The Director authorized
-push + PR this session and reserved the merge decision; the 554-line figure is disclosed in the PR body
-so that decision is made on the real number.
+One final verification from a clean detached worktree at the corrected tip, then push and open the PR.
+The Director authorized push + PR this session and reserved the merge decision; the 554-line figure is
+disclosed in the PR body so that decision is made on the real number.
+
+## Round 2 (terminal) — scoped re-judgment of the round-1 fix delta
+
+Both judges received the same frozen ledger (SHA-256
+`3ec3996a3fafcb03847aa822ce3b92f93742b23cb1a94f9d6fdbcbdec722db95`) and resolved only their own four rows.
+
+| Pass | Judge A | Judge B |
+|---|---|---|
+| Re-judgment 1, `1b73722..5c3ba96` | JD-A-001 `verified`, **JD-A-002 `regression`**, JD-A-003 `verified`, JD-A-004 `verified` | JD-B-001…004, all `verified` |
+| Re-judgment 2 (terminal), `5c3ba96..cec18ef` | all four `verified` | all four `verified` |
+
+**Why a second round ran, and what it fixed.** The native resolution shape carries no reason, so the
+`regression` on JD-A-002 could not be read off the verdict. Rather than guess, soften the row, or
+present the fix as clean, the mutation sweep was finished by hand and the two defects the round-1 fix
+had itself left were found and fixed in `cec18ef`: `SameShape`'s JSDoc asserted a universal that no
+mutant demonstrates, and this record's mutant matrix still presented the pre-audit pass counts and stale
+type-level line numbers as the shipped artifact's. The terminal re-judgment then resolved all eight rows
+`verified`, which is also the confirmation that the reported regression was one of those two.
+
+**Terminal verdict.** Two audit passes, two bounded fix rounds, two scoped re-judgments. **No CRITICAL
+row in any pass**, no confirmed severe finding, no behavioural regression, every frozen row closed
+`verified` by both judges. The round-2 sweep is the one that matches the shipped tree: fifteen type pins
+mutated one by one and none vacuous, four behavioural mutants all killed.
+
+**`JUDGMENT: APPROVED`** for the reviewed range `a3b56c3..cec18ef`. The two reportable contradictions
+(design §12's AS-IS row and `Conditions`' home) are carried to the Director as reports rather than
+fixes, and **DN-05 is explicitly unsatisfied for this slice** — no tribunal debate occurred, so no
+Arena consensus exists and none is claimed. The record commits that followed the terminal re-judgment
+(the round-2 ledger above, the tribunal entry) are SDD bookkeeping, excluded from the review load and
+**not** re-audited.

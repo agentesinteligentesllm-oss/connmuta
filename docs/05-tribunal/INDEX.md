@@ -426,6 +426,24 @@ debt stays visible.
 | Left open, carried to the Director | `src/shared/constants.ts:3` pins a blind-stripped hash (`4ce5e514…`; the rule-conformant value is `039d53a2…`) — pre-existing from the PR-01b lineage, one judge, outside this slice's range. And design §12's reuse table still marks both v1 ranges **AS-IS** → a module that is SEAM by construction (`bus-v2-f1-tasks-001` items 1–2); reported rather than silently resolved because `design.md` is gated and audited. |
 | Consequence | **DN-05 is not satisfied for PR-07a either.** The Director owns the audit path for PR-07b and later slices. |
 
+## `bus-v2-f1-pr-07b-audit-001` — record (an audit-path decision, not a debate)
+
+Not a row in the Debates table above, for the same reason as the PR-06 waiver and PR-07a's record: no
+Arena exchange occurred, so there is no `CONSENSUS`/`ESCALATED` outcome to record. It is recorded so the
+governance debt stays visible.
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-17 |
+| Subject | PR-07b (`shared/tool-output.ts`, SEAM, with its twin, one provenance entry and a carried D4 correction), branch `f1/07b-tool-output`, code tip `cec18ef`; audited range `a3b56c3..cec18ef` |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | The path `HANDOFF.md` §2 had settled under the session-9 delegation, which the Director's session prompt adopted step by step: **ODD + Judgment Day** — the `bus-v2-f1-pr-06-waiver-001` substitute — not `sdd-apply` (still refused before child launch by the host-owned native preflight, `extensions/gentle-ai.ts` ~L9255 → `lib/sdd-preflight.ts:896-926`) and not the Arena tribunal (bridge down). Two questions were nonetheless put to the Director this session, and both were the Director's to answer: the **PR-scoped budget exception** (offered as disclose 495 · chain PR-07c for the shape half ≈449 · fit at ≈405 by under-disclosing the header — the Director chose the disclosed exception, which the audit then carried to 554), and the **delivery scope** (push + PR with the merge reserved). |
+| What was used instead | **Judgment Day** — two blind read-only judges over the frozen range `a3b56c3..1b73722` with identical scope and criteria, a hash-bound merged ledger (`3ec3996a…`), one bounded correction round, and two scoped re-judgments (the second terminal) over the fix deltas. |
+| Outcome | Round 1: **0 CRITICAL**; 2 WARNING + 2 SUGGESTION from each judge, disjoint except one finding both reached independently; all seven confirmed rows corrected in one bounded round (run on WARNING rows, following PR-07a's practice under the Director's settled route). Re-judgment 1: judge B verified all four of its rows; judge A returned `regression` on JD-A-002 — the row the fix belongs to — carrying no reason, as the native shape does not. Re-judgment 2 (terminal): **all eight rows `verified` from both judges**. Terminal verdict **`JUDGMENT: APPROVED`** for `a3b56c3..cec18ef`. |
+| Defects it caught | A header clause attributing two exported functions to design §8.4, which mandates nothing of the kind; a twin that constrained no member of five declared output types, so deleting `LogEntry.basis` or narrowing `UnannouncedClosure.resolved_at` left the suite green; a digest assertion over a test-local literal that could not fail, against a gate that names digest rendering; a gated carried-findings note still describing D4 as live after it was closed; a fence case that restated PT-13's assertions and over-claimed its own title; a decorative round-trip assertion; and — in the fix round itself — a pin that used mutual assignability alone and silently tolerated a dropped optional member, caught by the fix's own mutant run and corrected. |
+| Left open, carried to the Director | Two contradictions, reported rather than silently resolved because `design.md` is gated: its §12 row still marks `src/tools/fetch.ts:65-348` **AS-IS** over a module that is SEAM by construction (the same A4 class PR-07a reported), and `Conditions` has no shared home in design §2's file list, so the fetch output's carrier type is declared in `shared/tool-output.ts`. |
+| Consequence | **DN-05 is not satisfied for PR-07b either.** The Director owns the audit path for PR-08 and later slices. |
+
 ## Reserved: `bus-v2-referee-001`
 
 Scope fixed by amendment A3 and backlog B-01–B-03: one optional referee per group with an explicit
