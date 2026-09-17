@@ -221,20 +221,24 @@ Requirements: `project-binding › Machine registry schema and invariants` (PT-1
 Runtime harness: N/A — loader tested against temp fixture files (design §15 "Integration" layer, temp homes).
 
 **Apply-time re-slice (Director-authorized this session; same in-place precedent as PR-01, PR-06 and PR-08).**
-The ≈380-line estimate was 3.9× under: the files below measured **1,570 authored lines** when this
+The ≈380-line estimate was 4.1× under (1,570 / 380; the 3.9× this repository's records also quote is the
+ratio to the 400-line budget, 1,570 / 400 — the two are different claims and were conflated in the first
+draft of the record, round 1's `JD-A-007`): the files below measured **1,570 authored lines** when this
 re-slice was decided (`git diff --numstat -- src test`), because every module carries the doc-comment
 density its audited siblings do and every twin carries one assertion per rule plus its boundary. Rather
 than one 1,570-line PR — three times the largest exception this repository has accepted — the slice is cut
 at the only boundary that compiles on its own, the loader (neither `schema.ts` nor `invariants.ts` imports
 it, and the twin rule forbids shipping a module without its test):
 
-  - **PR-09a** (`f1/09a-registry-document`): `src/registry/schema.ts` (262) + `src/registry/invariants.ts`
+  - **PR-09a** (`f1/09a-registry-document`): `src/registry/schema.ts` (309) + `src/registry/invariants.ts`
     (133) + `src/registry/tsconfig.json` (14) + the root `references` entry + `test/registry/fixtures.ts`
-    (100) + `test/registry/schema.test.ts` (277) + `test/registry/invariants.test.ts` (267) +
-    `src/shared/project-file.ts` (+10 / −1, the shared roster-entry schema) = **1,063 authored lines, 663
-    over** the 400-line budget; granted a PR-09a-scoped size exception. (The half measured 1,066 when the
-    re-slice was decided; `d5d73a0`'s `M4` correction moved `schema.test.ts` from 280 to 277, which is why
-    the figures in `apply-progress.md` are measured and not carried over.) Grounds: the
+    (110) + `test/registry/schema.test.ts` (368) + `test/registry/invariants.test.ts` (267) +
+    `src/shared/project-file.ts` (+55 / −20: the shared roster-entry schema and, after round 1, the shared
+    `applyRosterUniqueness`) = **1,256 authored lines, 856 over** the 400-line budget; granted a
+    PR-09a-scoped size exception. (The half measured 1,063 — 663 over — when the Director granted it and
+    1,570 for the whole slice when the re-slice was decided; `d5d73a0`'s `M4` correction and Judgment Day
+    round 1's mandated fixes moved both figures, which is why every number here is measured rather than
+    carried over.) Grounds: the
     strict shape, the version rule and R1–R3 are one contract — the invariants are applied *through* the
     schema, so no path parses a registry without them — and the twins carry one assertion per rule: the
     RED→GREEN, the active-only boundaries of R1/R2, R3's missing `active` qualifier, the R4 and
@@ -250,8 +254,10 @@ it, and the twin rule forbids shipping a module without its test):
     shared token regex (`\d+:[A-Za-z0-9_-]{35}`) matches a canonical hash by accident, and the loader
     masks that one value. The mask cannot hide a token (it is `sha256:` plus 64 hexadecimal characters,
     and a token's own colon is outside that class); the root cause is filed as backlog **B-27**.
-  - **Task close-out.** PR-09a completes **9.1**'s registry-document scenarios and **9.2**; PR-09b
-    completes **9.3**, **9.4**, **9.5** and **9.6**, plus the loader half of 9.1's five-scenario list.
+  - **Task close-out.** PR-09a completes **9.2** and the registry-document scenarios of 9.1; **9.1 itself
+    stays open**, because two of the five scenarios it names (hot-reload without restart, malformed
+    registry quarantined not defaulted) are the loader's and land in PR-09b, and unfinished work is never
+    checked off. PR-09b completes **9.1**, **9.3**, **9.4**, **9.5** and **9.6**.
   - **Cell discipline.** PR-09a fills PT-18's cell (loading the file fails, and R1 is named). PR-09b
     appends PT-25's cell with the registry-side half only — the file is never renamed or rewritten and the
     loader has no write path — because PT-25's assertion as written is the daemon-side
@@ -259,20 +265,23 @@ it, and the twin rule forbids shipping a module without its test):
     rather than silently resolved (backlog **B-26**), following the PT-05/PT-06 precedent of one cell
     filled across two commits.
 
-- [x] 9.1 RED: write `test/registry/invariants.test.ts` covering R1–R6's five spec scenarios (duplicate `bot_id` rejected, hot-reload without restart, malformed registry quarantined not defaulted, binding never rewritten from bus/API data) plus R3/R4 checks.
+- [ ] 9.1 RED: write `test/registry/invariants.test.ts` covering R1–R6's five spec scenarios (duplicate `bot_id` rejected, hot-reload without restart, malformed registry quarantined not defaulted, binding never rewritten from bus/API data) plus R3/R4 checks.
 - [x] 9.2 GREEN: implement `src/registry/schema.ts` (`z.strictObject`, `roster_snapshot`/`roster_hash` required, `REGISTRY_VERSION`) and `src/registry/invariants.ts` (`superRefine` for R1–R6).
 - [ ] 9.3 RED: write `test/registry/loader.test.ts` asserting the mtime/size fingerprint reload (D-12) and the never-renamed quarantine-on-invalid behavior.
 - [ ] 9.4 GREEN: implement `src/registry/loader.ts` (last-good-in-memory, `registry_invalid` condition, R5 pre-parse scan via `token-shape.ts` from PR-08).
 - [ ] 9.5 Verify: `npm run build && node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js" "dist/test/registry/loader.test.js"`.
 - [ ] 9.6 Docs: update the file-name cell(s) of PT-18, PT-25 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
-9.1 and 9.2 flipped to `[x]` in the **PR-09a** commit. 9.3–9.6 stay open until **PR-09b** lands: 9.1's
-five-scenario list spans the loader tests (hot-reload without restart, quarantine not defaulted) and 9.6
-names PT-25's registry-side half, which `test/registry/loader.test.ts` pins. PR-09a merged with them still
-open — unfinished work is never checked off. 9.2's own text says "`superRefine` for R1–R6": the shipped
-refinement holds **R1–R3**, because R4 needs `conmuta.json` (design §4 puts it in `POST /session` and F2's
-`doctor`), R5 is the loader's pre-parse raw-text scan and R6 holds by construction — a refinement over the
-parsed document cannot decide those three, and the module documents each boundary where it *is* enforced.
+9.2 flipped to `[x]` in the **PR-09a** commit; **9.1 stays open with it** — two of the five scenarios it
+names (hot-reload without restart, malformed registry quarantined not defaulted) are the loader's and land
+in PR-09b, so checking it here would claim a scenario list this half does not complete. 9.3–9.6 stay open
+for the same reason: 9.5 verifies all three suites and 9.6 names PT-25's registry-side half. PR-09a merged
+with them still open — unfinished work is never checked off (round 1's `JD-A-003` caught the first draft
+checking 9.1 while the same block admitted its loader half was outstanding). 9.2's own text says
+"`superRefine` for R1–R6": the shipped refinement holds **R1–R3**, because R4 needs `conmuta.json`
+(design §4 puts it in `POST /session` and F2's `doctor`), R5 is the loader's pre-parse raw-text scan and R6
+holds by construction — a refinement over the parsed document cannot decide those three, and the module
+documents each boundary where it *is* enforced.
 
 ### Unit 4 — `ledger`
 

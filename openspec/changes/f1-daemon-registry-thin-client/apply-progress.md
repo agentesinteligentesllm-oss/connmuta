@@ -2357,20 +2357,20 @@ Branch `f1/09a-registry-document` from `main` @ `e177c58`.
 | Correction commit | `d5d73a0` (the `M4` mutant's fix in `test/registry/schema.test.ts`; see the mutant matrix below) |
 | Requirements | `project-binding › Machine registry schema and invariants` (PT-18; PT-25's half lands in PR-09b) |
 | Provenance | none — no v1 range is vendored; the fixture stays at **11** entries, and all three new modules carry no `Provenance:` header |
-| Budget | **1,063 authored lines / 400** — a **663-line PR-09a-scoped exception**, disclosed in `tasks.md` and granted by the Director when the 1,570-line whole was measured (3.9× the ≈380 estimate) |
+| Budget | **1,256 authored lines / 400** — an **856-line PR-09a-scoped exception**. It was 663 when the Director granted it (1,063 authored, measured before Judgment Day); round 1's mandated corrections and the informational folds added **+193**, every line of them a fix the CRITICAL required, a boundary a judge asked to be pinned, or the record of either — re-measured in the same pass as the edits, which is the lesson HANDOFF §2.4 draws from PR-08a/PR-08b |
 
 ## Scope and budget (measured)
 
 | Path | Lines |
 |---|---|
-| `src/registry/schema.ts` | 262 |
+| `src/registry/schema.ts` | 309 (`262` before round 1: the snapshot's roster-level rules + `collapseShapeProblems`) |
 | `src/registry/invariants.ts` | 133 |
 | `src/registry/tsconfig.json` (new compile unit, counted in `src`) | 14 |
-| `test/registry/fixtures.ts` | 100 |
-| `test/registry/schema.test.ts` | 277 (`280` before `d5d73a0`'s `M4` correction) |
+| `test/registry/fixtures.ts` | 110 (`100` before round 1: `VALID_ROSTER_HASH` re-pinned and `activeBinding` derives the field; `addSecondBinding` removed with it) |
+| `test/registry/schema.test.ts` | 368 (`280` at the code tip, `277` after `M4`'s fix, before round 1's four new cases and the informational pins) |
 | `test/registry/invariants.test.ts` | 267 |
-| `src/shared/project-file.ts` | +10 / −1 (`export` on the shared roster-entry schema) |
-| **budget total** (`git diff --numstat e177c58..HEAD -- src test`) | **1,063 / 400** — 663-line exception |
+| `src/shared/project-file.ts` | +55 / −20 (the `rosterEntrySchema` export, then round 1's extracted `applyRosterUniqueness`) |
+| **budget total** (`git diff --numstat e177c58..HEAD -- src test`, loader half excluded) | **1,256 / 20** — 856-line exception |
 | `tsconfig.json` (root — outside the `src`/`test` scope the total measures) | +1 / −1, **not counted** |
 
 **Why the shared export, and why it is not drift.** `bindings[].roster_snapshot` is a *copy* of
@@ -2390,7 +2390,7 @@ no hash-pinned file is involved.
 | 9.2 GREEN (local tree) | `node node_modules/typescript/bin/tsc -b`, then the two suites | clean build; **30/30** in the two suites (`schema` 14, `invariants` 16), inside a local full run of 45/45 that also carried PR-09b's three loader suites — which are **not** part of this commit |
 | full suite (clean worktree at `d5d73a0`) | `npm ci --ignore-scripts && npm run build && node --test "dist/test/**/*.test.js"` | **298/298** (PR-08's 268 + `schema` 14 + `invariants` 16) |
 | focused, task 9.5's half | `node --test "dist/test/registry/schema.test.js" "dist/test/registry/invariants.test.js"` | **30/30** |
-| `test:static` (clean worktree at `d5d73a0`) | `node --test "dist/test/security/*.test.js"` | **8/8** — the twin walk, the provenance registry (still 11 entries) and the repo scan all pass with the new files staged (`git add -N` first, because those scanners read `git ls-files`) |
+| `test:static` (clean worktree at `d5d73a0`) | `node --test "dist/test/security/*.test.js"` | **8/8** — pack (4), provenance (2) and repo-scan (2), with the new files staged (`git add -N` first, because those scanners read `git ls-files`). The **twin walk is not in this glob**: `test/twins.test.ts` compiles to `dist/test/twins.test.js`, so the twin rule for `src/registry/*` is proved by the full-suite row above, not here (this attribution was wrong in the first draft; both judges reached it independently as `JD-A-006`/`JD-B-006`) |
 
 **A figure in the first draft of this table was computed, not measured, and is corrected here.** It said
 `29/29` and `297/297` — `268 + 29`, written before the clean-worktree run existed. The measured numbers
@@ -2479,10 +2479,109 @@ contradiction a raw-text scanner discovers only when the second module exists.
    `assertNoTokenShape`'s message prose or writing a second copy of the shape order it applies — two
    implementations of one rule. The problem stays value-free; naming the rule is part of **B-27**'s
    follow-up.
+4. **Nothing at load time ties `roster_hash` to its own snapshot.** Both judges reached this independently
+   in round 1 (`JD-A-001`, `JD-B-002`), and the slice's first draft made it visible by accident: the
+   fixture pinned the *two-entry* known answer into a document whose snapshot has *one* entry — an
+   internally inconsistent "valid registry" that loaded clean. The fixture now derives the field with
+   `computeRosterHash`, so a fixture cannot disagree with its snapshot, but the underlying boundary holds:
+   DATA-MODEL §2.4 calls `roster_hash` "derived", yet no R1–R6 row requires it to describe the snapshot the
+   binding admits from, and this schema cannot decide the rule without inventing one. Reported and filed as
+   **B-29** (a load-time consistency check, or a session handshake that recomputes from the snapshot
+   instead of trusting the stored field) rather than silently added.
+5. **`projects[].path` is not required to be absolute** (`JD-A-004`, `JD-B-003`). DATA-MODEL §2.3 calls it
+   an "absolute local path" while the schema accepts any non-empty string — which is deliberate (an
+   absolute-path test differs per platform, the value chooses no authorization decision, and the data model
+   itself calls it informational) but was disclosed only in a code comment. It is now a pinned boundary
+   (a relative path, a POSIX path and an empty path are exercised) and reported here; a later tightening
+   needs its own decision rather than a silent test change.
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) swept the frozen tree
+(`../telegram_bus_agent-worktrees/jd-09a`, detached at `b096b65`) in one exhaustive pass each, graph-v1
+rows only, with the slice's own record in scope. The Arena bridge is down, so nothing was debated and
+**DN-05 is unsatisfied for PR-09a** as for the rest of F1.
+
+Result: **13 rows — 1 CRITICAL, 5 WARNING, 7 SUGGESTION**, of which two pairs are the same defect reached
+independently. Judge A's `JD-A-002` arrived with `status_reference: null` instead of the canonical
+`status_at_freeze`; the controller canonicalized that one field before freezing, which is recorded because
+the frozen ledger's hash is computed over the canonical rows.
+
+| Judge | Row | Severity | Disposition |
+|---|---|---|---|
+| B | `JD-B-001` | **CRITICAL** | the snapshot inherits only the *entry* shape, not the roster-level uniqueness rules of `conmuta.json`; fixed in round 1 (see below), with the scoped re-judgment of that fix as the next step |
+| A | `JD-A-002` | WARNING | the same defect at `schema.ts:183`, independently reached; closed by the same patch |
+| A | `JD-A-001` | WARNING | the fixture's `roster_hash` was the two-entry known answer inside a one-entry snapshot (also `JD-B-002`); folded |
+| B | `JD-B-002` | WARNING | same defect as `JD-A-001`, independently reached; folded — and the underlying boundary reported as **B-29** |
+| A | `JD-A-003` | WARNING | `tasks.md` checked 9.1 while the same block admitted its loader half was outstanding; folded (9.1 is open again) |
+| A | `JD-A-004` | SUGGESTION | `projects[].path`'s absoluteness is documented but unpinned and unreported (also `JD-B-003`); folded |
+| B | `JD-B-003` | SUGGESTION | same as `JD-A-004`, independently reached; folded |
+| A | `JD-A-005` | SUGGESTION | shape problems were not collapsed, so a malformed document reported up to nine identical rows; folded |
+| A | `JD-A-006` | SUGGESTION | the record credited the twin walk to the `test:static` glob, which cannot run it (also `JD-B-006`); folded |
+| B | `JD-B-006` | SUGGESTION | same as `JD-A-006`, independently reached; folded |
+| A | `JD-A-007` | SUGGESTION | "3.9×" conflated "under the estimate" (4.1×) with "over the budget" (3.9×) in the row that justifies the exception; folded |
+| B | `JD-B-004` | SUGGESTION | the "strict at every level" guarantee had no unknown-key case for `groups[0]`, `projects[0]` or `token_ref`; folded |
+| B | `JD-B-005` | SUGGESTION | `addSecondBinding` shipped unexercised in this tree (its only caller is PR-09b's loader suite); folded |
+
+**The judges disagreed on severity, not on the defect.** `JD-B-001` is CRITICAL and `JD-A-002` is the same
+defect as a WARNING; the higher severity governs, so the batch was dispatched as severe. This is recorded
+plainly because the skill's own gate says a severity contradiction is a human decision: the Director
+authorized round 1 in full (severe batch plus the informational folds) before anything was changed.
+
+### The CRITICAL, and why it is a real one
+
+`bindings[].roster_snapshot` is a **copy** of `conmuta.json`'s `roster[]` (D-07 makes it the admission
+source while no client is connected), and the slice reused the project file's *entry* schema for it —
+which is exactly the reuse the slice's own export rationale claimed prevented a copy from accepting what
+its source refuses. It did not: DATA-MODEL §1's roster-level rules (`agent_id` unique, `user_id` unique)
+lived in `projectFileSchema.superRefine`, not in `rosterEntrySchema`, so a snapshot with two entries
+sharing one `agent_id` — or two different agents under one `user_id` — loaded clean. Judge B's impact
+claim is the sharp end: design resolves `message.from.id` by reverse lookup in the snapshot, so a
+hand-edited registry (permitted by R6 until F2) could map a second numeric id to a binding's `agent_id`,
+and R3's first-match `find` made the verdict depend on entry *order* (Judge A reproduced the same
+construction and rated it WARNING).
+
+**Round 1's authorized batch** (`jd-fix-agent`, round 1 of 2, one authorized ID `JD-B-001`, frozen ledger
+SHA-256 `664687b3…`, canonical lowercase): the uniqueness logic was extracted from
+`projectFileSchema.superRefine` into an exported `applyRosterUniqueness` in `src/shared/project-file.ts`
+(running over any roster array, keeping the project file's own issue paths so its 39 tests are unchanged)
+and applied to `bindings[].roster_snapshot` in `src/registry/schema.ts`. Its issue is deliberately
+**untagged**, so it maps to `schema_invalid` rather than naming an invariant: R3's gated row does not carry
+a roster-level uniqueness rule and naming it there would claim a gate that never evaluated it. Fix evidence:
+focused 73/73 (schema 18, invariants 16, project-file 39) and a full local run of 317/317; a temporary
+neutralization of the new call failed exactly the three new cases, so the rule is load-bearing.
+
+Two earlier attempts at this dispatch were rejected by the runtime, and the reason is worth recording:
+the first listed `JD-A-002` (a WARNING) among the "authorized severe IDs", and the validator requires that
+section's rows to be exactly the BLOCKER/CRITICAL rows; the second used a ledger hash computed over the
+two-row batch instead of the one authorized row. HANDOFF §2.2 calls this out, and it did indeed cost two
+attempts.
+
+### Corrections applied (round 1, informational folds)
+
+Disclosed as author decisions, not as part of the authorized severe batch — the same shape PR-08a and
+PR-08b used, under the Director's standing preference for folding informational rows before the re-judgment
+so the re-judged tree is the shipped tree:
+
+| Row(s) | Change | Why |
+|---|---|---|
+| `JD-A-001`/`JD-B-002` | `test/registry/fixtures.ts`: `VALID_ROSTER_HASH` is now the **single-entry** known answer and `activeBinding()` **derives** the field with `computeRosterHash` unless a case supplies its own; `schema.test.ts` ties the fixture to that vector | a fixture that spells the hash out drifts from the snapshot silently — and this one had, so every "valid registry" in the suite was internally inconsistent. Deriving it removes the class instead of the instance |
+| `JD-A-003` | `tasks.md`: 9.1 back to `[ ]`, with the close-out note and the block's own text aligned | the file admitted in the same commit that two of 9.1's five scenarios land in PR-09b; "unfinished work is never checked off" |
+| `JD-A-004`/`JD-B-003` | `schema.test.ts`: a pinned boundary (Windows, POSIX, relative and empty `projects[].path`) plus reportable item 5 | the documented rule was enforced nowhere and pinned nowhere; the boundary is now explicit and reversible |
+| `JD-A-005` | `schema.ts`: `collapseShapeProblems` reports at most one `schema_invalid` per document | nine byte-identical rows carry no information an operator can act on, and the invariant vocabulary already collapsed per document |
+| `JD-A-006`/`JD-B-006` | this record's `test:static` row names what the glob actually runs | the twin walk lives in `dist/test/twins.test.js`, outside `dist/test/security/`, so the row credited a leg that cannot execute |
+| `JD-A-007` | this record and `tasks.md`: 4.1× against the estimate, 3.9× against the budget | the row justifying a 663-line exception has to be reproducible from its own numbers |
+| `JD-B-004` | `schema.test.ts`: unknown-key cases for `groups[0]`, `projects[0]` and `bots[0].token_ref` | the module docstring claims the strictness is *pinned*, and three of the four levels it names had no case |
+| `JD-B-005` | `test/registry/fixtures.ts`: `addSecondBinding` removed from this half | its only caller is PR-09b's loader suite; shipping it here would be an unexercised helper this tree cannot fail on |
+
+One of those folds is itself a lesson worth keeping: `JD-B-005`'s removal means the local build needed the
+helper back while PR-09b's suite stayed in the working tree, so the removal had to be verified in the clean
+worktree rather than locally. That is the same reason the clean worktree exists.
 
 ## Next
 
-- PR-09a's Judgment Day audit and its ordinary native review, then the PR.
+- Red-team the corrected tree with a scoped re-judgment (round 1) over the fix delta, then the ordinary
+  native review, then the PR.
 - **PR-09b** (`f1/09b-registry-loader`, stacked on this slice): `src/registry/loader.ts` +
-  `test/registry/loader.test.ts`, tasks 9.3–9.6, PT-25's registry-side cell, and the R5/`roster_hash`
-  resolution described above.
+  `test/registry/loader.test.ts`, tasks 9.1's loader scenarios, 9.3–9.6, PT-25's registry-side cell,
+  `addSecondBinding` back where it is used, and the R5/`roster_hash` resolution described above.
