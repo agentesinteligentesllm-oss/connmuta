@@ -3870,7 +3870,59 @@ disclosed as measurement-checked but not judge-re-judged, exactly as PR-11 escal
 SUGGESTION-class rows. The controller records **JUDGMENT APPROVED** for `70d643a..04189da`, with that
 escalation attached.
 
+## The ordinary native review — APPROVED for this candidate
+
+The separate, independent lifecycle (RDD switch on) ran **after** the audit closed, exactly as HANDOFF §2.5
+prescribes: `gentle_review` `inspect` first, then only the START route that inspect offered.
+
+**START argument shapes, recorded because the shape is not obvious and 4 of 6 attempts failed before
+authority.** `inspect` was blocked on the intended-untracked selection, which the same call resolved with
+`untrackedScope: "exclude"` — the eligible inventory is the orchestrator's own `odd/` files, which are not
+product artefacts. The offered route then carried the committed range itself (`--base-ref=70d643a1…`,
+`--committed-only=true`), and the only `input` that reached native START was the one carrying **all** of the
+bound fields the offer named, in camelCase, plus the retained `lineageId`:
+`{"mode":"ordinary","baseRef":…,"committedOnly":true,"untrackedScope":"exclude","expectedUntrackedInventory":…}`.
+The four failures were, in order: `{"mode":"ordinary"}` alone → native `identity-mismatch`; the same with
+`baseRef`/`committedOnly` → `candidate-target-projection-drift`; the offered flags in kebab-case →
+`unknown-field: cwd`; the same without `mode` → the facade's own "graph-v1 START requires lineageId". Every
+one failed **before authority access**, so no lineage was created and nothing burned, which is why six
+attempts cost nothing.
+
+**The START was consent-resolved by the host**, inside the eligible interactive Pi host, and returned
+`state: reviewing` — not a typed consent envelope. **Recorded as a host resolution, not a decision taken
+here**: nothing in this session invented consent, and no `answer-consent` call was made.
+
+| Item | Value |
+|---|---|
+| Lineage | `review-b6fc7d771f933aed` |
+| Target identity | `sha256:faeec82e08c4ccf3fa8e03e268b9db17d794c762a52b7364a4fc1173564b809d` |
+| Risk tier | medium, 10 changed files, **2,427** changed lines, correction budget 200 |
+| Lenses | one, `review-reliability` |
+| Forecast | relayed before the run: **1 model run**, transport `pi_host_relay`, no mutation |
+| Capture | one materialize slot, resubmitted with `reviewerRunAcknowledged: true` |
+| Closure | `approved`; the exact `acknowledge-approved` continuation executed unchanged |
+| After the burn | `authority: burned`, `gentle-ai.review-acknowledged/v1`, `delivery: ordinary-repository-policy` |
+
+Three **advisory** findings came with the closure and are **recorded, not actioned** — none opened a
+correction and none reopens the review: `R3-replay-audit-idempotency` (WARNING,
+`test/ledger/inbox.test.ts:144-164`), `R3-catchup-project-scope` (SUGGESTION,
+`test/ledger/cursors.test.ts:129-139`) and `R3-ensure-instant-order` (SUGGESTION, `src/ledger/cursors.ts:147`).
+They are filed as **B-36**. The closure carries their ids, lens, locations and severities and not their
+statement text, and this record says so rather than paraphrasing findings it does not hold.
+
+**The RDD fallback was not needed** — the review closed for this candidate, which is the one condition under
+which the on-path holds. `assess` was still run, with `nativeReviewOutcome: "closed"` stated explicitly right
+after the acknowledgement, and it returned `risk: "unassessable"` (its own native command answered with empty
+output) with `outcome_source: "explicit"`, `writerProfile: "large"` and the plan
+**`writerSelfVerification: true`, `structuralReadbackOnly: false`, `independentVerifier: false`** — because "the
+native review closed for this candidate: the writer's self-verification is the record and the closed native
+review was the independent check the writer cannot influence". **An independent verifier was run anyway**, and
+the reason is recorded rather than implied: `unassessable` is the one risk value this repository treats exactly
+like `high`, and PR-09a's, PR-10's and PR-11's independent verifiers each found record defects that no other
+step had — eleven, three and eight respectively. The result is in the next section.
+
 ## Next
 
-- The scoped re-judgment over the frozen ledger plus this fix delta, then the ordinary native review, then
-  push, the PR and its CI matrix.
+- Push, the PR and its CI matrix, then the close-out sweep. The audit-path record goes to
+  `docs/05-tribunal/INDEX.md` as `bus-v2-f1-pr-12-audit-001`, with DN-05 unsatisfied; B-35 and B-36 are filed
+  in this PR.
