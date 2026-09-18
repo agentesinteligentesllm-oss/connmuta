@@ -5,10 +5,9 @@
     "outDir": "../../dist",
     "tsBuildInfoFile": "../../dist/.tsbuildinfo/ledger.tsbuildinfo"
   },
-  "include": ["**/*.ts"]
-  // This unit references no other unit yet, and that is a property of these two modules rather than an
-  // omission: `schema.ts` is the DDL text and `transaction.ts` imports `node:sqlite`'s type only. The
-  // slice that first needs a shared constant — `ledger/open.ts` reads `LEDGER_SCHEMA_VERSION` (PR-11) —
-  // adds `{ "path": "../shared" }` here. An empty *referencing* unit is TS18003, so that reference
-  // lands with the first `.ts` file that uses it (HANDOFF §4).
+  "include": ["**/*.ts"],
+  // `../shared` lands here with the first module of this unit that uses a shared constant:
+  // `migrations.ts` reads `LEDGER_SCHEMA_VERSION` (PR-11). An empty *referencing* unit is TS18003, so
+  // the reference could not arrive before that import did (PR-09a disclosed the same omission).
+  "references": [{ "path": "../shared" }]
 }
