@@ -4298,10 +4298,10 @@ worth carrying forward: **a correction is a claim about a file, and every figure
 until it is re-measured.**
 
 **Round 3 touches only `openspec/**`**, so the shipped source and test bytes are untouched: `git diff
---numstat 2580afc..<round-3 tip> -- src test` is empty, which is what makes the verification below the
+--numstat 2580afc..b6c3539 -- src test` is empty, which is what makes the verification below the
 verification of the tip that ships rather than of an earlier commit.
 
-**Terminal verdict: `JUDGMENT: APPROVED` for `2055486..2580afc`** (source and tests) **and `<round-3 tip>`
+**Terminal verdict: `JUDGMENT: APPROVED` for `2055486..2580afc`** (source and tests) **and `b6c3539`
 (docs)**. No BLOCKER and no CRITICAL row survives: the three CRITICALs were `JD-A-001`, `JD-B-001` and
 `JD-B-002`, and all three came back `verified` from both judges on the terminal re-judgment. The two
 surviving SUGGESTION/WARNING rows are escalated with their round-3 corrections disclosed as
