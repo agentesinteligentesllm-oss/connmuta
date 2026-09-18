@@ -3354,8 +3354,8 @@ touches `tsconfig.json`. Stating that is stronger than reporting a re-run whose 
   superseded here rather than rewritten.
 - **The false TS18003 wording still stands in two other unit `tsconfig.json` files and in the handoff**, as
   judge A observed: `src/cli/tsconfig.json:10`, `src/registry/tsconfig.json:12` and `HANDOFF.md`'s §5.5. Those
-  files belong to audited slices, so this slice does not edit them and files a backlog row instead; the
-  handoff is rewritten at this slice's close, where the claim is corrected.
+  files belong to audited slices, so this slice does not edit them; **B-34 was filed for them at this slice's
+  close**, and the handoff's own copy of the claim was rewritten there too.
 
 ## Judgment Day round 1 (substitute for the tribunal debate)
 
@@ -3365,7 +3365,7 @@ concurrently over **one frozen committed tree** (`judgment-11`, detached at `839
 one JSON row per line with keys sorted alphabetically, LF-terminated — is
 **`d0b078f4639f967811a6ba8c97fbfd04c99ff9d4dc90d5c602a919ea5c140c50`** for **11 rows**.
 
-**The round returned 1 CRITICAL, 4 WARNING and 6 SUGGESTION, and two defects were reached independently by
+**The round returned 1 CRITICAL, 5 WARNING and 5 SUGGESTION, and three defects were reached independently by
 both judges** — the strongest signal this process produces. Every row was reproduced by the writer before it
 was believed, and three of them are defects no gate in this repository could have seen.
 
@@ -3405,9 +3405,9 @@ Commit `5ead74e`, **+215 / −25** across four files:
 ## Scoped re-judgment over the fix delta (`8392b1c..5ead74e`)
 
 Both judges received only the requested frozen IDs, their hash-bound rows, the frozen-ledger hash and the fix
-diff, and each resolved every one of its own rows. **Nine of the eleven rows came back `verified`. Judge A
-returned two `regression`, and both were right** — the only rows in this slice that neither judge would accept,
-and both of them corrections this slice had written itself.
+diff, and each resolved every one of its own rows. **Nine of the eleven IDs came back `verified` in this round
+and two `regression` — both of them corrections this slice had written itself, and in the round that followed
+both were accepted.**
 
 **Judge A — `verified`:** `JD-A-001` (the two new tests, with a micro-probe proving the failure now comes from
 `quick_check` and not from `new DatabaseSync`; mutant `M12` reproduced as the new tests failing while the
@@ -3436,14 +3436,42 @@ the re-judge can read them — which is what makes the round-2 resolution checka
 
 ### Round 2 (the last bounded round)
 
-Commit `b69a921`, **+5 / −5**, comment only:
+Commit `b69a921`, **+5 / −5**, comment only, plus this record's own two figures. **The round-2 scoped
+re-judgment split on both rows, and both objections are accepted.**
 
-- **`JD-A-006` / `JD-B-003`:** the note now states what was measured — an unused reference builds clean, a
-  composite unit holding only its `tsconfig.json` builds clean, and TS18003 is the empty-non-composite unit's
-  error — and records that both earlier versions of the sentence were false.
-- **`JD-A-007`:** resolved by this record and the size exception above, in the same PR, before the re-judgment
-  ran. The two code commits' messages are deliberately **not** rewritten: they are inside the audited range,
-  and rewriting them would silently change the tree the audit covers. The forward reference resolves here.
-- Nothing behavioural: the full suite (379/379), the focused suites (26/26) and `test:static` (8/8) were
-  re-run at this tip, and the mutant sweep's kill set stands on a sha256 proof that its two mutated files are
-  unchanged.
+| ID | Judge A | Judge B | The disagreement, and what it came down to |
+|---|---|---|---|
+| `JD-A-006` / `JD-B-003` | `regression` | `verified` | Both judges measured the *same* facts and agree on the discriminator: TS18003 is suppressed by the presence of a `references` entry (even `[]`), not by composite-ness. Judge A read the note's second clause as asserting the composite-ness rule and refuted it; judge B read it as a statement about *this* unit, which does carry the reference, and verified it. Judge A is right that the clause does not generalize as written — so the note was rewritten again to name the discriminator explicitly. |
+| `JD-A-007` | `verified` | `regression` | Judge A checked the three conditions the row itself named (record present, forward reference resolves, exception disclosed and arithmetically correct) and verified them. Judge B found two further defects **inside the record**: its severity tally was wrong, and §PR-11 did not yet carry the ordinary native review the two commit messages promise as the third item. Both are accepted and corrected. |
+
+**Two corrections were applied after the round budget was exhausted, and they are measurement-checked but
+not judge-re-judged** — disclosed here because this protocol's own rule is that a correction is unaudited
+until something re-checks it:
+
+1. `src/ledger/tsconfig.json`'s clause now names the discriminator both judges measured (the reference edge,
+   not composite-ness) and records that three earlier versions of the sentence were false. Evidence: judge A's
+   seven-case compiler matrix, judge B's independent reproduction of the same four facts, and the writer's own
+   three-project probe — all three agree.
+2. This record's figures: the round-1 tally is **1 CRITICAL / 5 WARNING / 5 SUGGESTION** (not 1/4/6 — the
+   earlier figure was an arithmetic error, and the frozen ledger `rows.jsonl` is the authority), and **three**
+   defects were reached by both judges (not two — `src/ledger/open.ts:272`, `src/ledger/open.ts:166` and
+   `src/ledger/tsconfig.json:10`, exactly as the row table above marks them). **The messages of `5ead74e`,
+   `b69a921` and the record commit carry the same arithmetic error and are superseded here rather than
+   rewritten**, for the same reason as the earlier message disclosure: they are inside the audited range.
+   The third item the messages promise — the ordinary native review — lands in the section below.
+
+### Terminal verdict
+
+**No severe row survives.** The single CRITICAL (`JD-A-001`) was fixed in round 1 and resolved `verified` by
+judge A in the scoped re-judgment; every WARNING row was fixed and resolved too. Two **SUGGESTION**-class rows
+survive round two with split verdicts, and by this protocol's own rules a SUGGESTION never schedules a fix;
+both are recorded above with the corrections applied outside the budget and with the evidence that accepts
+them.
+
+Final verification, one run in a clean worktree at the corrected tip with `dist/` rebuilt from scratch:
+focused **26/26**, full suite **379/379**, `test:static` **8/8**.
+
+**`JUDGMENT: APPROVED` for `ab6dbf1..b69a921`** — no severe row surviving and the final verification passing
+— with the two surviving SUGGESTION rows escalated to the Director as informational, their corrections
+disclosed as not judge-re-judged, and the mutant sweep's kill set standing on a sha256 proof that its two
+mutated files are byte-identical across the comment-only delta.

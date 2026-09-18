@@ -6,13 +6,14 @@
     "tsBuildInfoFile": "../../dist/.tsbuildinfo/ledger.tsbuildinfo"
   },
   "include": ["**/*.ts"],
-  // `../shared` lands here with the first module of this unit that uses a shared constant:
-  // `migrations.ts` reads `LEDGER_SCHEMA_VERSION` (PR-11). That is not a compiler constraint — measured
-  // with this repository's TypeScript 7.0.2, a composite unit that carries a project reference and imports
-  // nothing from it builds clean (exit 0), and so does a composite unit whose directory holds only its
-  // `tsconfig.json`. TS18003 ("No inputs were found in config file") is what an *empty non-composite* unit
-  // reports, not what a reference produces. The reference lands with the import because it was not needed
-  // before it. (Two earlier versions of this note were false and Judgment Day measured both: an empty
-  // *referencing* unit is not TS18003, and a unit's `tsconfig.json` can exist before its first `.ts` file.)
+  // `../shared` lands here with the first module of this unit that uses a shared constant: `migrations.ts`
+  // reads `LEDGER_SCHEMA_VERSION` (PR-11). That is not a compiler constraint — measured with this
+  // repository's TypeScript 7.0.2, a unit that carries a project reference and imports nothing from it builds
+  // clean (exit 0), so the reference could have been present at PR-10 and simply was not needed before this
+  // import. TS18003 ("No inputs were found in config file") is what a project whose `include` matches nothing
+  // reports when it carries no `references` entry at all; any entry, even `[]`, suppresses it, and
+  // composite-ness neither causes nor prevents the error. Three earlier versions of this note asserted a
+  // constraint in one direction or the other and are false — this one states only what was measured, and the
+  // two judges who measured it agree on the discriminator (the reference edge, not composite-ness).
   "references": [{ "path": "../shared" }]
 }
