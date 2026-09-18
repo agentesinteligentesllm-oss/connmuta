@@ -63,6 +63,14 @@
 - **Two SUGGESTION-class rows** from PR-11's second Judgment Day round, surviving on split verdicts, for the
   Director to disposition; no third round exists.
 
+**Two of this session's own artefacts are damaged and superseded rather than rewritten**, both because a
+frozen artefact must not be edited. The audited-range commit messages of `8392b1c`, `5ead74e`, `b69a921` and
+`248e318` carry one claim, one over-broad compiler clause and one severity tally that the audit later
+corrected (each disclosed in `apply-progress.md` §PR-11), and the board-precision commit `050933f`'s message
+lost two fragments to shell backtick expansion inside a double-quoted `-m` — the trap `HANDOFF.md` §4 warns
+about, which bit again at this close. `main` is protected against force-push (DN-08), so both stand as history;
+from here on, Markdown in a commit message goes through `git commit -F <file>`, never `-m`.
+
 **Carried**
 
 - The audit-path record is `bus-v2-f1-pr-11-audit-001` in
