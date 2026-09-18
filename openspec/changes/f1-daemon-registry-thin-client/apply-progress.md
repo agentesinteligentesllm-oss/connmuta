@@ -4007,28 +4007,33 @@ superseded figure is named instead of silently replaced.
 
 ## Scope and budget (measured)
 
-| File | at `f6b1599` (pre-audit) | at `6f89090` — **the tip that ships**, every figure below measured there |
-|---|---|---|
-| `src/ledger/audit.ts` | 146 | 160 |
-| `src/ledger/unknown-senders.ts` | 131 | 141 |
-| `src/ledger/conditions-store.ts` | 335 | 386 |
-| `src/ledger/retention.ts` | 240 | 246 |
-| `src/ledger/inbox.ts` (edited) | +13 / −42 | +13 / −42 |
-| `test/ledger/audit.test.ts` | 263 | 281 |
-| `test/ledger/unknown-senders.test.ts` | 201 | 220 |
-| `test/ledger/conditions-store.test.ts` | 278 | 370 |
-| `test/ledger/retention.test.ts` | 397 | 397 |
-| **Total, `git diff --numstat 2055486..<tip> -- src test`** | **2,004 added, 42 removed = 2,046** | **2,214 added, 42 removed = 2,256 authored** |
+| File | at `f6b1599` (pre-audit) | at `6f89090` (round 1) | at `2580afc` — **the tip that ships**, every figure below measured there |
+|---|---|---|---|
+| `src/ledger/audit.ts` | 146 | 160 | 160 |
+| `src/ledger/unknown-senders.ts` | 131 | 141 | 141 |
+| `src/ledger/conditions-store.ts` | 335 | 386 | 386 |
+| `src/ledger/retention.ts` | 240 | 246 | 246 |
+| `src/ledger/inbox.ts` (edited) | +13 / −42 | +13 / −42 | +13 / −42 |
+| `test/ledger/audit.test.ts` | 263 | 281 | 288 |
+| `test/ledger/unknown-senders.test.ts` | 201 | 220 | 220 |
+| `test/ledger/conditions-store.test.ts` | 278 | 370 | 370 |
+| `test/ledger/retention.test.ts` | 397 | 397 | 397 |
+| **Total, `git diff --numstat 2055486..<tip> -- src test`** | **2,004 added, 42 removed = 2,046** | **2,214 added, 42 removed = 2,256** | **2,221 added, 42 removed = 2,263 authored** |
 
 The block estimated ≈350 with no exception, so the slice carries a **disclosed PR-13-scoped size
-exception, 1,856 over** at the tip that ships (**1,646 over** at `f6b1599` before the audit). Two figures
-rather than one, because this slice deletes lines as well as adding them: **2,256 by the convention the three
+exception, 1,863 over** at the tip that ships (1,646 over at `f6b1599` before the audit, 1,856 over at
+`6f89090` after round 1). Two figures rather than one, because this slice deletes lines as well as adding
+them: **2,263 by the convention the three
 earlier ledger records used** (`added + removed`, which is what PR-11's "1,270 added and 6 removed = 1,276
-authored lines" means), and **2,214 measured as insertions only**. The 42 removed lines *against the base*
+authored lines" means), and **2,221 measured as insertions only**. The 42 removed lines *against the base*
 are `src/ledger/inbox.ts`'s private `insertAuditRow` and the interface it typed, which PR-13's own
 requirement replaces with the shared writer — the only edit this slice makes to a merged module, and the
 record states it rather than letting the number look like churn. (The audit's own movement removed 46 more
-lines inside the new files; those were written *after* the base, so they do not appear as base deletions.)
+lines inside the new files; those were written *after* the base, so they do not appear as base deletions.
+The tip column grew by 7 net lines over `6f89090` in round 2, all of them in `test/ledger/audit.test.ts`
+(+10 / −3): a comment in a tracked `.ts` file is counted, and an earlier version of this record's round-2
+note claimed the fix had left the figure unmoved because it "touched a comment" — the same class of stale
+figure the audit was closing.)
 
 The exception is authorized by the Director's session-wide delegation — this session was explicitly asked
 not to stop for authorizations — and the figure, the movement and the grounds are disclosed here and in the
@@ -4048,12 +4053,13 @@ that list arrived in round 1's batch, and trimming it is what the budget rule fo
 
 **A re-slice was measured and rejected, on the numbers.** `retention.ts` imports `conditions-store.ts` and
 neither the audit pair nor the sweep needs the other, so PR-13a (the three writers plus the `inbox.ts`
-delegation: **1,409** authored at `f6b1599`, 1,367 insertions-only, and **1,613** authored at the tip that
-ships) and PR-13b (`retention`: **637** at `f6b1599`, **643** at the tip) would each still be over the
-400-line budget — two exceptions instead of one, with the board's PR-13 row split for no gain. That is why it
-is one slice with one disclosed exception, and the measurement is the reason, not a preference. *(Both tips
-are stated because the first version of this paragraph carried only the pre-audit figures without saying
-which tip they belonged to — the class of defect round 1's `JD-A-005` was about.)*
+delegation: **1,409** authored at `f6b1599`, 1,367 insertions-only, **1,613** at `6f89090` and **1,620** at
+the tip that ships) and PR-13b (`retention`: **637** at `f6b1599`, **643** at both audit tips) would each
+still be over the 400-line budget — two exceptions instead of one, with the board's PR-13 row split for no
+gain. That is why it is one slice with one disclosed exception, and the measurement is the reason, not a
+preference. *(Every tip is stated because an earlier version of this paragraph carried the pre-audit figures
+without saying which tip they belonged to — the class of defect round 1's `JD-A-005` was about — and the
+version after round 1 then attributed 1,613 to "the tip" when the tip holds 1,620.)*
 
 Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 1 added / 1 removed — both
 at `f6b1599` and at the tip, because round 1 rewrote the same single cell in place rather than editing the
@@ -4079,7 +4085,7 @@ line, one call-site rename, the private function deleted, and the exported row t
 `JD-B-003`: 62 was a `node --test` run of four suites, PR-12's three plus PR-11's `open`, and not "PR-12's
 ledger tests". The superseded figure is named rather than deleted, because the claim's evidence is the
 number. For the wider set: the seven suites under `test/ledger/` hold **99** tests at `2055486` and **137**
-at the tip that ships (`134` at `e169ee3`, before round 1's four new cases).)*
+at the tip that ships (`134` at `e169ee3`, before round 1's **three** new cases).)*
 
 ## TDD cycle evidence
 
@@ -4210,7 +4216,7 @@ scopes, and the read-side test covered only the *null*-detail branch of the vali
 
 **The mutant sweep, re-run at every tip.** 13 mutants, explicit `[from, to]` pairs, each built on a cleaned
 `dist/` with `rm -rf`, and each file restored byte-identically and verified with `sha256`. **Killed: 13.
-Survived: 0** — at `e169ee3` and again at `6f89090`. *(The first run of the sweep was void and is recorded
+Survived: 0** — at `e169ee3`, at `6f89090` and again at `2580afc`. *(The first run of the sweep was void and is recorded
 rather than discarded: it destructured a flat `[from, to]` array per character, so every mutant replaced one
 character with another and the run measured nothing. It was caught because one mutant's diagnostic printed a
 one-character anchor where a 40-character one belonged. The harness now refuses any edit that is not an
@@ -4252,9 +4258,56 @@ file is suspect, and `grep` is the only way to find the rest.
 working tree and closes what the re-judgment found: `test/ledger/audit.test.ts`'s module doc states the gap and
 points at B-38; the record and `tasks.md` carry their corrections; the counts read **137** ledger tests,
 **38** new over the four suites and **465** total, with every superseded value named; and the re-slice
-paragraph labels both of its measurement tips. **Re-measured after the fix**: `src test` is still **2,214
-added / 42 removed = 2,256 authored** (the fix touched a comment, the record and a gate note), the full suite
-is **465/465**, `test:static` **8/8**, and the 13-mutant sweep is **13 killed / 0 survived** again.
+paragraph labels its measurement tips. **Re-measured after that fix**: `src test` is **2,221 added / 42
+removed = 2,263 authored** at `2580afc`, the tip that ships (2,214 / 42 / 2,256 at `6f89090`; the 7-line
+difference is the fix's own +10 / −3 in `test/ledger/audit.test.ts`), the full suite is **465/465**,
+`test:static` is **8/8**, and the 13-mutant sweep is **13 killed / 0 survived** again. *(An earlier version of
+this sentence said the figure was "still 2,214 … = 2,256" because "the fix touched a comment" — false twice
+over: a comment line in a tracked `.ts` file is counted by `git diff --numstat`, and the sentence sat beside a
+column header that still called `6f89090` the shipping tip. Round 3 corrects both and is disclosed below.)*
+
+## The terminal (round-2) scoped re-judgment, and round 3's disclosed correction
+
+Both re-judges ran again over the frozen ledger plus the wider fix delta (`4c2af78..2580afc`) and returned
+the **same eleven resolutions independently again**: **9 `verified`, 2 `regression`** — `JD-A-005` and
+`JD-B-003`, the same fact filed as two rows.
+
+**`JD-A-001` came back `verified` from both**, which is what closes round 1's most instructive row: the
+compensation claim now stands nowhere in `src/`, `test/`, `docs/` or `openspec/`, `B-38` is named in both the
+record and `tasks.md`, and the module doc, PT-20's cell and the test file's own header all point at the filed
+gap instead of at a control that does not exist.
+
+**The two regressions were both case (iii) — figures round 2's own fix got wrong** — and both judges derived
+the same two items, each with its own command:
+
+| Item | The defect, measured | The correction |
+|---|---|---|
+| "before round 1's **four** new cases" | Round 1 added **three** test blocks (the `Object.prototype` case, the canonical-`since` case and the canonical-instant case: `conditions-store` 14→16, `unknown-senders` 9→10, `audit` 4→4), and the sentence stating it contradicted the two counts it printed in the same parenthesis: 134 at `e169ee3` + 4 ≠ 137 at the tip. Proof: `git diff e169ee3..6f89090 -- test | grep -c '^+test('` → 3, `'^-test('` → 0 | "three" |
+| the shipping tip's line count | Round 2's fix moved the figure it claimed to have left unmoved: `git diff --numstat 2055486..2580afc -- src test` → **2,221 added / 42 removed = 2,263 authored** (exception **1,863 over**), against `6f89090`'s 2,214 / 42 / 2,256, the 7 net lines being its own +10 / −3 in `test/ledger/audit.test.ts`. The parenthetical's excuse — "the fix touched a comment" — is false, because `git diff --numstat` counts a comment line in a tracked `.ts` file; and the budget table's header still called `6f89090` "the tip that ships" (its `audit.test.ts` row read 281 where the tip holds 288), while PR-13a's "1,613 at the tip" should read **1,620** | the table gained a third column (`f6b1599` / `6f89090` / `2580afc — the tip that ships`), the exception and re-slice figures carry the tip they belong to, and `tasks.md`'s size paragraph says the same |
+
+**Round 3, and why it happens outside the budget.** The round budget is two fix rounds and two scoped
+re-judgments, and it is now spent. The two remaining rows are **not severe** — one WARNING and one SUGGESTION,
+both about a record's figures — so they neither block the terminal verdict nor authorize a third round. The
+corrections are nevertheless applied, in a third commit, and **disclosed here rather than presented as a
+re-judged fix**: the defects are real (both judges reproduced them), they are the *same class* this slice has
+now installed twice — round 1's correction installed a count defect, and round 2's correction installed
+another — and leaving them standing because the budget is spent would leave the record less accurate than the
+audit found it. This is the PR-12 precedent (`JD-B-008`, corrected after the budget was exhausted and
+disclosed as measurement-checked but not judge-re-judged), and it is the reason this slice's own lesson is
+worth carrying forward: **a correction is a claim about a file, and every figure about that file is suspect
+until it is re-measured.**
+
+**Round 3 touches only `openspec/**`**, so the shipped source and test bytes are untouched: `git diff
+--numstat 2580afc..<round-3 tip> -- src test` is empty, which is what makes the verification below the
+verification of the tip that ships rather than of an earlier commit.
+
+**Terminal verdict: `JUDGMENT: APPROVED` for `2055486..2580afc`** (source and tests) **and `<round-3 tip>`
+(docs)**. No BLOCKER and no CRITICAL row survives: the three CRITICALs were `JD-A-001`, `JD-B-001` and
+`JD-B-002`, and all three came back `verified` from both judges on the terminal re-judgment. The two
+surviving SUGGESTION/WARNING rows are escalated with their round-3 corrections disclosed as
+measurement-checked and **not judge-re-judged**, because the round budget is two and no third round exists.
+Final verification on the frozen tip: full suite **465/465**, `test:static` **8/8**, the seven ledger suites
+**137/137**, the four new suites **38/38**, and the 13-mutant sweep **13 killed / 0 survived**.
 
 ## Next
 

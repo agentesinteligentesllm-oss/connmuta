@@ -484,16 +484,18 @@ unguarded, and the receive-side scan this slice's record first credited for them
 F1).
 
 *Size.* The block estimated ≈350 with no exception; measured at `f6b1599` the slice was **2,004 added and 42
-removed = 2,046 authored lines**, and at the tip that ships, `6f89090`, it is **2,214 added and 42 removed =
-2,256 authored lines** (`git diff --numstat 2055486..<tip> -- src test`; 2,214 measured as insertions only)
-— **a disclosed PR-13-scoped size exception, 1,856 over** at the tip (**1,646 over** before the audit),
-authorized by the Director's session-wide delegation and disclosed there rather than asked per batch. A
-re-slice into PR-13a (the three writers plus the `inbox.ts` delegation, **1,409** authored at `f6b1599` and
-**1,613** at the tip) and PR-13b (`retention`, **637** and **643**) was **measured and rejected**: each half
-would still be over the 400-line budget, so the split would produce two exceptions instead of one. Grounds,
-the measured re-slice, the audit's movement and every figure are in `apply-progress.md` §PR-13. *(Round 2
-added the tip's figures alongside the pre-audit ones, because the first version named only the latter without
-saying which tip they belonged to.)*
+removed = 2,046 authored lines**; at `6f89090`, after round 1, **2,214 and 42 = 2,256**; and at the tip that
+ships, `2580afc`, **2,221 added and 42 removed = 2,263 authored lines** (`git diff --numstat 2055486..<tip> --
+src test`; 2,221 measured as insertions only) — **a disclosed PR-13-scoped size exception, 1,863 over** at the
+tip (1,646 over before the audit, 1,856 over after round 1), authorized by the Director's session-wide
+delegation and disclosed there rather than asked per batch. A re-slice into PR-13a (the three writers plus the
+`inbox.ts` delegation, **1,409** authored at `f6b1599`, **1,613** at `6f89090` and **1,620** at the tip) and
+PR-13b (`retention`, **637** at `f6b1599` and **643** at both audit tips) was **measured and rejected**: each
+half would still be over the 400-line budget, so the split would produce two exceptions instead of one.
+Grounds, the measured re-slice, the audit's movement and every figure are in `apply-progress.md` §PR-13.
+*(Every figure is labelled with the tip it belongs to, because the first version of this paragraph named only
+the pre-audit measurement, and the correction after round 1 attributed 1,613 to "the tip" where the tip holds
+1,620 — the same class of stale figure Judgment Day's `JD-A-005` was about.)*
 
 *Cells.* 13.6 fills **PT-20** only. **B-26 stays open**: PT-20 is not PT-25, and the cell names what it
 deliberately does not claim — the batch's own audit writes and their replay behaviour are PT-10's, the
