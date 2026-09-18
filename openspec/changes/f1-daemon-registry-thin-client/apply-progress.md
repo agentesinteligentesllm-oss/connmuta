@@ -3943,7 +3943,52 @@ native review closed for this candidate: the writer's self-verification is the r
 review was the independent check the writer cannot influence". **An independent verifier was run anyway**, and
 the reason is recorded rather than implied: `unassessable` is the one risk value this repository treats exactly
 like `high`, and PR-09a's, PR-10's and PR-11's independent verifiers each found record defects that no other
-step had — eleven, three and eight respectively. The result is in the next section.
+step had — eleven, three and eight respectively.
+
+### The independent verification, and the seven defects it found
+
+`gentle-ai-verify`, read-only, 78 turns and 102 tool calls, over the frozen worktree `pr-12-verify`
+(`162a5a1`) with a mandate to **reproduce** the record rather than read it. Its own hygiene: every mutation
+ran on copies under `%TEMP%`, the frozen worktree ended clean, and it verified the temp copies' `src test`
+bytes against both `pr-12-fix` (`99f397c`) and the frozen tip before trusting them.
+
+**Everything it re-measured held, exactly.** The six `sha256` values; both line-count columns, both totals and
+the exception; the movement across all nine named tips; every test count at every tip the record names
+(`main` 379/379; `4703ee6` 41/41 + 420/420 + 8/8; `7005d22` 420/420 + 8/8; the tip 48/48 + 427/427 + 8/8);
+the frozen ledger's canonical hash, its line count, its LF termination, its sorted keys and its **2/6/5**
+severities read from the file; all 26 mutant outcomes with their exact pass/fail splits and the byte-identical
+restoration of every mutated file; the named killer of every killed row; the four survivors and the *narrow*
+rationale for them; and every pointer — `design.md`'s six sections, `tasks.md` 12.6, `B-26`, `B-35`, the
+`v1` citations at `bf8f365`, all ten commit shas, all five worktrees, and `test/fixtures/v1-provenance.json`'s
+11 entries. It confirmed the code's own claims with its own probes (the offset upsert creating a missing row,
+the forward-only guard, the read-back, the duplicate-identity refusal, the schema refusing a duplicate `eid`,
+D-20 in both directions, the history cap/reconciliation/order, the adapter composing inside a caller's
+transaction, the strict catch-up edge, and `EXPLAIN QUERY PLAN` showing the project-scoped index search).
+
+**It found seven defects, all of them in the record's prose and none in the shipped bytes** (six numbered,
+plus one it filed as adjacent), every one reproduced with its own command:
+
+| # | What it found | Correction |
+|---|---|---|
+| `F1` | The THREAT-MODEL churn figure said 3 added / 3 removed; measured, the slice moved 2/2 and round 1 moved 1/1 | the figure is the measurement, with the correction disclosed in place |
+| `F2` | The round-1 table graded `JD-A-001`/`JD-B-002` CRITICAL for both judges; the frozen ledger files that defect CRITICAL from A and WARNING from B, and the two CRITICAL *rows* are `JD-A-001` and `JD-B-001` | the row states both severities; the terminal verdict is regrouped and recounted from the ledger |
+| `F3` | `99f397c` was called "the tip that ships" and the approval was scoped to `70d643a..04189da` | every figure now says the tip it is measured at, and the verdict says what it runs over — `src test` is byte-identical from `99f397c` through `162a5a1`, which the record proves |
+| `F4` | The survivors' rationale claimed the *placement* of a write is not observable, which its own hoist mutant falsifies for the offset advance (46/2) — the same asymmetry round 2's residual (b) had already conceded for the thread write | the claim is narrowed to the two placements that are measured unobservable, and the falsified broad version is recorded rather than deleted |
+| `F5` | The shared-cursor citation pointed at the setup document for two field names that live in the state module | two citations, each for what it carries |
+| `F6` | "Three defects were reached independently by both judges" is three **pairings** across five row ids, not three rows, because `JD-B-003` is one Judge-B row used twice | the count is stated as pairings, with the ids named |
+| adjacent | `tasks.md`'s PR-12 apply-time note carried 1,847 / 1,447 unlabelled against a stale tip | both figures are stated with the tip each belongs to, and the tip's 2,064 / 1,664 are added |
+
+Its verdict: *"the record's measurements are trustworthy … but its prose is not clean … none of the defects
+touches the shipped bytes."* All seven were corrected in `ced9c8c` (commit subject: "correct the seven
+defects"), which is **after** the reviewed tip `162a5a1`, so the reviewed bytes are unchanged —
+`git diff --numstat 162a5a1..ced9c8c -- src test` is empty.
+
+**One frozen artefact still carries the wrong count, and it is disclosed rather than amended.** The merged
+PR **#17** body says the verifier "found eight defects". It found seven: six numbered plus one adjacent, with
+its separate note about the RED runs listed as *unverifiable* rather than as a finding, so counting that note
+inflates the tally — the same class of severity-tally error this round's own `F2` was about. The PR body is a
+merged artefact and this record does not rewrite it: **the count here (seven) is the correct one**, and the
+superseded figure is named instead of silently replaced.
 
 ## Next
 

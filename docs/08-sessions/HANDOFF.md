@@ -356,7 +356,7 @@ not touch it** either.
   module (`TS2307`, or `TS2305` over a module that exists and exports nothing) is a legitimate RED.
 - **Stale comments, stale figures and stale records**: after a correction edits a file, every figure about
   that file is suspect — grep the whole record for the old number, and for the new one, before committing.
-  PR-12's independent verifier found eight defects this way, every one of them in the record's own prose.
+  PR-12's independent verifier found seven defects this way, every one of them in the record's own prose.
 
 ---
 
