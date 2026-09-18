@@ -240,8 +240,9 @@ applies that string; **it must not edit it** (a schema change is a migration, no
      Expect a **new reference** in `src/ledger/tsconfig.json` (`{ "path": "../shared" }`) the moment
      `LEDGER_SCHEMA_VERSION` is imported — an empty *referencing* unit is TS18003, so it lands with that
      first import.
-   - **11.6** (if the block names one): the docs/cell task, which per §2.3 above is **none** for PR-11 —
-     say so rather than inventing a cell.
+   - **There is no 11.6.** The block ends at 11.5 and names no PT cell, so this slice updates no
+     `THREAT-MODEL.md` cell: PT-11 stays with PR-12 (task 12.6) and PT-20 with PR-13 (task 13.6). Say that
+     in the PR rather than inventing a cell (§2.3).
 4. **Verify** from a frozen worktree (never the working tree): the full suite and `test:static`, plus **at
    least four mutants on a cleaned `dist/`** — including one on the quarantine rename (does the corrupt
    file survive? are the `-wal`/`-shm` siblings moved?), one that stamps `user_version` outside the
@@ -350,6 +351,8 @@ applies that string; **it must not edit it** (a schema change is a migration, no
 - v1 checkout beside this repository: `telegram-agent-bus` at `bf8f365` (tag `v1.0.2` + 2 commits),
   **read-only**; cite as `path:line`. It carries one pre-existing untracked `alpha_response.json`.
 - Verification worktrees live in `../telegram_bus_agent-worktrees/` and are removed when their run ends;
-  **an empty directory is the expected end state**. PR-10 left `verify-10` and `verify-10-fix`; remove them.
+  **an empty directory is the expected end state** — PR-10's `verify-10` and `verify-10-fix` were removed at
+  its close, so it is empty now, and the next session's worktrees must be removed the same way
+  (`git worktree remove --force <path>` works even when they hold scratch files).
 - Arena bridge: `.mcp.json` (gitignored) points at `http://127.0.0.1:8766/mcp` — the Arena Orion Electron
   app, **down** unless the Director launched it. Never quote `.mcp.json` and never commit it.
