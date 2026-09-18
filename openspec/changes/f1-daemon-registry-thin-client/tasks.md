@@ -393,10 +393,10 @@ in this unit. The reference did not need to arrive earlier; an unused project re
 with this repository's TypeScript 7.0.2 (Judgment Day round 1 corrected an earlier note here that claimed an
 empty *referencing* unit is TS18003, and round 2 corrected the clause that replaced it).
 
-*Size.* The block estimated ≈350 with no exception; the measured diff at the tip that ships is **1,269 added
-and 6 removed = 1,275 authored lines** (`git diff --numstat ab6dbf1..<tip> -- src test`; 1,085 / 685-over at the
-first committed tip `8392b1c`, then 1,275 / 875-over after round 1's corrections) — **a disclosed PR-11-scoped
-size exception, 875 over**. Grounds: a real `node:sqlite` harness over temp files plus two corrupt fixtures
+*Size.* The block estimated ≈350 with no exception; the measured diff at the tip that ships is **1,270 added
+and 6 removed = 1,276 authored lines** (`git diff --numstat ab6dbf1..19ff8a5 -- src test`; 1,085 / 685-over at
+the first committed tip `8392b1c`, 1,275 / 875-over after round 1's corrections, then a comment-only +1) — **a
+disclosed PR-11-scoped size exception, 876 over**. Grounds: a real `node:sqlite` harness over temp files plus two corrupt fixtures
 (one a file that is not a database, one a single-byte flip whose damage SQLite *reports* rather than throws);
 the two spec scenarios; the PRAGMA sequence with its own non-vacuous control; the corruption *class* rule (the
 primary-code mask, plus the synthetic extended codes no plain file can produce); the two non-corruption probe
