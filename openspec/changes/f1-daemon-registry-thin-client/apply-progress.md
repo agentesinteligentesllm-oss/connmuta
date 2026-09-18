@@ -3628,8 +3628,11 @@ PR-05) is the consumer the thread adapter exists for; it is not edited here.
 (the modules did not exist) — a legitimate RED for a missing module. `src/ledger/threads.ts` then went green
 first because `inbox.ts` imports it, and `src/ledger/inbox.ts` followed. `test/ledger/cursors.test.ts` then
 failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin. Round 1 added
-seven cases (three digest cases, the offset rewind, the thread-row rollback, the two duplicate-identity
-refusals, the history order), each of which is the test its own mutant now dies on.
+**seven** cases — two digest cases, the offset rewind, the thread-row rollback, the two duplicate-identity
+refusals and the history order — and **six of the seven have a mutant in the sweep below that dies on them**
+(`M18`, `M20`/`M25`, `M24` twice and `M21`). The seventh, the thread-row rollback, is the observable half of
+a *placement* whose mutant (`M19`) survives for the reason the matrix states; no in-process mutant can die on
+it, which is why it is disclosed here rather than credited.
 
 | Where | `node --test` over the three focused suites | Whole suite | `test:static` |
 |---|---|---|---|
@@ -3721,7 +3724,7 @@ Commit `99f397c`, **+272 / −55** across six files (the PT-10 cell included):
 ## Mutant matrix — each built on a cleaned `dist/` in an isolated worktree, each restored byte-identically
 
 Run at `99f397c` in `pr-12-fix`, `node odd/mutants.mjs` (the script lives outside the repository and is
-removed at close). **25 mutants, 21 killed, 4 survived**, and every mutated file was restored byte-identically
+removed at close). **26 mutants, 22 killed, 4 survived**, and every mutated file was restored byte-identically
 after each one (`sha256` re-checked by the script).
 
 | # | Mutant | Result | Killed by |
@@ -3751,6 +3754,7 @@ after each one (`sha256` re-checked by the script).
 | `M23` | the thread adapter opens a transaction of its own | killed (36/12) | the nested-call case, named among the twelve |
 | `M24` | a repeated identity inside one batch is not refused | killed (46/2) | the two duplicate-identity refusals |
 | `M25` | the forward-only guard is dropped | killed (47/1) | an older batch cannot rewind the offset |
+| `M26` | an explicit `null` no longer clears the digest | killed (47/1) | an explicit `null` clears the stored digest |
 
 All four survivors are reported rather than removed from the matrix, and three of them are one disclosure:
 
@@ -3806,6 +3810,26 @@ All four survivors are reported rather than removed from the matrix, and three o
 | — | **B-26 is untouched**: `tasks.md` 12.6 names PT-10 and PT-11 only, and neither is PT-25 |
 | — | `updates.body`'s coupling is refused rather than normalized: silently stripping a body would delete the evidence of a classification bug |
 | **B-35** | filed in this PR for PT-10's assertion wording, which round 1's `JD-B-007` showed reading against the evidence cell |
+
+## Scoped re-judgment round 1, and the defect it found in the correction
+
+Both judges received only the frozen-ledger hash, **their own** rows, and the fix delta `4703ee6..c04ffe9`,
+and each resolved every one of its own rows. **All thirteen rows came back `verified`** — A's six and B's
+seven — and Judge B additionally recorded one row that was not in the ledger: **`JD-B-008`, `regression`**,
+for a defect the correction itself had installed.
+
+| Row | Severity | What it found | Correction |
+|---|---|---|---|
+| `JD-B-008` | SUGGESTION | The TDD-cycle paragraph round 1 wrote enumerated **eight** items for a stated **seven** (it said "three digest cases" where the diff adds exactly two: `cursors.test.ts` grew 16 → 18, which this record's own table states), and its closing clause — "each of which is the test its own mutant now dies on" — was false for two of the seven: no mutant in the frozen matrix dies on the explicit-`null` digest case, and the thread-row rollback's placement mutant (`M19`) **survives**. The judge reproduced both facts, including a bespoke mutant for the `null` branch | the enumeration is the seven real cases; the clause now names the six whose killer is in the matrix and discloses the seventh; and the `null` branch's discriminating mutant is now in the matrix as `M26` (killed, 47/1) |
+
+That finding is the class `JD-B-004` named, **re-installed by round 1's own new text** in the same record —
+the hazard HANDOFF §2.2 gives its own bullet to ("a correction can install a *new* defect of the same class as
+the one it fixed"), and it was caught by the judge attacking the replacement rather than the original. The
+matrix is **26 mutants, 22 killed, 4 survived** after it. The code is not touched, so
+`git diff --numstat c04ffe9..<this commit> -- src test` is empty and every figure in the budget table above
+still holds at this tip.
+
+Round 2 — the last bounded round — is the scoped re-judgment over this delta.
 
 ## Next
 
