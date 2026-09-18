@@ -4,6 +4,65 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-18 — Session 15: PR-12 (the inbox write-ahead transaction, the thread adapter and the per-client cursors) delivered and merged as #17
+
+**Closed**
+
+- **PR-12** — `src/ledger/{inbox,threads,cursors}.ts` + all three twins — is merged as PR **#17** (`6558bb6`,
+  code tip `99f397c`, record tip `ced9c8c`), CI green on both legs (Node 24.15 and 26), branch deleted.
+  **17 PR blocks / 12 row ids are complete (70 of the 210 checkboxes)**; the remaining board is
+  **28 blocks / 30 row ids (`PR-13…PR-42`)**. **427 tests, `test:static` 8/8.** Budget **2,064 authored
+  lines with a disclosed 1,664-line PR-12-scoped exception** (1,845 before Judgment Day's corrections grew
+  it by +271 / −54). Unit 4 `ledger` is three-quarters done; only PR-13 remains in it.
+- **The audit route held for the tenth slice.** Arena down, native SDD preflight closed, so ODD with the SDD
+  contract preserved and Judgment Day as the substitute: two blind judges over a frozen tree, a 13-row
+  frozen ledger, two bounded correction rounds and **two** scoped re-judgments — the full budget. Record:
+  `bus-v2-f1-pr-12-audit-001`. **DN-05 remains unsatisfied.**
+- **The ordinary native review closed APPROVED** for lineage `review-b6fc7d771f933aed` (one
+  `review-reliability` lens, medium risk, 10 files / 2,427 changed lines); its exact
+  `acknowledge-approved` continuation was executed unchanged, so authority is burned and delivery stayed
+  under ordinary repository policy. Three advisory findings, recorded not actioned, filed as **B-36**.
+
+**Opened**
+
+- **PR-13** — `src/ledger/{audit,unknown-senders,conditions-store,retention}.ts` + four twins, the audit log
+  with no body, the unknown-sender upsert, the condition store and the retention sweep; PT-20; task 13.6
+  fills PT-20's cell. Next session starts there.
+- **B-35** — PT-10's assertion cell against the evidence cell PR-12 wrote (the offset is `max(update_id) + 1`
+  over every entry the batch covered, dropped entries included). Wording only, in a gated row, for the
+  Director.
+- **B-36** — the three advisory findings of PR-12's approved review.
+
+**What was learned**
+
+- **A correction can install a defect of the class it just fixed, and PR-12 proved it twice.** Round 1's own
+  new sentence carried a count its enumeration contradicted; round 2's replacement of that sentence carried a
+  second one, plus an impossibility claim. Both re-judgments attacked the replacement harder than the
+  original, which is exactly what this repository's handoff predicts. **Re-measure the replacement text.**
+- **A record's most attackable prose is its survivors' rationale.** PR-12's broad claim that a write's
+  *placement* inside a transaction is unobservable was falsified by the independent verifier's own hoist
+  mutant, while the narrow claim survived. State the measured set, never the generalisation.
+- **The native review's START shape is graded, and every failure is pre-authority.** Four of six attempts
+  failed (`identity-mismatch`, `candidate-target-projection-drift`, `unknown-field: cwd`, and the facade's own
+  "graph-v1 START requires lineageId"); the one that worked carried every field the offered `execute`
+  binding named, in camelCase, plus the retained `lineageId`. Nothing was burned by any of them.
+- **The independent verifier earns its place even when the plan does not require it.** Its eight findings
+  were exclusively record defects — a severity label contradicting the frozen ledger, a stale churn figure,
+  stale tip labels, an over-broad rationale, a wrong citation, a mis-counted shared-defect tally, and a stale
+  figure in a gate document — while every one of ~60 figures it re-measured held exactly.
+- **A heredoc truncates on long Markdown, and backticks inside a double-quoted shell string execute.** PR-12's
+  close lost a 3,670-line append to the first and a `node -e` command to the second. The editor plus a `node`
+  splice is the only reliable path for Markdown of this size.
+
+**Pointers**
+
+- [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) §PR-12 — the
+  budget table, the frozen verification with all six `sha256` values, the 26-row mutant matrix with its four
+  reported survivors, the round-1 ledger and its correction batch, both re-judgments, the terminal verdict,
+  the native review, and every boundary the modules state.
+- [`INDEX.md`](../05-tribunal/INDEX.md) `bus-v2-f1-pr-12-audit-001` — the audit-path record.
+- [`HANDOFF.md`](./HANDOFF.md) — rewritten for PR-13, with the START shape and the four new rules in §2.
+
 ## 2026-09-17 — Session 14: PR-11 (the ledger's open sequence, quarantine and forward-only migrations) delivered and merged as #16
 
 **Closed**
