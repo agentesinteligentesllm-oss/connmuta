@@ -4007,53 +4007,57 @@ superseded figure is named instead of silently replaced.
 
 ## Scope and budget (measured)
 
-| File | Authored lines at `f6b1599` — the tip these figures are measured at |
-|---|---|
-| `src/ledger/audit.ts` | 146 |
-| `src/ledger/unknown-senders.ts` | 131 |
-| `src/ledger/conditions-store.ts` | 335 |
-| `src/ledger/retention.ts` | 240 |
-| `src/ledger/inbox.ts` (edited) | +13 / −42 |
-| `test/ledger/audit.test.ts` | 263 |
-| `test/ledger/unknown-senders.test.ts` | 201 |
-| `test/ledger/conditions-store.test.ts` | 278 |
-| `test/ledger/retention.test.ts` | 397 |
-| **Total, `git diff --numstat 2055486..f6b1599 -- src test`** | **2,004 added, 42 removed = 2,046 authored** |
+| File | at `f6b1599` (pre-audit) | at `6f89090` — **the tip that ships**, every figure below measured there |
+|---|---|---|
+| `src/ledger/audit.ts` | 146 | 160 |
+| `src/ledger/unknown-senders.ts` | 131 | 141 |
+| `src/ledger/conditions-store.ts` | 335 | 386 |
+| `src/ledger/retention.ts` | 240 | 246 |
+| `src/ledger/inbox.ts` (edited) | +13 / −42 | +13 / −42 |
+| `test/ledger/audit.test.ts` | 263 | 281 |
+| `test/ledger/unknown-senders.test.ts` | 201 | 220 |
+| `test/ledger/conditions-store.test.ts` | 278 | 370 |
+| `test/ledger/retention.test.ts` | 397 | 397 |
+| **Total, `git diff --numstat 2055486..<tip> -- src test`** | **2,004 added, 42 removed = 2,046** | **2,214 added, 42 removed = 2,256 authored** |
 
 The block estimated ≈350 with no exception, so the slice carries a **disclosed PR-13-scoped size
-exception, 1,646 over**. Two figures rather than one, because this slice deletes lines as well as adding
-them: **2,046 by the convention the three earlier ledger records used** (`added + removed`, which is what
-PR-11's "1,270 added and 6 removed = 1,276 authored lines" means), and **2,004 measured as insertions
-only**. The 42 removed lines are `src/ledger/inbox.ts`'s private `insertAuditRow` and the interface it
-typed, which PR-13's own requirement replaces with the shared writer — the only edit this slice makes to a
-merged module, and the record states it rather than letting the number look like churn.
+exception, 1,856 over** at the tip that ships (**1,646 over** at `f6b1599` before the audit). Two figures
+rather than one, because this slice deletes lines as well as adding them: **2,256 by the convention the three
+earlier ledger records used** (`added + removed`, which is what PR-11's "1,270 added and 6 removed = 1,276
+authored lines" means), and **2,214 measured as insertions only**. The 42 removed lines *against the base*
+are `src/ledger/inbox.ts`'s private `insertAuditRow` and the interface it typed, which PR-13's own
+requirement replaces with the shared writer — the only edit this slice makes to a merged module, and the
+record states it rather than letting the number look like churn. (The audit's own movement removed 46 more
+lines inside the new files; those were written *after* the base, so they do not appear as base deletions.)
 
 The exception is authorized by the Director's session-wide delegation — this session was explicitly asked
 not to stop for authorizations — and the figure, the movement and the grounds are disclosed here and in the
 PR body so the Director can review the decision.
 
 Grounds: four modules plus four twins, each over real `node:sqlite` temp files opened through
-`ledger/open.ts`; PT-20's two halves with the token half driven through *three* writers and proven against
-the ledger **file's bytes** with a raw-SQL control that makes the scan fail; the "one shared writer" claim
-asserted structurally against `inbox.ts`'s own text; the unknown-sender upsert's `first_seen_at` first-wins,
-its `MAX` on `last_seen_at`, its composite key and its composability inside a caller's transaction; the
-condition store's `since`-first-wins/clear-deletes pair, its `(scope, name)` key, its per-name scope and
-detail contracts validated in *both* directions and its mapping into `Conditions`; and the retention
-sweep's five windows with both sides of each strict edge, the two DDL cascades, the "open threads are never
-pruned" negative, the history cap's own pass and the backlog condition's boundary. Trimming that list is
-what the budget rule forbids.
+`ledger/open.ts`; PT-20's two halves with the token half driven through *four* writers and four columns of
+the condition store, proven against the ledger **file's bytes** with a raw-SQL control that makes the scan
+fail; the "one shared writer" claim asserted structurally over every `src/ledger/*.ts`; the unknown-sender
+upsert's `first_seen_at` first-wins, its `MAX` on `last_seen_at`, its composite key, its canonical instants
+and its composability inside a caller's transaction; the condition store's `since`-first-wins/clear-deletes
+pair, its `(scope, name)` key, its per-name scope and detail contracts validated in *both* directions, its
+refusals that name fields and not values, its prototype-proof lookup maps and its mapping into `Conditions`;
+and the retention sweep's five windows with both sides of each strict edge, the two DDL cascades, the "open
+threads are never pruned" negative, the history cap's own pass and the backlog condition's boundary. Most of
+that list arrived in round 1's batch, and trimming it is what the budget rule forbids.
 
 **A re-slice was measured and rejected, on the numbers.** `retention.ts` imports `conditions-store.ts` and
 neither the audit pair nor the sweep needs the other, so PR-13a (the three writers plus the `inbox.ts`
-delegation: **1,409** authored, 1,367 insertions-only) and PR-13b (`retention`: **637**) would each still be
-over the 400-line budget — two exceptions instead of one, with the board's PR-13 row split for no gain.
-That is why it is one slice with one disclosed exception, and the measurement is the reason, not a
-preference.
+delegation: **1,409** authored at `f6b1599`, 1,367 insertions-only, and **1,613** authored at the tip that
+ships) and PR-13b (`retention`: **637** at `f6b1599`, **643** at the tip) would each still be over the
+400-line budget — two exceptions instead of one, with the board's PR-13 row split for no gain. That is why it
+is one slice with one disclosed exception, and the measurement is the reason, not a preference. *(Both tips
+are stated because the first version of this paragraph carried only the pre-audit figures without saying
+which tip they belonged to — the class of defect round 1's `JD-A-005` was about.)*
 
-Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 1 added / 1 removed (the
-PT-20 evidence cell, rewritten in place because 13.6 names exactly that cell and "the file is never renamed
-or rewritten" applies to the *assertion* column, which is untouched), and `docs/06-backlog/CHECKLIST.md`, 1
-added (B-37).
+Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 1 added / 1 removed — both
+at `f6b1599` and at the tip, because round 1 rewrote the same single cell in place rather than editing the
+row twice — and `docs/06-backlog/CHECKLIST.md`, **2** added (B-37 at `f6b1599`, B-38 with round 1).
 
 ## Where the code came from
 
@@ -4069,8 +4073,13 @@ slice is explicit — "`inbox.ts` already writes `audit_log` rows for a poll bat
 be the **shared** writer those rows and the send path both use, not a second one that drifts" — so the
 delegation is the slice's requirement rather than an opportunity taken. The edit is byte-minimal: one import
 line, one call-site rename, the private function deleted, and the exported row type turned into an alias of
-`ledger/audit.ts`'s so `test/ledger/inbox.test.ts` keeps the import it had. All 62 of PR-12's ledger tests
-pass unchanged, which is what makes the claim measurable.
+`ledger/audit.ts`'s so `test/ledger/inbox.test.ts` keeps the import it had. **All 48 of PR-12's ledger tests**
+(18 `inbox`, 12 `threads`, 18 `cursors`, measured) pass unchanged, which is what makes the claim measurable.
+*(This sentence said "62" until Judgment Day round 1, which reached it from both sides — `JD-A-005` and
+`JD-B-003`: 62 was a `node --test` run of four suites, PR-12's three plus PR-11's `open`, and not "PR-12's
+ledger tests". The superseded figure is named rather than deleted, because the claim's evidence is the
+number. For the wider set: the seven suites under `test/ledger/` hold **99** tests at `2055486` and **137**
+at the tip that ships (`134` at `e169ee3`, before round 1's four new cases).)*
 
 ## TDD cycle evidence
 
@@ -4093,8 +4102,13 @@ three modules, 13.3 RED, 13.4 GREEN — with one addition the block omits: `unkn
 landed in the **13.2** pass, `audit.ts` first because `inbox.ts` imports it. Red still precedes green for
 every module; the record says so rather than claiming the block's order was followed.
 
-The focused counts before the full suite: **33 new tests** over four suites (`audit` 4, `unknown-senders`
-9, `conditions-store` 12, `retention` 8), which is the 427 → 460 movement.
+The focused counts before the full suite: **38 new tests** over four suites (`audit` 4, `unknown-senders`
+10, `conditions-store` 16, `retention` 8), which is the 427 → **465** movement. *(Superseded figures, named
+rather than deleted because this line's evidence is the count: it said "33 new tests" before round 1, and the
+first version of this correction said "35" while naming `audit` 6 — an enumeration that summed to the right
+total under a wrong per-suite number, which is the same defect class round 2 caught in round 1's own text.
+The measurements, each at its own tip: `f6b1599` 33 new / **460** total; `e169ee3` 35 new / **462** total;
+`6f89090` 38 new / **465** total.)*
 
 ## Runtime facts this slice rests on (measured on the pinned build before the claims were written)
 
@@ -4118,16 +4132,20 @@ The focused counts before the full suite: **33 new tests** over four suites (`au
   reason stated at the call site. A count of rows is a number; the bigint half of that union is for
   statement counts that overflow it.
 - **`thread_history` is a composite-key rowid table**, so the cap's `DELETE … WHERE rowid IN (SELECT rowid
-  FROM (ROW_NUMBER() OVER (PARTITION BY project_id, thread_id …)))` is available and the ordering tie-break
-  (`at DESC, eid DESC`) can match `ledger/threads.ts`'s read order (`ORDER BY at, eid`); the two sides agree
-  on what "newest" means.
+  FROM (ROW_NUMBER() OVER (PARTITION BY project_id, thread_id …)))` is available, and the ordering
+  (`at DESC, eid DESC`) is the same two columns `ledger/threads.ts` reads back with (`ORDER BY at, eid`) in
+  the reverse direction — **not the same selection**, which is what this line and the module's own doc
+  claimed before round 1 corrected both (`JD-B-005`): the writer's cap is the record's arrival order
+  (`slice(-MAX_THREAD_HISTORY)`), chronological in the ordinary case and not in general, so the two agree
+  only while they agree. What makes the difference unreachable in F1 is that the sweep's pass only ever acts
+  on rows no writer route produced.
 
 ## Boundaries stated in the modules rather than left to be found
 
 | Boundary | Where it is stated | Why it is a decision |
 |---|---|---|
 | **The token guard refuses; design §6 says `redactTokenShapes`** | `src/ledger/audit.ts` (module doc, "Why the token guard refuses rather than redacts") | `secret-store/redaction.ts` is **PR-14**, which *depends on* PR-13, so no module here can import it; a local redactor would be a second copy of a rule that has a home. The guarantee PT-20 states holds either way; the mechanism differs from the design's sentence, so the sentence is not restated as a fact |
-| **`updates.body` is not guarded by a ledger writer** | `src/ledger/audit.ts`, and PT-20's new cell | A peer's body reaches `updates` only after the admission pipeline's receive-side secret scan (`SECRET_PATTERN_DETECTED`, PR-22a); the ledger is not where that scan belongs |
+| **`updates.body` is not guarded by a ledger writer — and the control this record first credited for it does not exist** | `src/ledger/audit.ts` (corrected), PT-20's cell (corrected), **B-38** | The first version of this row said a peer body reaches `updates` only after "the admission pipeline's receive-side secret scan (`SECRET_PATTERN_DETECTED`, PR-22a)". Round 1 measured that no such step exists anywhere in F1 (`JD-A-001`), and the writer reproduced the token landing in the file. The row therefore records a **gap** and not a placement: the peer-body columns (`updates.body`, and `threads.body`/`thread_history.body` by the same argument) are unguarded, a guard in the ledger's own writer would leave the offset unmoved and wedge the poller, and the fix belongs to admission (PR-22a), whose audit vocabulary already carries the reason code |
 | **The cursor advance — the scenario's third write path — has no guard** | `src/ledger/audit.ts`, PT-20's cell, **B-37** | `ledger/cursors.ts` is PR-12's, merged and frozen; a guard there is its own slice with its own audit, not a drive-by edit |
 | **`conditions.detail`'s "codes and ids only" is the caller's contract** | `src/ledger/conditions-store.ts` (module doc, "What it cannot decide") | The store enforces the four things a validator can decide (member set, member type, single-line, no token shape); telling a code from a single-line message needs a vocabulary it does not have, and F2's `state_quarantined.quarantined_path` is legitimately a path |
 | **`since` is first-wins while raised, and clearing deletes** | `src/ledger/conditions-store.ts` | "Still raised" and "raised again" must be different states, or `open_thread_backlog` reports "since the last sweep" for ever |
@@ -4148,6 +4166,95 @@ The focused counts before the full suite: **33 new tests** over four suites (`au
    `updates.body` placement (PR-22a's) and the cursor path (B-37's). **B-26 is untouched**: 13.6 names PT-20,
    which is not PT-25.
 4. **The `.changes` typing fact** is recorded above so the next module in this unit does not rediscover it.
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+**Route and authorization.** Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) launched in parallel
+over one frozen tree — `../telegram_bus_agent-worktrees/pr-13`, detached at `4c2af78`, with a junction to
+the main checkout's `node_modules` so both could build and run. Graph-v1 native shapes only: discovery
+returned `{"rows":[…]}` and nothing else. The Arena Orion bridge is down, so this is the DN-05 substitute and
+**DN-05 is unsatisfied for PR-13**, exactly as it is for the ten slices before it. The round-one correction
+batch was authorized by the Director's session-wide delegation ("do not stop for authorizations") rather than
+by a fresh question, and this paragraph is the disclosure that replaces the question: **eleven rows, two
+judge runs, one bounded correction batch, one mutant-sweep re-run at each tip.** The target is over 400
+changed lines, so each judge was allowed up to two exhaustive read-only sweeps.
+
+**Result.** 11 rows, every one `deterministic` (each judge reproduced what it filed): **3 CRITICAL, 4
+WARNING, 4 SUGGESTION**; Judge A 6 rows, Judge B 5. The frozen ledger is `odd/pr-13-ledger.md` (untracked,
+deleted at close), with the rows verbatim and the ledger file's SHA-256
+`6576f7af4a8e18c3c471d0283c5f6d15611c75fab3c766cbf456bcb086222e00`. Both tallies above were **recounted from
+that file** rather than from memory.
+
+**Agreement, and where it was substantive.** Two facts were reached *independently* by both judges, with
+different severities: the unguarded `conditions.scope` (`JD-B-001` CRITICAL / `JD-A-002` WARNING) and the
+instant ordering (`JD-B-002` CRITICAL / `JD-A-003` WARNING). Two more rows are the same fact from both sides
+(`JD-A-005` and `JD-B-003`, the "62" figure). **The writer reproduced all eleven underlying claims itself
+before editing anything**, with its own probes rather than the judges' — including `JD-A-001`'s file-bytes
+half and `JD-A-004`'s prototype lookups.
+
+| Row | Judge | Severity | What it was | Disposition |
+|---|---|---|---|---|
+| `JD-B-001` / `JD-A-002` | B **and** A | CRITICAL / WARNING | `raiseCondition` guarded `detail.*` and never `scope`, so a token-shaped scope was accepted, stored and present in the ledger file — through a public API, with no cast | fixed: `assertNoTokenShape("conditions.scope", …)` runs first, and the token test drives the token through it |
+| `JD-B-002` / `JD-A-003` | B **and** A | CRITICAL / WARNING | `parseInstant` admits more than it orders: `…T10:00:00Z` sorts after `…T10:00:00.500Z` and `…T11:00:00+05:00` is four hours earlier than both, so `MAX(last_seen_at, …)` did not advance and could move backwards; the retention cutoff read the same text | fixed: every instant these two modules store is `new Date(ms).toISOString()` |
+| `JD-A-001` | A only | CRITICAL | The control the record credited for `updates.body` — a receive-side secret scan in admission — **does not exist anywhere in F1**, and a token-shaped body lands in the file | corrected as a **record** defect (module doc and PT-20's cell) and filed as **B-38** with its dispositions; the code half is pre-existing, and a guard in the ledger's own writer would wedge the poller |
+| `JD-B-004` | B only | WARNING | Two refusals interpolated the caller's `scope` and `detail` member name, copying into the log what the guard beside them keeps out of the ledger | fixed: refusals name the field, never the value |
+| `JD-B-003` / `JD-A-005` | B **and** A | WARNING / SUGGESTION | "All 62 of PR-12's ledger tests pass unchanged" does not reproduce: PR-12's three suites hold **48**, and 62 is 48 plus PR-11's `open` (14) | corrected in place with the superseded figure named, here and in `tasks.md` |
+| `JD-A-004` | A only | SUGGESTION | Plain-object lookups answered from `Object.prototype`: `constructor`, `toString`, `valueOf`, `hasOwnProperty`, `__proto__` produced a bare `TypeError` instead of the store's refusal | fixed: the contracts and their member maps are `Map`s; three prototype names and a `toString` detail member are pinned |
+| `JD-A-006` | A only | SUGGESTION | The structural "one `INSERT INTO audit_log`" test read two files by name, so a second insert in a sibling passed it — narrower than the claim it was cited for | fixed: the assertion walks every `src/ledger/*.ts` |
+| `JD-B-005` | B only | SUGGESTION | The cap's doc claimed its `(at DESC, eid DESC)` ranking was the writer's tie-break "so newest means the same thing on both sides"; the writer reads ascending and caps by arrival order | corrected in the module and here: the same columns, reverse direction, the same selection only while they agree |
+
+**The writer's own mutant sweep found two survivors before the judges returned**, and both were real gaps
+rather than mutants the suite cannot reach: no test cleared one of two same-named conditions under different
+scopes, and the read-side test covered only the *null*-detail branch of the validation. Both were pinned in
+`e169ee3`, a correction that precedes this batch and is therefore *inside* the fix delta the re-judgment sees.
+
+**The mutant sweep, re-run at every tip.** 13 mutants, explicit `[from, to]` pairs, each built on a cleaned
+`dist/` with `rm -rf`, and each file restored byte-identically and verified with `sha256`. **Killed: 13.
+Survived: 0** — at `e169ee3` and again at `6f89090`. *(The first run of the sweep was void and is recorded
+rather than discarded: it destructured a flat `[from, to]` array per character, so every mutant replaced one
+character with another and the run measured nothing. It was caught because one mutant's diagnostic printed a
+one-character anchor where a 40-character one belonged. The harness now refuses any edit that is not an
+explicit pair.)*
+
+**What a mutant cannot reach, stated.** The append-only claim has no plausible mutant beyond the two-row
+test; the token guard's *file*-level evidence is its raw-SQL control and not a mutant; and this record's own
+prose is measured by re-derivation, not by mutation.
+
+**Severity readings that differ from a judge's.** `JD-A-001` is a single-judge CRITICAL: the
+*candidate-caused* half is a documentation defect — a false compensation claim written into a gated cell and
+a module doc — which the writer corrected; the *code* half is pre-existing, and its fix is a plan decision, so
+**B-38** records it instead of this slice shipping a guard that would wedge the poller. For
+`JD-B-001`/`JD-A-002` the writer's reading is the defect both judges saw; it was corrected, and both
+severities are recorded rather than one being silently adopted.
+
+
+## The round-1 scoped re-judgment, and the three regressions it found
+
+Both re-judges ran over the frozen ledger plus the fix delta (`4c2af78..6f89090`), read-only, and returned
+the **same eleven resolutions independently**: **8 `verified`, 3 `regression`** — `JD-A-001`, `JD-A-005` and
+`JD-B-003`. The graph-v1 shape carries only `id` and `outcome`, so **both re-judgment sessions were continued
+for the proof**, and both produced the same one, each with its own commands:
+
+| Row | Verdict from | The regression, as measured |
+|---|---|---|
+| `JD-A-001` | both judges | **The disposition was never committed, so the fix delta could not contain it.** `git diff --name-status 4c2af78..6f89090` lists nine files and **no `openspec/**`**: the record's own boundary row (the one quoting the compensation), `tasks.md`'s Cells line and — the single *committed* location — `test/ledger/audit.test.ts`'s own module doc all still stated the compensation the row measured to be nonexistent, and `B-38` appeared **0 times** in `tasks.md` and `apply-progress.md`. The row's second half still reproduced: `commitInboxBatch` with a token-shaped `body` stores it and the ledger file's bytes match the shape. |
+| `JD-A-005` / `JD-B-003` | both judges | The "62" figure stood unchanged where the row cited it, for the same reason — its correction was in the working tree and not in the commit. The right figure: PR-12's three suites hold **48** (18 `inbox` + 12 `threads` + 18 `cursors`), and 62 is 48 plus PR-11's `open` (14). |
+| — | round 2's own measurement | **And the correction that had been written installed a second defect of the same class** — the failure mode this file warns about, reproduced here: the replacement sentence said "35 new tests" while enumerating `audit` 6 / `unknown-senders` 10 / `conditions-store` 14 / `retention` 8, an enumeration that sums to 38 under a wrong per-suite number, and stated the full suite as 462 instead of 465; the wider-set sentence said "134 at this tip" where the tip holds 137. |
+
+**What that cost, and the lesson.** Two blind judges, independently and with their own commands, found the
+same thing: **a disposition is not landed until it is in the commit the re-judgment reads.** Every row here
+was a record or documentation defect — the eight code rows came back `verified` — and the one *committed-file*
+defect it exposed (a test file's own doc still repeating a claim its sibling module had just dropped) is
+exactly the class the handoff's trap list names: after a correction edits a file, every statement about that
+file is suspect, and `grep` is the only way to find the rest.
+
+**Round 2's bounded fix** — the budget's second and final fix round — commits what round 1 had left in the
+working tree and closes what the re-judgment found: `test/ledger/audit.test.ts`'s module doc states the gap and
+points at B-38; the record and `tasks.md` carry their corrections; the counts read **137** ledger tests,
+**38** new over the four suites and **465** total, with every superseded value named; and the re-slice
+paragraph labels both of its measurement tips. **Re-measured after the fix**: `src test` is still **2,214
+added / 42 removed = 2,256 authored** (the fix touched a comment, the record and a gate note), the full suite
+is **465/465**, `test:static` **8/8**, and the 13-mutant sweep is **13 killed / 0 survived** again.
 
 ## Next
 

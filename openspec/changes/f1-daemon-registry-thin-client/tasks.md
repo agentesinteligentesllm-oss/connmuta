@@ -473,22 +473,33 @@ PR-11 and PR-12 each made for their own omitted RED sub-tasks.
 
 *Scope.* The block names eight files. The slice also edits `src/ledger/inbox.ts` (+13 / −42): PR-13's own
 requirement is that `audit.ts` be the **shared** writer the poll batch and the send path both use, so that
-module's private `insertAuditRow` is deleted and its call site renamed — byte-minimal, with PR-12's 62 ledger
-tests passing unchanged. It also files **B-37**: the `ledger` spec's "No token in any ledger table" scenario
-names three write paths, and the third (`ledger/cursors.ts`, the cursor advance) is merged and frozen from
-PR-12, so the gap is filed rather than edited here.
+module's private `insertAuditRow` is deleted and its call site renamed — byte-minimal, with **PR-12's 48**
+ledger tests (18 `inbox`, 12 `threads`, 18 `cursors`) passing unchanged. *(This sentence said "PR-12's 62
+ledger tests" until Judgment Day round 1, which reached it from both sides — `JD-A-005` and `JD-B-003`;
+62 was a `node --test` run of PR-12's three suites plus PR-11's `open`, and the claim's evidence is the
+number.)* It also files **B-37** (the `ledger` spec's "No token in any ledger table" scenario names three
+write paths, and the third — `ledger/cursors.ts`, the cursor advance — is merged and frozen from PR-12, so
+the gap is filed rather than edited here) and **B-38** (round 1's finding: the peer-body columns are
+unguarded, and the receive-side scan this slice's record first credited for them does not exist anywhere in
+F1).
 
-*Size.* The block estimated ≈350 with no exception; measured at `f6b1599` the slice is **2,004 added and 42
-removed = 2,046 authored lines** (`git diff --numstat 2055486..f6b1599 -- src test`; 2,004 measured as
-insertions only) — **a disclosed PR-13-scoped size exception, 1,646 over**, authorized by the Director's
-session-wide delegation and disclosed there rather than asked per batch. A re-slice into PR-13a (the three
-writers plus the `inbox.ts` delegation, 1,409 authored) and PR-13b (`retention`, 637) was **measured and
-rejected**: each half would still be over the 400-line budget, so the split would produce two exceptions
-instead of one. Grounds, the measured re-slice and every figure are in `apply-progress.md` §PR-13.
+*Size.* The block estimated ≈350 with no exception; measured at `f6b1599` the slice was **2,004 added and 42
+removed = 2,046 authored lines**, and at the tip that ships, `6f89090`, it is **2,214 added and 42 removed =
+2,256 authored lines** (`git diff --numstat 2055486..<tip> -- src test`; 2,214 measured as insertions only)
+— **a disclosed PR-13-scoped size exception, 1,856 over** at the tip (**1,646 over** before the audit),
+authorized by the Director's session-wide delegation and disclosed there rather than asked per batch. A
+re-slice into PR-13a (the three writers plus the `inbox.ts` delegation, **1,409** authored at `f6b1599` and
+**1,613** at the tip) and PR-13b (`retention`, **637** and **643**) was **measured and rejected**: each half
+would still be over the 400-line budget, so the split would produce two exceptions instead of one. Grounds,
+the measured re-slice, the audit's movement and every figure are in `apply-progress.md` §PR-13. *(Round 2
+added the tip's figures alongside the pre-audit ones, because the first version named only the latter without
+saying which tip they belonged to.)*
 
-*Cells.* 13.6 fills **PT-20** only. **B-26 stays open**: PT-20 is not PT-25, and the cell names the three
-halves it deliberately does not claim — the batch's own audit writes and their replay behaviour are PT-10's,
-`updates.body` is the admission pipeline's receive-side scan (PR-22a), and the cursor advance is B-37's.
+*Cells.* 13.6 fills **PT-20** only. **B-26 stays open**: PT-20 is not PT-25, and the cell names what it
+deliberately does not claim — the batch's own audit writes and their replay behaviour are PT-10's, the
+**peer-body columns are unguarded and are B-38's** (round 1 corrected this line, which had said
+`updates.body` is admission's receive-side scan, PR-22a: no such step exists in F1), and the cursor advance
+is B-37's.
 
 ### Unit 5 — `secret-store`
 

@@ -34,9 +34,16 @@ import { upsertUnknownSender } from "../../src/ledger/unknown-senders.js";
  *
  * **What this file does not cover, stated so the omission is a decision.**
  *
- * - `updates.body` carries a peer's message text, and the ledger's writers do not refuse a token shape
- *   there: a body reaches `updates` only after the admission pipeline's own receive-side secret scan
- *   (`SECRET_PATTERN_DETECTED`, `daemon/admission.ts` in PR-22a) — the ledger is not the scan's home.
+ * - **`updates.body` is unguarded, and the compensation this file originally cited for it does not
+ *   exist.** The first version of this paragraph said a body reaches `updates` only after "the admission
+ *   pipeline's own receive-side secret scan (`SECRET_PATTERN_DETECTED`, `daemon/admission.ts`, PR-22a)".
+ *   Judgment Day round 1 measured that no such step exists anywhere in F1, and round 1's re-judgment found
+ *   this very block still standing after the first correction, which is why it is stated here as a gap and
+ *   not as a placement (`JD-A-001`; filed as **B-38**, with the measurements and the dispositions).
+ *   `commitInboxBatch` accepts a token-shaped `body`, stores it, and the ledger file's bytes then match the
+ *   shape: design §6's "the ledger (no column receives it)" is unsatisfied for the peer-body columns, and a
+ *   guard in the ledger's own writer would leave the offset unmoved and wedge the poller, so the fix belongs
+ *   to admission.
  * - `cursor advance` is the third write path the `ledger` spec's "No token in any ledger table" scenario
  *   names, and it lives in `ledger/cursors.ts`, merged in PR-12 and frozen; a guard there is its own slice
  *   with its own audit, not a drive-by edit to this one. Filed rather than silently absorbed.
