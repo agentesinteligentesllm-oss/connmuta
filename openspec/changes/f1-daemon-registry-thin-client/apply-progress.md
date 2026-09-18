@@ -3629,10 +3629,13 @@ PR-05) is the consumer the thread adapter exists for; it is not edited here.
 first because `inbox.ts` imports it, and `src/ledger/inbox.ts` followed. `test/ledger/cursors.test.ts` then
 failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin. Round 1 added
 **seven** cases — two digest cases, the offset rewind, the thread-row rollback, the two duplicate-identity
-refusals and the history order — and **six of the seven have a mutant in the sweep below that dies on them**
-(`M18`, `M20`/`M25`, `M24` twice and `M21`). The seventh, the thread-row rollback, is the observable half of
-a *placement* whose mutant (`M19`) survives for the reason the matrix states; no in-process mutant can die on
-it, which is why it is disclosed here rather than credited.
+refusals and the history order — and **six of the seven have a mutant in the sweep below that dies on them**:
+`M18` and `M26` (one per digest case), `M20`/`M25` (the offset rewind), `M24` (both duplicate-identity
+cases) and `M21` (the history order). The seventh, the thread-row rollback, is the observable half of a
+*placement*: the mutant that defers the thread write **past** the transaction (`M19`) survives for the reason
+the matrix states, and that deferral is what no test here can see. The narrower claim is the true one — a
+mutant that *hoists* the thread write out of the batch before it is killed on this very case, so what is
+unobservable is the deferral, not the rollback. The case is disclosed rather than credited for that reason.
 
 | Where | `node --test` over the three focused suites | Whole suite | `test:static` |
 |---|---|---|---|
@@ -3820,7 +3823,7 @@ for a defect the correction itself had installed.
 
 | Row | Severity | What it found | Correction |
 |---|---|---|---|
-| `JD-B-008` | SUGGESTION | The TDD-cycle paragraph round 1 wrote enumerated **eight** items for a stated **seven** (it said "three digest cases" where the diff adds exactly two: `cursors.test.ts` grew 16 → 18, which this record's own table states), and its closing clause — "each of which is the test its own mutant now dies on" — was false for two of the seven: no mutant in the frozen matrix dies on the explicit-`null` digest case, and the thread-row rollback's placement mutant (`M19`) **survives**. The judge reproduced both facts, including a bespoke mutant for the `null` branch | the enumeration is the seven real cases; the clause now names the six whose killer is in the matrix and discloses the seventh; and the `null` branch's discriminating mutant is now in the matrix as `M26` (killed, 47/1) |
+| `JD-B-008` | SUGGESTION | The TDD-cycle paragraph round 1 wrote enumerated **eight** items for a stated **seven** (it said "three digest cases" where the diff adds exactly two: `cursors.test.ts` grew 16 → 18, which this record's own table states), and its closing clause — "each of which is the test its own mutant now dies on" — was false for two of the seven: no mutant in the frozen matrix dies on the explicit-`null` digest case, and the thread-row rollback's placement mutant (`M19`) **survives**. The judge reproduced both facts, including a bespoke mutant for the `null` branch | the enumeration is the seven real cases; the clause names a killer for each of the six; and the `null` branch's discriminating mutant is now in the matrix as `M26` (killed, 47/1) |
 
 That finding is the class `JD-B-004` named, **re-installed by round 1's own new text** in the same record —
 the hazard HANDOFF §2.2 gives its own bullet to ("a correction can install a *new* defect of the same class as
@@ -3830,6 +3833,42 @@ matrix is **26 mutants, 22 killed, 4 survived** after it. The code is not touche
 still holds at this tip.
 
 Round 2 — the last bounded round — is the scoped re-judgment over this delta.
+
+### Round 2 (the last bounded round), and the two residuals it found in round 2's own text
+
+Both judges received only the frozen-ledger hash, their own rows, `JD-B-008` and the delta
+`c04ffe9..04189da`, and **both resolved in the same way**: the thirteen ledger rows `verified`, and
+`JD-B-008` **`regression`** — the same verdict on identical facts. Judge A re-derived it itself rather than
+adopting Judge B's round-1 characterisation, which is what makes the agreement substantive rather than a
+carry-over.
+
+What survived the round-2 correction was, again, the correction's own replacement text — a **count whose own
+enumeration contradicts it**, which is the defect `JD-B-008` was raised for:
+
+| Residual | Where | What it found | Correction applied |
+|---|---|---|---|
+| a | the killer clause | "six of the seven have a mutant… (`M18`, `M20`/`M25`, `M24` twice and `M21`)" states six but names killers for **five** cases: `M20` and `M25` kill one case, `M24` covers two. `M26` — added by the same delta for exactly the missing case — was absent from the list, while the correction described itself as naming the six | the parenthetical now pairs each killer with the case it kills, `M26` included |
+| b | the same paragraph, next sentence | "no in-process mutant can die on it" is false: a mutant that **hoists** the thread write out of the batch before it *is* killed on the thread-row rollback case (the judge measured 43/5, that test among the failures). What is unobservable is the *deferral past* the transaction (`M19`), not the rollback | the claim is narrowed to the deferral, and the hoist mutant's kill is stated |
+
+Both are the same class as the row they were found in, both were introduced by a correction, and both are
+deterministic — reproduced by *both* judges from the frozen tree with their own mutants. **The round budget
+is two and no third round exists**, so these corrections are **measurement-checked and not
+judge-re-judged**, which is the disposition PR-11 recorded for its own surviving SUGGESTION-class rows. They
+are escalated below rather than absorbed. Nothing in either residual touches the code: `src test` is
+unchanged by this commit too.
+
+### Terminal verdict (round 2, budget exhausted)
+
+**No BLOCKER and no CRITICAL row survives.** Of the two CRITICALs round 1 returned, `JD-A-001`/`JD-B-002` was
+verified by both judges in the round-1 re-judgment and `JD-B-001` was resolved by the writer with its name
+corrected and its observable half pinned, recorded as a single-judge row that reproduced. Every WARNING row
+was verified. The final verification is green: **427 / 427** in the frozen tree, **48 / 48** focused and
+**8 / 8** `test:static`, and every budget figure re-measured at the tip that ships.
+
+**`JD-B-008` is escalated to the Director** with both residuals stated above and their corrections
+disclosed as measurement-checked but not judge-re-judged, exactly as PR-11 escalated its two surviving
+SUGGESTION-class rows. The controller records **JUDGMENT APPROVED** for `70d643a..04189da`, with that
+escalation attached.
 
 ## Next
 
