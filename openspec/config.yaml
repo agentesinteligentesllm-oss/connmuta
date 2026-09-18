@@ -3,14 +3,16 @@ schema: spec-driven
 context: |
   Conmuta (working name, B-11 pending trademark clearance): a project-scoped
   Telegram agent bus. Status F1 apply in progress -- PR-01a, PR-01b, PR-02, PR-03,
-  PR-04, PR-05 and the two PR-06 slices merged (scaffold, CI, static gates,
-  shared/constants.ts, provenance mechanism, shared/envelope.ts AS-IS,
+  PR-04, PR-05, both PR-06 slices, PR-07a, PR-07b, both PR-08 slices, PR-09a, PR-09b and PR-10 merged
+  (scaffold, CI, static gates, shared/constants.ts,
+  provenance mechanism, shared/envelope.ts AS-IS,
   shared/secrets.ts SEAM, shared/thread-record.ts SEAM,
   shared/protocol-apply.ts SEAM D-05, shared/fence.ts SEAM D-15,
   shared/protocol-select.ts SEAM, shared/tool-schemas.ts SEAM,
   shared/error-payload.ts SEAM, shared/tool-output.ts SEAM, shared/token-shape.ts,
-  shared/project-file.ts, shared/roster-hash.ts and src/cli/{main,validate}.ts); next slice PR-09
-  (~/.conmuta/registry.json schema, invariants R1-R6 and fingerprint hot-reload).
+  shared/project-file.ts, shared/roster-hash.ts, src/cli/{main,validate}.ts,
+  src/registry/{schema,invariants,loader}.ts and src/ledger/{schema,transaction}.ts); next slice PR-11
+  (the ledger open sequence with quarantine and the forward-only migrations, D-21).
   Ratified stack for F1 onward (ADR-0028..0031): Node.js >= 24 LTS,
   TypeScript -> ESM, node:test, @modelcontextprotocol/sdk + zod, node:sqlite
   ledger, @clack/prompts, @napi-rs/keyring. Wire: emit AGENTBUS/2, accept

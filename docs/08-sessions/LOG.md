@@ -4,6 +4,64 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 13: PR-10 (the ledger DDL and the `node:sqlite` transaction spike) delivered and merged as #15
+
+**Closed**
+
+- **PR-10** — `src/ledger/{schema,transaction}.ts` + both twins, the `ledger` compile unit's wiring and
+  PT-10's cell — is merged as PR **#15** (`daad417`, code/record tip `fcf5086`), CI green on both legs
+  (Node 24.15 and 26), branch deleted. **12 of the 45 rows are done, delivered as 15 PRs**; **59/210 tasks**,
+  **353 tests**, `test:static` 8/8. Budget **1,357 authored lines with a disclosed 957-line PR-10-scoped
+  exception**, authorized by the Director and moved four times (885 → 1,140 → 1,285 → 1,357), every movement
+  measured at the tip it describes.
+- **The spike design §5.3's risk register asked for is closed with no ADR.** On the pinned build (Node
+  24.16.0, SQLite 3.53.0): `isTransaction` flips on `BEGIN IMMEDIATE`, `ROLLBACK` outside a transaction
+  throws, a nested `BEGIN` is refused by SQLite, `exec()` runs the whole DDL as one string, and
+  `PRAGMA foreign_keys` defaults to 1. The DDL is design §5.2's text **byte-for-byte** — sha256
+  `9e9bb65545df29ce5871bea095a6d5457a8865a1a739abda9feb62058915b506`, 74 lines / 4,123 bytes, 0 differing
+  lines — with two failing controls proving the comparison can fail.
+- **Judgment Day: 0 BLOCKER, 0 CRITICAL** across 13 informational rows from two blind judges, then a
+  Director-authorized batch and one final bounded fix round. The batch corrected **six statements the slice
+  made about itself** (a `design §12` premise `design.md:452` contradicts; a self-referential
+  provenance-token rationale; a data-hygiene claim the file's own ids violate; a wrong `PT-27` citation; a
+  spike verdict that is false for SQLite's auto-rollback classes; a promised control that did not exist) and
+  added **five pins** (`AUTOINCREMENT`'s monotonicity across the retention delete — measured `seq` 3 → 1
+  without it; the per-table `NOT NULL` inventory; the DDL's refusal of a second application; SQLite's
+  auto-rollback class; the thenable refusal). The scoped re-judgment then returned **`JD-B-007` as
+  `regression` from both judges independently**: round 1's refusal of an async callback happened *after*
+  calling it, so a tail after an `await` still autocommitted outside the rolled-back transaction.
+  Reproduced, then corrected in round 2 by moving the refusal **before `BEGIN`**; both judges resolved
+  `verified` → **`JUDGMENT: APPROVED` for `3534739..4951fc6`**.
+- **The ordinary native review declined this candidate** (`consent-declined-this-candidate`,
+  `lineage_created: false`, no mutation, `correction_budget: 0`), so it is never re-reviewed and the
+  risk-gated path ran: writer self-verification plus a **separate independent verifier**. `assess` read the
+  risk as **high** on one signal — `process_boundary` on `src/ledger/schema.ts` — which is a **false
+  positive**: that file has no imports at all, and its only `exec` occurrences are `node:sqlite`'s `db.exec`
+  named in prose. The verifier reproduced every claim of the record and found three defects, all corrected
+  and re-checked by it: a **generator callback bypassed both refusals** (its body then ran outside the
+  transaction and autocommitted — the same class as the round-2 regression, one shape over), the **rejection
+  half of the settling guarantee was unpinned**, and a **stale figure carried no marker**.
+- **The sweep is 21/21 mutants killed, 0 survived, 0 skipped**, each built on a cleaned `dist/` in an
+  isolated worktree and each restored byte-identically. Two of the slice's own new pins failed their first
+  sweep and were fixed rather than reported green: `M17` (`IF NOT EXISTS` on one table) survived a
+  "something was refused" assertion, and the settling test could not see a fulfilment-only settle.
+- A trap worth carrying forward: **`test/security/provenance.test.ts` reads a file's *leading* `/**` block as
+  a vendor header**, so a non-vendored module that begins with its doc comment — one with no imports — must
+  not spell that header's first token. `schema.ts` has no imports, the first draft spelled it, and the static
+  gate reported the file as a malformed vendored module. Filed as **B-33**.
+- `test:static` caught what the focused suite could not, for the second slice running: the provenance rule
+  above, and in PR-09b a pasted 9-digit bot id. Both times the failure appeared only once the new file was
+  visible to `git ls-files`.
+
+**Opened**
+
+- Next slice **PR-11** — `src/ledger/open.ts` + `src/ledger/migrations.ts` + twins: the open sequence
+  (`mkdir`, `quick_check`, quarantine-rename on corruption or a future `user_version`, `journal_mode = WAL`,
+  `synchronous = FULL`, `foreign_keys = ON`) and the forward-only `{ to, up }` migrations that apply
+  `LEDGER_SCHEMA_DDL` and stamp `PRAGMA user_version`. The unit must add `{ "path": "../shared" }` to its own
+  `tsconfig.json` when the first shared constant (`LEDGER_SCHEMA_VERSION`) arrives. **151 tasks remain,
+  33 rows.**
+
 ## 2026-09-17 — Session 12, continued: PR-09b (the registry loader) delivered and merged as #14
 
 **Closed**
