@@ -455,12 +455,40 @@ Scope: `src/ledger/audit.ts`, `src/ledger/unknown-senders.ts`, `src/ledger/condi
 Requirements: `ledger › Audit log is append-only and stores no rejected body or token` (PT-20); `ledger › No token in any ledger table`; `ledger › Retention is a named constant, pruning runs in the daemon`.
 Runtime harness: real `node:sqlite` fixture rows aged past each retention window.
 
-- [ ] 13.1 RED: write `test/ledger/audit.test.ts` (rejected update leaves a bodiless row; no row ever matches the token regex through every write path).
-- [ ] 13.2 GREEN: implement `src/ledger/audit.ts`, `src/ledger/unknown-senders.ts` (bodiless upsert on `unknown_sender`), `src/ledger/conditions-store.ts` (`scope`/`name` upsert, `detail` codes/ids only).
-- [ ] 13.3 RED: write `test/ledger/retention.test.ts` covering "`thread_history` is capped, not truncated on read" and "hourly sweep removes rows past each window, keeps everything younger" (`INBOX_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `UNKNOWN_SENDER_RETENTION_DAYS`, `CLIENT_SESSION_STALE_HOURS`).
-- [ ] 13.4 GREEN: implement `src/ledger/retention.ts` (`RETENTION_SWEEP_INTERVAL_HOURS` schedule, one indexed `DELETE` per table, open threads never pruned).
-- [ ] 13.5 Verify: `npm run build && node --test "dist/test/ledger/audit.test.js" "dist/test/ledger/unknown-senders.test.js" "dist/test/ledger/conditions-store.test.js" "dist/test/ledger/retention.test.js"`.
-- [ ] 13.6 Docs: update the file-name cell(s) of PT-20 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 13.1 RED: write `test/ledger/audit.test.ts` (rejected update leaves a bodiless row; no row ever matches the token regex through every write path).
+- [x] 13.2 GREEN: implement `src/ledger/audit.ts`, `src/ledger/unknown-senders.ts` (bodiless upsert on `unknown_sender`), `src/ledger/conditions-store.ts` (`scope`/`name` upsert, `detail` codes/ids only).
+- [x] 13.3 RED: write `test/ledger/retention.test.ts` covering "`thread_history` is capped, not truncated on read" and "hourly sweep removes rows past each window, keeps everything younger" (`INBOX_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `UNKNOWN_SENDER_RETENTION_DAYS`, `CLIENT_SESSION_STALE_HOURS`).
+- [x] 13.4 GREEN: implement `src/ledger/retention.ts` (`RETENTION_SWEEP_INTERVAL_HOURS` schedule, one indexed `DELETE` per table, open threads never pruned).
+- [x] 13.5 Verify: `npm run build && node --test "dist/test/ledger/audit.test.js" "dist/test/ledger/unknown-senders.test.js" "dist/test/ledger/conditions-store.test.js" "dist/test/ledger/retention.test.js"`.
+- [x] 13.6 Docs: update the file-name cell(s) of PT-20 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+13.1–13.6 flipped to `[x]` in the **PR-13** commits. **Apply-time note.**
+
+*Order.* The block's 13.1 names `audit.test.ts` alone and its 13.2 names three modules, so neither
+`unknown-senders.test.ts` nor `conditions-store.test.ts` has a RED sub-task of its own. Both landed in the
+**13.1** pass — all three suites failed together, each on its missing module (`TS2307` ×3) — and all three
+modules landed in the **13.2** pass, `audit.ts` first because `inbox.ts` imports it. Red still precedes green
+for every module; the record says so instead of claiming the block's order was followed, the same disclosure
+PR-11 and PR-12 each made for their own omitted RED sub-tasks.
+
+*Scope.* The block names eight files. The slice also edits `src/ledger/inbox.ts` (+13 / −42): PR-13's own
+requirement is that `audit.ts` be the **shared** writer the poll batch and the send path both use, so that
+module's private `insertAuditRow` is deleted and its call site renamed — byte-minimal, with PR-12's 62 ledger
+tests passing unchanged. It also files **B-37**: the `ledger` spec's "No token in any ledger table" scenario
+names three write paths, and the third (`ledger/cursors.ts`, the cursor advance) is merged and frozen from
+PR-12, so the gap is filed rather than edited here.
+
+*Size.* The block estimated ≈350 with no exception; measured at `f6b1599` the slice is **2,004 added and 42
+removed = 2,046 authored lines** (`git diff --numstat 2055486..f6b1599 -- src test`; 2,004 measured as
+insertions only) — **a disclosed PR-13-scoped size exception, 1,646 over**, authorized by the Director's
+session-wide delegation and disclosed there rather than asked per batch. A re-slice into PR-13a (the three
+writers plus the `inbox.ts` delegation, 1,409 authored) and PR-13b (`retention`, 637) was **measured and
+rejected**: each half would still be over the 400-line budget, so the split would produce two exceptions
+instead of one. Grounds, the measured re-slice and every figure are in `apply-progress.md` §PR-13.
+
+*Cells.* 13.6 fills **PT-20** only. **B-26 stays open**: PT-20 is not PT-25, and the cell names the three
+halves it deliberately does not claim — the batch's own audit writes and their replay behaviour are PT-10's,
+`updates.body` is the admission pipeline's receive-side scan (PR-22a), and the cursor advance is B-37's.
 
 ### Unit 5 — `secret-store`
 

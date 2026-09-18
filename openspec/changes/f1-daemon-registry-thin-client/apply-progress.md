@@ -3995,3 +3995,163 @@ superseded figure is named instead of silently replaced.
 - Push, the PR and its CI matrix, then the close-out sweep. The audit-path record goes to
   `docs/05-tribunal/INDEX.md` as `bus-v2-f1-pr-12-audit-001`, with DN-05 unsatisfied; B-35 and B-36 are filed
   in this PR.
+
+# PR-13 — audit, unknown senders, conditions store, retention (`src/ledger/{audit,unknown-senders,conditions-store,retention}.ts`)
+
+| | |
+|---|---|
+| Branch | `f1/13-ledger-audit-retention` → `main` (branched from `main` at `2055486`) |
+| Mode | **Strict TDD**, run as **ODD with the SDD contract preserved**: `sdd-apply` dispatch is refused before child launch by the host-owned preflight gate, so no phase envelope exists for this slice |
+| Range | `2055486..f6b1599` for `src test` and the two docs files (three commits: the three writer/module twins and the batch writer's delegation, the retention sweep and its twin, then PT-20's cell and B-37); the record commit that carries this section adds nothing to `src test` |
+| Status | implemented, focused-verified; **Judgment Day and the ordinary native review follow in the sections below**; **DN-05 unsatisfied** |
+
+## Scope and budget (measured)
+
+| File | Authored lines at `f6b1599` — the tip these figures are measured at |
+|---|---|
+| `src/ledger/audit.ts` | 146 |
+| `src/ledger/unknown-senders.ts` | 131 |
+| `src/ledger/conditions-store.ts` | 335 |
+| `src/ledger/retention.ts` | 240 |
+| `src/ledger/inbox.ts` (edited) | +13 / −42 |
+| `test/ledger/audit.test.ts` | 263 |
+| `test/ledger/unknown-senders.test.ts` | 201 |
+| `test/ledger/conditions-store.test.ts` | 278 |
+| `test/ledger/retention.test.ts` | 397 |
+| **Total, `git diff --numstat 2055486..f6b1599 -- src test`** | **2,004 added, 42 removed = 2,046 authored** |
+
+The block estimated ≈350 with no exception, so the slice carries a **disclosed PR-13-scoped size
+exception, 1,646 over**. Two figures rather than one, because this slice deletes lines as well as adding
+them: **2,046 by the convention the three earlier ledger records used** (`added + removed`, which is what
+PR-11's "1,270 added and 6 removed = 1,276 authored lines" means), and **2,004 measured as insertions
+only**. The 42 removed lines are `src/ledger/inbox.ts`'s private `insertAuditRow` and the interface it
+typed, which PR-13's own requirement replaces with the shared writer — the only edit this slice makes to a
+merged module, and the record states it rather than letting the number look like churn.
+
+The exception is authorized by the Director's session-wide delegation — this session was explicitly asked
+not to stop for authorizations — and the figure, the movement and the grounds are disclosed here and in the
+PR body so the Director can review the decision.
+
+Grounds: four modules plus four twins, each over real `node:sqlite` temp files opened through
+`ledger/open.ts`; PT-20's two halves with the token half driven through *three* writers and proven against
+the ledger **file's bytes** with a raw-SQL control that makes the scan fail; the "one shared writer" claim
+asserted structurally against `inbox.ts`'s own text; the unknown-sender upsert's `first_seen_at` first-wins,
+its `MAX` on `last_seen_at`, its composite key and its composability inside a caller's transaction; the
+condition store's `since`-first-wins/clear-deletes pair, its `(scope, name)` key, its per-name scope and
+detail contracts validated in *both* directions and its mapping into `Conditions`; and the retention
+sweep's five windows with both sides of each strict edge, the two DDL cascades, the "open threads are never
+pruned" negative, the history cap's own pass and the backlog condition's boundary. Trimming that list is
+what the budget rule forbids.
+
+**A re-slice was measured and rejected, on the numbers.** `retention.ts` imports `conditions-store.ts` and
+neither the audit pair nor the sweep needs the other, so PR-13a (the three writers plus the `inbox.ts`
+delegation: **1,409** authored, 1,367 insertions-only) and PR-13b (`retention`: **637**) would each still be
+over the 400-line budget — two exceptions instead of one, with the board's PR-13 row split for no gain.
+That is why it is one slice with one disclosed exception, and the measurement is the reason, not a
+preference.
+
+Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 1 added / 1 removed (the
+PT-20 evidence cell, rewritten in place because 13.6 names exactly that cell and "the file is never renamed
+or rewritten" applies to the *assertion* column, which is untouched), and `docs/06-backlog/CHECKLIST.md`, 1
+added (B-37).
+
+## Where the code came from
+
+**No vendoring.** Design §12's only row naming `ledger/*` is the **REPLACED** row
+(`v1:src/state.ts:89-186, 217-250, 252-456` → `ledger/*`), so there is no v1 text to reuse and no
+provenance header to write: `test/fixtures/v1-provenance.json` stays at its eleven entries, and the four
+modules begin with imports — which is also why none of them can trip
+`test/security/provenance.test.ts`'s leading-block heuristic (B-33).
+
+**The one merged module this slice edits, and why that is not a drive-by.**
+`src/ledger/inbox.ts` carried a private `insertAuditRow` since PR-12. The handoff's own instruction for this
+slice is explicit — "`inbox.ts` already writes `audit_log` rows for a poll batch, so PR-13's `audit.ts` must
+be the **shared** writer those rows and the send path both use, not a second one that drifts" — so the
+delegation is the slice's requirement rather than an opportunity taken. The edit is byte-minimal: one import
+line, one call-site rename, the private function deleted, and the exported row type turned into an alias of
+`ledger/audit.ts`'s so `test/ledger/inbox.test.ts` keeps the import it had. All 62 of PR-12's ledger tests
+pass unchanged, which is what makes the claim measurable.
+
+## TDD cycle evidence
+
+Red before green, module by module, each RED observed with its own compiler output:
+
+| Step | RED | GREEN |
+|---|---|---|
+| 13.1 (plus the block's two omitted twins) | `rm -rf dist && npx tsc -b` → `error TS2307` for `../../src/ledger/audit.js`, `.../conditions-store.js` and `.../unknown-senders.js` — exit 2 | the three modules + the `inbox.ts` delegation → focused trio **25/25** |
+| 13.3 | `rm -rf dist && npx tsc -b` → `error TS2307: Cannot find module '../../src/ledger/retention.js'` — exit 2 | `src/ledger/retention.ts` → focused suite **8/8** |
+| 13.5 | — | focused quartet **33/33**, full suite **460 pass / 0 fail**, `test:static` **8/8** |
+
+`TS2307` for a module that does not exist yet is the legitimate RED this repository's §6 records
+("a missing module … is a legitimate RED"); each suite was written before its module, and the two extra RED
+files the block does not name are disclosed below.
+
+The block's own ordering is followed as written — 13.1 RED covering `audit.test.ts`, 13.2 GREEN covering
+three modules, 13.3 RED, 13.4 GREEN — with one addition the block omits: `unknown-senders.test.ts` and
+`conditions-store.test.ts` are named in 13.2's GREEN list but have no RED sub-task, so both landed in the
+**13.1** pass (all three suites failed together, on their three missing modules) and all three modules
+landed in the **13.2** pass, `audit.ts` first because `inbox.ts` imports it. Red still precedes green for
+every module; the record says so rather than claiming the block's order was followed.
+
+The focused counts before the full suite: **33 new tests** over four suites (`audit` 4, `unknown-senders`
+9, `conditions-store` 12, `retention` 8), which is the 427 → 460 movement.
+
+## Runtime facts this slice rests on (measured on the pinned build before the claims were written)
+
+- **All five age deletes are table scans.** `EXPLAIN QUERY PLAN` (Node 24.16.0, SQLite 3.53.0) answers
+  `SCAN updates`, `SCAN audit_log`, `SCAN unknown_senders`, `SCAN client_cursors` and `SCAN threads` — no
+  index exists on `received_at`, `ts`, `last_seen_at`, `COALESCE(resolved_at, updated_at)` or `status` in
+  version 1, and `audit_log_project_ts` cannot serve a `ts`-only predicate. The design's rationale sentence
+  ("one indexed `DELETE` per table") is therefore true of the *intent* — one indexed-shaped statement per
+  table — and **not** of the plan, so `retention.ts` states the measurement instead of the adjective. It is
+  affordable because each table is bounded by the retention deleting from it; adding an index would be a
+  migration, not an edit. The two **cascades do use an index**
+  (`SEARCH client_surfaced USING COVERING INDEX sqlite_autoindex_client_surfaced_1`, `SEARCH thread_history
+  USING COVERING INDEX sqlite_autoindex_thread_history_1`), and the cap's outer delete is a rowid lookup.
+- **A token guard is provable against the file, not only against the rows.** After
+  `PRAGMA wal_checkpoint(TRUNCATE)` the database file holds every committed page, so scanning its bytes
+  finds a token that landed — and does not find one that never did. The suite's control writes the fixture
+  token with raw SQL, bypassing every writer, and the same scan reports it: that is what makes the clean
+  answer evidence.
+- **`node:sqlite` types `changes` as `number | bigint`.** Three `TS2322` on the first retention build
+  (`Type 'number | bigint' is not assignable to type 'number'`), so each count is `Number(...)`-ed with the
+  reason stated at the call site. A count of rows is a number; the bigint half of that union is for
+  statement counts that overflow it.
+- **`thread_history` is a composite-key rowid table**, so the cap's `DELETE … WHERE rowid IN (SELECT rowid
+  FROM (ROW_NUMBER() OVER (PARTITION BY project_id, thread_id …)))` is available and the ordering tie-break
+  (`at DESC, eid DESC`) can match `ledger/threads.ts`'s read order (`ORDER BY at, eid`); the two sides agree
+  on what "newest" means.
+
+## Boundaries stated in the modules rather than left to be found
+
+| Boundary | Where it is stated | Why it is a decision |
+|---|---|---|
+| **The token guard refuses; design §6 says `redactTokenShapes`** | `src/ledger/audit.ts` (module doc, "Why the token guard refuses rather than redacts") | `secret-store/redaction.ts` is **PR-14**, which *depends on* PR-13, so no module here can import it; a local redactor would be a second copy of a rule that has a home. The guarantee PT-20 states holds either way; the mechanism differs from the design's sentence, so the sentence is not restated as a fact |
+| **`updates.body` is not guarded by a ledger writer** | `src/ledger/audit.ts`, and PT-20's new cell | A peer's body reaches `updates` only after the admission pipeline's receive-side secret scan (`SECRET_PATTERN_DETECTED`, PR-22a); the ledger is not where that scan belongs |
+| **The cursor advance — the scenario's third write path — has no guard** | `src/ledger/audit.ts`, PT-20's cell, **B-37** | `ledger/cursors.ts` is PR-12's, merged and frozen; a guard there is its own slice with its own audit, not a drive-by edit |
+| **`conditions.detail`'s "codes and ids only" is the caller's contract** | `src/ledger/conditions-store.ts` (module doc, "What it cannot decide") | The store enforces the four things a validator can decide (member set, member type, single-line, no token shape); telling a code from a single-line message needs a vocabulary it does not have, and F2's `state_quarantined.quarantined_path` is legitimately a path |
+| **`since` is first-wins while raised, and clearing deletes** | `src/ledger/conditions-store.ts` | "Still raised" and "raised again" must be different states, or `open_thread_backlog` reports "since the last sweep" for ever |
+| **The history cap is enforced twice** | `src/ledger/retention.ts` | The writer's cap covers records built by `applyEnvelope`; the sweep's covers rows no writer route produced. Both read the one constant |
+| **Who "one indexed `DELETE`" is and is not true of** | `src/ledger/retention.ts`, and the measurements above | The plan is a scan on all five; the sentence is the design's, and this slice reports the measurement rather than repeating the claim |
+| **Neither the sweep nor the three writers opens a transaction** | all four modules | `withTransaction` refuses a nested call, so the poll batch's transaction composes only with writers that open none; a partial sweep is idempotent at the same `now` |
+| **`upsertUnknownSender`'s `count` is an observation counter** | `src/ledger/unknown-senders.ts` | Nothing in the table can tell a redelivered message from a new one; `(bot_id, update_id)` (PT-10) is the dedup answer and this module does not invent a second |
+
+## Reportable items (reported, not silently resolved)
+
+1. **B-37 filed**: the `ledger` spec's "No token in any ledger table" scenario names three write paths
+   (poller admission, send-path audit, cursor advance); PR-13 pins the two a ledger writer owns and the third
+   has no guard. Dispositions are in the row; nothing here edits an audited, frozen module.
+2. **The design's "one indexed `DELETE` per table" is measurably not what the planner does** (§5.4's
+   rationale sentence). This is not a defect in shipped code and not a reason to reword a gate: the
+   measurement is recorded, the module states it, and nothing in F1's behaviour depends on it.
+3. **`PT-20`'s cell names three things it does not claim** — the batch's own audit writes (PT-10's), the
+   `updates.body` placement (PR-22a's) and the cursor path (B-37's). **B-26 is untouched**: 13.6 names PT-20,
+   which is not PT-25.
+4. **The `.changes` typing fact** is recorded above so the next module in this unit does not rediscover it.
+
+## Next
+
+- Judgment Day (the substitute for the tribunal debate, DN-05 unsatisfied) over the frozen committed range,
+  then the ordinary native review and, if it declines, the RDD fallback — plus the independent verifier this
+  file's §2.9 requires either way. Push, PR, CI matrix, merge. Then the close-out sweep, the audit-path
+  record as `bus-v2-f1-pr-13-audit-001`, and the handoff for **PR-14** (the secret store).
