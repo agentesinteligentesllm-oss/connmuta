@@ -4301,8 +4301,9 @@ until it is re-measured.**
 --numstat 2580afc..b6c3539 -- src test` is empty, which is what makes the verification below the
 verification of the tip that ships rather than of an earlier commit.
 
-**Terminal verdict: `JUDGMENT: APPROVED` for `2055486..2580afc`** (source and tests) **and `b6c3539`
-(docs)**. No BLOCKER and no CRITICAL row survives: the three CRITICALs were `JD-A-001`, `JD-B-001` and
+**Terminal verdict: `JUDGMENT: APPROVED` for `2055486..b6c3539`** — source, tests and docs (the record
+commit that carries this section adds nothing to `src test`). No BLOCKER and no CRITICAL row survives: the
+three CRITICALs were `JD-A-001`, `JD-B-001` and
 `JD-B-002`, and all three came back `verified` from both judges on the terminal re-judgment. The two
 surviving SUGGESTION/WARNING rows are escalated with their round-3 corrections disclosed as
 measurement-checked and **not judge-re-judged**, because the round budget is two and no third round exists.
