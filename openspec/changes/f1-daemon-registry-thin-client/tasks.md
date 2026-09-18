@@ -416,12 +416,38 @@ Scope: `src/ledger/inbox.ts`, `src/ledger/threads.ts`, `src/ledger/cursors.ts`, 
 Requirements: `durable-inbox › Write-ahead before offset confirmation` (PT-10); `durable-inbox › Per-client cursors and surfaced state decouple presentation` (PT-11, D-19 catch-up window).
 Runtime harness: real `node:sqlite`, fault injection by throwing inside `withTransaction`.
 
-- [ ] 12.1 RED: write `test/ledger/inbox.test.ts` covering "crash between insert and offset advance replays once" (fault injected before the offset-advance commit; redelivery deduplicated by `UNIQUE (bot_id, update_id)`).
-- [ ] 12.2 GREEN: implement `src/ledger/inbox.ts` (one transaction per poll batch: insert `updates`, upsert `threads`/`thread_history`, insert `audit_log` rows, advance `offsets.next_update_id`) and `src/ledger/threads.ts` (`ThreadRecord` adapter consumed by `shared/protocol-apply.ts` from PR-05).
-- [ ] 12.3 RED: write `test/ledger/cursors.test.ts` covering "two clients each see the full batch once" and "a fresh session's cursor starts at the catch-up window, not at zero" (D-19, `SESSION_CATCHUP_HOURS`).
-- [ ] 12.4 GREEN: implement `src/ledger/cursors.ts` (`client_cursors`/`client_surfaced` reads/writes).
-- [ ] 12.5 Verify: `npm run build && node --test "dist/test/ledger/inbox.test.js" "dist/test/ledger/threads.test.js" "dist/test/ledger/cursors.test.js"`.
-- [ ] 12.6 Docs: update the file-name cell(s) of PT-10, PT-11 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 12.1 RED: write `test/ledger/inbox.test.ts` covering "crash between insert and offset advance replays once" (fault injected before the offset-advance commit; redelivery deduplicated by `UNIQUE (bot_id, update_id)`).
+- [x] 12.2 GREEN: implement `src/ledger/inbox.ts` (one transaction per poll batch: insert `updates`, upsert `threads`/`thread_history`, insert `audit_log` rows, advance `offsets.next_update_id`) and `src/ledger/threads.ts` (`ThreadRecord` adapter consumed by `shared/protocol-apply.ts` from PR-05).
+- [x] 12.3 RED: write `test/ledger/cursors.test.ts` covering "two clients each see the full batch once" and "a fresh session's cursor starts at the catch-up window, not at zero" (D-19, `SESSION_CATCHUP_HOURS`).
+- [x] 12.4 GREEN: implement `src/ledger/cursors.ts` (`client_cursors`/`client_surfaced` reads/writes).
+- [x] 12.5 Verify: `npm run build && node --test "dist/test/ledger/inbox.test.js" "dist/test/ledger/threads.test.js" "dist/test/ledger/cursors.test.js"`.
+- [x] 12.6 Docs: update the file-name cell(s) of PT-10, PT-11 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+12.1–12.6 flipped to `[x]` in the **PR-12** commits. **Apply-time note.**
+
+*Order.* The block's 12.1 and 12.2 name `inbox.ts` only; `threads.ts` appears in 12.2's prose with no RED
+sub-task of its own. Red still precedes green for both modules, but both RED files (`test/ledger/threads.test.ts`
+and `test/ledger/inbox.test.ts`) landed in the **12.1** pass, and both GREEN modules followed in **12.2**, with
+`threads.ts` first because `inbox.ts` imports it. The record says so instead of claiming the block's order was
+followed — the same disclosure PR-11 made for 11.1/11.3.
+
+*Size.* The block estimated ≈400 with no exception; the measured diff at the tip that ships is **1,847 authored
+lines** (`git diff --numstat 70d643a..7005d22 -- src test`: `inbox.ts` 334, `threads.ts` 242, `cursors.ts` 265,
+`inbox.test.ts` 406, `threads.test.ts` 263, `cursors.test.ts` 337; zero deletions, so the insertion-only figure
+is the same) — **a disclosed PR-12-scoped size exception, 1,447 over**, authorized by the Director's session-wide
+delegation rather than by a fresh per-batch question. A re-slice into PR-12a/PR-12b was measured and rejected:
+`cursors.ts` imports neither of the other two, so the halves would measure 1,245 and 602 and would each still be
+over the budget, producing two exceptions instead of one. Grounds, movement and the full record are in
+`apply-progress.md` §PR-12.
+
+*Cells.* 12.6 fills PT-10's cell (the crash-replay scenario the cell had recorded as staying with `ledger/inbox`)
+and PT-11's, for the ledger half only — that each client is *served* the batch by `fetch` is `daemon/serve/fetch`'s
+(PR-23) per design §15's PT→file map. The cell says which half it holds rather than crediting this slice with both.
+**B-26 is untouched**: 12.6 names PT-10 and PT-11, and neither is PT-25.
+
+*Deviations disclosed in the modules.* `offsets.next_update_id` is written by an upsert where design §5.3 says
+`UPDATE`, because nothing in F1 creates that row; and the slice asserts no provenance entry, because design §12
+maps `ledger/*` to the **REPLACED** v1 row, so `test/fixtures/v1-provenance.json` stays at eleven entries.
 
 #### PR-13 — audit, unknown senders, conditions, retention
 Branch `f1/13-ledger-audit-retention` → `main`. Depends: PR-12. Size: ≈350 lines, no exception.

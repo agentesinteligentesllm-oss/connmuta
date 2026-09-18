@@ -3554,3 +3554,173 @@ measured.**
 - Push, the PR and its CI matrix, then the close-out sweep. The audit-path record goes to
   `docs/05-tribunal/INDEX.md` at close as `bus-v2-f1-pr-11-audit-001`, with DN-05 unsatisfied. B-34 is filed in
   this PR, and the handoff's own copy of the TS18003 wording is corrected in the close commit.
+
+# PR-12 — inbox write-ahead transaction, thread adapter, cursors (`src/ledger/{inbox,threads,cursors}.ts`)
+
+| | |
+|---|---|
+| Branch | `f1/12-ledger-inbox-cursors` → `main` (branched from `main` at `fdbcd8a`) |
+| Mode | **Strict TDD**, run as **ODD with the SDD contract preserved**: `sdd-apply` dispatch is refused before child launch by the host-owned preflight gate, so no phase envelope exists for this slice |
+| Range | `70d643a..7005d22` (three commits: the batch transaction and the thread adapter, the cursors, the PT cells) |
+| Status | implemented and frozen-verified; audited by the **Judgment Day substitute**; DN-05 unsatisfied |
+
+## Scope and budget (measured)
+
+| File | Authored lines (measured at `7005d22`, the tip that ships) |
+|---|---|
+| `src/ledger/inbox.ts` | 334 |
+| `src/ledger/threads.ts` | 242 |
+| `src/ledger/cursors.ts` | 265 |
+| `test/ledger/inbox.test.ts` | 406 |
+| `test/ledger/threads.test.ts` | 263 |
+| `test/ledger/cursors.test.ts` | 337 |
+| **Total, `git diff --numstat 70d643a..7005d22 -- src test`** | **1,847 added, 0 deleted = 1,847 authored** |
+
+The block estimated ≈400 with no exception, so the slice carries a **disclosed PR-12-scoped size exception,
+1,447 over**. The count is identical measured either way (0 deletions), so there is no second figure to state
+here. The exception is authorized by the Director's session-wide delegation rather than by a fresh per-batch
+question, because this session was explicitly asked not to stop for authorizations; the figure, the movement
+and the grounds are disclosed here and in the PR body so the Director can review the decision.
+
+The movement is recorded rather than smoothed: **1,245** at `4cfd317` (the batch transaction and the thread
+adapter, four files), then **+602** at `d4498df` (the cursors, two files), and `7005d22` adds nothing to
+`src test` — a docs-only commit — for **1,847** at the tip that ships.
+
+Grounds: three modules plus three twins, each over real `node:sqlite` temp files opened through
+`ledger/open.ts`; PT-10's two halves (the replay and the all-or-nothing rollback) with a real SQLite fault
+injected inside `withTransaction`; D-20's coupling refused in both directions; the offset's value, its
+`max`-over-the-batch rule and its placement; the `(bot_id, update_id)` key pinned against a same-id update
+under another bot; the thread adapter's round trip, its upsert, its per-project scoping, its cap and its
+reconciliation of a shortened history; and D-19's catch-up window with its edge pinned on both sides (a row
+exactly on the edge is inside the window, and `0` is the answer when nothing is older). Trimming that list is
+what the budget rule forbids.
+
+**A re-slice was considered and rejected, on the numbers.** `cursors.ts` does not import `inbox.ts`, so
+PR-12a (`inbox` + `threads`, 1,245) and PR-12b (`cursors`, 602) would each still be over the 400-line budget —
+the split would produce two exceptions instead of one and renumber a board row this slice's 12.6 needs to
+fill as one. That is why it is one slice with one disclosed exception rather than two blocks, and the
+measurement is the reason, not a preference.
+
+Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 2 added / 2 removed — task
+12.6's two cells.
+
+## Where the code came from
+
+**No vendoring.** Design §12's only row naming `ledger/*` is the **REPLACED** row
+(`v1:src/state.ts:89-186, 217-250, 252-456` → `ledger/*`), so there is no v1 text to reuse and no provenance
+header to write: `test/fixtures/v1-provenance.json` stays at its eleven entries, and the three modules begin
+with their imports so `test/security/provenance.test.ts` never reads a leading block in them.
+
+v1's behaviour is what these modules *replace*, and the replacement is the point of the unit: one
+`next_update_id` and one global `first_surfaced_at` in `state.json` became `client_cursors.inbox_seq` and
+`client_surfaced` (v1's `CHANNEL-setup.md:114-120`, reversed). `applyEnvelope` (`shared/protocol-apply.ts`,
+PR-05) is the consumer the thread adapter exists for; it is not edited here.
+
+## TDD cycle evidence
+
+`test/ledger/threads.test.ts` and `test/ledger/inbox.test.ts` were authored first and failed with **TS2307**
+(the modules did not exist) — a legitimate RED for a missing module. `src/ledger/threads.ts` then went green
+first because `inbox.ts` imports it, and `src/ledger/inbox.ts` followed. `test/ledger/cursors.test.ts` then
+failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin.
+
+| Where | `node --test` over the three focused suites | Whole suite | `test:static` |
+|---|---|---|---|
+| `main` before this slice | not run as a set | 379 | 8 |
+| this slice at `7005d22` | **41 / 41** (11 threads, 14 inbox, 16 cursors) | **420 / 420** | **8 / 8** |
+
+**Sub-task order deviated once, disclosed.** The block's 12.1 and 12.2 name `inbox.ts` only; `threads.ts`
+appears in 12.2's prose with no RED sub-task of its own. Strict TDD still holds — red before green for both
+modules — but both RED files landed in the 12.1 pass and both GREEN modules followed in the 12.2 pass, so
+`threads.ts`'s GREEN preceded `inbox.ts`'s. The record says so instead of claiming the block's order was
+followed, the same disclosure PR-11 made for 11.1/11.3.
+
+## Frozen verification (the working tree was never the subject)
+
+`git worktree add --detach ../telegram_bus_agent-worktrees/pr-12 7005d22`, a junction to the main checkout's
+`node_modules`, `rm -rf dist`, `tsc -b --force`:
+
+- whole suite **420 / 420**, `test:static` **8 / 8** at `7005d22`.
+
+The six files' bytes at that tip, so any later claim can be checked against them:
+
+| File | sha256 at `7005d22` |
+|---|---|
+| `src/ledger/inbox.ts` | `8ef10cb480ff694652720376f82df8e0cae8d748ae217943a070f3ae14ce85f3` |
+| `src/ledger/threads.ts` | `d4adc2d69dd9952e6b3338082a57cb3c9eaf4badf890cca5d1130b4ad5493ab8` |
+| `src/ledger/cursors.ts` | `1f28c0cc276c93c5dbdd50caccb0d97e8d7563050ef415933e985cde857526ba` |
+| `test/ledger/inbox.test.ts` | `16e410c39b8dc91e133bec3af00d49d160a177383908cccff79886718341a624` |
+| `test/ledger/threads.test.ts` | `ca619196f7ac39d03c61b2377bc3f3aa8cced0ad98d84c0cceb3126ea4194b36` |
+| `test/ledger/cursors.test.ts` | `77dc7dc7896ee0f8215d41eece3c34d799e2d9978f3d510ebdd9d2324af18aed` |
+
+## Mutant matrix — each built on a cleaned `dist/` in the isolated worktree, each restored byte-identically
+
+| # | Mutant | Expected killer | Result |
+|---|---|---|---|
+| `M1` | the offset is written as a constant (`0`) instead of the batch's own value | the offset value tests | **killed** (34 pass / 7 fail) |
+| `M2` | the offset is advanced inside the transaction but **before** any row is written | — | **SURVIVED** (41 / 0) — see below |
+| `M3` | the replay check is removed, so a re-served batch is written again | a batch re-served after the crash replays once | **killed** (39 / 2) |
+| `M4` | the batch's highest `update_id` is taken from the last entry seen rather than the maximum | the offset advances one past the highest `update_id` | **killed** (40 / 1) |
+| `M5` | the offset advance drops its `+1` | the offset value tests | **killed** (34 / 7) |
+| `M6` | D-20's body coupling is not checked at all | the two body/outcome refusals | **killed** (39 / 2) |
+| `M7` | D-20's coupling is checked in one direction only | the writer refuses a kept-body outcome with a null body | **killed** (40 / 1) |
+| `M8` | the thread upsert becomes `INSERT OR REPLACE`, so the cascade takes the history | — | **SURVIVED** (41 / 0) — see below |
+| `M9` | the writer stores an uncapped history | the writer trims to the newest `MAX_THREAD_HISTORY` | **killed** (40 / 1) |
+| `M10` | the history reconciliation deletes the entries it meant to keep | a shortened history reconciles the table | **killed** (36 / 5) |
+| `M11` | a fresh session's cursor starts at zero | a fresh session starts at the newest seq older than the window | **killed** (40 / 1) |
+| `M12` | the catch-up query drops its `received_at` filter | the catch-up window test | **killed** (39 / 2) |
+| `M13` | the catch-up edge is inclusive instead of strict | the catch-up window test's edge case | **killed** (40 / 1) |
+| `M14` | advancing one client's cursor moves every client's | advancing one client leaves the other's alone | **killed** (36 / 5) |
+| `M15` | the surfaced mark is last-wins instead of first-wins | `first_surfaced_at` is first-wins | **killed** (40 / 1) |
+
+**15 mutants, 13 killed, 2 survived**, and every file was restored byte-identically (`sha256` re-checked after
+each one). Both survivors are reported rather than removed from the matrix:
+
+- **`M2` is a real gap in what the tests can see, and it is disclosed as one.** Within one transaction the
+  *position* of the offset advance is unobservable through this suite: a batch that throws rolls the whole
+  transaction back wherever in it the write sat, and a batch that commits leaves the same value in `offsets`
+  either way. What `test/ledger/inbox.test.ts` pins is therefore the offset's **value**, its
+  `max`-over-the-batch rule, its `+1`, its survival of a refused batch and its stability across a replay — not
+  the order of the statements inside the transaction. That order is design §5.3's, and its evidence is the
+  design plus the module's own reading, in the sense HANDOFF §2.2 gives "a prose claim has no executable
+  mutant": saying a test distinguishes it would be the kind of over-claim PR-11's judges corrected twice.
+- **`M8` is an equivalent mutant**, and it is stated as one rather than as a test failure. `INSERT OR REPLACE`
+  does delete the thread row and cascade its history away — but the writer's very next step re-inserts exactly
+  the entries the record carries, so the end state is identical. The true `INSERT … ON CONFLICT … DO UPDATE` is
+  kept because it does not depend on that equivalence holding (a future caller that wrote the row without
+  reconciling the history would break under `OR REPLACE`), and the module says so where the SQL is.
+
+## Boundaries stated in the modules rather than left to be found
+
+- **`updates.envelope_json`'s "without the body key" is not enforced** here or by the DDL; PR-22a builds that
+  string.
+- **An admitted entry whose outcome touched a thread row is not required to carry one.** `ApplyResult.thread`'s
+  contract is the forwarder's, so a `resolved` update stored without its thread row leaves that thread open —
+  a visible wrong answer rather than a corrupt log. This is the one coupling design §5.2 does *not* hand to
+  this writer, and the module says which one it does.
+- **A duplicate `eid` refuses the whole batch** rather than skipping that row: `seen_eids` is classification
+  (design §8.2 step 6, PR-22a). The deliberate consequence is a poller that fails loudly rather than one that
+  makes half a batch of progress.
+- **A replayed *drop* is audited again.** A dropped update writes no `updates` row, so PT-10's key has nothing
+  to match; `inserted` stays 0 and nothing is surfaced twice.
+- **The stored history is read back ordered by `(at, eid)`.** `thread_history`'s primary key is
+  `(project_id, thread_id, eid)` and version 1 is frozen, so a tie is ordered by `eid` rather than by arrival.
+  The set is exactly the record's array, and nothing in F1 depends on the difference — the digest uses
+  `history.length` — but it is a difference.
+- **The catch-up query is a scan** (`updates` has no index on `project_id` or `received_at` in version 1),
+  bounded by the inbox retention window and by one run per new session.
+- **The offset write is an upsert where design §5.3 writes a plain `UPDATE`.** Nothing in F1 creates the
+  `offsets` row, and a first poll that updated nothing would leave the offset unstored, so Telegram would
+  re-serve that batch for ever. Both modules state the deviation where the statement is.
+
+## Reportable items (reported, not silently resolved)
+
+| Id | Item |
+|---|---|
+| — | `M2`: the offset's *position* inside the transaction is not observable through this suite; the evidence is the design and the module's reading, not a mutant |
+| — | `M8` is an equivalent mutant, not a test failure |
+| — | **B-26 is untouched**: `tasks.md` 12.6 names PT-10 and PT-11 only, and neither is PT-25 |
+| — | `updates.body`'s coupling is refused rather than normalized: silently stripping a body would delete the evidence of a classification bug |
+
+## Next
+
+- Judgment Day over the frozen range, the ordinary native review, then push, the PR and its CI matrix.
