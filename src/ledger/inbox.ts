@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type { ThreadRecord } from "../shared/thread-record.js";
+import { appendAuditRow, type AuditRow } from "./audit.js";
 import { writeThreadRecord } from "./threads.js";
 import { withTransaction } from "./transaction.js";
 
@@ -15,8 +16,11 @@ import { withTransaction } from "./transaction.js";
  * eleven entries. (That gate reads a file's *leading* `/**` block; this module begins with its imports.)
  *
  * **The order inside the transaction is the whole point, and the reason is I-3.** Every admitted update
- * is written to `updates`, its thread row to `threads`/`thread_history` and its audit rows to `audit_log`;
- * every dropped update leaves its audit rows; and *then* the offset moves. Nothing outside this function
+ * is written to `updates`, its thread row to `threads`/`thread_history` and its audit rows to `audit_log`
+ * through `ledger/audit.ts` — the unit's single writer, which is why this module's own private
+ * `insertAuditRow` was deleted in PR-13: the send path needs the same statement, and two statements with
+ * one meaning drift the moment a column is added to one of them. Every dropped update leaves its audit
+ * rows; and *then* the offset moves. Nothing outside this function
  * tells Telegram anything: the value the caller may send to `getUpdates` is the one returned
  * ({@link InboxBatchResult.nextUpdateId}), and it is read **inside** the transaction that committed the
  * rows it names. A crash after `COMMIT` but before that value is used costs a redelivery and nothing else:
@@ -100,25 +104,14 @@ export interface InboxThreadUpdate {
 }
 
 /**
- * One `audit_log` row, as the admission pipeline hands it over — everything but the AUTOINCREMENT `id`.
+ * One `audit_log` row, as the admission pipeline hands it over.
  *
- * The table has no body column at all (PT-20), so there is nothing here to omit; every field is nullable
- * except `ts`, `direction` and `outcome`, matching the DDL.
+ * The row type lives in `ledger/audit.ts` since PR-13, when that module became the unit's only writer of
+ * the table: both this batch and the send path must produce the same statement, so they must also agree on
+ * the shape. This name stays as an alias so the batch's callers and its suite keep the import they had; the
+ * fields are the ones the table has, and it still has no body column at all (PT-20).
  */
-export interface InboxAuditRow {
-	readonly ts: string;
-	readonly project_id: string | null;
-	readonly bot_id: number | null;
-	readonly chat_id: number | null;
-	readonly client_id: string | null;
-	readonly direction: "send" | "receive" | "reject" | "system";
-	readonly eid: string | null;
-	readonly envelope_type: string | null;
-	readonly from_user_id: number | null;
-	readonly to_user_id: number | null;
-	readonly outcome: "ok" | "degraded" | "rejected" | "dropped";
-	readonly reason: string | null;
-}
+export type InboxAuditRow = AuditRow;
 
 /**
  * One update the admission pipeline admitted: an `updates` row, the thread its transition touched (if any),
@@ -268,7 +261,7 @@ export function commitInboxBatch(db: DatabaseSync, batch: InboxBatch): InboxBatc
 			}
 
 			for (const audit of entry.audits ?? []) {
-				insertAuditRow(db, audit);
+				appendAuditRow(db, audit);
 			}
 		}
 
@@ -318,28 +311,6 @@ function insertUpdate(db: DatabaseSync, bot_id: number, update: InboxUpdateInput
 		update.body,
 		update.apply_outcome,
 		update.received_at,
-	);
-}
-
-/** Writes one `audit_log` row. `id` is the table's own AUTOINCREMENT and is never supplied. */
-function insertAuditRow(db: DatabaseSync, audit: InboxAuditRow): void {
-	db.prepare(
-		`INSERT INTO audit_log (ts, project_id, bot_id, chat_id, client_id, direction, eid, envelope_type,
-		                        from_user_id, to_user_id, outcome, reason)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-	).run(
-		audit.ts,
-		audit.project_id,
-		audit.bot_id,
-		audit.chat_id,
-		audit.client_id,
-		audit.direction,
-		audit.eid,
-		audit.envelope_type,
-		audit.from_user_id,
-		audit.to_user_id,
-		audit.outcome,
-		audit.reason,
 	);
 }
 
