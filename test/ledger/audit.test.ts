@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -197,23 +197,27 @@ test("the writer appends: two identical events are two rows and never one rewrit
 });
 
 test("the unit holds one audit_log insert, and the batch writer is not it", () => {
-	const inboxSource = readFileSync(join(REPO_ROOT, "src/ledger/inbox.ts"), "utf8");
-	const auditSource = readFileSync(join(REPO_ROOT, "src/ledger/audit.ts"), "utf8");
+	const ledgerDir = join(REPO_ROOT, "src/ledger");
+	const files = readdirSync(ledgerDir).filter((name) => name.endsWith(".ts"));
 
-	// Non-vacuous: the reads must be of the two files this claims to be about.
-	assert.ok(inboxSource.includes("commitInboxBatch"), "expected to have read the batch writer");
-	assert.ok(auditSource.includes("appendAuditRow"), "expected to have read the shared writer");
+	// Non-vacuous: the walk must see the unit, not an empty directory or one file.
+	assert.ok(files.length >= 10, `expected the whole ledger unit, found ${files.length} files`);
 
 	// The requirement this pins is "one shared writer, not two that drift" (design §5.1 §5.3, PT-20): the
-	// batch's audit rows and the send path's are the same statement, so a private second INSERT in the batch
-	// writer is a defect rather than a style choice.
-	assert.equal(
-		inboxSource.includes("INSERT INTO audit_log"),
-		false,
-		"src/ledger/inbox.ts must write audit rows through ledger/audit.ts, not with its own INSERT",
-	);
+	// batch's audit rows and the send path's are the same statement, so a second `INSERT INTO audit_log`
+	// anywhere in this unit is a defect rather than a style choice. The first version of this test read two
+	// files by name, which is narrower than the claim it was cited for — round 1 reproduced that a second
+	// INSERT in `retention.ts` or a future `src/ledger/*.ts` passed it (`JD-A-006`).
+	const inserting = files
+		.filter((name) => readFileSync(join(ledgerDir, name), "utf8").includes("INSERT INTO audit_log"))
+		.sort();
+	assert.deepEqual(inserting, ["audit.ts"], "one writer, and it is ledger/audit.ts");
+
+	const inboxSource = readFileSync(join(ledgerDir, "inbox.ts"), "utf8");
+	assert.ok(inboxSource.includes("commitInboxBatch"), "expected to have read the batch writer");
 	assert.match(inboxSource, /from "\.\/audit\.js"/);
-	assert.equal(auditSource.includes("INSERT INTO audit_log"), true, "the shared writer owns the statement");
+	// The boundary: this assertion covers `src/ledger/*.ts`. A writer in another unit — the send path (PR-27),
+	// which is where the design puts the next caller — is outside it, and the claim it pins is the unit's.
 });
 
 test("no write path ever persists a token shape, and the scan that says so can fail", () => {
@@ -244,6 +248,20 @@ test("no write path ever persists a token shape, and the scan that says so can f
 					detail: { last_error: FIXTURE_TOKEN },
 				}),
 			"conditions.detail",
+		);
+
+		// (5) The condition store's own scope column: caller-supplied text written into a ledger table, and the
+		// one column of that table this suite's first version did not drive a token through. Round 1 found the
+		// token reaching the file there (`JD-B-001`, reached independently as `JD-A-002`).
+		assertRefused(
+			() =>
+				raiseCondition(db, {
+					scope: FIXTURE_TOKEN,
+					name: "group_outage",
+					since: NOW,
+					detail: { last_error: "TELEGRAM_CONFLICT" },
+				}),
+			"conditions.scope",
 		);
 
 		// Every refusal above is a refusal *instead of* a write, not after one.

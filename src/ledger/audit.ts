@@ -38,12 +38,26 @@ import { TELEGRAM_BOT_TOKEN_RE } from "../shared/secrets.js";
  * apply identically, which is the same reason `shared/token-shape.ts` shares its regex instead of copying
  * it.
  *
- * **Two boundaries stated rather than hidden.** `updates.body` carries a peer's message text and this
- * module does not guard it: a body reaches the inbox only after the admission pipeline's own receive-side
- * secret scan (`SECRET_PATTERN_DETECTED`, `daemon/admission.ts`, PR-22a), because the ledger is not where
- * that scan belongs. And the third write path the `ledger` spec's "No token in any ledger table" scenario
- * names — the cursor advance — is `ledger/cursors.ts`, merged in PR-12 and frozen; a guard there is its own
- * slice with its own audit.
+ * **Two boundaries stated rather than hidden, and one of them was wrong until Judgment Day round 1.**
+ *
+ * - **`updates.body` is unguarded, and the control this file originally cited for it does not exist.** The
+ *   first version of this paragraph — and PT-20's cell beside it — said a peer body reaches the inbox only
+ *   after "the admission pipeline's own receive-side secret scan (`SECRET_PATTERN_DETECTED`,
+ *   `daemon/admission.ts`, PR-22a)". Round 1 measured that no such step exists anywhere in F1: v1's
+ *   `SECRET_PATTERN_DETECTED` occurs only on the **send** path (`v1:src/tools/send.ts:163,349`),
+ *   `checkForSecrets` is documented as the OUTBOUND backstop (`v1:src/secrets.ts:29-34`),
+ *   `grep -i secret` over `v1:src/tools/fetch.ts` is empty, design §8.2's seven-step admission table and the
+ *   `durable-inbox` spec's admission requirement list no scan step, and `tasks.md`'s PR-22a block names none.
+ *   Reproduced here as well: `commitInboxBatch` with a token-shaped `body` stores it, and the ledger file's
+ *   bytes match the shape. So design §6's "the ledger (no column receives it)" is **unsatisfied for the
+ *   peer-body columns** — `updates.body`, and `threads.body`/`thread_history.body` by the same argument — and
+ *   it is filed as **B-38** with its dispositions instead of papered over here. A guard *in this unit* would
+ *   be the wrong fix: `updates.body` is written by the poll batch, and refusing the batch would leave the
+ *   offset unmoved and the poller wedged on the same update for ever. The place the design already reserved
+ *   for it is admission, whose audit vocabulary already carries `SECRET_PATTERN_DETECTED` (DATA-MODEL
+ *   §3.6).
+ * - **The third write path that scenario names — the cursor advance — is `ledger/cursors.ts`**, merged in
+ *   PR-12 and frozen; a guard there is its own slice with its own audit, filed as **B-37**.
  */
 
 /** The `direction` values design §5.2's CHECK accepts, as a type so a caller cannot hand over a fifth. */

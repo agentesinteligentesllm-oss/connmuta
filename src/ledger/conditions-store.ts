@@ -40,6 +40,20 @@ import { assertNoTokenShape } from "./audit.js";
  *   message and no code or id has one;
  * - a string member carries no token shape (`ledger/audit.ts`).
  *
+ * **Two more of the same kind, added by Judgment Day round 1**, each of them a column this store owns:
+ *
+ * - **`scope` carries no token shape either.** It is caller-supplied text and it is a column of a ledger
+ *   table, so it gets the guard its detail members get — before the scope-shape check, so the refusal is the
+ *   guard's and not a message about which scope was passed (`JD-B-001`, reached independently as
+ *   `JD-A-002`; before this correction the store accepted a token-shaped scope and wrote it to the file);
+ * - **`since` is stored in one canonical form** (`.toISOString()`), because a stored instant that some other
+ *   comparison cannot place is the hazard `CONDITION_INSTANT_INVALID_MESSAGE` exists to name, and
+ *   `parseInstant` alone admits `+05:00` forms whose text does not order against `Z` forms.
+ *
+ * **And one rule about the refusals themselves**: a refusal names the field and never the offending value,
+ * because a refusal reaches the log. What may be interpolated is what this store owns — the condition's own
+ * name once its contract has been found, and that contract's member names (`JD-B-004`).
+ *
  * **What it cannot decide, stated so the module is not read as claiming it.** A single-line string that
  * looks like a code and a single-line string that is an error message are the same thing to a validator
  * with no vocabulary, and one legitimate member — F2's `state_quarantined.quarantined_path` — is a path.
@@ -99,7 +113,7 @@ export interface ConditionRow {
 /** What each name promises: the scope it may be raised under, and its `detail` members with their types. */
 interface ConditionContract {
 	readonly scope: "daemon" | "project";
-	readonly fields: Readonly<Record<string, "string" | "number">>;
+	readonly fields: ReadonlyMap<string, "string" | "number">;
 }
 
 /**
@@ -110,13 +124,19 @@ interface ConditionContract {
  * `shared/tool-output.ts`'s `Conditions` members, whose required fields are `{ since, last_error }`,
  * `{ at, quarantined_path }` and `{ count, since }` respectively — the store holds the extra members and
  * `since` supplies the two timestamp members (`at` for the F2 case, `since` for the other two).
+ *
+ * A `Map` rather than an object literal, and a `Map` for each contract's members too, because an object
+ * literal answers for every member of `Object.prototype`: `raiseCondition(db, …, name: "constructor")`
+ * would find a function where a contract belongs and fail with a bare `TypeError` instead of this store's
+ * refusal, and a detail member named `toString` would be reported as "expects a function" rather than as a
+ * member the readers do not render. Judgment Day round 1 reproduced both (`JD-A-004`).
  */
-const CONDITION_CONTRACTS: Readonly<Record<ConditionName, ConditionContract>> = {
-	ledger_quarantined: { scope: "daemon", fields: { reason: "string" } },
-	group_outage: { scope: "project", fields: { last_error: "string" } },
-	state_quarantined: { scope: "project", fields: { quarantined_path: "string" } },
-	open_thread_backlog: { scope: "project", fields: { count: "number" } },
-};
+const CONDITION_CONTRACTS: ReadonlyMap<ConditionName, ConditionContract> = new Map<ConditionName, ConditionContract>([
+	["ledger_quarantined", { scope: "daemon", fields: new Map([["reason", "string"]]) }],
+	["group_outage", { scope: "project", fields: new Map([["last_error", "string"]]) }],
+	["state_quarantined", { scope: "project", fields: new Map([["quarantined_path", "string"]]) }],
+	["open_thread_backlog", { scope: "project", fields: new Map([["count", "number"]]) }],
+]);
 
 /**
  * The refusal this store raises for anything that does not fit a name's contract, as a function of what
@@ -124,8 +144,14 @@ const CONDITION_CONTRACTS: Readonly<Record<ConditionName, ConditionContract>> = 
  *
  * One builder for the name, the scope and the detail cases, because they are one rule — the store holds only
  * what a reader can render — and exporting one spelling is what lets a caller and its test pin it instead of
- * matching prose. `what` never carries the offending value: the detail case is exactly the case where the
- * value may be a secret's neighbourhood.
+ * matching prose.
+ *
+ * **`what` names the field and never the offending value**, and that is a rule rather than a style choice:
+ * a refusal reaches the daemon's log, so interpolating a caller-supplied scope or detail member would copy
+ * into the log the very string the guard beside it exists to keep out of the ledger. Judgment Day round 1
+ * reached that with a token-shaped scope and a token-shaped member name (`JD-B-004`). What may be
+ * interpolated is what the store itself owns: the condition's own name once its contract has been found,
+ * and the member names of that contract.
  */
 export function conditionContractRefusalMessage(what: string): string {
 	return `conditions-store: ${what}; the store holds only the conditions this build raises, each under the scope and with the detail record its readers render (design §5.1 §5.4, PT-20).`;
@@ -151,15 +177,21 @@ export const CONDITION_INSTANT_INVALID_MESSAGE =
  * that does not match the name's contract (see the module doc for exactly what is checked).
  */
 export function raiseCondition(db: DatabaseSync, raise: ConditionRaise): void {
+	// The scope is a caller-supplied text column this store writes, so it carries the same guard as the
+	// detail's members — and it runs FIRST, so a token-shaped scope is refused by the guard rather than by a
+	// message about scope shape. Before round 1's correction only the detail was guarded, and the module doc
+	// claimed the store was the last line while a token-shaped scope went into the file (`JD-B-001`, reached
+	// independently as `JD-A-002`).
+	assertNoTokenShape("conditions.scope", raise.scope);
 	const contract = contractFor(raise.name);
 	assertScopeMatches(raise.name, contract, raise.scope);
-	parseInstant(raise.since);
+	const since = canonicalInstant(raise.since);
 	const detail = validateDetail(raise.name, contract, raise.detail ?? {});
 
 	db.prepare(
 		`INSERT INTO conditions (scope, name, since, detail) VALUES (?, ?, ?, ?)
 		 ON CONFLICT (scope, name) DO UPDATE SET detail = excluded.detail`,
-	).run(raise.scope, raise.name, raise.since, serializeDetail(detail));
+	).run(raise.scope, raise.name, since, serializeDetail(detail));
 }
 
 /**
@@ -230,9 +262,11 @@ export function readProjectConditions(db: DatabaseSync, project_id: string): Con
 
 /** The contract for a name, refusing a name this build does not raise. */
 function contractFor(name: ConditionName): ConditionContract {
-	const contract = CONDITION_CONTRACTS[name];
+	const contract = CONDITION_CONTRACTS.get(name);
 	if (contract === undefined) {
-		throw new Error(conditionContractRefusalMessage(`"${name}" is not a condition name this build raises`));
+		// The name is not echoed: this branch is reached exactly when the name is NOT one of ours, so the value
+		// is caller-supplied text and a refusal that repeated it would be a log line carrying it.
+		throw new Error(conditionContractRefusalMessage("the condition name is not one this build raises"));
 	}
 	return contract;
 }
@@ -241,10 +275,10 @@ function contractFor(name: ConditionName): ConditionContract {
 function assertScopeMatches(name: ConditionName, contract: ConditionContract, scope: string): void {
 	const daemonScoped = contract.scope === "daemon";
 	if (daemonScoped !== (scope === DAEMON_CONDITION_SCOPE)) {
+		// `name` and `contract.scope` are ours (the contract was found above); `scope` is the caller's and is
+		// deliberately not repeated — see the builder's doc.
 		throw new Error(
-			conditionContractRefusalMessage(
-				`"${name}" is a ${contract.scope} condition, and it was raised under scope "${scope}"`,
-			),
+			conditionContractRefusalMessage(`the condition "${name}" is a ${contract.scope} condition and was raised under the other scope`),
 		);
 	}
 }
@@ -257,9 +291,11 @@ function assertScopeMatches(name: ConditionName, contract: ConditionContract, sc
  */
 function validateDetail(name: ConditionName, contract: ConditionContract, detail: ConditionDetail): ConditionDetail {
 	for (const key of Object.keys(detail)) {
-		const expected = contract.fields[key];
+		const expected = contract.fields.get(key);
 		if (expected === undefined) {
-			throw new Error(conditionContractRefusalMessage(`the detail for "${name}" carries "${key}", which its readers do not render`));
+			// The member's own name is not echoed: `detail`'s keys are caller-supplied, and a member named after a
+			// token shape would be copied into the log by this message (`JD-B-004`).
+			throw new Error(conditionContractRefusalMessage(`the detail for "${name}" carries a member its readers do not render`));
 		}
 		const value = detail[key];
 		if (typeof value !== expected) {
@@ -280,8 +316,10 @@ function validateDetail(name: ConditionName, contract: ConditionContract, detail
 		}
 	}
 
-	for (const key of Object.keys(contract.fields)) {
-		if (!(key in detail)) {
+	for (const key of contract.fields.keys()) {
+		// `Object.hasOwn` and not `in`: `in` walks the prototype chain, so an own member is not what it answers
+		// for. Every key here is one of ours, which is what makes repeating it safe.
+		if (!Object.hasOwn(detail, key)) {
 			throw new Error(conditionContractRefusalMessage(`the detail for "${name}" is missing "${key}", which its readers require`));
 		}
 	}
@@ -292,7 +330,7 @@ function validateDetail(name: ConditionName, contract: ConditionContract, detail
 function parseDetail(name: ConditionName, raw: string | null): ConditionDetail | null {
 	const contract = contractFor(name);
 	if (raw === null) {
-		if (Object.keys(contract.fields).length > 0) {
+		if (contract.fields.size > 0) {
 			throw new Error(conditionContractRefusalMessage(`the stored detail for "${name}" is missing, and its readers require it`));
 		}
 		return null;
@@ -332,4 +370,17 @@ function parseInstant(instant: string): number {
 		throw new Error(CONDITION_INSTANT_INVALID_MESSAGE);
 	}
 	return ms;
+}
+
+/**
+ * The same instant in the one form this unit's text comparisons assume.
+ *
+ * `.toISOString()` and nothing else, because `2026-03-01T11:00:00+05:00` and `2026-03-01T10:00:00Z` are the
+ * same instant written two ways and only the canonical form orders lexicographically against every other
+ * value this unit stores. `parseInstant` alone would accept both, so a stored `since` could be an instant
+ * no later comparison can place — and this is the same correction `ledger/unknown-senders.ts` received for
+ * its `last_seen_at`, where the mis-ordering was measurable (`JD-B-002`, independently `JD-A-003`).
+ */
+function canonicalInstant(instant: string): string {
+	return new Date(parseInstant(instant)).toISOString();
 }

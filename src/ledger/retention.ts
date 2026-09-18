@@ -176,8 +176,14 @@ function deleteOlderThan(db: DatabaseSync, table: string, column: string, cutoff
  *
  * One statement with a window function rather than a loop: SQLite ranks the rows per thread in the same
  * pass that deletes them, so there is no read-then-write gap in which a concurrent append could be ranked
- * against a list that moved. The ordering is `(at DESC, eid DESC)` — the same tie-break `ledger/threads.ts`
- * reads history back with, so "newest" means the same thing on both sides.
+ * against a list that moved. The ordering is `(at DESC, eid DESC)` — the same two columns `ledger/threads.ts`
+ * reads its history back with (`ORDER BY at, eid`), in the reverse direction, because this pass has no array
+ * to take a tail of. The two are the **same selection only while they agree**: the writer's cap is
+ * `record.history.slice(-MAX_THREAD_HISTORY)`, which is the record's arrival order and is chronological in
+ * the ordinary case and not in general. Judgment Day round 1 corrected the earlier sentence here, which
+ * claimed both sides meant the same thing (`JD-B-005`); what makes the difference unreachable in F1 is that
+ * this pass only ever acts on rows no writer route produced — `test/ledger/retention.test.ts` seeds them
+ * with raw SQL, which is exactly that case.
  */
 function trimOverlongHistories(db: DatabaseSync): number {
 	return Number(

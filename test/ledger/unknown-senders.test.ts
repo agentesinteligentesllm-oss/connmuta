@@ -182,6 +182,25 @@ test("an unparseable sighting instant is refused rather than stored and compared
 	});
 });
 
+test("instants are stored in the one canonical form the comparison orders by", () => {
+	withLedger((db) => {
+		// `2026-03-01T10:00:00Z` parses and, lexicographically, sorts AFTER `2026-03-01T10:00:00.500Z`, so a
+		// version of this module that stored the caller's spelling let a 500 ms-later sighting fail to advance
+		// `last_seen_at` — and the retention cutoff read the same text (`JD-B-002`, independently `JD-A-003`).
+		upsertUnknownSender(db, { bot_id: BOT_ID, user_id: 444, username: null, seen_at: "2026-03-01T10:00:00Z" });
+		const later = upsertUnknownSender(db, { bot_id: BOT_ID, user_id: 444, username: null, seen_at: "2026-03-01T10:00:00.500Z" });
+		assert.equal(later.first_seen_at, NOW, "the first sighting is stored canonically");
+		assert.equal(later.last_seen_at, "2026-03-01T10:00:00.500Z", "and the later one advances it");
+
+		// An instant hours EARLIER, written in an offset form, must not be adopted as the latest one.
+		upsertUnknownSender(db, { bot_id: BOT_ID, user_id: 555, username: null, seen_at: NOW });
+		const earlier = upsertUnknownSender(db, { bot_id: BOT_ID, user_id: 555, username: null, seen_at: "2026-03-01T11:00:00+05:00" });
+		assert.equal(earlier.last_seen_at, NOW, "a differently-written earlier instant cannot rewind it");
+		assert.equal(earlier.first_seen_at, NOW);
+		assert.equal(earlier.count, 2, "and it still counts as a sighting");
+	});
+});
+
 test("the upsert opens no transaction of its own, so it composes inside the batch's", () => {
 	withLedger((db) => {
 		upsertUnknownSender(db, { bot_id: BOT_ID, user_id: 444, username: null, seen_at: NOW });

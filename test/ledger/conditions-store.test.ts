@@ -227,9 +227,64 @@ test("a condition name this build does not know is refused rather than stored wh
 					since: NOW,
 					detail: { anything: 1 },
 				}),
-			(error: unknown) => error instanceof Error && error.message.includes("not_a_condition") === true,
+			(error: unknown) => {
+				assert.ok(error instanceof Error);
+				// The refusal names the field, not the value it was handed: a name is caller-supplied text and this
+				// message reaches the log (`JD-B-004`).
+				assert.equal(error.message.includes("condition name"), true, error.message);
+				assert.equal(error.message.includes("not_a_condition"), false, "the refusal must not echo the name");
+				return true;
+			},
 		);
 		assert.equal(rowCount(db), 0);
+	});
+});
+
+test("a member of Object.prototype is refused like any other unknown name, not answered by the prototype", () => {
+	withLedger((db) => {
+		// Plain-object lookups once answered for every member of `Object.prototype`, so `constructor` found a
+		// function where a contract belongs and the caller got a bare `TypeError` instead of this store's
+		// refusal (`JD-A-004`). `conditionContractRefusalMessage` is the marker: a `TypeError` is not.
+		for (const name of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"] as const) {
+			assert.throws(
+				() => raiseCondition(db, { scope: PROJECT_ID, name: name as never, since: NOW, detail: { last_error: "X" } }),
+				(error: unknown) =>
+					error instanceof Error &&
+					 error.constructor === Error &&
+					error.message.startsWith("conditions-store:") === true,
+				`expected the store's refusal for ${name}`,
+			);
+		}
+
+		// A detail member named after a prototype member is a member the readers do not render — not "expects a
+		// function", which is what the prototype lookup used to report.
+		assert.throws(
+			() => raiseCondition(db, { scope: PROJECT_ID, name: "group_outage", since: NOW, detail: { last_error: "X", toString: 1 } }),
+			(error: unknown) =>
+				error instanceof Error && error.message.includes("a member its readers do not render") === true && error.message.includes("toString") === false,
+		);
+
+		// And the read side: a row only raw SQL can produce, named after a prototype member, refuses with the same
+		// message rather than a `TypeError`.
+		db.prepare("INSERT INTO conditions (scope, name, since, detail) VALUES (?, 'constructor', ?, '{}')").run(PROJECT_ID, NOW);
+		assert.throws(
+			() => readCondition(db, PROJECT_ID, "constructor" as never),
+			(error: unknown) => error instanceof Error && error.constructor === Error && error.message.startsWith("conditions-store:") === true,
+		);
+		assert.equal(rowCount(db), 1, "only the row the raw insert wrote");
+	});
+});
+
+test("a `since` in a non-canonical but legal form is stored in the one form that orders", () => {
+	withLedger((db) => {
+		// `+05:00` is the same instant as `Z` and its text does not order against it, which is what made the
+		// sibling module's `MAX` read wrongly (`JD-A-003`, independently `JD-B-002`). The stored form is the one
+		// every comparison in this unit assumes.
+		raiseCondition(db, { scope: PROJECT_ID, name: "open_thread_backlog", since: "2026-03-01T11:00:00+05:00", detail: { count: 51 } });
+
+		assert.equal(readCondition(db, PROJECT_ID, "open_thread_backlog")?.since, "2026-03-01T06:00:00.000Z");
+		// And the wire shape renders that same instant, not the caller's spelling.
+		assert.equal(readProjectConditions(db, PROJECT_ID).open_thread_backlog?.since, "2026-03-01T06:00:00.000Z");
 	});
 });
 

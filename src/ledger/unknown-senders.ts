@@ -24,6 +24,13 @@ import { assertNoTokenShape } from "./audit.js";
  *   `ledger/inbox.ts` applies to the offset. ISO 8601 UTC strings order lexicographically, which is what
  *   makes the comparison meaningful and what the retention sweep's cutoff relies on too; an observation that
  *   arrives out of order must not lengthen a row's life or, worse, resurrect one the sweep has aged out.
+ *   **The comparison is exact only because the stored value is canonical**, and that is a correction
+ *   Judgment Day round 1 forced (`JD-B-002`, independently `JD-A-003`): `parseInstant` admits any
+ *   `Date.parse`-able string, and `2026-03-01T10:00:00Z` sorts *after* `2026-03-01T10:00:00.500Z` while
+ *   `2026-03-01T11:00:00+05:00` is four hours earlier than both — measured, the first pair left
+ *   `last_seen_at` un-advanced and the second moved it backwards, and the retention cutoff read the same
+ *   text. Every instant this module stores is therefore `new Date(ms).toISOString()`, so the value written,
+ *   the `MAX` that reads it and the sweep's cutoff all speak the one form the ordering needs.
  * - **`count` is an observation counter, not a deduplicated event count.** Nothing in this table can tell a
  *   re-delivered message from a new one — the poll batch's `(bot_id, update_id)` key (PT-10) is what
  *   deduplicates, and this module deliberately does not invent a second answer.
@@ -91,7 +98,10 @@ export const UNKNOWN_SENDER_INSTANT_INVALID_MESSAGE =
  * than redacts), and an unreadable `seen_at`.
  */
 export function upsertUnknownSender(db: DatabaseSync, observation: UnknownSenderObservation): UnknownSender {
-	parseInstant(observation.seen_at);
+	// Canonical, not merely parseable: the stored value is the `MAX` comparison's operand and the retention
+	// sweep's cutoff operand, so an instant in any other legal form (`+05:00`, or `Z` with no milliseconds)
+	// orders wrongly against it. See the module doc.
+	const seenAt = new Date(parseInstant(observation.seen_at)).toISOString();
 	const username = observation.username ?? null;
 	assertNoTokenShape("unknown_senders.username", username);
 
@@ -102,7 +112,7 @@ export function upsertUnknownSender(db: DatabaseSync, observation: UnknownSender
 		   username = COALESCE(excluded.username, unknown_senders.username),
 		   last_seen_at = MAX(unknown_senders.last_seen_at, excluded.last_seen_at),
 		   count = unknown_senders.count + 1`,
-	).run(observation.bot_id, observation.user_id, username, observation.seen_at, observation.seen_at);
+	).run(observation.bot_id, observation.user_id, username, seenAt, seenAt);
 
 	// Read back rather than constructed: `first_seen_at` is the stored one, and a reader that trusted its own
 	// inputs would report the observation it just made instead of the row it produced.
