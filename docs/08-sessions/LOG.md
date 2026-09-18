@@ -4,6 +4,58 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-18 — Session 16: PR-13 (audit log, unknown senders, conditions store, retention) delivered and merged as #18
+
+**Closed**
+
+- **PR-13** — `src/ledger/{audit,unknown-senders,conditions-store,retention}.ts` + all four twins, plus a
+  +13/−42 delegation edit to `src/ledger/inbox.ts` — is merged as PR **#18** (`6e71bca`, code/record tip
+  `1e8c24c`), CI green on both legs (Node 24.15 and 26), branch deleted. **18 PR blocks / 13 row ids are
+  complete (76 of the 210 checkboxes)**; the remaining board is **27 blocks / 29 row ids (`PR-14…PR-42`)**.
+  **465 tests, `test:static` 8/8**, the ledger directory 137/137 on a frozen worktree. Budget **2,268
+  authored lines with a disclosed 1,868-line PR-13-scoped exception** (2,046 at the pre-audit tip; +7 by
+  round 1, +7 by round 2, +5 by round 4 — every figure measured at its own tip). **Unit 4 `ledger` is
+  closed.**
+- **The audit route held for the eleventh slice.** Arena down, native SDD preflight closed, so ODD with the
+  SDD contract preserved and Judgment Day as the substitute: two blind judges over a frozen tree `4c2af78`,
+  an 11-row frozen ledger (3 CRITICAL / 4 WARNING / 4 SUGGESTION, ledger SHA-256
+  `6576f7af4a8e18c3c471d0283c5f6d15611c75fab3c766cbf456bcb086222e00`), one writer-applied correction batch,
+  **two** scoped re-judgments (the full budget) and **two further corrections disclosed as outside it**.
+  Record: `bus-v2-f1-pr-13-audit-001`. **DN-05 remains unsatisfied for all eleven.**
+- **Its three CRITICALs were real and are fixed**: a token-shaped `conditions.scope` was accepted, stored and
+  present in the ledger file through a public API with no cast; a text `MAX` over `last_seen_at` let a
+  500 ms-later sighting fail to advance it and an offset-form instant move it backwards; and a compensation
+  the slice had written for `updates.body` — a receive-side secret scan in admission — **does not exist
+  anywhere in F1**, so the peer-body columns are filed as **B-38** (with the cursor advance as **B-37**)
+  rather than guarded in a writer that would wedge the poller.
+- **The slice's own lesson, recorded because it cost two rounds**: *a correction is a claim about a file, and
+  every figure about that file is suspect until it is re-measured* — and *a disposition is not landed until
+  it is in the commit the re-judgment reads*. Round 1's corrections were committed without `openspec/**`, so
+  the first re-judgment returned `JD-A-001` as `regression` and both judges proved it from the fix delta;
+  round 1's replacement text then carried a count its own enumeration contradicted, and round 2's carried
+  another.
+- **The ordinary native review was declined by the host** for this candidate
+  (`consent-declined-this-candidate`, `lineage_created: false`, `correction_budget: 0`, medium risk, 13 files
+  / 2,641 changed lines) after one recoverable `consent-binding-stale`; no consent envelope reached the
+  session and nothing was answered, so the candidate is never re-reviewed. The RDD fallback's `assess`
+  returned `risk: "unassessable"` with `nativeReviewOutcome: "declined"` (`outcome_source: explicit`) and the
+  high-risk plan **with** `independentVerifier: true`.
+- **The independent verifier ran and earned its place**: it re-derived every load-bearing figure, wrote 51
+  independent probes for the code claims, **re-ran the 13-mutant sweep itself** at three tips (13 killed / 0
+  survived, no restore mismatch), found **no defect in the shipped source logic**, and found two prose
+  defects — one in `src/ledger/retention.ts` (an index claim `threads_needs_action` falsifies) and one in
+  the record's terminal verdict (a test count labelled with the wrong suite set). Both are corrected; the
+  first is round 4 and the only correction that moved the shipped bytes, which is why the sweep and the full
+  verification were re-run after it.
+
+**Opened**
+
+- **PR-14** — `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts` + five twins: the
+  `SecretStore` interface, the `@napi-rs/keyring` entry per bot, the ACL'd fallback file, the shared
+  `redactTokenShapes` (which PR-13's audit and condition writers currently stand in for by *refusing* the
+  shape) and the selection probe that raises `secret_store_fallback`; PT-08, PT-09 and PT-19; task 14.6 fills
+  those three cells. Next session starts there.
+
 ## 2026-09-18 — Session 15: PR-12 (the inbox write-ahead transaction, the thread adapter and the per-client cursors) delivered and merged as #17
 
 **Closed**
