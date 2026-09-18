@@ -4,6 +4,78 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-17 — Session 14: PR-11 (the ledger's open sequence, quarantine and forward-only migrations) delivered and merged as #16
+
+**Closed**
+
+- **PR-11** — `src/ledger/{open,migrations}.ts` + both twins, the unit's `../shared` reference and a corrupt
+  fixture — is merged as PR **#16** (`50c506a`, code/record tip `4d207df`), CI green on both legs (Node 24.15
+  and 26), branch deleted. **13 of the 45 rows are done, delivered as 16 PRs**; **64/210 tasks**, **379 tests**,
+  `test:static` 8/8. Budget **1,276 authored lines with a disclosed 876-line PR-11-scoped exception**, moved
+  1,085 → 1,275 → 1,276, every figure measured at the tip it describes.
+- **The open sequence and the migration path land.** `openLedger` makes the home with
+  `POSIX_PRIVATE_DIR_MODE`, decides with `PRAGMA quick_check` (a corruption-class error **or** a returned row
+  that is not `ok`), quarantines by rename with the `-wal`/`-shm` siblings, and leaves the connection in WAL,
+  at `synchronous = FULL` (I-3) and `foreign_keys = ON`, migrated to `LEDGER_SCHEMA_VERSION`.
+  `runPendingMigrations` applies the forward-only `{ to, up }` list, each step inside `withTransaction` with
+  the `PRAGMA user_version = to` stamp written inside that same transaction — measured transactional on the
+  pinned build, and pinned in both directions (a step that commits itself keeps both; a step that throws
+  keeps neither).
+- **Judgment Day: 1 CRITICAL, 5 WARNING, 5 SUGGESTION**, with **three defects reached independently by both
+  judges** (the unpinned non-throwing half of the corruption decision; a same-millisecond quarantine
+  collision that destroyed the earlier copy; the compiler-claim note). The CRITICAL was a boundary the module
+  promised that **no test could fail**: the test named for it never reached the decision, because
+  `new DatabaseSync` throws for a directory first — so a mutant that quarantined *every* failed probe renamed
+  a healthy ledger out from under another writer. Two reachable cases now pin it (`SQLITE_BUSY` from a second
+  writer, `SQLITE_CANTOPEN` from a directory where the `-wal` belongs). Round 1's batch corrected four defects
+  and three false self-statements; the scoped re-judgment returned nine `verified` and two `regression`, and
+  **round 2 split on both rows** — one judge `regression`, the other `verified`, measuring the same facts. The
+  round budget is **two**, so the surviving SUGGESTION-class rows are escalated with their corrections
+  disclosed as measurement-checked but not judge-re-judged. **`JUDGMENT: APPROVED` for `ab6dbf1..b69a921`**
+  (no severe row surviving; final verification 379/379, focused 26/26, `test:static` 8/8).
+- **The ordinary native review declined this candidate, host-resolved**: `consent-declined-this-candidate`,
+  `lineage_created: false`, no consent envelope ever reached the session, risk medium on 8 files / 1,586
+  changed lines, `correction_budget: 0`. One of its risk-evidence lines is a false positive from the Markdown
+  record ("an executable change in `apply-progress.md`"). A declined candidate is never re-reviewed; `assess`
+  then returned **`risk: "unassessable"`** (the native assessment failed `schema incompatible`), which its own
+  rule treats as high risk, with a plan of writer self-verification plus a **separate independent verifier**.
+- **The independent verifier found eight defects, every one of them in the record's own numbers and
+  pointers, all corrected before the commit that claims them**: the budget table measured one commit behind
+  the reviewed tip (1,269 → 1,270 plus the net +1 of the post-budget correction), a backlog row promised and
+  never filed (**B-34**, now filed), a handoff claim that was false and a citation (`§5.5`) that does not
+  resolve, a stale TDD count (20/20 + 373/373 where the tree is 21/21 + 374/374), and three message
+  attributions that grep refutes. It also re-derived the frozen ledger's canonical hash and 1/5/5 tally, the
+  suite counts **by running them** at three tips, six quarantine probes, ten migration probes, the honest
+  limits and its own `tsc` matrix.
+- **One mutant survivor, disclosed:** `M8` (the `POSIX_PRIVATE_DIR_MODE` mutant) passes on this machine
+  because the mode assertion is skipped on Windows and the CI matrix is `windows-latest` only (**B-24**).
+  Fifteen mutants ran, fourteen were killed, with zero stale anchors.
+
+**Opened**
+
+- **PR-12** — the inbox write-ahead transaction, the thread adapter and the cursors
+  (`src/ledger/{inbox,threads,cursors}.ts` + three twins), PT-10 + PT-11, D-19 — with its block's tasks
+  12.1–12.6 (12.6 updates **both** PT cells) and the audit/review path of `HANDOFF.md` §2.
+- **B-34** — the false `TS18003` rule still standing in `src/cli/tsconfig.json:10` and
+  `src/registry/tsconfig.json:12` (both audited slices this one could not edit); the measured rule — the
+  discriminator is the presence of a `references` entry, not composite-ness — now lives in
+  `src/ledger/tsconfig.json`.
+- **Two SUGGESTION-class rows** from PR-11's second Judgment Day round, surviving on split verdicts, for the
+  Director to disposition; no third round exists.
+
+**Carried**
+
+- The audit-path record is `bus-v2-f1-pr-11-audit-001` in
+  [`INDEX.md`](../05-tribunal/INDEX.md); **DN-05 is unsatisfied for the ninth slice** (PR-06, PR-07a, PR-07b,
+  PR-08a, PR-08b, PR-09a, PR-09b, PR-10, PR-11).
+- Two of PR-11's three PRAGMA assertions cannot discriminate their own statement (`synchronous` and
+  `foreign_keys` already hold on this build's defaults), and `quick_check` is not an integrity check — index
+  damage that leaves the pages readable passes it. Both are stated as boundaries in `src/ledger/open.ts`
+  rather than papered over with tests that cannot fail.
+- The quarantine collision refusal is a deliberate **behaviour** deviation with the design's name format
+  untouched: a taken `ledger.corrupt-<epochMs>.db` is refused instead of replacing the only copy of what was
+  quarantined. Unreachable with `Date.now`; reachable through the `now` seam.
+
 ## 2026-09-17 — Session 13: PR-10 (the ledger DDL and the `node:sqlite` transaction spike) delivered and merged as #15
 
 **Closed**
