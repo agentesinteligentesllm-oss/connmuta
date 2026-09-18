@@ -78,8 +78,8 @@ returns only `{"rows":[…]}`; a scoped re-judgment returns only `{"resolutions"
 correction round and **at most two scoped re-judgments — the budget is two, and a round-two survivor
 escalates**. `review-risk`/`review-*` agents are **not** dispatchable outside the native review lifecycle.
 Record the audit path in the tribunal index the way the ten existing records do, and state plainly that
-DN-05 is unsatisfied. The rules learned so far (the first six from PR-06…PR-10, the next six from PR-11,
-the last four from PR-12):
+DN-05 is unsatisfied. The rules learned so far — the first six from PR-06…PR-10, the next six from PR-11,
+and PR-12's additions, which are one new rule at the end plus three of the earlier ones widened:
 
 - **Ask before round 1** (the skill requires it). If the Director's standing instruction for the session is
   "do not stop for authorizations", authorize the batch by that delegation and **disclose the batch, its size
@@ -146,7 +146,8 @@ PR-08b 272, PR-09a 866, PR-09b 375, PR-10 957, PR-11 876, **PR-12 1,664**. Five 
 
 **5. The ordinary native review is a separate, independent lifecycle (RDD switch: on).** After authorized
 implementation is complete and normalized, and **before** reporting it complete, call `gentle_review` with
-`{"operation":"inspect"}` and follow only the transition it returns. Seven outcomes are now precedented:
+`{"operation":"inspect"}` and follow only the transition it returns. **Nine observations are now
+precedented:**
 
 - **granted and approved** (PR-07b, PR-08a, PR-09b, **PR-12**): inspect → START → closure `approved` →
   execute the **exact** `acknowledge-approved` continuation (its envelope reports `authority: burned`) →
