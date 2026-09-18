@@ -431,14 +431,14 @@ and `test/ledger/inbox.test.ts`) landed in the **12.1** pass, and both GREEN mod
 `threads.ts` first because `inbox.ts` imports it. The record says so instead of claiming the block's order was
 followed — the same disclosure PR-11 made for 11.1/11.3.
 
-*Size.* The block estimated ≈400 with no exception; the measured diff at the tip that ships is **1,847 authored
-lines** (`git diff --numstat 70d643a..7005d22 -- src test`: `inbox.ts` 334, `threads.ts` 242, `cursors.ts` 265,
-`inbox.test.ts` 406, `threads.test.ts` 263, `cursors.test.ts` 337; zero deletions, so the insertion-only figure
-is the same) — **a disclosed PR-12-scoped size exception, 1,447 over**, authorized by the Director's session-wide
-delegation rather than by a fresh per-batch question. A re-slice into PR-12a/PR-12b was measured and rejected:
-`cursors.ts` imports neither of the other two, so the halves would measure 1,245 and 602 and would each still be
-over the budget, producing two exceptions instead of one. Grounds, movement and the full record are in
-`apply-progress.md` §PR-12.
+*Size.* The block estimated ≈400 with no exception. Measured at `4703ee6` (before Judgment Day) the slice was **1,847 authored lines** (`git diff --numstat 70d643a..4703ee6 -- src test`: `inbox.ts` 334, `threads.ts` 242, `cursors.ts` 265, `inbox.test.ts` 406, `threads.test.ts` 263, `cursors.test.ts` 337; zero deletions, so the insertion-only figure is the same); round 1's corrections grew it by **+271 / −54** and the tip that ships measures **2,064 authored lines** (`70d643a..99f397c -- src test`: 379, 242, 276, 509, 289, 369). The exception is **1,664 over** at the tip — **a disclosed PR-12-scoped size exception**, authorized by the Director's session-wide
+delegation rather than by a fresh per-batch question, with round 1's growth disclosed rather than absorbed. A
+re-slice into PR-12a/PR-12b was measured and rejected: `cursors.ts` imports neither of the other two, so the
+halves would measure 1,245 and 602 and would each still be over the budget, producing two exceptions instead
+of one. Grounds, movement and the full record are in `apply-progress.md` §PR-12. *(This note carried the
+1,847 / 1,447 figures unlabelled against the tip until the independent verifier showed the tip label was
+stale — its adjacent finding, outside the record's own claims — so both figures are now stated with the tip
+each belongs to.)*
 
 *Cells.* 12.6 fills PT-10's cell (the crash-replay scenario the cell had recorded as staying with `ledger/inbox`)
 and PT-11's, for the ledger half only — that each client is *served* the batch by `fetch` is `daemon/serve/fetch`'s

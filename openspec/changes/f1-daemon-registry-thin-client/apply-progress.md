@@ -3566,7 +3566,7 @@ measured.**
 
 ## Scope and budget (measured)
 
-| File | Authored lines at `99f397c`, the tip that ships | at `4703ee6`, before round 1 |
+| File | Authored lines at `99f397c` — the tip every figure here is measured at, and `src test` is byte-identical from it through `162a5a1` (proved: `git diff --numstat 99f397c..162a5a1 -- src test` is empty) | at `4703ee6`, before round 1 |
 |---|---|---|
 | `src/ledger/inbox.ts` | 379 | 334 |
 | `src/ledger/threads.ts` | 242 | 242 |
@@ -3606,9 +3606,12 @@ the split would produce two exceptions instead of one and renumber a board row t
 fill as one. That is why it is one slice with one disclosed exception rather than two blocks, and the
 measurement is the reason, not a preference.
 
-Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 3 added / 3 removed after
-round 1's second correction of PT-10's cell, and `docs/06-backlog/CHECKLIST.md`, the B-35 row round 1 added —
-both in the commit that carries this record (the first in `99f397c`, the second here).
+Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 2 added / 2 removed for the
+whole slice — the PT-10 row rewritten and the PT-11 row filled, of which round 1 moved 1 of each (measured:
+`git diff --numstat 70d643a..99f397c --` that file is 2/2, and `4703ee6..99f397c` is 1/1; an earlier version
+of this sentence said 3/3, which matches no measurement and was corrected by the independent verifier's `F1`)
+— and `docs/06-backlog/CHECKLIST.md`, the B-35 and B-36 rows — the first in `99f397c`, the others in the
+commits that carry this record.
 
 ## Where the code came from
 
@@ -3619,7 +3622,10 @@ with their imports so `test/security/provenance.test.ts` never reads a leading b
 
 v1's behaviour is what these modules *replace*, and the replacement is the point of the unit: one
 `next_update_id` and one global `first_surfaced_at` in `state.json` became `client_cursors.inbox_seq` and
-`client_surfaced` (v1's `CHANNEL-setup.md:114-120`, reversed). `applyEnvelope` (`shared/protocol-apply.ts`,
+`client_surfaced` (v1's `state.ts:67` and `:116` for the two field names, and `CHANNEL-setup.md:114-120` for the
+shared-cursor statement it reverses — the setup document states the sharing, the field names are in the state
+module; an earlier version of this sentence cited the setup document for both, corrected by the verifier's
+`F5`). `applyEnvelope` (`shared/protocol-apply.ts`,
 PR-05) is the consumer the thread adapter exists for; it is not edited here.
 
 ## TDD cycle evidence
@@ -3627,7 +3633,9 @@ PR-05) is the consumer the thread adapter exists for; it is not edited here.
 `test/ledger/threads.test.ts` and `test/ledger/inbox.test.ts` were authored first and failed with **TS2307**
 (the modules did not exist) — a legitimate RED for a missing module. `src/ledger/threads.ts` then went green
 first because `inbox.ts` imports it, and `src/ledger/inbox.ts` followed. `test/ledger/cursors.test.ts` then
-failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin. Round 1 added
+failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin. *(The RED runs are
+the writer's own observation: no artefact in the tree records them, which the independent verifier flagged as
+unverifiable here and was equally unverifiable in PR-09a's, PR-10's and PR-11's records.)* Round 1 added
 **seven** cases — two digest cases, the offset rewind, the thread-row rollback, the two duplicate-identity
 refusals and the history order — and **six of the seven have a mutant in the sweep below that dies on them**:
 `M18` and `M26` (one per digest case), `M20`/`M25` (the offset rewind), `M24` (both duplicate-identity
@@ -3641,7 +3649,7 @@ unobservable is the deferral, not the rollback. The case is disclosed rather tha
 |---|---|---|---|
 | `main` before this slice | not run as a set | 379 | 8 |
 | `4703ee6` (before round 1) | **41 / 41** (14 inbox, 11 threads, 16 cursors) | **420 / 420** | **8 / 8** |
-| `99f397c` (the tip that ships) | **48 / 48** (18 inbox, 12 threads, 18 cursors) | **427 / 427** | **8 / 8** |
+| `99f397c` (= `162a5a1` for `src test`) | **48 / 48** (18 inbox, 12 threads, 18 cursors) | **427 / 427** | **8 / 8** |
 
 **Sub-task order deviated once, disclosed.** The block's 12.1 and 12.2 name `inbox.ts` only; `threads.ts`
 appears in 12.2's prose with no RED sub-task of its own. Strict TDD still holds — red before green for both
@@ -3682,13 +3690,16 @@ concurrently over **one frozen committed tree** (`judgment-12`, detached at `470
 file, one JSON row per line with keys sorted alphabetically, LF-terminated — is
 **`47880377d734d74f41b371f0a3a1434012701bec901fddb96fcacd3d3d212f26`** for **13 rows**.
 
-**The round returned 2 CRITICAL, 6 WARNING and 5 SUGGESTION, and three defects were reached independently by
-both judges.** Every row was reproduced here before it was believed, and every one of the thirteen named a
-real defect of this slice.
+**The round returned 2 CRITICAL, 6 WARNING and 5 SUGGESTION** — counted from the frozen ledger file, not from
+this prose — **and three defects were reached independently by both judges, across five row ids**
+(`JD-A-001`/`JD-B-002`, `JD-A-002`/`JD-B-003` and `JD-A-003`, which pairs with `JD-B-003` again; the two
+judges filed their halves at different severities, which is why "three defects" is not three *rows*). Every
+row was reproduced here before it was believed, and every one of the thirteen named a real defect of this
+slice.
 
 | Frozen row | Severity | What it found | Reproduced by the writer |
 |---|---|---|---|
-| `JD-A-001` / `JD-B-002` | **CRITICAL** (both judges) | `advanceClientCursor` branched on `"last_surfaced_digest" in advance`, so a caller forwarding an optional value — key present, value `undefined`, which this repository's `strict` config permits because it sets no `exactOptionalPropertyTypes` — took the write branch and **erased** the stored digest. That is the conflation the field's own contract forbids, and its consequence is the defect the unit exists to remove: a wiped digest is a client treated as never surfaced, so the next `fetch` re-serves a body it already saw | Yes: a probe on the frozen `dist` showed `digest-1` → `null` after a call passing an explicit `undefined`; and a mutant on a copy of the built tree that flipped the branch to `!== undefined` **survived** the whole suite, so the documented semantics were indistinguishable from the erasing ones |
+| `JD-A-001` / `JD-B-002` | **CRITICAL** as Judge A filed it, **WARNING** as Judge B did — the same defect reached by both judges, at different severities | `advanceClientCursor` branched on `"last_surfaced_digest" in advance`, so a caller forwarding an optional value — key present, value `undefined`, which this repository's `strict` config permits because it sets no `exactOptionalPropertyTypes` — took the write branch and **erased** the stored digest. That is the conflation the field's own contract forbids, and its consequence is the defect the unit exists to remove: a wiped digest is a client treated as never surfaced, so the next `fetch` re-serves a body it already saw | Yes: a probe on the frozen `dist` showed `digest-1` → `null` after a call passing an explicit `undefined`; and a mutant on a copy of the built tree that flipped the branch to `!== undefined` **survived** the whole suite, so the documented semantics were indistinguishable from the erasing ones |
 | `JD-B-001` | **CRITICAL** (one judge) | The test named for the thread write happening *inside the batch's transaction* could not fail for its name: deferring `writeThreadRecord` until after `withTransaction` returned left all 41 focused tests green. The spec's "Every poll MUST write admitted updates to the `updates` inbox, `threads` and `audit_log` inside one transaction" was therefore unpinned for the `threads` half | Yes: reproduced by the writer independently (`M19`, 41/41 green at `4703ee6`). Recorded as a **single-judge** row, reported for the substance and not dismissed; the writer's own reading of its severity is WARNING — the shipped code does write inside the transaction, so what was wrong is the test's name and the missing observable half, not the behaviour |
 | `JD-A-002` / `JD-B-003` | WARNING (both judges) | The claim that the offset is "read back rather than echoed, so what the caller is told is what the ledger holds" had **no test that could fail on it**: replacing the read-back with `return nextUpdateId;` left 41/41 green (ADR-12) | Yes: the echo mutant survives at `4703ee6` |
 | `JD-A-003` / `JD-B-003` | WARNING (both judges) | PT-10's cell, which this slice wrote, credited `test/ledger/inbox.test.ts` with pinning the read-back "inside the committing transaction" — the read-back half could not fail through that file, and the placement half is not observable at all | Yes: the same mutant, plus the writer's own `M2`/`M16`/`M19` results |
@@ -3761,16 +3772,25 @@ after each one (`sha256` re-checked by the script).
 
 All four survivors are reported rather than removed from the matrix, and three of them are one disclosure:
 
-- **`M2`, `M16` and `M19` are the same gap seen from three sides, and it is disclosed as one.** Within a
-  single transaction, **where** a write sits relative to the rows it accompanies is not observable through
-  this suite: a batch that throws rolls the whole transaction back wherever in it the write sat, and a batch
-  that commits leaves the same rows and the same offset either way. So the *placement* of the offset advance,
-  and of the thread write, is a claim of design §5.3 and of the modules' own reading, not something a test
-  here can fail on — in the sense HANDOFF §2.2 gives "a prose claim has no executable mutant". What *is*
-  pinned is everything that placement protects: the offset's presence, its value, its `max` rule, its `+1`,
-  its forward-only guard, its being read back from the ledger, and its survival of a refused batch and of a
-  replay — plus, for the thread write, that a refused batch takes the thread rows with it. Saying a test
-  distinguishes the placement would be exactly the over-claim round 1 corrected.
+- **`M2`, `M16` and `M19` are one gap seen from three sides, and the claim here is deliberately narrow
+  because the broad version was falsified.** Two placements of a write are unobservable through this suite:
+  doing it *earlier inside* the transaction but after nothing (`M2`, which survives 48/0), and doing it
+  *after* `withTransaction` returns (`M16` for the offset, `M19` for the thread write, both 48/0). Both are
+  invisible for the same reason — a batch that throws rolls the transaction back wherever inside it the write
+  sat, and a write placed after the return never runs on such a batch — and a batch that commits leaves the
+  same rows and the same offset either way. **What is not unobservable is hoisting a write out of the batch
+  and before it**: then it autocommits ahead of the callback's work, so a refused batch leaves it standing
+  while everything else rolls back. The independent verifier measured exactly that, and it is one of this
+  section's own corrections: hoisting the offset advance kills two tests (46/2 — *a batch the schema refuses
+  leaves nothing behind* and *one identity carried twice in one batch is refused*) and hoisting the thread
+  write kills five (43/5 — *a refused batch takes the thread rows it had already written with it* among them).
+  So nothing here claims an impossibility, which is the shape round 2's residual (b) corrected for the thread
+  write and which an earlier broad sentence in this bullet repeated for the offset advance (the verifier's
+  `F4`): the claim is the two placements named above, each measured, and the placement that *is* observable
+  has a test that dies on it. What remains pinned either way is everything those placements protect: the
+  offset's presence, its value, its `max` rule, its `+1`, its forward-only guard, its being read back from
+  the ledger, and its survival of a refused batch and of a replay — plus, for the thread write, that a
+  refused batch takes the thread rows with it.
 - **`M8` is an equivalent mutant.** `INSERT OR REPLACE` does delete the thread row and cascade its history
   away — but the writer's very next step re-inserts exactly the entries the record carries, so the end state
   is identical. The true `INSERT … ON CONFLICT … DO UPDATE` is kept because it does not depend on that
@@ -3808,7 +3828,7 @@ All four survivors are reported rather than removed from the matrix, and three o
 | Id | Item |
 |---|---|
 | `JD-B-001` | recorded as a **single-judge CRITICAL** that the writer reproduced and re-read as WARNING; the name was corrected and the observable half pinned, and the placement remains unobservable (`M19`) |
-| `M2` / `M16` / `M19` | the transaction **placement** of the offset advance and the thread write is not observable through this suite; the evidence is design §5.3 and the modules' reading, not a mutant |
+| `M2` / `M16` / `M19` | two placements of a write are unobservable through this suite (earlier inside the transaction, and after the transaction returns); a hoisted write **is** observable and a test dies on it — the narrow claim, with the falsified broad version recorded in the matrix bullet |
 | `M8` | an equivalent mutant, not a test failure |
 | — | **B-26 is untouched**: `tasks.md` 12.6 names PT-10 and PT-11 only, and neither is PT-25 |
 | — | `updates.body`'s coupling is refused rather than normalized: silently stripping a body would delete the evidence of a classification bug |
@@ -3859,11 +3879,15 @@ unchanged by this commit too.
 
 ### Terminal verdict (round 2, budget exhausted)
 
-**No BLOCKER and no CRITICAL row survives.** Of the two CRITICALs round 1 returned, `JD-A-001`/`JD-B-002` was
-verified by both judges in the round-1 re-judgment and `JD-B-001` was resolved by the writer with its name
-corrected and its observable half pinned, recorded as a single-judge row that reproduced. Every WARNING row
-was verified. The final verification is green: **427 / 427** in the frozen tree, **48 / 48** focused and
-**8 / 8** `test:static`, and every budget figure re-measured at the tip that ships.
+**No BLOCKER and no CRITICAL row survives.** The two CRITICAL rows round 1 returned are `JD-A-001` — the
+digest erasure, which Judge B filed as WARNING on the same defect — and `JD-B-001`, the thread-write test's
+name; the terminal tally was recounted from the frozen ledger, not from this prose (the verifier's `F2`).
+Both are closed: the first was verified by both judges in the round-1 re-judgment, and the second was resolved
+by the writer with its name corrected and its observable half pinned, recorded as a single-judge row that
+reproduced. Every WARNING row was verified. The final verification is green: **427 / 427** in the frozen tree,
+**48 / 48** focused and
+**8 / 8** `test:static`, and every budget figure re-measured at the tip that ships (`162a5a1`; `src test` is
+byte-identical to `99f397c`, which is where the figures were measured — the verifier's `F3`).
 
 **`JD-B-008` is escalated to the Director** with both residuals stated above and their corrections
 disclosed as measurement-checked but not judge-re-judged, exactly as PR-11 escalated its two surviving
