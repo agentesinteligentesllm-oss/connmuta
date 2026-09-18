@@ -250,6 +250,43 @@ test("an unparseable 'since' is refused, and so is a stored detail the wire shap
 	});
 });
 
+test("clearing one scope's condition leaves the other scope's row alone", () => {
+	withLedger((db) => {
+		raiseCondition(db, { scope: PROJECT_ID, name: "group_outage", since: NOW, detail: { last_error: "TELEGRAM_CONFLICT" } });
+		raiseCondition(db, { scope: OTHER_PROJECT_ID, name: "group_outage", since: NOW, detail: { last_error: "RATE_LIMITED" } });
+
+		assert.equal(clearCondition(db, PROJECT_ID, "group_outage"), true);
+
+		// The scope is half the key on the way in *and* on the way out: a clear that filtered on the name alone
+		// would take the other project's outage off its status with it. The mutant sweep found this unpinned.
+		assert.equal(readCondition(db, PROJECT_ID, "group_outage"), undefined);
+		assert.equal(readCondition(db, OTHER_PROJECT_ID, "group_outage")?.detail?.last_error, "RATE_LIMITED");
+		assert.equal(rowCount(db), 1);
+	});
+});
+
+test("a stored detail that violates its contract is refused on the way out", () => {
+	withLedger((db) => {
+		// A row only raw SQL can produce: the member is the right name and the wrong type, which is the case a
+		// validator on the write side alone would render as `count: "51"` (the mutant sweep found this unpinned
+		// too: the null-detail row below covers a different branch of the same read).
+		db.prepare("INSERT INTO conditions (scope, name, since, detail) VALUES (?, 'open_thread_backlog', ?, ?)").run(
+			PROJECT_ID,
+			NOW,
+			JSON.stringify({ count: "51" }),
+		);
+
+		assert.throws(
+			() => readCondition(db, PROJECT_ID, "open_thread_backlog"),
+			(error: unknown) => error instanceof Error && error.message.includes("open_thread_backlog") === true && error.message.includes("count") === true,
+		);
+		assert.throws(
+			() => readProjectConditions(db, PROJECT_ID),
+			(error: unknown) => error instanceof Error && error.message.includes("open_thread_backlog") === true,
+		);
+	});
+});
+
 test("the store opens no transaction of its own, so it composes inside a caller's", () => {
 	withLedger((db) => {
 		raiseCondition(db, { scope: PROJECT_ID, name: "group_outage", since: NOW, detail: { last_error: "TELEGRAM_CONFLICT" } });
