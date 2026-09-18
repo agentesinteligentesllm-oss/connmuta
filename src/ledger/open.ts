@@ -26,12 +26,18 @@ import { readLedgerSchemaVersion, runPendingMigrations } from "./migrations.js";
  *    happily), so nothing is decided here.
  * 3. **`PRAGMA quick_check`** is the decision: a corruption-class error **or** a returned row other than
  *    `ok` — SQLite answers some damage with an explanation row instead of a throw. A failure that is *not*
- *    corruption class (a directory in the ledger's place, a lock, permissions) propagates instead: renaming
- *    a healthy ledger out from under a second daemon would be worse than refusing to start.
+ *    corruption class propagates instead: a second writer holding the file (`SQLITE_BUSY`), a directory in
+ *    the ledger's place or where the `-wal` belongs (`SQLITE_CANTOPEN`), permissions — renaming a healthy
+ *    ledger out from under another writer would be worse than refusing to start. **What this probe does not
+ *    cover**: `quick_check` does not verify index content, so damage that leaves every page readable answers
+ *    `ok` (measured: patching one index key byte leaves `quick_check` at `ok` while `integrity_check`
+ *    reports a missing index row). This step decides whether the file is usable at all, not whether it is
+ *    fully consistent; the heavier pragma stays off the start path.
  * 4. **On corruption or a future version: close, rename to `ledger.corrupt-<epochMs>.db`** with the
  *    `-wal`/`-shm` siblings, and open a fresh ledger. The corrupt file is never deleted and never
- *    overwritten, and nothing is downgraded: a file with a `user_version` this build does not know is a
- *    file from the future (ADR-0015), and it is set aside rather than migrated backwards.
+ *    overwritten — a name already taken is refused rather than reused — and nothing is downgraded: a file
+ *    with a `user_version` this build does not know is a file from the future (ADR-0015), and it is set
+ *    aside rather than migrated backwards.
  * 5. **The PRAGMA sequence** — `journal_mode = WAL`, `synchronous = FULL`, `foreign_keys = ON`. WAL is what
  *    lets a reader work while the poller writes; `synchronous = FULL` is deliberate and load-bearing: the
  *    offset confirmed to Telegram must never outlive a commit lost to a power failure (I-3).
@@ -80,9 +86,15 @@ const SQLITE_NOTADB = 26;
  *
  * A `node:sqlite` error's `errcode` is not always a primary code: extended codes share the primary code's
  * low byte (measured: opening a directory answers `526`, whose low byte `14` is `SQLITE_CANTOPEN`; the
- * corruption extensions are `267` and `779`, both in class `11`). Comparing the mask is therefore the
- * class rule the design asks for — "`SQLITE_CORRUPT`/`SQLITE_NOTADB`" names a class, not two integers —
- * and it is what keeps a corrupt index from being read as a healthy database.
+ * corruption extensions are `267` and `779`, both in class `11`). Comparing through this mask is therefore
+ * the class rule the design asks for — "`SQLITE_CORRUPT`/`SQLITE_NOTADB`" names a class, not two integers
+ * — and it costs nothing when the class is all that is being asked about.
+ *
+ * **What it is not.** The mask says which codes belong to the class; it does not make the probe see
+ * anything more. Index damage is *not* caught by `quick_check` at all (see step 3 of the module doc), so
+ * no `SQLITE_CORRUPT_INDEX` arrives from it on the open path, and an earlier version of this comment
+ * claimed the mask was "what keeps a corrupt index from being read as a healthy database" — Judgment Day
+ * measured that claim false and it is corrected here.
  */
 const PRIMARY_CODE_MASK = 0xff;
 
@@ -132,9 +144,10 @@ export interface LedgerOpenOptions {
  * Whether an error is SQLite telling us the file is not a usable database.
  *
  * The class, not two exact numbers, and it is exported so that rule is pinnable on its own: an extended
- * corruption code (`267`, `779`) cannot be produced from a plain file here, so the suite pins the mask
- * with synthetic codes and pins the real ones with the corrupt fixture. Everything outside the class —
- * `SQLITE_BUSY`, `SQLITE_CANTOPEN`, a plain `Error` — is deliberately *not* corruption.
+ * corruption code (`267`, `779`) cannot be produced from a plain file here, so the suite pins the mask with
+ * synthetic codes and pins the two real ones — a file whose bytes are not a database, and damage SQLite
+ * reports as a `quick_check` row — with real corrupt files. Everything outside the class — `SQLITE_BUSY`,
+ * `SQLITE_CANTOPEN`, a plain `Error` — is deliberately *not* corruption.
  */
 export function isLedgerCorruptionError(error: unknown): boolean {
 	if (typeof error !== "object" || error === null) {
@@ -149,20 +162,38 @@ export function isLedgerCorruptionError(error: unknown): boolean {
 }
 
 /**
+ * The refusal {@link quarantineLedgerFile} raises when a ledger was already set aside under this exact name.
+ *
+ * A named constant rather than a literal for the same reason as the other refusals in this unit: the caller
+ * and its test pin one spelling. What it protects is a single copy — the file already quarantined is the
+ * only copy of what was quarantined, and on POSIX `renameSync` would replace it without a word.
+ */
+export const LEDGER_QUARANTINE_COLLISION_MESSAGE =
+	"quarantineLedgerFile: a ledger is already set aside under this name, and it is the only copy of what was quarantined; refusing rather than replacing it (design §5.1).";
+
+/**
  * Moves a ledger file, and the `-wal`/`-shm` siblings that exist beside it, to `ledger.corrupt-<epochMs>.db`.
  *
  * Exported because the sibling half of this step cannot be reached from the open path: a clean `close()`
- * removes both siblings, and SQLite removes them too when it opens a file that is not a database, so by
- * the time the open path renames, the only sibling it can meet is one a crash left behind. The helper's
- * contract — every sibling that exists at rename time moves with the ledger, and a missing one is not an
- * error — is pinned directly in `test/ledger/open.test.ts`, which is also where F2's `doctor` and PR-13's
- * condition store will find it if they need the same move.
+ * removes both siblings and the open path always closes before it renames, so the only sibling it can meet
+ * there is one a crash left behind. (An earlier version of this note said SQLite removes them when it
+ * *opens* a file that is not a database. That is wrong, and Judgment Day measured it: they survive the
+ * failed open and disappear on the close.) The helper's contract — every sibling that exists at rename
+ * time moves with the ledger, and a missing one is not an error — is pinned directly in
+ * `test/ledger/open.test.ts`, which is also where F2's `doctor` and PR-13's condition store will find it if
+ * they need the same move.
  *
  * The name is the design's, verbatim: `<epochMs>` is milliseconds since the epoch, so two quarantines an
- * instant apart do not collide and the newest is the largest name.
+ * instant apart do not collide and the newest is the largest name. Two inside the *same* millisecond would
+ * collide, and `renameSync` replaces an existing target on POSIX — so that case is refused
+ * ({@link LEDGER_QUARANTINE_COLLISION_MESSAGE}) instead of allowed to destroy the earlier copy. One
+ * `Date.now` cannot reach it (one daemon opens one `ledger.db`), but `now` is a seam the caller controls.
  */
 export function quarantineLedgerFile(dbPath: string, epochMs: number): string {
 	const quarantinedPath = join(dirname(dbPath), `${LEDGER_CORRUPT_FILE_PREFIX}${epochMs}${LEDGER_FILE_EXTENSION}`);
+	if (existsSync(quarantinedPath)) {
+		throw new Error(LEDGER_QUARANTINE_COLLISION_MESSAGE);
+	}
 	renameSync(dbPath, quarantinedPath);
 	for (const suffix of LEDGER_QUARANTINE_SIBLING_SUFFIXES) {
 		const sibling = `${dbPath}${suffix}`;

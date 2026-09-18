@@ -10,6 +10,7 @@ import {
 	isLedgerCorruptionError,
 	LEDGER_CORRUPT_FILE_PREFIX,
 	LEDGER_FILE_NAME,
+	LEDGER_QUARANTINE_COLLISION_MESSAGE,
 	LEDGER_QUARANTINE_SIBLING_SUFFIXES,
 	openLedger,
 	quarantineLedgerFile,
@@ -29,7 +30,9 @@ import { LEDGER_SCHEMA_VERSION, POSIX_PRIVATE_DIR_MODE } from "../../src/shared/
  * The corrupt fixture is a file whose bytes are not a SQLite database. Both corruption detections are
  * real SQLite answers rather than a simulated error: measured on the pinned build, `new DatabaseSync`
  * is lazy, so a prose file opens and `PRAGMA quick_check` is what throws (`errcode 26`), while a
- * damaged page throws `errcode 11`.
+ * damaged page throws `errcode 11`. A third case is pinned separately and it is the one a detector built
+ * only from throws would miss: damage SQLite reports as a `quick_check` **row** instead (see
+ * {@link SQLITE_HEADER_RESERVED_BYTE}).
  */
 
 // dist/test/ledger/open.test.js -> repo root is three levels up; the fixture is a repository file, not
@@ -68,6 +71,17 @@ const QUARANTINE_EPOCH_MS = 1_700_000_000_000;
 
 /** The version a file from the future carries; tied to the constant so a bump keeps the test true. */
 const FUTURE_VERSION = LEDGER_SCHEMA_VERSION + 1;
+
+/**
+ * The offset of the first of the header's 20 reserved bytes, whose only legal value is zero.
+ *
+ * Named because the damage the row-kind test applies is a single flip of this byte, and the flip *is* the
+ * point: measured on the pinned build, XOR-ing it makes SQLite answer `PRAGMA quick_check` with a row
+ * (`*** in database main *** … free space corruption`) instead of throwing, while the database stays
+ * readable and keeps its `user_version`. A detector that only caught thrown errors would open that file as
+ * healthy.
+ */
+const SQLITE_HEADER_RESERVED_BYTE = 20;
 
 /** Every handle `openLedger` hands out, so the temp-home cleanup below can close them all. */
 const OPEN_HANDLES: DatabaseSync[] = [];
@@ -258,8 +272,10 @@ test("the home directory is created recursively with POSIX_PRIVATE_DIR_MODE (des
 	});
 });
 
-test("a failure outside the corruption class does not quarantine (a directory in the ledger's place)", () => {
+test("an unopenable path does not quarantine (a directory in the ledger's place)", () => {
 	withHome((homeDir) => {
+		// This failure happens in `new DatabaseSync`, **before** `quick_check` runs: it pins the open step,
+		// not the corruption decision. The two tests below are what pin the decision itself.
 		const dbPath = join(homeDir, LEDGER_FILE_NAME);
 		mkdirSync(dbPath);
 
@@ -268,18 +284,109 @@ test("a failure outside the corruption class does not quarantine (a directory in
 			(error) => (((error as { errcode?: number }).errcode ?? 0) & 0xff) === SQLITE_CANTOPEN,
 		);
 
-		// Nothing was moved aside: a locked or unopenable ledger is not a corrupt one.
+		// Nothing was moved aside: an unopenable path is not a corrupt ledger.
 		assert.deepEqual(quarantinedNames(homeDir), []);
 		assert.ok(statSync(dbPath).isDirectory());
 	});
 });
 
+test("a quick_check failure outside the corruption class propagates, and the healthy ledger stays put", () => {
+	withHome((homeDir) => {
+		// The ledger a mutant would set aside: healthy, at the current version, holding a row.
+		const ledger = open({ homeDir });
+		ledger.db.exec("INSERT INTO offsets (bot_id) VALUES (7)");
+		ledger.db.close();
+		const dbPath = join(homeDir, LEDGER_FILE_NAME);
+
+		// A second writer in rollback-journal mode holds the file exclusively, so `quick_check` fails with
+		// SQLITE_BUSY (measured) — the failure arrives from the corruption decision, not from the open.
+		const holder = new DatabaseSync(dbPath);
+		holder.exec("PRAGMA journal_mode = delete");
+		holder.exec("BEGIN EXCLUSIVE");
+		try {
+			assert.throws(
+				() => open({ homeDir, now: () => QUARANTINE_EPOCH_MS }),
+				(error) => (((error as { errcode?: number }).errcode ?? 0) & 0xff) === SQLITE_BUSY,
+			);
+		} finally {
+			holder.exec("ROLLBACK");
+			holder.close();
+		}
+
+		// Refusing to start beats renaming another writer's live ledger: nothing was set aside, and the row is
+		// still there afterwards.
+		assert.deepEqual(quarantinedNames(homeDir), []);
+		const still = open({ homeDir });
+		assert.equal(still.status, "opened");
+		assert.equal(countRows(still.db, "offsets"), 1);
+	});
+});
+
+test("a quick_check failure SQLite reports as unopenable propagates too, and stays in place", () => {
+	withHome((homeDir) => {
+		const ledger = open({ homeDir });
+		ledger.db.exec("INSERT INTO offsets (bot_id) VALUES (7)");
+		ledger.db.close();
+
+		// A directory where the write-ahead log belongs. Measured on the pinned build: the ledger file itself
+		// is intact and the *probe* is what fails (SQLITE_CANTOPEN), which is why a detector that quarantined
+		// every failed probe would rename a healthy ledger holding the user's data.
+		const dbPath = join(homeDir, LEDGER_FILE_NAME);
+		mkdirSync(`${dbPath}-wal`);
+
+		assert.throws(
+			() => open({ homeDir, now: () => QUARANTINE_EPOCH_MS }),
+			(error) => (((error as { errcode?: number }).errcode ?? 0) & 0xff) === SQLITE_CANTOPEN,
+		);
+		assert.deepEqual(quarantinedNames(homeDir), []);
+
+		// With the stray directory gone the same ledger opens as healthy, row included: it was never damaged.
+		rmSync(`${dbPath}-wal`, { recursive: true });
+		const again = open({ homeDir });
+		assert.equal(again.status, "opened");
+		assert.equal(countRows(again.db, "offsets"), 1);
+	});
+});
+
+test("corruption SQLite answers with a quick_check row is quarantined, not opened (the non-throwing half)", () => {
+	withHome((homeDir) => {
+		const dbPath = join(homeDir, LEDGER_FILE_NAME);
+		open({ homeDir }).db.close();
+		const damaged = readFileSync(dbPath);
+		damaged[SQLITE_HEADER_RESERVED_BYTE] ^= 0xff;
+		writeFileSync(dbPath, damaged);
+
+		// The control: this damage must be the kind SQLite *reports* rather than throws, or the test would be
+		// pinning the branch the fixture test already pins. Read on a copy so the probe cannot touch the file
+		// the open sequence is about to meet.
+		const copyPath = join(homeDir, "row-kind-copy.db");
+		writeFileSync(copyPath, damaged);
+		let reported: unknown[] = [];
+		const probe = new DatabaseSync(copyPath);
+		try {
+			reported = probe.prepare("PRAGMA quick_check").all() as unknown[];
+		} finally {
+			probe.close();
+		}
+		assert.ok(reported.length > 0, "expected quick_check to answer with a row rather than throw");
+		assert.ok(
+			reported.every((row) => (row as { quick_check?: unknown }).quick_check !== "ok"),
+			"expected the reported row to say the file is damaged",
+		);
+
+		const result = open({ homeDir, now: () => QUARANTINE_EPOCH_MS });
+		assert.equal(result.status, "quarantined");
+		assert.equal(result.reason, "corruption");
+		assert.deepEqual(readFileSync(result.quarantinedPath), damaged);
+	});
+});
+
 test("quarantineLedgerFile moves the -wal/-shm siblings with the ledger and tolerates their absence", () => {
 	withHome((homeDir) => {
-		// Siblings are created by hand, and that is the honest way to pin this step: a clean `close()`
-		// removes -wal/-shm, and SQLite also removes them when it opens a file that is not a database, so
-		// the rename would otherwise never see them. What is pinned is the helper's contract — every
-		// sibling that exists at rename time moves with the ledger — which is the call the open path makes.
+		// Siblings are created by hand, and that is the honest way to pin this step: a clean `close()` removes
+		// -wal/-shm and the open path closes before it renames, so the rename would otherwise never see them.
+		// What is pinned is the helper's contract — every sibling that exists at rename time moves with the
+		// ledger — which is the call the open path makes.
 		const dbPath = join(homeDir, LEDGER_FILE_NAME);
 		writeFileSync(dbPath, readFileSync(CORRUPT_FIXTURE_PATH));
 		writeFileSync(`${dbPath}-wal`, "wal bytes");
@@ -304,6 +411,29 @@ test("quarantineLedgerFile moves the -wal/-shm siblings with the ledger and tole
 		writeFileSync(barePath, "not a database either");
 		assert.equal(quarantineLedgerFile(barePath, 1), join(bareDir, `${LEDGER_CORRUPT_FILE_PREFIX}1.db`));
 		assert.equal(readFileSync(join(bareDir, `${LEDGER_CORRUPT_FILE_PREFIX}1.db`), "utf8"), "not a database either");
+	});
+});
+
+test("a second quarantine in the same millisecond is refused, so the earlier copy survives", () => {
+	withHome((homeDir) => {
+		const dbPath = join(homeDir, LEDGER_FILE_NAME);
+		writeFileSync(dbPath, readFileSync(CORRUPT_FIXTURE_PATH));
+		const first = open({ homeDir, now: () => QUARANTINE_EPOCH_MS });
+		assert.equal(first.status, "quarantined");
+		const setAside = readFileSync(first.quarantinedPath);
+		first.db.close();
+
+		// The same millisecond again, through the module's own clock seam: the ledger opened fresh, so damage
+		// it differently and open once more. `renameSync` would replace the first file without a word — on
+		// POSIX — and that file is the only copy of what was already quarantined.
+		writeFileSync(dbPath, Buffer.concat([readFileSync(CORRUPT_FIXTURE_PATH), Buffer.from("\nand now: different bytes\n")]));
+		assert.throws(
+			() => open({ homeDir, now: () => QUARANTINE_EPOCH_MS }),
+			(error) => error instanceof Error && error.message === LEDGER_QUARANTINE_COLLISION_MESSAGE,
+		);
+
+		assert.deepEqual(readFileSync(first.quarantinedPath), setAside, "the first quarantine must be untouched");
+		assert.deepEqual(quarantinedNames(homeDir), [`${LEDGER_CORRUPT_FILE_PREFIX}${QUARANTINE_EPOCH_MS}.db`]);
 	});
 });
 

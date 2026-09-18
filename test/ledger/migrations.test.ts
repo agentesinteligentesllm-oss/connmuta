@@ -33,6 +33,10 @@ import { LEDGER_SCHEMA_VERSION } from "../../src/shared/constants.js";
 const PROBE_TABLE = "probe_table";
 const PROBE_DDL = `CREATE TABLE ${PROBE_TABLE} (id INTEGER PRIMARY KEY) STRICT`;
 
+/** A second probe table, for the injected paths that need two steps. */
+const PROBE_TABLE_TWO = `${PROBE_TABLE}_two`;
+const PROBE_DDL_TWO = `CREATE TABLE ${PROBE_TABLE_TWO} (id INTEGER PRIMARY KEY) STRICT`;
+
 /** Opens a fresh temp-file ledger, runs `operation`, and removes the directory even on failure. */
 function withDatabase(operation: (db: DatabaseSync) => void): void {
 	const dir = mkdtempSync(join(tmpdir(), "conmuta-ledger-migrations-"));
@@ -241,6 +245,26 @@ test("the stamp is written inside the step's own transaction, so a step that com
 		// Committed together, or not at all: the schema the step applied and the version that records it.
 		assert.equal(readLedgerSchemaVersion(db), 1, "the stamp must travel with the step's transaction");
 		assert.ok(hasTable(db, PROBE_TABLE));
+	});
+});
+
+test("a later step records its own version, not the first one's", () => {
+	withDatabase((db) => {
+		// Two steps that both succeed, which the shipped path (one step, and `LEDGER_SCHEMA_VERSION` = 1) cannot
+		// express: the value of the stamp above version 1 is otherwise unpinned, and a stamp that always wrote
+		// `1` would leave the next open believing step 2 still had to run.
+		const twoSuccessfulSteps: LedgerMigration[] = [
+			{ to: 1, up: (handle) => { handle.exec(PROBE_DDL); } },
+			{ to: 2, up: (handle) => { handle.exec(PROBE_DDL_TWO); } },
+		];
+
+		assert.equal(runPendingMigrations(db, 0, twoSuccessfulSteps), 2);
+		assert.equal(readLedgerSchemaVersion(db), 2, "the stamp must be the step's own `to`");
+		assert.ok(hasTable(db, PROBE_TABLE));
+		assert.ok(hasTable(db, PROBE_TABLE_TWO));
+
+		// And because the recorded version really is 2, a second run applies nothing at all.
+		assert.equal(runPendingMigrations(db, readLedgerSchemaVersion(db), twoSuccessfulSteps), 2);
 	});
 });
 

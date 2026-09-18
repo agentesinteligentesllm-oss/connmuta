@@ -7,7 +7,12 @@
   },
   "include": ["**/*.ts"],
   // `../shared` lands here with the first module of this unit that uses a shared constant:
-  // `migrations.ts` reads `LEDGER_SCHEMA_VERSION` (PR-11). An empty *referencing* unit is TS18003, so
-  // the reference could not arrive before that import did (PR-09a disclosed the same omission).
+  // `migrations.ts` reads `LEDGER_SCHEMA_VERSION` (PR-11). That is not a compiler constraint — measured
+  // with this repository's TypeScript 7.0.2, a composite unit that carries a project reference and imports
+  // nothing from it builds clean (exit 0), and TS18003 is the *empty unit* error ("No inputs were found in
+  // config file"), which is why a unit's `tsconfig.json` cannot exist before its first `.ts` file. The
+  // reference lands with the import because it was not needed before it. (An earlier version of this note
+  // said an empty *referencing* unit is TS18003 and that the reference "could not arrive earlier"; Judgment
+  // Day measured both halves false, and the wording is corrected here.)
   "references": [{ "path": "../shared" }]
 }
