@@ -10,8 +10,8 @@
 
 - **PR-11** — `src/ledger/{open,migrations}.ts` + both twins, the unit's `../shared` reference and a corrupt
   fixture — is merged as PR **#16** (`50c506a`, code/record tip `4d207df`), CI green on both legs (Node 24.15
-  and 26), branch deleted. **13 of the 45 rows are done, delivered as 16 PRs**; **64/210 tasks**, **379 tests**,
-  `test:static` 8/8. Budget **1,276 authored lines with a disclosed 876-line PR-11-scoped exception**, moved
+  and 26), branch deleted. **16 PR blocks / 11 row ids are complete (64 of the 210 checkboxes)**; the
+  remaining board is **32 blocks / 31 row ids (`PR-12…PR-42`)**. **379 tests, `test:static` 8/8.** Budget **1,276 authored lines with a disclosed 876-line PR-11-scoped exception**, moved
   1,085 → 1,275 → 1,276, every figure measured at the tip it describes.
 - **The open sequence and the migration path land.** `openLedger` makes the home with
   `POSIX_PRIVATE_DIR_MODE`, decides with `PRAGMA quick_check` (a corruption-class error **or** a returned row
