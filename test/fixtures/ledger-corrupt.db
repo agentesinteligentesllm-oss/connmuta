@@ -1,0 +1,7 @@
+A corrupt ledger fixture for the ledger's open sequence (test/ledger/open.test.ts).
+
+This file stands in for a `ledger.db` whose bytes are no longer a SQLite database. It is deliberately
+not a database: SQLite answers "file is not a database" when the open sequence probes it, so the open
+sequence must quarantine it under the design's own name (`ledger.corrupt-<epochMs>.db`), open a fresh
+empty ledger instead, and never delete or overwrite these bytes. See design §5.1 and the
+`ledger › Schema-version migrations and quarantine on corruption or a future version` requirement.
