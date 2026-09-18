@@ -372,11 +372,43 @@ Scope: `src/ledger/open.ts`, `src/ledger/migrations.ts`, `test/ledger/open.test.
 Requirements: `ledger › Schema-version migrations and quarantine on corruption or a future version` (D-21).
 Runtime harness: real `node:sqlite` over temp files, including a deliberately corrupted fixture file.
 
-- [ ] 11.1 RED: write `test/ledger/open.test.ts` covering the two spec scenarios (corrupt ledger quarantined not defaulted, future `user_version` quarantined too) plus `PRAGMA synchronous = FULL`/`journal_mode = WAL` assertions.
-- [ ] 11.2 GREEN: implement `src/ledger/open.ts` (mkdir home, open, `quick_check`, quarantine-rename to `ledger.corrupt-<epochMs>.db` on corruption or a future version, PRAGMA sequence per design §5.1).
-- [ ] 11.3 RED: write `test/ledger/migrations.test.ts` asserting forward-only `{to, up}` migrations run inside one transaction each and `PRAGMA user_version` lands at `LEDGER_SCHEMA_VERSION` (1).
-- [ ] 11.4 GREEN: implement `src/ledger/migrations.ts`.
-- [ ] 11.5 Verify: `npm run build && node --test "dist/test/ledger/open.test.js" "dist/test/ledger/migrations.test.js"`.
+- [x] 11.1 RED: write `test/ledger/open.test.ts` covering the two spec scenarios (corrupt ledger quarantined not defaulted, future `user_version` quarantined too) plus `PRAGMA synchronous = FULL`/`journal_mode = WAL` assertions.
+- [x] 11.2 GREEN: implement `src/ledger/open.ts` (mkdir home, open, `quick_check`, quarantine-rename to `ledger.corrupt-<epochMs>.db` on corruption or a future version, PRAGMA sequence per design §5.1).
+- [x] 11.3 RED: write `test/ledger/migrations.test.ts` asserting forward-only `{to, up}` migrations run inside one transaction each and `PRAGMA user_version` lands at `LEDGER_SCHEMA_VERSION` (1).
+- [x] 11.4 GREEN: implement `src/ledger/migrations.ts`.
+- [x] 11.5 Verify: `npm run build && node --test "dist/test/ledger/open.test.js" "dist/test/ledger/migrations.test.js"`.
+
+11.1–11.5 flipped to `[x]` in the **PR-11** commit. **Apply-time note.**
+
+*Order.* The block runs 11.1/11.2 (the open sequence) before 11.3/11.4 (the migrations), but `open.ts` cannot
+compile without `migrations.ts`: the open sequence is what reads the version and runs the path. Both RED files
+therefore landed in one pass and both GREEN modules followed, `migrations.ts` first. Red still precedes green
+for every module — only the sub-task order moved, and the record says so instead of claiming the block's order
+was followed.
+
+*Scope.* The block names four files. The slice also lands `test/fixtures/ledger-corrupt.db`, the deliberately
+corrupt file the spec's first scenario opens (written as text, so the corruption is reviewable rather than an
+opaque binary blob), and `src/ledger/tsconfig.json` gains `{ "path": "../shared" }` — the first shared import
+in this unit. The reference did not need to arrive earlier; an unused project reference is legal, measured
+with this repository's TypeScript 7.0.2 (Judgment Day round 1 corrected an earlier note here that claimed an
+empty *referencing* unit is TS18003, and round 2 corrected the clause that replaced it).
+
+*Size.* The block estimated ≈350 with no exception; the measured diff at the tip that ships is **1,269 added
+and 6 removed = 1,275 authored lines** (`git diff --numstat ab6dbf1..<tip> -- src test`; 1,085 / 685-over at the
+first committed tip `8392b1c`, then 1,275 / 875-over after round 1's corrections) — **a disclosed PR-11-scoped
+size exception, 875 over**. Grounds: a real `node:sqlite` harness over temp files plus two corrupt fixtures
+(one a file that is not a database, one a single-byte flip whose damage SQLite *reports* rather than throws);
+the two spec scenarios; the PRAGMA sequence with its own non-vacuous control; the corruption *class* rule (the
+primary-code mask, plus the synthetic extended codes no plain file can produce); the two non-corruption probe
+failures (`SQLITE_BUSY`, `SQLITE_CANTOPEN`) whose mutant would rename a healthy ledger; the sibling rename,
+whose five assertions are the only place that step is observable at all; the quarantine-collision refusal;
+the mechanism pins (the transaction the step runs in, the async refusal, the generator refusal, the stamp's
+placement, the stamp's value); and the six-case refusal matrix. Trimming that list is what the budget rule
+forbids. Every figure is measured at the tip it describes, and the round-by-round movement plus the audit
+records are in `apply-progress.md` §PR-11.
+
+*PT cells.* The block names none and there is no 11.6, so this slice updates no `THREAT-MODEL.md` cell: PT-11
+stays with PR-12 (12.6) and PT-20 with PR-13 (13.6).
 
 #### PR-12 — inbox write-ahead transaction + thread adapter + cursors
 Branch `f1/12-ledger-inbox-cursors` → `main`. Depends: PR-11. Size: ≈400 lines, no exception.
