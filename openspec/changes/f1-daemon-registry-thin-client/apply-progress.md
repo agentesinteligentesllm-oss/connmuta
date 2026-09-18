@@ -3561,39 +3561,44 @@ measured.**
 |---|---|
 | Branch | `f1/12-ledger-inbox-cursors` → `main` (branched from `main` at `fdbcd8a`) |
 | Mode | **Strict TDD**, run as **ODD with the SDD contract preserved**: `sdd-apply` dispatch is refused before child launch by the host-owned preflight gate, so no phase envelope exists for this slice |
-| Range | `70d643a..7005d22` (three commits: the batch transaction and the thread adapter, the cursors, the PT cells) |
-| Status | implemented and frozen-verified; audited by the **Judgment Day substitute**; DN-05 unsatisfied |
+| Range | `70d643a..99f397c` for `src test` and the PT cells (five commits: the batch transaction and the thread adapter, the cursors, the two `THREAT-MODEL.md` cells, the slice's record, and round 1's corrections); the record commit that carries this section adds nothing to `src test` |
+| Status | implemented, frozen-verified and independently re-checked after **Judgment Day round 1** (13 rows); **DN-05 unsatisfied** |
 
 ## Scope and budget (measured)
 
-| File | Authored lines (measured at `7005d22`, the tip that ships) |
-|---|---|
-| `src/ledger/inbox.ts` | 334 |
-| `src/ledger/threads.ts` | 242 |
-| `src/ledger/cursors.ts` | 265 |
-| `test/ledger/inbox.test.ts` | 406 |
-| `test/ledger/threads.test.ts` | 263 |
-| `test/ledger/cursors.test.ts` | 337 |
-| **Total, `git diff --numstat 70d643a..7005d22 -- src test`** | **1,847 added, 0 deleted = 1,847 authored** |
+| File | Authored lines at `99f397c`, the tip that ships | at `4703ee6`, before round 1 |
+|---|---|---|
+| `src/ledger/inbox.ts` | 379 | 334 |
+| `src/ledger/threads.ts` | 242 | 242 |
+| `src/ledger/cursors.ts` | 276 | 265 |
+| `test/ledger/inbox.test.ts` | 509 | 406 |
+| `test/ledger/threads.test.ts` | 289 | 263 |
+| `test/ledger/cursors.test.ts` | 369 | 337 |
+| **Total, `git diff --numstat 70d643a..99f397c -- src test`** | **2,064 added, 0 deleted = 2,064 authored** | **1,847** |
 
 The block estimated ≈400 with no exception, so the slice carries a **disclosed PR-12-scoped size exception,
-1,447 over**. The count is identical measured either way (0 deletions), so there is no second figure to state
-here. The exception is authorized by the Director's session-wide delegation rather than by a fresh per-batch
-question, because this session was explicitly asked not to stop for authorizations; the figure, the movement
-and the grounds are disclosed here and in the PR body so the Director can review the decision.
+1,664 over**. The count is identical measured either way (0 deletions, because all six files are new relative
+to the base), so there is no second figure to state here. The exception is authorized by the Director's
+session-wide delegation rather than by a fresh per-batch question, because this session was explicitly asked
+not to stop for authorizations; the figure, the movement and the grounds are disclosed here and in the PR body
+so the Director can review the decision. **Round 1's corrections grew the slice by +271 / −54 in `src test`**
+(+272 / −55 including the PT-10 cell, and the B-35 row in `docs/06-backlog/CHECKLIST.md` on top), and that
+growth is disclosed rather than absorbed, as the budget policy requires.
 
 The movement is recorded rather than smoothed: **1,245** at `4cfd317` (the batch transaction and the thread
-adapter, four files), then **+602** at `d4498df` (the cursors, two files), and `7005d22` adds nothing to
-`src test` — a docs-only commit — for **1,847** at the tip that ships.
+adapter, four files), then **+602** at `d4498df` (the cursors, two files), `7005d22` and `4703ee6` add nothing
+to `src test` (docs-only), and round 1's corrections at `99f397c` add 272 and remove 55 for **2,064** at the
+tip that ships.
 
 Grounds: three modules plus three twins, each over real `node:sqlite` temp files opened through
 `ledger/open.ts`; PT-10's two halves (the replay and the all-or-nothing rollback) with a real SQLite fault
 injected inside `withTransaction`; D-20's coupling refused in both directions; the offset's value, its
-`max`-over-the-batch rule and its placement; the `(bot_id, update_id)` key pinned against a same-id update
-under another bot; the thread adapter's round trip, its upsert, its per-project scoping, its cap and its
-reconciliation of a shortened history; and D-19's catch-up window with its edge pinned on both sides (a row
-exactly on the edge is inside the window, and `0` is the answer when nothing is older). Trimming that list is
-what the budget rule forbids.
+`max`-over-the-batch rule, its forward-only guard and the fact that the value reported is the ledger's
+rather than the writer's arithmetic; the `(bot_id, update_id)` key pinned against a same-id update under
+another bot and against a repeat inside one batch; the thread adapter's round trip, its upsert, its
+per-project scoping, its cap, its reconciliation of a shortened history and its read order; and D-19's
+catch-up window with its edge pinned on both sides (a row exactly on the edge is inside the window, and `0`
+is the answer when nothing is older). Trimming that list is what the budget rule forbids.
 
 **A re-slice was considered and rejected, on the numbers.** `cursors.ts` does not import `inbox.ts`, so
 PR-12a (`inbox` + `threads`, 1,245) and PR-12b (`cursors`, 602) would each still be over the 400-line budget —
@@ -3601,8 +3606,9 @@ the split would produce two exceptions instead of one and renumber a board row t
 fill as one. That is why it is one slice with one disclosed exception rather than two blocks, and the
 measurement is the reason, not a preference.
 
-Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 2 added / 2 removed — task
-12.6's two cells.
+Outside the rule's own unit (`src test`): `docs/02-architecture/THREAT-MODEL.md`, 3 added / 3 removed after
+round 1's second correction of PT-10's cell, and `docs/06-backlog/CHECKLIST.md`, the B-35 row round 1 added —
+both in the commit that carries this record (the first in `99f397c`, the second here).
 
 ## Where the code came from
 
@@ -3621,12 +3627,15 @@ PR-05) is the consumer the thread adapter exists for; it is not edited here.
 `test/ledger/threads.test.ts` and `test/ledger/inbox.test.ts` were authored first and failed with **TS2307**
 (the modules did not exist) — a legitimate RED for a missing module. `src/ledger/threads.ts` then went green
 first because `inbox.ts` imports it, and `src/ledger/inbox.ts` followed. `test/ledger/cursors.test.ts` then
-failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin.
+failed the same way and `src/ledger/cursors.ts` made it pass. Every `src` file has its twin. Round 1 added
+seven cases (three digest cases, the offset rewind, the thread-row rollback, the two duplicate-identity
+refusals, the history order), each of which is the test its own mutant now dies on.
 
 | Where | `node --test` over the three focused suites | Whole suite | `test:static` |
 |---|---|---|---|
 | `main` before this slice | not run as a set | 379 | 8 |
-| this slice at `7005d22` | **41 / 41** (11 threads, 14 inbox, 16 cursors) | **420 / 420** | **8 / 8** |
+| `4703ee6` (before round 1) | **41 / 41** (14 inbox, 11 threads, 16 cursors) | **420 / 420** | **8 / 8** |
+| `99f397c` (the tip that ships) | **48 / 48** (18 inbox, 12 threads, 18 cursors) | **427 / 427** | **8 / 8** |
 
 **Sub-task order deviated once, disclosed.** The block's 12.1 and 12.2 name `inbox.ts` only; `threads.ts`
 appears in 12.2's prose with no RED sub-task of its own. Strict TDD still holds — red before green for both
@@ -3636,58 +3645,130 @@ followed, the same disclosure PR-11 made for 11.1/11.3.
 
 ## Frozen verification (the working tree was never the subject)
 
-`git worktree add --detach ../telegram_bus_agent-worktrees/pr-12 7005d22`, a junction to the main checkout's
+`git worktree add --detach ../telegram_bus_agent-worktrees/<name> <sha>`, a junction to the main checkout's
 `node_modules`, `rm -rf dist`, `tsc -b --force`:
 
-- whole suite **420 / 420**, `test:static` **8 / 8** at `7005d22`.
-
-The six files' bytes at that tip, so any later claim can be checked against them:
-
-| File | sha256 at `7005d22` |
-|---|---|
-| `src/ledger/inbox.ts` | `8ef10cb480ff694652720376f82df8e0cae8d748ae217943a070f3ae14ce85f3` |
-| `src/ledger/threads.ts` | `d4adc2d69dd9952e6b3338082a57cb3c9eaf4badf890cca5d1130b4ad5493ab8` |
-| `src/ledger/cursors.ts` | `1f28c0cc276c93c5dbdd50caccb0d97e8d7563050ef415933e985cde857526ba` |
-| `test/ledger/inbox.test.ts` | `16e410c39b8dc91e133bec3af00d49d160a177383908cccff79886718341a624` |
-| `test/ledger/threads.test.ts` | `ca619196f7ac39d03c61b2377bc3f3aa8cced0ad98d84c0cceb3126ea4194b36` |
-| `test/ledger/cursors.test.ts` | `77dc7dc7896ee0f8215d41eece3c34d799e2d9978f3d510ebdd9d2324af18aed` |
-
-## Mutant matrix — each built on a cleaned `dist/` in the isolated worktree, each restored byte-identically
-
-| # | Mutant | Expected killer | Result |
+| Worktree | Frozen at | Whole suite | `test:static` |
 |---|---|---|---|
-| `M1` | the offset is written as a constant (`0`) instead of the batch's own value | the offset value tests | **killed** (34 pass / 7 fail) |
-| `M2` | the offset is advanced inside the transaction but **before** any row is written | — | **SURVIVED** (41 / 0) — see below |
-| `M3` | the replay check is removed, so a re-served batch is written again | a batch re-served after the crash replays once | **killed** (39 / 2) |
-| `M4` | the batch's highest `update_id` is taken from the last entry seen rather than the maximum | the offset advances one past the highest `update_id` | **killed** (40 / 1) |
-| `M5` | the offset advance drops its `+1` | the offset value tests | **killed** (34 / 7) |
-| `M6` | D-20's body coupling is not checked at all | the two body/outcome refusals | **killed** (39 / 2) |
-| `M7` | D-20's coupling is checked in one direction only | the writer refuses a kept-body outcome with a null body | **killed** (40 / 1) |
-| `M8` | the thread upsert becomes `INSERT OR REPLACE`, so the cascade takes the history | — | **SURVIVED** (41 / 0) — see below |
-| `M9` | the writer stores an uncapped history | the writer trims to the newest `MAX_THREAD_HISTORY` | **killed** (40 / 1) |
-| `M10` | the history reconciliation deletes the entries it meant to keep | a shortened history reconciles the table | **killed** (36 / 5) |
-| `M11` | a fresh session's cursor starts at zero | a fresh session starts at the newest seq older than the window | **killed** (40 / 1) |
-| `M12` | the catch-up query drops its `received_at` filter | the catch-up window test | **killed** (39 / 2) |
-| `M13` | the catch-up edge is inclusive instead of strict | the catch-up window test's edge case | **killed** (40 / 1) |
-| `M14` | advancing one client's cursor moves every client's | advancing one client leaves the other's alone | **killed** (36 / 5) |
-| `M15` | the surfaced mark is last-wins instead of first-wins | `first_surfaced_at` is first-wins | **killed** (40 / 1) |
+| `pr-12` | `7005d22` | 420 / 420 | 8 / 8 |
+| `judgment-12` | `4703ee6` | 420 / 420 | 8 / 8 |
+| `pr-12-fix` | `99f397c` | (mutant sweep only; the tip's suite is 427 / 427 above) | — |
 
-**15 mutants, 13 killed, 2 survived**, and every file was restored byte-identically (`sha256` re-checked after
-each one). Both survivors are reported rather than removed from the matrix:
+The six files' bytes at `99f397c`, so any later claim can be checked against them:
 
-- **`M2` is a real gap in what the tests can see, and it is disclosed as one.** Within one transaction the
-  *position* of the offset advance is unobservable through this suite: a batch that throws rolls the whole
-  transaction back wherever in it the write sat, and a batch that commits leaves the same value in `offsets`
-  either way. What `test/ledger/inbox.test.ts` pins is therefore the offset's **value**, its
-  `max`-over-the-batch rule, its `+1`, its survival of a refused batch and its stability across a replay — not
-  the order of the statements inside the transaction. That order is design §5.3's, and its evidence is the
-  design plus the module's own reading, in the sense HANDOFF §2.2 gives "a prose claim has no executable
-  mutant": saying a test distinguishes it would be the kind of over-claim PR-11's judges corrected twice.
-- **`M8` is an equivalent mutant**, and it is stated as one rather than as a test failure. `INSERT OR REPLACE`
-  does delete the thread row and cascade its history away — but the writer's very next step re-inserts exactly
-  the entries the record carries, so the end state is identical. The true `INSERT … ON CONFLICT … DO UPDATE` is
-  kept because it does not depend on that equivalence holding (a future caller that wrote the row without
-  reconciling the history would break under `OR REPLACE`), and the module says so where the SQL is.
+| File | sha256 at `99f397c` |
+|---|---|
+| `src/ledger/inbox.ts` | `a8025501fe62a1fcad77026d91acfd4598c86500c6ae9f8fe40ce1ff42adb37e` |
+| `src/ledger/threads.ts` | `d4adc2d69dd9952e6b3338082a57cb3c9eaf4badf890cca5d1130b4ad5493ab8` |
+| `src/ledger/cursors.ts` | `e55bfa6b3e06e689af13a1a73e6361a49e65b310d142ea41ea0f3612ed32ac6c` |
+| `test/ledger/inbox.test.ts` | `2c7f11d40175942435e33fa9606484b132183919e037323d1fda23ca43bbe539` |
+| `test/ledger/threads.test.ts` | `2236b1f830769ffa384147414d75005b5264c0f37c98e9f7e40b7f13008d9c0a` |
+| `test/ledger/cursors.test.ts` | `ada64c19a5ae4378463a4677d6fd43b44df647fc28c3ed1f8e387ebf4e4cbd00` |
+
+`src/ledger/threads.ts` is the one file whose bytes round 1 did not touch: JD-A-005 and JD-A-006 were fixed in
+its *twin*, which is why its hash is the same before and after.
+
+## Judgment Day round 1 (substitute for the tribunal debate)
+
+Two blind read-only judges (`jd-judge-a`, `jd-judge-b`) with identical scope, criteria and skill paths, run
+concurrently over **one frozen committed tree** (`judgment-12`, detached at `4703ee6`, clean, full suite
+420/420 and `test:static` 8/8 at that tip). The frozen ledger's canonical SHA-256 — SHA-256 over the rows
+file, one JSON row per line with keys sorted alphabetically, LF-terminated — is
+**`47880377d734d74f41b371f0a3a1434012701bec901fddb96fcacd3d3d212f26`** for **13 rows**.
+
+**The round returned 2 CRITICAL, 6 WARNING and 5 SUGGESTION, and three defects were reached independently by
+both judges.** Every row was reproduced here before it was believed, and every one of the thirteen named a
+real defect of this slice.
+
+| Frozen row | Severity | What it found | Reproduced by the writer |
+|---|---|---|---|
+| `JD-A-001` / `JD-B-002` | **CRITICAL** (both judges) | `advanceClientCursor` branched on `"last_surfaced_digest" in advance`, so a caller forwarding an optional value — key present, value `undefined`, which this repository's `strict` config permits because it sets no `exactOptionalPropertyTypes` — took the write branch and **erased** the stored digest. That is the conflation the field's own contract forbids, and its consequence is the defect the unit exists to remove: a wiped digest is a client treated as never surfaced, so the next `fetch` re-serves a body it already saw | Yes: a probe on the frozen `dist` showed `digest-1` → `null` after a call passing an explicit `undefined`; and a mutant on a copy of the built tree that flipped the branch to `!== undefined` **survived** the whole suite, so the documented semantics were indistinguishable from the erasing ones |
+| `JD-B-001` | **CRITICAL** (one judge) | The test named for the thread write happening *inside the batch's transaction* could not fail for its name: deferring `writeThreadRecord` until after `withTransaction` returned left all 41 focused tests green. The spec's "Every poll MUST write admitted updates to the `updates` inbox, `threads` and `audit_log` inside one transaction" was therefore unpinned for the `threads` half | Yes: reproduced by the writer independently (`M19`, 41/41 green at `4703ee6`). Recorded as a **single-judge** row, reported for the substance and not dismissed; the writer's own reading of its severity is WARNING — the shipped code does write inside the transaction, so what was wrong is the test's name and the missing observable half, not the behaviour |
+| `JD-A-002` / `JD-B-003` | WARNING (both judges) | The claim that the offset is "read back rather than echoed, so what the caller is told is what the ledger holds" had **no test that could fail on it**: replacing the read-back with `return nextUpdateId;` left 41/41 green (ADR-12) | Yes: the echo mutant survives at `4703ee6` |
+| `JD-A-003` / `JD-B-003` | WARNING (both judges) | PT-10's cell, which this slice wrote, credited `test/ledger/inbox.test.ts` with pinning the read-back "inside the committing transaction" — the read-back half could not fail through that file, and the placement half is not observable at all | Yes: the same mutant, plus the writer's own `M2`/`M16`/`M19` results |
+| `JD-A-004` | WARNING | The test named "...refuses a `rejected` row that carries a body..." submitted an **`ignored`** row, so the `rejected` half of D-20 was unpinned: a writer refusing `ignored`+body while storing `rejected`+body kept the suite green | Yes: read directly — line 264 is the only `rejected` fixture and it carries `body: null` — and the one-directional mutant survives at `4703ee6` |
+| `JD-B-004` | WARNING | The mutant matrix was presented as the sweep but **omitted two of the six mutants HANDOFF §5 step 4 mandates** — "remove the offset advance from the transaction" and "move it outside it" — without disclosing the omission. Moving it outside leaves 41/41 green | Yes: reproduced here as `M16` (survives, 48/48) and `M17` (killed, 43/5) |
+| `JD-A-005` | SUGGESTION | The adapter's stated `ORDER BY (at, eid)` was unpinned: `ORDER BY eid` survived, because every fixture ordered its eids as its `at` values did | Yes: the mutant survives at `4703ee6` |
+| `JD-A-006` | SUGGESTION | The test named for the adapter "opening no transaction of its own" could not fail for its name: wrapping `writeThreadRecord` in `withTransaction` left it passing, with seven inbox tests absorbing the failure instead | Yes: the mutant's failures were listed by name and none was that test |
+| `JD-B-005` | SUGGESTION | The note claiming the catch-up query "is a scan" was false: `UNIQUE (project_id, eid)` yields `sqlite_autoindex_updates_2`, whose leftmost column is `project_id`, and the planner uses it | Yes: `EXPLAIN QUERY PLAN` → `SEARCH updates USING INDEX sqlite_autoindex_updates_2 (project_id=?)`, with `received_at` a residual filter |
+| `JD-B-006` | SUGGESTION | A `(bot_id, update_id)` repeated *inside one batch* was counted `replayed` — a counter documented as "an earlier transaction already stored this" — and the entry was skipped whole, silently discarding its `eid`, thread row and audit rows | Yes: a two-entry batch with `update_id` 101 twice returned `{inserted: 1, replayed: 1, nextUpdateId: 102}` and stored only one `eid` |
+| `JD-B-007` | SUGGESTION | PT-10's assertion and the evidence cell this slice wrote read as a contradiction, because the offset is `max(update_id) + 1` over entries that persist no `updates` row at all | Yes: this slice's own test asserts `nextUpdateId: 203` with `inserted: 0` and an empty `updates` table |
+
+### The correction batch (round 1)
+
+**Authorized by the Director's session-wide delegation, not by a fresh per-batch question.** The Director
+asked this session to run to the end of the slice without stopping for authorizations; the batch, its size
+(+272 / −55) and its cost are disclosed here and in the PR body instead. It is one round (`1 of 2`), applied
+by the **writer** — no `jd-fix-agent` dispatch, because that dispatch's shape admits exactly the
+BLOCKER/CRITICAL rows and this batch also corrected the WARNING/SUGGESTION rows, which is the shape PR-10's
+and PR-11's round 1 took.
+
+Commit `99f397c`, **+272 / −55** across six files (the PT-10 cell included):
+
+| Row | Correction | Mutant killed by it |
+|---|---|---|
+| `JD-A-001` / `JD-B-002` | the branch is `advance.last_surfaced_digest !== undefined`; the field's contract now says *why* `in` was wrong, and three cases pin write, skip and clear separately | `M18`: key on presence |
+| `JD-A-002` / `JD-B-003` / `JD-A-003` | the offset move is **forward-only** (`MAX(offsets.next_update_id, excluded.next_update_id)`) and the value is read back; a test seeds an offset ahead of the batch so the ledger's value and the writer's arithmetic differ, and the cell no longer claims the test pins where in the transaction the write sits | `M20`: echo the computed value · `M25`: drop the guard |
+| `JD-B-001` | the test is re-titled to what it pins, and the **observable** half of the clause is pinned by a new case: a refused batch takes the thread rows it had already written with it | `M19` still survives on the *position*, and that is disclosed as `M2` is |
+| `JD-A-004` | the refusal is exercised for both bodiless outcomes in one loop | `M22`: refuse `ignored`+body, store `rejected`+body |
+| `JD-B-004` | the two mandated mutants are implemented as `M16` and `M17` and recorded, survivors included | — (record) |
+| `JD-A-005` | a case where the two orderings **disagree** (earliest entry, alphabetically last eid) plus a tie on `at` | `M21`: `ORDER BY eid` |
+| `JD-A-006` | the adapter is now called from **inside** a transaction the suite opened, where a self-opening adapter is refused | `M23`: wrap the adapter in `withTransaction` |
+| `JD-B-005` | the note carries the measured plan instead of the false word "scan" | — (comment) |
+| `JD-B-006` | a repeated identity inside one batch is a **named refusal**, and `replayed` is documented as "an earlier transaction" | `M24`: drop the check |
+| `JD-B-007` | the cell states the operative reading explicitly, and the assertion's own wording is filed as **B-35** for the Director | — (record) |
+
+## Mutant matrix — each built on a cleaned `dist/` in an isolated worktree, each restored byte-identically
+
+Run at `99f397c` in `pr-12-fix`, `node odd/mutants.mjs` (the script lives outside the repository and is
+removed at close). **25 mutants, 21 killed, 4 survived**, and every mutated file was restored byte-identically
+after each one (`sha256` re-checked by the script).
+
+| # | Mutant | Result | Killed by |
+|---|---|---|---|
+| `M1` | the offset is written as a constant | killed (40/8) | the offset value tests |
+| `M2` | the offset is advanced before any row is written | **SURVIVED** (48/0) | — see below |
+| `M3` | the replay check is removed | killed (46/2) | a batch re-served after the crash replays once |
+| `M4` | the highest `update_id` is the last seen, not the maximum | killed (47/1) | the offset advances one past the highest `update_id` |
+| `M5` | the offset advance drops its `+1` | killed (40/8) | the offset value tests |
+| `M6` | D-20's coupling is not checked at all | killed (46/2) | the two body/outcome refusals |
+| `M7` | D-20's coupling is checked in one direction only | killed (47/1) | a kept-body outcome with a null body |
+| `M8` | the thread upsert becomes `INSERT OR REPLACE` | **SURVIVED** (48/0) | — equivalent mutant, see below |
+| `M9` | the writer stores an uncapped history | killed (47/1) | the writer trims to the newest `MAX_THREAD_HISTORY` |
+| `M10` | the history reconciliation deletes what it meant to keep | killed (42/6) | a shortened history reconciles the table |
+| `M11` | a fresh session's cursor starts at zero | killed (47/1) | the catch-up window test |
+| `M12` | the catch-up query drops its `received_at` filter | killed (46/2) | the catch-up window test |
+| `M13` | the catch-up edge is inclusive instead of strict | killed (47/1) | the edge case inside the catch-up test |
+| `M14` | advancing one client's cursor moves every client's | killed (42/6) | advancing one leaves the other's alone |
+| `M15` | the surfaced mark is last-wins | killed (47/1) | `first_surfaced_at` is first-wins |
+| `M16` | the offset advance is **moved out** of the transaction | **SURVIVED** (48/0) | — see below |
+| `M17` | the offset advance is **removed** entirely | killed (43/5) | the offset value tests |
+| `M18` | the digest branch is keyed on presence | killed (47/1) | an explicit `undefined` leaves the stored digest alone |
+| `M19` | the thread write is **deferred** past the transaction | **SURVIVED** (48/0) | — see below |
+| `M20` | the offset is echoed instead of read back | killed (47/1) | an older batch cannot rewind the offset |
+| `M21` | the history is read back ordered by `eid` alone | killed (47/1) | the history comes back ordered by time |
+| `M22` | `ignored`+body refused, `rejected`+body stored | killed (47/1) | the parametrized refusal test |
+| `M23` | the thread adapter opens a transaction of its own | killed (36/12) | the nested-call case, named among the twelve |
+| `M24` | a repeated identity inside one batch is not refused | killed (46/2) | the two duplicate-identity refusals |
+| `M25` | the forward-only guard is dropped | killed (47/1) | an older batch cannot rewind the offset |
+
+All four survivors are reported rather than removed from the matrix, and three of them are one disclosure:
+
+- **`M2`, `M16` and `M19` are the same gap seen from three sides, and it is disclosed as one.** Within a
+  single transaction, **where** a write sits relative to the rows it accompanies is not observable through
+  this suite: a batch that throws rolls the whole transaction back wherever in it the write sat, and a batch
+  that commits leaves the same rows and the same offset either way. So the *placement* of the offset advance,
+  and of the thread write, is a claim of design §5.3 and of the modules' own reading, not something a test
+  here can fail on — in the sense HANDOFF §2.2 gives "a prose claim has no executable mutant". What *is*
+  pinned is everything that placement protects: the offset's presence, its value, its `max` rule, its `+1`,
+  its forward-only guard, its being read back from the ledger, and its survival of a refused batch and of a
+  replay — plus, for the thread write, that a refused batch takes the thread rows with it. Saying a test
+  distinguishes the placement would be exactly the over-claim round 1 corrected.
+- **`M8` is an equivalent mutant.** `INSERT OR REPLACE` does delete the thread row and cascade its history
+  away — but the writer's very next step re-inserts exactly the entries the record carries, so the end state
+  is identical. The true `INSERT … ON CONFLICT … DO UPDATE` is kept because it does not depend on that
+  equivalence holding (a caller that wrote the row without reconciling the history would break under
+  `OR REPLACE`), and the module says so where the SQL is.
 
 ## Boundaries stated in the modules rather than left to be found
 
@@ -3697,30 +3778,36 @@ each one). Both survivors are reported rather than removed from the matrix:
   contract is the forwarder's, so a `resolved` update stored without its thread row leaves that thread open —
   a visible wrong answer rather than a corrupt log. This is the one coupling design §5.2 does *not* hand to
   this writer, and the module says which one it does.
-- **A duplicate `eid` refuses the whole batch** rather than skipping that row: `seen_eids` is classification
-  (design §8.2 step 6, PR-22a). The deliberate consequence is a poller that fails loudly rather than one that
-  makes half a batch of progress.
+- **A duplicate `eid` refuses the whole batch**, and so does **a repeated `(bot_id, update_id)` inside one
+  batch**. `seen_eids` is classification (design §8.2 step 6, PR-22a) and the identity is the entry's; in both
+  cases the alternative is a silent half-measure, and the deliberate consequence of refusing is a poller that
+  fails loudly rather than one that makes progress by discarding.
 - **A replayed *drop* is audited again.** A dropped update writes no `updates` row, so PT-10's key has nothing
   to match; `inserted` stays 0 and nothing is surfaced twice.
 - **The stored history is read back ordered by `(at, eid)`.** `thread_history`'s primary key is
   `(project_id, thread_id, eid)` and version 1 is frozen, so a tie is ordered by `eid` rather than by arrival.
   The set is exactly the record's array, and nothing in F1 depends on the difference — the digest uses
-  `history.length` — but it is a difference.
-- **The catch-up query is a scan** (`updates` has no index on `project_id` or `received_at` in version 1),
-  bounded by the inbox retention window and by one run per new session.
-- **The offset write is an upsert where design §5.3 writes a plain `UPDATE`.** Nothing in F1 creates the
-  `offsets` row, and a first poll that updated nothing would leave the offset unstored, so Telegram would
-  re-serve that batch for ever. Both modules state the deviation where the statement is.
+  `history.length` — but it is a difference, and a test now pins both halves of the rule.
+- **The catch-up query is a project-scoped index search, not a scan.** `updates` has no index on
+  `received_at`; the planner uses `sqlite_autoindex_updates_2` (from `UNIQUE (project_id, eid)`) for the
+  project and filters `received_at` residually. The note said "scan" until round 1 measured the plan.
+- **The offset write is an upsert where design §5.3 writes a plain `UPDATE`, and it is forward-only.** Nothing
+  in F1 creates the `offsets` row, and a first poll that updated nothing would leave the offset unstored, so
+  Telegram would re-serve that batch for ever; and an offset is a promise about a range, so a re-served older
+  window must not pull it backwards. Both halves are stated where the statement is.
 
 ## Reportable items (reported, not silently resolved)
 
 | Id | Item |
 |---|---|
-| — | `M2`: the offset's *position* inside the transaction is not observable through this suite; the evidence is the design and the module's reading, not a mutant |
-| — | `M8` is an equivalent mutant, not a test failure |
+| `JD-B-001` | recorded as a **single-judge CRITICAL** that the writer reproduced and re-read as WARNING; the name was corrected and the observable half pinned, and the placement remains unobservable (`M19`) |
+| `M2` / `M16` / `M19` | the transaction **placement** of the offset advance and the thread write is not observable through this suite; the evidence is design §5.3 and the modules' reading, not a mutant |
+| `M8` | an equivalent mutant, not a test failure |
 | — | **B-26 is untouched**: `tasks.md` 12.6 names PT-10 and PT-11 only, and neither is PT-25 |
 | — | `updates.body`'s coupling is refused rather than normalized: silently stripping a body would delete the evidence of a classification bug |
+| **B-35** | filed in this PR for PT-10's assertion wording, which round 1's `JD-B-007` showed reading against the evidence cell |
 
 ## Next
 
-- Judgment Day over the frozen range, the ordinary native review, then push, the PR and its CI matrix.
+- The scoped re-judgment over the frozen ledger plus this fix delta, then the ordinary native review, then
+  push, the PR and its CI matrix.
