@@ -455,12 +455,55 @@ Scope: `src/ledger/audit.ts`, `src/ledger/unknown-senders.ts`, `src/ledger/condi
 Requirements: `ledger › Audit log is append-only and stores no rejected body or token` (PT-20); `ledger › No token in any ledger table`; `ledger › Retention is a named constant, pruning runs in the daemon`.
 Runtime harness: real `node:sqlite` fixture rows aged past each retention window.
 
-- [ ] 13.1 RED: write `test/ledger/audit.test.ts` (rejected update leaves a bodiless row; no row ever matches the token regex through every write path).
-- [ ] 13.2 GREEN: implement `src/ledger/audit.ts`, `src/ledger/unknown-senders.ts` (bodiless upsert on `unknown_sender`), `src/ledger/conditions-store.ts` (`scope`/`name` upsert, `detail` codes/ids only).
-- [ ] 13.3 RED: write `test/ledger/retention.test.ts` covering "`thread_history` is capped, not truncated on read" and "hourly sweep removes rows past each window, keeps everything younger" (`INBOX_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `UNKNOWN_SENDER_RETENTION_DAYS`, `CLIENT_SESSION_STALE_HOURS`).
-- [ ] 13.4 GREEN: implement `src/ledger/retention.ts` (`RETENTION_SWEEP_INTERVAL_HOURS` schedule, one indexed `DELETE` per table, open threads never pruned).
-- [ ] 13.5 Verify: `npm run build && node --test "dist/test/ledger/audit.test.js" "dist/test/ledger/unknown-senders.test.js" "dist/test/ledger/conditions-store.test.js" "dist/test/ledger/retention.test.js"`.
-- [ ] 13.6 Docs: update the file-name cell(s) of PT-20 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 13.1 RED: write `test/ledger/audit.test.ts` (rejected update leaves a bodiless row; no row ever matches the token regex through every write path).
+- [x] 13.2 GREEN: implement `src/ledger/audit.ts`, `src/ledger/unknown-senders.ts` (bodiless upsert on `unknown_sender`), `src/ledger/conditions-store.ts` (`scope`/`name` upsert, `detail` codes/ids only).
+- [x] 13.3 RED: write `test/ledger/retention.test.ts` covering "`thread_history` is capped, not truncated on read" and "hourly sweep removes rows past each window, keeps everything younger" (`INBOX_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `UNKNOWN_SENDER_RETENTION_DAYS`, `CLIENT_SESSION_STALE_HOURS`).
+- [x] 13.4 GREEN: implement `src/ledger/retention.ts` (`RETENTION_SWEEP_INTERVAL_HOURS` schedule, one indexed `DELETE` per table, open threads never pruned).
+- [x] 13.5 Verify: `npm run build && node --test "dist/test/ledger/audit.test.js" "dist/test/ledger/unknown-senders.test.js" "dist/test/ledger/conditions-store.test.js" "dist/test/ledger/retention.test.js"`.
+- [x] 13.6 Docs: update the file-name cell(s) of PT-20 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+13.1–13.6 flipped to `[x]` in the **PR-13** commits. **Apply-time note.**
+
+*Order.* The block's 13.1 names `audit.test.ts` alone and its 13.2 names three modules, so neither
+`unknown-senders.test.ts` nor `conditions-store.test.ts` has a RED sub-task of its own. Both landed in the
+**13.1** pass — all three suites failed together, each on its missing module (`TS2307` ×3) — and all three
+modules landed in the **13.2** pass, `audit.ts` first because `inbox.ts` imports it. Red still precedes green
+for every module; the record says so instead of claiming the block's order was followed, the same disclosure
+PR-11 and PR-12 each made for their own omitted RED sub-tasks.
+
+*Scope.* The block names eight files. The slice also edits `src/ledger/inbox.ts` (+13 / −42): PR-13's own
+requirement is that `audit.ts` be the **shared** writer the poll batch and the send path both use, so that
+module's private `insertAuditRow` is deleted and its call site renamed — byte-minimal, with **PR-12's 48**
+ledger tests (18 `inbox`, 12 `threads`, 18 `cursors`) passing unchanged. *(This sentence said "PR-12's 62
+ledger tests" until Judgment Day round 1, which reached it from both sides — `JD-A-005` and `JD-B-003`;
+62 was a `node --test` run of PR-12's three suites plus PR-11's `open`, and the claim's evidence is the
+number.)* It also files **B-37** (the `ledger` spec's "No token in any ledger table" scenario names three
+write paths, and the third — `ledger/cursors.ts`, the cursor advance — is merged and frozen from PR-12, so
+the gap is filed rather than edited here) and **B-38** (round 1's finding: the peer-body columns are
+unguarded, and the receive-side scan this slice's record first credited for them does not exist anywhere in
+F1).
+
+*Size.* The block estimated ≈350 with no exception; measured at `f6b1599` the slice was **2,004 added and 42
+removed = 2,046 authored lines**; at `6f89090`, after round 1, **2,214 and 42 = 2,256**; at `2580afc`, after
+round 2, **2,221 and 42 = 2,263**; and at the round-4 tip that ships **2,226 added and 42 removed = 2,268
+authored lines** (`git diff --numstat 2055486..<tip> -- src test`; 2,226 measured as insertions only) — **a
+disclosed PR-13-scoped size exception, 1,868 over** at the tip (1,646 before the audit, 1,856 after round 1,
+1,863 after round 2), authorized by the Director's session-wide delegation and disclosed there rather than
+asked per batch. A re-slice into PR-13a (the three writers plus the `inbox.ts` delegation, **1,409** authored
+at `f6b1599`, **1,613** at `6f89090` and **1,620** at both later tips) and PR-13b (`retention`, **637** at
+`f6b1599`, **643** at `6f89090` and `2580afc`, **648** at the round-4 tip) was **measured and rejected**: each
+half would still be over the 400-line budget, so the split would produce two exceptions instead of one.
+Grounds, the measured re-slice, the audit's movement and every figure are in `apply-progress.md` §PR-13.
+*(Every figure is labelled with the tip it belongs to, because the first version of this paragraph named only
+the pre-audit measurement, the correction after round 1 attributed 1,613 to "the tip" where the tip held
+1,620, and round 4's own comment correction moved the tip again — the same class of stale figure Judgment
+Day's `JD-A-005` was about.)*
+
+*Cells.* 13.6 fills **PT-20** only. **B-26 stays open**: PT-20 is not PT-25, and the cell names what it
+deliberately does not claim — the batch's own audit writes and their replay behaviour are PT-10's, the
+**peer-body columns are unguarded and are B-38's** (round 1 corrected this line, which had said
+`updates.body` is admission's receive-side scan, PR-22a: no such step exists in F1), and the cursor advance
+is B-37's.
 
 ### Unit 5 — `secret-store`
 
