@@ -37,10 +37,13 @@ import { SESSION_CATCHUP_HOURS } from "../shared/constants.js";
  * **Boundaries stated rather than hidden.** Neither `client_surfaced` nor `advanceClientCursor` can
  * reference a session that does not exist: `open.ts` turns `foreign_keys` on, so a surfaced row for an
  * unknown client is refused by the database, and an advance that matched no row is refused by name rather
- * than left as a silent no-op. The catch-up query reads `updates` by `(project_id, received_at)` and
- * version 1 carries no index on either, so it is a scan — bounded by the inbox retention window
- * (`INBOX_RETENTION_DAYS` days) and by one run per new session, which is why no index was added: an index
- * here would be a schema change, and a schema change is a migration.
+ * than left as a silent no-op. The catch-up query reads `updates` filtered by `(project_id, received_at)`
+ * and version 1 has no index on `received_at` — but it is **not** a full scan, and an earlier version of
+ * this note said it was: `updates` carries `UNIQUE (project_id, eid)`, whose autoindex's leftmost column is
+ * `project_id`, so the planner does a project-scoped index search with `received_at` as a residual filter
+ * (measured on the pinned build: `SEARCH updates USING INDEX sqlite_autoindex_updates_2 (project_id=?)`).
+ * What remains true is the part that matters — no index on `received_at`, one run per new session — which is
+ * why no index was added: an index here would be a schema change, and a schema change is a migration.
  *
  * This module writes no transactions of its own. `design §8.4`'s handler is where these calls are
  * ordered; each statement here autocommits, and the one relationship that must hold across two of them —
@@ -119,9 +122,17 @@ export interface ClientCursorAdvance {
 	/**
 	 * The digest this session was shown, when it was shown one.
 	 *
-	 * Omitted — not `null` — when there is none to report, because the two differ: A4's quiet tick advances
-	 * the position and surfaces nothing, and it must not erase the digest the previous surfacing stored.
-	 * Pass `null` explicitly to clear it.
+	 * `undefined` — whether the property is omitted or passed as an explicit `undefined`, which this
+	 * repository's `strict` configuration permits because it does not set `exactOptionalPropertyTypes` —
+	 * means "there is none to report and the stored one stands". A4's quiet tick advances the position and
+	 * surfaces nothing, and it must not erase the digest the previous surfacing stored. Pass `null`
+	 * explicitly to clear it.
+	 *
+	 * The distinction is drawn with `!== undefined` rather than with `"last_surfaced_digest" in advance`,
+	 * and that is load-bearing: the natural call is to forward an optional value
+	 * (`{ …, last_surfaced_digest: maybeDigest }`), which puts the key *present* and the value `undefined`,
+	 * so an `in` test would take the write branch and erase the digest — the exact conflation this contract
+	 * forbids. `test/ledger/cursors.test.ts` pins both cases.
 	 */
 	readonly last_surfaced_digest?: string | null;
 }
@@ -184,17 +195,18 @@ export function readClientCursor(db: DatabaseSync, client_id: string): ClientCur
 export function advanceClientCursor(db: DatabaseSync, client_id: string, advance: ClientCursorAdvance): void {
 	// Two statement shapes rather than one with a CASE: "leave the digest alone" and "write the digest" are
 	// different statements, and expressing them as one would mean a sentinel value that a real digest could
-	// collide with.
-	const result =
-		"last_surfaced_digest" in advance
-			? db
-					.prepare(
-						"UPDATE client_cursors SET inbox_seq = ?, last_seen_at = ?, last_surfaced_digest = ? WHERE client_id = ?",
-					)
-					.run(advance.inbox_seq, advance.last_seen_at, advance.last_surfaced_digest ?? null, client_id)
-			: db
-					.prepare("UPDATE client_cursors SET inbox_seq = ?, last_seen_at = ? WHERE client_id = ?")
-					.run(advance.inbox_seq, advance.last_seen_at, client_id);
+	// collide with. The test is `!== undefined` and NOT `"last_surfaced_digest" in advance`, because a caller
+	// forwarding an optional value puts the key present with the value `undefined` — see the field's doc.
+	const hasDigest = advance.last_surfaced_digest !== undefined;
+	const result = hasDigest
+		? db
+				.prepare(
+					"UPDATE client_cursors SET inbox_seq = ?, last_seen_at = ?, last_surfaced_digest = ? WHERE client_id = ?",
+				)
+				.run(advance.inbox_seq, advance.last_seen_at, advance.last_surfaced_digest ?? null, client_id)
+		: db
+				.prepare("UPDATE client_cursors SET inbox_seq = ?, last_seen_at = ? WHERE client_id = ?")
+				.run(advance.inbox_seq, advance.last_seen_at, client_id);
 
 	// SQLite counts the rows the statement MATCHED, so zero means "no such session" and never "the values
 	// were already those values" — which is what makes this a usable guard rather than a false alarm.
@@ -202,7 +214,6 @@ export function advanceClientCursor(db: DatabaseSync, client_id: string, advance
 		throw new Error(CLIENT_CURSOR_UNKNOWN_MESSAGE);
 	}
 }
-
 /**
  * The threads this session has already been shown — the set `shared/protocol-select.ts` takes to decide
  * what `body_omitted` applies to.

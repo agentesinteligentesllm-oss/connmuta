@@ -5,10 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
-import { commitInboxBatch, INBOX_BODY_OUTCOME_MISMATCH_MESSAGE } from "../../src/ledger/inbox.js";
+import {
+	commitInboxBatch,
+	INBOX_BODY_OUTCOME_MISMATCH_MESSAGE,
+	INBOX_DUPLICATE_UPDATE_ID_MESSAGE,
+} from "../../src/ledger/inbox.js";
 import { openLedger } from "../../src/ledger/open.js";
 import type { InboxAuditRow, InboxBatchEntry, InboxUpdateInput } from "../../src/ledger/inbox.js";
-import { writeThreadRecord } from "../../src/ledger/threads.js";
+import { readThreadRecord, writeThreadRecord } from "../../src/ledger/threads.js";
+import { withTransaction } from "../../src/ledger/transaction.js";
 import type { ThreadRecord } from "../../src/shared/thread-record.js";
 
 /**
@@ -258,6 +263,78 @@ test("a batch the schema refuses leaves nothing behind, not even the entries alr
 	});
 });
 
+test("a refused batch takes the thread rows it had already written with it", () => {
+	withLedger((db) => {
+		// The observable half of the spec's "writes `threads` inside one transaction": the entry whose thread
+		// was written is the FIRST one, and the throw comes from the one after it, so a writer that put the
+		// thread rows outside the batch would leave `thread-1` standing while the batch rolled back.
+		assert.throws(
+			() =>
+				commitInboxBatch(db, {
+					bot_id: BOT_ID,
+					entries: [admitted(updateInput(311, "eid-311"), "thread-1"), admitted(updateInput(312, "eid-311"), "thread-2")],
+				}),
+			(error: unknown) => (error as { errcode?: number }).errcode === SQLITE_CONSTRAINT_UNIQUE,
+		);
+
+		assert.deepEqual(readThreadRecord(db, PROJECT_ID, "thread-1"), undefined);
+		assert.deepEqual(tableCounts(db), { updates: 0, threads: 0, thread_history: 0, audit_log: 0 });
+	});
+});
+
+test("one identity carried twice in one batch is refused, not counted as a replay", () => {
+	withLedger((db) => {
+		// A cross-batch replay is the PT-10 case and is counted; this is the OTHER case, and the distinction is
+		// the counter's meaning. Skipping the second entry whole — which is what the replay path does — would
+		// discard `eid-B`, its thread row and its audit rows with nothing left saying it was ever seen.
+		assert.throws(
+			() =>
+				commitInboxBatch(db, {
+					bot_id: BOT_ID,
+					entries: [admitted(updateInput(101, "eid-a"), "thread-1"), admitted(updateInput(101, "eid-b"), "thread-2")],
+				}),
+			(error: unknown) => (error as Error).message === INBOX_DUPLICATE_UPDATE_ID_MESSAGE,
+		);
+
+		assert.deepEqual(tableCounts(db), { updates: 0, threads: 0, thread_history: 0, audit_log: 0 });
+		assert.equal(persistedOffset(db), null);
+	});
+});
+
+test("a dropped entry and an admitted entry may not share one update_id either", () => {
+	withLedger((db) => {
+		// The identity is the entry's, not the admitted row's: a batch that admitted an update and also
+		// reported it dropped would otherwise advance the offset over a conflict with nothing to show.
+		assert.throws(
+			() =>
+				commitInboxBatch(db, {
+					bot_id: BOT_ID,
+					entries: [admitted(updateInput(401, "eid-a"), "thread-1"), { kind: "dropped", update_id: 401, audits: [] }],
+				}),
+			(error: unknown) => (error as Error).message === INBOX_DUPLICATE_UPDATE_ID_MESSAGE,
+		);
+
+		assert.deepEqual(tableCounts(db), { updates: 0, threads: 0, thread_history: 0, audit_log: 0 });
+	});
+});
+
+test("an older batch cannot rewind the offset, and the value reported is the ledger's, not the writer's arithmetic", () => {
+	withLedger((db) => {
+		// The ledger is already at 501 — a window Telegram re-served after a restart arrives below it. The
+		// writer computed 102 for this batch, so the two candidates differ and the test can tell them apart:
+		// a writer that echoed its own arithmetic would answer 102 and leave the promise about the range broken.
+		commitInboxBatch(db, { bot_id: BOT_ID, entries: [admitted(updateInput(500, "eid-500"), "thread-seed")] });
+		assert.equal(persistedOffset(db), 501);
+
+		const result = commitInboxBatch(db, { bot_id: BOT_ID, entries: [admitted(updateInput(101, "eid-101"), "thread-1")] });
+
+		assert.deepEqual(result, { inserted: 1, replayed: 0, nextUpdateId: 501 });
+		assert.equal(persistedOffset(db), 501);
+		// The row itself still landed: what did not move is the offset, which is the point.
+		assert.equal(tableCounts(db).updates, 2);
+	});
+});
+
 test("updates.body is NULL for rejected and ignored, and kept for not_mine and noted", () => {
 	withLedger((db) => {
 		const outcomes = [
@@ -286,21 +363,30 @@ test("updates.body is NULL for rejected and ignored, and kept for not_mine and n
 	});
 });
 
-test("the writer refuses a rejected row that carries a body, and writes nothing", () => {
+test("the writer refuses a bodied row for `rejected` and for `ignored` alike, and writes nothing", () => {
 	withLedger((db) => {
-		assert.throws(
-			() =>
-				commitInboxBatch(db, {
-					bot_id: BOT_ID,
-					entries: [
-						admitted(updateInput(501, "eid-501"), "thread-1"),
-						{ kind: "admitted", update: updateInput(502, "eid-502", { apply_outcome: "ignored", body: "a body that must not survive" }) },
-					],
-				}),
-			(error: unknown) => (error as Error).message === INBOX_BODY_OUTCOME_MISMATCH_MESSAGE,
-		);
+		// Both bodiless outcomes, not just the one the first draft happened to pick: D-20's rule is an
+		// equivalence, so a writer that refused one outcome and stored the other would still be wrong, and this
+		// loop is what makes that visible. (The first draft's name said `rejected` while its only fixture was
+		// `ignored`, so the `rejected` half was unpinned until Judgment Day round 1 pointed at it.)
+		for (const apply_outcome of ["rejected", "ignored"] as const) {
+			assert.throws(
+				() =>
+					commitInboxBatch(db, {
+						bot_id: BOT_ID,
+						entries: [
+							admitted(updateInput(501, "eid-501"), "thread-1"),
+							{
+								kind: "admitted",
+								update: updateInput(502, `eid-502-${apply_outcome}`, { apply_outcome, body: "a body that must not survive" }),
+							},
+						],
+					}),
+				(error: unknown) => (error as Error).message === INBOX_BODY_OUTCOME_MISMATCH_MESSAGE,
+			);
 
-		assert.deepEqual(tableCounts(db), { updates: 0, threads: 0, thread_history: 0, audit_log: 0 });
+			assert.deepEqual(tableCounts(db), { updates: 0, threads: 0, thread_history: 0, audit_log: 0 });
+		}
 	});
 });
 
@@ -380,8 +466,14 @@ test("a replayed drop is audited again, because (bot_id, update_id) leaves no ro
 	});
 });
 
-test("the thread a batch admits is written by the thread adapter, inside the same transaction", () => {
+test("the thread a batch admits is written, on the batch's own connection", () => {
 	withLedger((db) => {
+		// Re-titled after Judgment Day round 1: the name this test carried ("…inside the same transaction")
+		// claimed more than the test can see. The thread write happens inside the batch's transaction, but a
+		// writer that deferred it until after `withTransaction` returned leaves every assertion here passing
+		// too, so the *position* is a claim of the design and the module rather than one this test can fail on.
+		// What IS observable is the atomicity, and `a refused batch takes the thread rows it had already
+		// written with it` in this file pins exactly that.
 		commitInboxBatch(db, { bot_id: BOT_ID, entries: [admitted(updateInput(901, "eid-901"), "thread-1")] });
 
 		const thread = db.prepare("SELECT body, project_id FROM threads WHERE thread_id = ?").get("thread-1") as {
@@ -393,14 +485,25 @@ test("the thread a batch admits is written by the thread adapter, inside the sam
 	});
 });
 
-test("the thread adapter writes on the connection it is handed, opening no transaction of its own", () => {
+test("the thread adapter opens no transaction of its own, so it composes inside one", () => {
 	withLedger((db) => {
-		// The counterpart of the case above: `threads.ts` does not open a transaction, so the batch is the
-		// only boundary around it. Called directly its statements still land, which is what makes it usable
-		// as one step inside the batch and why the module documents that the batch owns atomicity.
-		const record = threadRecord("written directly");
-		writeThreadRecord(db, { project_id: PROJECT_ID, thread_id: "thread-direct", record, updated_at: RECEIVED_AT });
+		// Called from INSIDE a transaction this suite opened. `withTransaction` refuses a nested call, so an
+		// adapter that opened one of its own would throw here rather than store the row — which is what makes
+		// this test able to fail for the reason its name gives, instead of merely observing that a direct call
+		// lands. (Judgment Day round 1 measured that the earlier version could not: wrapping the adapter in
+		// `withTransaction` left it passing, with the seven inbox tests absorbing the failure instead.)
+		withTransaction(db, () => {
+			writeThreadRecord(db, {
+				project_id: PROJECT_ID,
+				thread_id: "thread-direct",
+				record: threadRecord("written inside the caller's transaction"),
+				updated_at: RECEIVED_AT,
+			});
+		});
 
-		assert.equal((db.prepare("SELECT body FROM threads WHERE thread_id = ?").get("thread-direct") as { body: string }).body, "written directly");
+		assert.equal(
+			(db.prepare("SELECT body FROM threads WHERE thread_id = ?").get("thread-direct") as { body: string }).body,
+			"written inside the caller's transaction",
+		);
 	});
 });

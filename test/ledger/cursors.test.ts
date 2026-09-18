@@ -268,6 +268,38 @@ test("the surfaced digest is written when it is given, and left alone when it is
 	});
 });
 
+test("an explicit undefined leaves the stored digest alone, exactly as omitting it does", () => {
+	withLedger((db) => {
+		ensureClientCursor(db, session("client-a"));
+		advanceClientCursor(db, "client-a", { inbox_seq: 1, last_seen_at: NOW, last_surfaced_digest: "digest-1" });
+
+		// This is the NATURAL call shape: a handler forwarding an optional value puts the key PRESENT with the
+		// value `undefined`, and this repository's `strict` config permits it because it does not set
+		// `exactOptionalPropertyTypes`. A writer that branched on the key's presence would erase the digest
+		// here — and a wiped digest is a client treated as never surfaced, which is the `body_omitted` defect
+		// v1 had and PT-11 exists to remove.
+		const maybeDigest: string | null | undefined = undefined;
+		advanceClientCursor(db, "client-a", { inbox_seq: 2, last_seen_at: NOW, last_surfaced_digest: maybeDigest });
+
+		assert.equal(readClientCursor(db, "client-a")?.last_surfaced_digest, "digest-1");
+		// The position still advanced, so the digest was skipped and not the whole call.
+		assert.equal(readClientCursor(db, "client-a")?.inbox_seq, 2);
+	});
+});
+
+test("an explicit null clears the stored digest, which is how a caller says so", () => {
+	withLedger((db) => {
+		ensureClientCursor(db, session("client-a"));
+		advanceClientCursor(db, "client-a", { inbox_seq: 1, last_seen_at: NOW, last_surfaced_digest: "digest-1" });
+
+		advanceClientCursor(db, "client-a", { inbox_seq: 2, last_seen_at: NOW, last_surfaced_digest: null });
+
+		// `null` and `undefined` are the two different things the contract says they are; this is the case that
+		// keeps them from collapsing into one.
+		assert.equal(readClientCursor(db, "client-a")?.last_surfaced_digest, null);
+	});
+});
+
 test("advancing a client the ledger does not know is refused instead of silently doing nothing", () => {
 	withLedger((db) => {
 		// An UPDATE that matches no row is not an error to SQLite, which is exactly the silent failure this

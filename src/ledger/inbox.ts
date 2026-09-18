@@ -38,7 +38,7 @@ import { withTransaction } from "./transaction.js";
  * thread row therefore leaves that thread open, which is a visible wrong answer rather than a corrupt
  * log — stated here so the omission is a decision and not an oversight.
  *
- * **Two boundaries stated rather than hidden**, both of them places where a reader might assume more.
+ * **Three boundaries stated rather than hidden**, all of them places where a reader might assume more.
  *
  * - **A duplicate `eid` refuses the whole batch.** The dedup this writer owns is PT-10's
  *   `(bot_id, update_id)`; `seen_eids` — `UNIQUE (project_id, eid)` — is enforced by the schema, and a
@@ -47,6 +47,12 @@ import { withTransaction } from "./transaction.js";
  *   silent duplicate. The deliberate consequence: a poller that keeps handing over the same duplicate
  *   keeps failing rather than making progress, which is the failure this repository prefers to a
  *   half-written batch.
+ * - **A repeated `(bot_id, update_id)` *inside one batch* refuses it too.**
+ *   {@link INBOX_DUPLICATE_UPDATE_ID_MESSAGE} is a refusal rather than a second `replayed`, because
+ *   `replayed` means "an earlier transaction already committed this" and because the alternative — skipping
+ *   the entry whole, as the replay path does — would discard its `eid`, its thread row and its audit rows
+ *   with nothing to show for it. Telegram does not repeat an update id within one response, so this only
+ *   ever fires on a caller's own duplication.
  * - **A replayed *drop* is audited again.** A dropped update writes no `updates` row, so the key PT-10
  *   names has nothing to match it against and a second poll appends a second audit row. `inserted` stays
  *   honest at 0 and nothing is surfaced twice; the audit log is append-only, and a second honest record of
@@ -156,7 +162,14 @@ export interface InboxBatch {
 export interface InboxBatchResult {
 	/** `updates` rows this batch actually wrote. */
 	readonly inserted: number;
-	/** Entries whose `(bot_id, update_id)` was already stored — PT-10's redelivery. */
+	/**
+	 * Entries whose `(bot_id, update_id)` was **already stored by an earlier transaction** — PT-10's
+	 * redelivery — and which were therefore skipped whole.
+	 *
+	 * A repeat *within one batch* is not this: it is refused outright
+	 * ({@link INBOX_DUPLICATE_UPDATE_ID_MESSAGE}), because counting it here would silently discard the
+	 * second entry's `eid`, thread row and audit rows.
+	 */
 	readonly replayed: number;
 	/**
 	 * The offset to send to `getUpdates` on the next call, read from `offsets` inside the committing
@@ -187,23 +200,47 @@ export const INBOX_BODY_OUTCOME_MISMATCH_MESSAGE =
 const BODILESS_OUTCOMES: ReadonlySet<InboxApplyOutcome> = new Set<InboxApplyOutcome>(["rejected", "ignored"]);
 
 /**
+ * The refusal {@link commitInboxBatch} raises when two entries in one batch carry the same
+ * `(bot_id, update_id)`.
+ *
+ * Two entries with one identity is a caller's bug — Telegram does not repeat an update id within a single
+ * `getUpdates` response — and neither available behaviour is acceptable: counting the second as `replayed`
+ * would make that counter mean something other than "an earlier transaction already stored this", and
+ * skipping the entry whole (which is what the replay path does) would discard its `eid`, its thread row and
+ * every one of its audit rows with nothing left to show that it was ever seen. Refusing is the only
+ * outcome that neither lies nor loses.
+ *
+ * Exported so the caller and its test pin one spelling of the refusal instead of matching prose.
+ */
+export const INBOX_DUPLICATE_UPDATE_ID_MESSAGE =
+	"commitInboxBatch: two entries in one batch carry the same (bot_id, update_id), and Telegram does not repeat an update id within one response; refusing the batch rather than counting the second as a replayed update and silently discarding its eid, thread row and audit rows (PT-10).";
+
+/**
  * Writes one poll batch and moves the offset, inside one write transaction (design §5.3).
  *
  * Returns what it did. The returned {@link InboxBatchResult.nextUpdateId} is the value the caller may
  * pass to `getUpdates` — and only now, because this call returning *is* the commit having returned.
  *
- * Throws whatever the callback threw, after rolling the whole batch back: a constraint SQLite refuses, or
- * {@link INBOX_BODY_OUTCOME_MISMATCH_MESSAGE} for a row whose body and outcome disagree. Every path
- * leaves the connection outside any transaction, because the poller reuses it.
+ * Throws whatever the transaction raised, after rolling the whole batch back: a constraint SQLite refuses,
+ * or one of this writer's own refusals — {@link INBOX_BODY_OUTCOME_MISMATCH_MESSAGE} for a row whose body
+ * and outcome disagree, {@link INBOX_DUPLICATE_UPDATE_ID_MESSAGE} for one identity carried twice. Every
+ * path leaves the connection outside any transaction, because the poller reuses it.
  */
 export function commitInboxBatch(db: DatabaseSync, batch: InboxBatch): InboxBatchResult {
 	return withTransaction(db, () => {
 		let inserted = 0;
 		let replayed = 0;
 		let highestUpdateId: number | null = null;
+		const batchUpdateIds = new Set<number>();
 
 		for (const entry of batch.entries) {
 			const updateId = entry.kind === "admitted" ? entry.update.update_id : entry.update_id;
+			// An identity repeated inside one batch, before anything is written for it: see
+			// INBOX_DUPLICATE_UPDATE_ID_MESSAGE for why this is a refusal and not a second `replayed`.
+			if (batchUpdateIds.has(updateId)) {
+				throw new Error(INBOX_DUPLICATE_UPDATE_ID_MESSAGE);
+			}
+			batchUpdateIds.add(updateId);
 			// Over every entry, admitted or not: an update this batch dropped still has to be moved past, or
 			// the next poll is served it again for ever. Deliberately the MAXIMUM and not the last one seen.
 			highestUpdateId = highestUpdateId === null ? updateId : Math.max(highestUpdateId, updateId);
@@ -307,7 +344,8 @@ function insertAuditRow(db: DatabaseSync, audit: InboxAuditRow): void {
 }
 
 /**
- * Moves a bot's offset to `nextUpdateId` and returns the value the ledger now holds.
+ * Moves a bot's offset to `nextUpdateId` — or leaves it where it is, if it is already past — and returns the
+ * value the ledger now holds.
  *
  * **An upsert where design §5.3 writes a plain `UPDATE`**, and the deviation is deliberate: nothing in F1
  * creates the `offsets` row — the design's `UPDATE` assumes a row some other step owns, and no such step
@@ -317,16 +355,23 @@ function insertAuditRow(db: DatabaseSync, audit: InboxAuditRow): void {
  * permanently stuck poller. Creating the row here is the smaller claim: the writer that advances the
  * offset owns the row that holds it.
  *
- * The value is **set**, not guarded monotonically, because the design's own rule is `max(update_id) + 1`
- * over the batch that is committing now, and a guard would be a second rule to keep true.
+ * **The move is forward-only**, which is the second half of that deviation and is `MAX(...)` rather than a
+ * plain assignment. An offset is a promise about a *range* — everything at or below it is stored — so a
+ * batch whose highest `update_id` sits *below* the offset already stored (a window Telegram re-served after
+ * a restart) must not pull that promise backwards: rewinding would ask for the whole older window again.
+ * In a healthy run the guard never fires, because Telegram serves `update_id >= offset`; it is there so the
+ * property is the writer's rather than a coincidence of the Bot API's.
  *
- * The value is read back rather than echoed, so what the caller is told is what the ledger holds — and so a
- * writer that computed the wrong number cannot agree with itself.
+ * **The value is read back rather than echoed**, and that is a guarantee with a test that can fail rather
+ * than a figure of speech: with the guard above, the value the ledger holds and the value this writer
+ * computed genuinely differ whenever the offset was already ahead, and
+ * `test/ledger/inbox.test.ts` pins exactly that case — a mutant that returns `nextUpdateId` instead of
+ * reading it back dies on it.
  */
 function advanceOffset(db: DatabaseSync, bot_id: number, nextUpdateId: number): number {
 	db.prepare(
 		`INSERT INTO offsets (bot_id, next_update_id) VALUES (?, ?)
-		 ON CONFLICT (bot_id) DO UPDATE SET next_update_id = excluded.next_update_id`,
+		 ON CONFLICT (bot_id) DO UPDATE SET next_update_id = MAX(offsets.next_update_id, excluded.next_update_id)`,
 	).run(bot_id, nextUpdateId);
 
 	const row = db.prepare("SELECT next_update_id AS value FROM offsets WHERE bot_id = ?").get(bot_id) as { value: number };

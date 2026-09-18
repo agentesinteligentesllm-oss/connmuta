@@ -191,6 +191,32 @@ test("the stored history is the record's own array, in its own order", () => {
 	});
 });
 
+test("the history comes back ordered by time, not by eid", () => {
+	withLedger((db) => {
+		// The two orderings have to DISAGREE for the read to pin which one is used, so the earliest entry
+		// carries the alphabetically LAST eid: `ORDER BY at, eid` answers [z-first, a-second] while a bare
+		// `ORDER BY eid` answers [a-second, z-first]. The later pair is a TIE on `at`, which is the case the
+		// module's doc says is broken by `eid` — so this test pins both halves of the stated rule.
+		const history = [
+			historyEntry("eid-z-earliest", "2026-01-01T01:00:00.000Z"),
+			historyEntry("eid-b-tie", "2026-01-01T02:00:00.000Z"),
+			historyEntry("eid-a-tie", "2026-01-01T02:00:00.000Z"),
+		];
+		writeThreadRecord(db, {
+			project_id: "project-a",
+			thread_id: "thread-1",
+			record: threadRecord({ history }),
+			updated_at: "2026-01-01T02:00:00.000Z",
+		});
+
+		assert.deepEqual(storedHistoryEids(db, "project-a", "thread-1"), ["eid-z-earliest", "eid-a-tie", "eid-b-tie"]);
+		assert.deepEqual(
+			readThreadRecord(db, "project-a", "thread-1")?.history.map((entry) => entry.eid),
+			["eid-z-earliest", "eid-a-tie", "eid-b-tie"],
+		);
+	});
+});
+
 test("the writer trims the history to the newest MAX_THREAD_HISTORY, and the trimmed row is gone", () => {
 	withLedger((db) => {
 		// MAX_THREAD_HISTORY + 1 entries, one minute apart, oldest first, so the newest 50 are known exactly.
