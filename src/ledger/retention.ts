@@ -57,8 +57,13 @@ import { clearCondition, listConditionScopes, raiseCondition } from "./condition
  * - **The five age deletes are table scans, measured, and the design's "one indexed `DELETE` per table" is
  *   not what the planner does here.** `EXPLAIN QUERY PLAN` on the pinned build (Node 24.16.0, SQLite
  *   3.53.0) answers `SCAN updates`, `SCAN audit_log`, `SCAN unknown_senders`, `SCAN client_cursors` and
- *   `SCAN threads` — no index exists on `received_at`, `ts`, `last_seen_at`, `COALESCE(resolved_at,
- *   updated_at)` or `status` in version 1, and `audit_log_project_ts` cannot serve a `ts`-only predicate.
+ *   `SCAN threads` — no index **can serve** a `received_at`-only, `ts`-only, `last_seen_at`-only or
+ *   `COALESCE(resolved_at, updated_at)` predicate: version 1 has no index on any of those expressions, and
+ *   `audit_log_project_ts` leads with `project_id`. `status` is a third case of the same shape rather than a
+ *   column with no index at all — `threads_needs_action` *does* contain `status`, but it leads with
+ *   `project_id`, so a `status`-only predicate scans too. (This sentence said "no index exists on … or
+ *   `status`" until the independent verification showed the index does exist and only the *predicate* is
+ *   unserved; the measured plan, `SCAN threads`, was right either way.)
  *   That is affordable because each table is bounded by the very retention that is deleting from it (seven
  *   days of inbox, ninety of audit, and the small session/stranger sets), while adding an index would be a
  *   schema change — a migration, not an edit. The two *cascades* do use an index

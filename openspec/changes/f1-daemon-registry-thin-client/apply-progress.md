@@ -4007,33 +4007,33 @@ superseded figure is named instead of silently replaced.
 
 ## Scope and budget (measured)
 
-| File | at `f6b1599` (pre-audit) | at `6f89090` (round 1) | at `2580afc` — **the tip that ships**, every figure below measured there |
-|---|---|---|---|
-| `src/ledger/audit.ts` | 146 | 160 | 160 |
-| `src/ledger/unknown-senders.ts` | 131 | 141 | 141 |
-| `src/ledger/conditions-store.ts` | 335 | 386 | 386 |
-| `src/ledger/retention.ts` | 240 | 246 | 246 |
-| `src/ledger/inbox.ts` (edited) | +13 / −42 | +13 / −42 | +13 / −42 |
-| `test/ledger/audit.test.ts` | 263 | 281 | 288 |
-| `test/ledger/unknown-senders.test.ts` | 201 | 220 | 220 |
-| `test/ledger/conditions-store.test.ts` | 278 | 370 | 370 |
-| `test/ledger/retention.test.ts` | 397 | 397 | 397 |
-| **Total, `git diff --numstat 2055486..<tip> -- src test`** | **2,004 added, 42 removed = 2,046** | **2,214 added, 42 removed = 2,256** | **2,221 added, 42 removed = 2,263 authored** |
+| File | at `f6b1599` (pre-audit) | at `6f89090` (round 1) | at `2580afc` (round 2) | at the round-4 tip — **the tip that ships**, every figure below measured there |
+|---|---|---|---|---|
+| `src/ledger/audit.ts` | 146 | 160 | 160 | 160 |
+| `src/ledger/unknown-senders.ts` | 131 | 141 | 141 | 141 |
+| `src/ledger/conditions-store.ts` | 335 | 386 | 386 | 386 |
+| `src/ledger/retention.ts` | 240 | 246 | 246 | 251 |
+| `src/ledger/inbox.ts` (edited) | +13 / −42 | +13 / −42 | +13 / −42 | +13 / −42 |
+| `test/ledger/audit.test.ts` | 263 | 281 | 288 | 288 |
+| `test/ledger/unknown-senders.test.ts` | 201 | 220 | 220 | 220 |
+| `test/ledger/conditions-store.test.ts` | 278 | 370 | 370 | 370 |
+| `test/ledger/retention.test.ts` | 397 | 397 | 397 | 397 |
+| **Total, `git diff --numstat 2055486..<tip> -- src test`** | **2,004 / 42 = 2,046** | **2,214 / 42 = 2,256** | **2,221 / 42 = 2,263** | **2,226 / 42 = 2,268 authored** |
 
 The block estimated ≈350 with no exception, so the slice carries a **disclosed PR-13-scoped size
-exception, 1,863 over** at the tip that ships (1,646 over at `f6b1599` before the audit, 1,856 over at
-`6f89090` after round 1). Two figures rather than one, because this slice deletes lines as well as adding
-them: **2,263 by the convention the three
+exception, 1,868 over** at the tip that ships (1,646 over at `f6b1599` before the audit, 1,856 over at
+`6f89090` after round 1, 1,863 over at `2580afc` after round 2). Two figures rather than one, because this
+slice deletes lines as well as adding them: **2,268 by the convention the three
 earlier ledger records used** (`added + removed`, which is what PR-11's "1,270 added and 6 removed = 1,276
-authored lines" means), and **2,221 measured as insertions only**. The 42 removed lines *against the base*
+authored lines" means), and **2,226 measured as insertions only**. The 42 removed lines *against the base*
 are `src/ledger/inbox.ts`'s private `insertAuditRow` and the interface it typed, which PR-13's own
 requirement replaces with the shared writer — the only edit this slice makes to a merged module, and the
 record states it rather than letting the number look like churn. (The audit's own movement removed 46 more
 lines inside the new files; those were written *after* the base, so they do not appear as base deletions.
-The tip column grew by 7 net lines over `6f89090` in round 2, all of them in `test/ledger/audit.test.ts`
-(+10 / −3): a comment in a tracked `.ts` file is counted, and an earlier version of this record's round-2
-note claimed the fix had left the figure unmoved because it "touched a comment" — the same class of stale
-figure the audit was closing.)
+The `2580afc` column grew by 7 net lines over `6f89090` in round 2, all of them in `test/ledger/audit.test.ts`
+(+10 / −3), and the tip column grew by 5 more in round 4, all of them in `src/ledger/retention.ts`: a comment
+is counted by `git diff --numstat`, which is what made an earlier version of this record's round-2 note wrong
+when it claimed the fix had left the figure unmoved because it "touched a comment".)
 
 The exception is authorized by the Director's session-wide delegation — this session was explicitly asked
 not to stop for authorizations — and the figure, the movement and the grounds are disclosed here and in the
@@ -4084,8 +4084,11 @@ line, one call-site rename, the private function deleted, and the exported row t
 *(This sentence said "62" until Judgment Day round 1, which reached it from both sides — `JD-A-005` and
 `JD-B-003`: 62 was a `node --test` run of four suites, PR-12's three plus PR-11's `open`, and not "PR-12's
 ledger tests". The superseded figure is named rather than deleted, because the claim's evidence is the
-number. For the wider set: the seven suites under `test/ledger/` hold **99** tests at `2055486` and **137**
-at the tip that ships (`134` at `e169ee3`, before round 1's **three** new cases).)*
+number. For the wider set: `test/ledger/` holds **eleven** suites at the tip — the **seven** that predate
+PR-13 hold **99** tests at both tips, and the whole directory holds **132** at `f6b1599`, **134** at
+`e169ee3` and **137** at the tip. *(This sentence said "the seven suites … hold 99 at `2055486` and 137 at
+the tip", which is the same mislabelling the audit filed as `JD-A-005`/`JD-B-003`: seven suites cannot gain
+38 tests without becoming eleven. The independent verification found it standing after round 3.)*
 
 ## TDD cycle evidence
 
@@ -4120,12 +4123,17 @@ The measurements, each at its own tip: `f6b1599` 33 new / **460** total; `e169ee
 
 - **All five age deletes are table scans.** `EXPLAIN QUERY PLAN` (Node 24.16.0, SQLite 3.53.0) answers
   `SCAN updates`, `SCAN audit_log`, `SCAN unknown_senders`, `SCAN client_cursors` and `SCAN threads` — no
-  index exists on `received_at`, `ts`, `last_seen_at`, `COALESCE(resolved_at, updated_at)` or `status` in
-  version 1, and `audit_log_project_ts` cannot serve a `ts`-only predicate. The design's rationale sentence
-  ("one indexed `DELETE` per table") is therefore true of the *intent* — one indexed-shaped statement per
-  table — and **not** of the plan, so `retention.ts` states the measurement instead of the adjective. It is
-  affordable because each table is bounded by the retention deleting from it; adding an index would be a
-  migration, not an edit. The two **cascades do use an index**
+  index **can serve** a `received_at`-only, `ts`-only, `last_seen_at`-only or `COALESCE(resolved_at,
+  updated_at)` predicate, and version 1 has none on those expressions (`audit_log_project_ts` leads with
+  `project_id`). `status` is the same shape rather than a column with no index at all:
+  `threads_needs_action` *does* contain it (`src/ledger/schema.ts`), but leads with `project_id`, so a
+  `status`-only predicate scans too. *(This bullet said "no index exists on … or `status`" until the
+  independent verification showed the index exists and only the predicate is unserved; the measured plan was
+  right either way, and the module's own sentence carries the same correction.)* The design's rationale
+  sentence ("one indexed `DELETE` per table") is therefore true of the *intent* — one indexed-shaped
+  statement per table — and **not** of the plan, so `retention.ts` states the measurement instead of the
+  adjective. It is affordable because each table is bounded by the retention deleting from it; adding an
+  index would be a migration, not an edit. The two **cascades do use an index**
   (`SEARCH client_surfaced USING COVERING INDEX sqlite_autoindex_client_surfaced_1`, `SEARCH thread_history
   USING COVERING INDEX sqlite_autoindex_thread_history_1`), and the cap's outer delete is a rowid lookup.
 - **A token guard is provable against the file, not only against the rows.** After
@@ -4301,14 +4309,69 @@ until it is re-measured.**
 --numstat 2580afc..b6c3539 -- src test` is empty, which is what makes the verification below the
 verification of the tip that ships rather than of an earlier commit.
 
-**Terminal verdict: `JUDGMENT: APPROVED` for `2055486..b6c3539`** — source, tests and docs (the record
-commit that carries this section adds nothing to `src test`). No BLOCKER and no CRITICAL row survives: the
+**Terminal verdict: `JUDGMENT: APPROVED`** for the tip of `f1/13-ledger-audit-retention` (`5ed3965`,
+`cabee48`, `f6b1599`, `e169ee3`, `6f89090`, `2580afc`, `b6c3539`, `c51ef3f`, `92d9a2e` and the round-4 commit
+that carries this note), i.e. the candidate `2055486..` that tip. No BLOCKER and no CRITICAL row survives: the
 three CRITICALs were `JD-A-001`, `JD-B-001` and
 `JD-B-002`, and all three came back `verified` from both judges on the terminal re-judgment. The two
 surviving SUGGESTION/WARNING rows are escalated with their round-3 corrections disclosed as
 measurement-checked and **not judge-re-judged**, because the round budget is two and no third round exists.
-Final verification on the frozen tip: full suite **465/465**, `test:static` **8/8**, the seven ledger suites
-**137/137**, the four new suites **38/38**, and the 13-mutant sweep **13 killed / 0 survived**.
+Final verification **after round 4**, on a frozen worktree at that tip: full suite **465/465**, `test:static`
+**8/8**, the ledger directory **137/137** — eleven suites, the seven that predate PR-13 at **99** plus the four new ones at **38** — and the
+13-mutant sweep **13 killed / 0 survived**. *(An earlier version of this line called the 137 "the seven ledger
+suites", which cannot hold beside "the four new suites 38/38": seven plus four is eleven, and 99 plus 38 is
+137. Corrected after the independent verification, which named this the figure least safe as written because
+the terminal verdict is the line a reader quotes.)*
+
+## The ordinary native review, the RDD fallback, and the independent verification (round 4)
+
+**The review was declined, by the host, for this candidate.** `inspect` first returned the
+intended-untracked selection stop (the ODD tree), resolved in one call with `untrackedScope: "exclude"`. The
+workspace then held one uncommitted record edit, and the first START came back **`consent-binding-stale`**
+(`lineage_created: false`, no mutation) — the failure the handoff already records as recoverable. Committing
+that edit changed the route the controller offered, from `current-changes` to the **base-diff over the
+committed range** (`--base-ref=2055486 --committed-only=true`, target `sha256:1ba5ce2c…`), and START on that
+route returned **`consent-declined-this-candidate`**: `lineage_created: false`,
+`mutation_performed: false`, `mutation_outcome: none`, `correction_budget: 0`, medium risk, 13 changed files
+and 2,641 changed lines, with the host's own reason lines. **A host resolution is not a decision taken
+here**: no typed consent envelope ever reached the session, nothing was answered, and this candidate is never
+re-reviewed (PR-11's precedent).
+
+**The RDD fallback, with the decline stated.** `assess` returned `risk: "unassessable"` (the native
+assessment answered with empty output), `nativeReviewOutcome: "declined"`, `outcome_source: "explicit"`,
+writer profile `large`, and the plan `{ writerSelfVerification: true, structuralReadbackOnly: false,
+independentVerifier: true }` — the risk-gated path exactly as RDD-off, treating an unassessable candidate as
+high risk. **The independent verifier was run**, read-only, over the frozen tree at `92d9a2e`, with a
+reproduce-the-figures mandate rather than a read-and-agree one.
+
+**What it reproduced.** Every load-bearing figure re-derived with its own commands: the budget table at all
+three tips it then had and the exception arithmetic; both re-slice halves; the docs churn; the whole
+test-count ladder (427 → 460 → 462 → 465; 33 / 35 / 38 new; 99 / 134 / 137 in the directory; 48 = 18 + 12 +
+18; `test:static` 8/8); both compile-time REDs, reconstructed read-only in a temp tree because the RED state
+was never committed; the query plans and the pinned versions; the `changes: number | bigint` fact and its
+three `Number(...)` sites; the frozen ledger's byte SHA-256, its 11 rows, its 3 / 4 / 4 severity split, its
+6 / 5 judge split and every cited location at the frozen reviewed tree; the round-1 fix-delta measurements
+(`--name-status` lists nine files and no `openspec/**`; `B-38` occurred 0 times in the two record files; the
+"62" stood at the cited line). It also wrote **51 independent probes** for the code claims — the token
+guard's four driven paths and its non-vacuous control, the canonical-instant cases, the condition key and its
+`since` semantics, all five retention windows with both sides of each strict edge, the history cap, the
+backlog's boundary, and both filed gaps (`B-37`, `B-38`, the latter reproduced end to end) — and reported
+**no finding in the shipped source logic**. **It re-ran the 13-mutant sweep itself** at three tips: 13
+killed / 0 survived, no `RESTORE MISMATCH`, and a clean worktree afterwards.
+
+**What it found, and round 4.** Two prose defects, neither behavioural:
+
+| Finding | Location | The defect | The correction |
+|---|---|---|---|
+| the `status` index claim | `src/ledger/retention.ts` (module doc) **and** the record's runtime-facts bullet | Both said no index exists on `…` **or `status`** in version 1. `threads_needs_action` **does** contain `status` (`src/ledger/schema.ts:74`); what is true is that it leads with `project_id`, so a `status`-only predicate scales as a scan — and the measured plan, `SCAN threads`, was right either way | both copies now say no index **can serve** those predicates and name the index's leading column as the reason |
+| "the seven ledger suites **137/137**" | the terminal-verdict line, and the wider-set sentence above it | `test/ledger/` holds **eleven** suites at the tip: seven predating PR-13 at 99, four new at 38. "Seven suites at 137" beside "four new suites at 38" cannot both hold — seven plus four is eleven, and 99 plus 38 is 137. The verifier named it the figure **least safe as written**, because the terminal verdict is the line a reader quotes | both lines now read eleven suites / 99 + 38 = 137, and the wider-set sentence names 132 / 134 / 137 at their own tips |
+
+**Round 4 is a fourth correction, outside the round budget, and the only one that moves the shipped bytes**:
+the module sentence it fixes lives in `src/ledger/retention.ts`, so the slice grows from 2,221 / 42 / 2,263 to
+**2,226 / 42 / 2,268** (exception **1,868 over**) and the "source and test bytes identical to `2580afc`" claim
+no longer covers this tip. The mutant sweep and the full verification were therefore **re-run after it**, and
+the budget table carries the final tip's own column. That is the entire cost of correcting a comment after a
+freeze, and it is recorded rather than argued away.
 
 ## Next
 
