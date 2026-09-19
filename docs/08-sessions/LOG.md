@@ -4,6 +4,36 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-19 — Session 18: PR-15 (daemon lifecycle: node-floor, home, log, lock, run-file) delivered
+
+**Closed**
+
+- **PR-15** — `src/daemon/{node-floor,home,log}.ts`, `src/daemon/lifecycle/{lock,run-file}.ts` + six twins
+  (`node-floor.test.ts`, `home.test.ts`, `log.test.ts`, `lifecycle/lock.test.ts`, `lifecycle/singleton.test.ts`,
+  `lifecycle/run-file.test.ts`), `src/daemon/tsconfig.json`, root `tsconfig.json` reference, and SEAM entry
+  in `test/fixtures/v1-provenance.json` — completes row PR-15 on branch `f1/15-lifecycle-lock-runfile`
+  (commits `8123d7f`, `affeb21`, `937b932`). **20 PR blocks / 15 row ids are complete (90 of the 210
+  checkboxes)**; the remaining board is **25 blocks / 27 row ids (`PR-16…PR-42`)**. **521 tests (520 pass,
+  1 skip), `test:static` 8/8**. Budget **1,008 authored lines with a disclosed 608-line PR-15-scoped exception**
+  (482 src + 526 test). **Unit 6 `daemon-lifecycle` first half is closed.**
+- **The audit route held for the thirteenth slice.** Arena down, native SDD preflight closed, so ODD with the
+  SDD contract preserved and Judgment Day as the substitute: two blind judges audited the slice. Round 1
+  findings on POSIX private modes (`0o700` dirs / `0o600` files) on lock (`JD-B-001`, `JD-B-002`) and log
+  (`JD-B-003`) were corrected in `affeb21`. An unpinned relative path resolution in `resolveHomeDir` (mutant M3)
+  was pinned in `937b932`. A 10-mutant sweep executed: **10 killed / 0 survived**. Record:
+  `bus-v2-f1-pr-15-audit-001`. **DN-05 remains unsatisfied for all thirteen.**
+- **Threat model cell PT-12 updated**: pins `test/daemon/lifecycle/lock.test.ts` and
+  `test/daemon/lifecycle/singleton.test.ts` in `docs/02-architecture/THREAT-MODEL.md` §4.
+- **RDD fallback & independent verification**: ordinary native review unassessable/declined, writer
+  self-verification plus independent verification pass confirmed all figures and verified 0 regressions.
+
+**Opened**
+
+- **PR-16** — `src/daemon/lifecycle/{heartbeat,idle}.ts`, `src/daemon/{bootstrap,main}.ts` with four twins
+  (`lifecycle/heartbeat.test.ts`, `lifecycle/idle.test.ts`, `bootstrap.test.ts`, `no-emission.test.ts`):
+  heartbeat timer, idle shutdown respecting open threads, composition root, and main entry point. Includes
+  manual Windows 11 console-flash observation. Closes Unit 6 `daemon-lifecycle`.
+
 ## 2026-09-19 — Session 17: PR-14 (secret store: keyring, fallback, redaction) delivered and merged as #19
 
 **Closed**

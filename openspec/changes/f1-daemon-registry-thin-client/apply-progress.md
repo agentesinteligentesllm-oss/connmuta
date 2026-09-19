@@ -4406,3 +4406,45 @@ freeze, and it is recorded rather than argued away.
 - `jd-judge-b`: `JD-B-001` → `verified`, `JD-B-002` → `verified`, `JD-B-003` → `verified`, `JD-B-004` → `verified`, `JD-B-005` → `verified`.
 All 6 findings across both judges are **100% verified** in Round 1. Zero survivors, no round 2 needed.
 
+---
+
+## PR-15 — node-floor, home, log, singleton lock, run-file (unit 6 `daemon-lifecycle` part 1)
+
+**What landed.** The first half of the `daemon-lifecycle` unit:
+- `src/daemon/node-floor.ts`: `isNodeAtOrAboveFloor(version)` and `enforceNodeFloor()` checking against `NODE_FLOOR` (24.0.0 LTS) before any disk write or dynamic import; writes error with download link to stderr and exits with `EXIT_NODE_FLOOR` (D-03, D-25).
+- `src/daemon/home.ts`: `resolveHomeDir(explicitPath)` resolving `~/.conmuta` by default with relative path resolution, and `ensureHomeDirs(homeDir)` creating home, `run/`, and `secrets/` with POSIX mode `0o700` (`POSIX_PRIVATE_DIR_MODE`).
+- `src/daemon/log.ts`: `writeDaemonLog(homeDir, message, options)` appending to `run/daemon.log` with POSIX mode `0o600` (`POSIX_PRIVATE_FILE_MODE`), redacting token shapes via `redactTokenShapes(text)`, and truncating the log file to `DAEMON_LOG_MAX_BYTES` (5 MB) when exceeded.
+- `src/daemon/lifecycle/lock.ts`: SEAM from `telegram-agent-bus/src/state.ts:458-602` @ `bf8f365`; singleton lock election via `acquireLock(homeDir, options)`, stale lock reclaim via `DAEMON_LOCK_STALE_SECONDS` (10s) or dead pid, owner-checked `releaseLock(homeDir, ownPid)` and `updateHeartbeat(homeDir, ownPid, now)` writing `POSIX_PRIVATE_FILE_MODE` (0o600), `LockHeldError` on conflict (PT-12).
+- `src/daemon/lifecycle/run-file.ts`: `writeRunFile(homeDir, payload)` generating fresh UUID secret on every start and writing `run/daemon.json` with POSIX mode `0o600`, `readRunFile(homeDir)` with pid liveness check, and `deleteRunFile(homeDir, ownPid)` deleting only when pid matches.
+- Six test twins: `test/daemon/node-floor.test.ts`, `test/daemon/home.test.ts`, `test/daemon/log.test.ts`, `test/daemon/lifecycle/lock.test.ts`, `test/daemon/lifecycle/singleton.test.ts`, `test/daemon/lifecycle/run-file.test.ts`.
+- Documentation & build: `docs/02-architecture/THREAT-MODEL.md` §4 cell for PT-12 updated, `src/daemon/tsconfig.json` wired, and SEAM entry added to `test/fixtures/v1-provenance.json` (12 entries total).
+
+**Budget.** Measured at **1,008 authored lines** (`git diff --numstat 9e99f67..HEAD -- src test`: 482 src + 526 test). Carries a disclosed PR-scoped exception of **608 lines over** the 400-line budget, authorized under the Director's session-wide delegation.
+
+**Judgment Day Round 1.** Two blind judges (`jd-judge-a`, `jd-judge-b`) audited the slice.
+- `JD-B-001` (WARNING): `writeLockFile` and `updateHeartbeat` created files with default umask instead of POSIX private mode `0o600`. Fixed in `affeb21` with explicit mode `POSIX_PRIVATE_FILE_MODE` and test assertions.
+- `JD-B-002` (WARNING): `resolveLockPath` did not ensure `run/` directory had `0o700` permissions on creation. Fixed in `affeb21` with `POSIX_PRIVATE_DIR_MODE`.
+- `JD-B-003` (WARNING): `writeDaemonLog` and `truncateLogFile` used default file modes instead of `0o600`. Fixed in `affeb21` with `POSIX_PRIVATE_FILE_MODE`.
+- `M3` pin: `resolveHomeDir` relative path resolution was unpinned; fixed in `937b932` with explicit assertion killing mutant M3.
+
+**Mutant Sweep.** 10 mutants evaluated against the test suite:
+- `M1`: Invert `isNodeAtOrAboveFloor` comparison (`semverGte` -> `false`). Killed by `node-floor.test.ts`.
+- `M2`: Omit stderr error message in `enforceNodeFloor`. Killed by `node-floor.test.ts`.
+- `M3`: Omit `path.resolve` in `resolveHomeDir` for relative paths. Killed by `home.test.ts` (`937b932`).
+- `M4`: Skip creating `run/` or `secrets/` in `ensureHomeDirs`. Killed by `home.test.ts`.
+- `M5`: Omit `redactTokenShapes` in `writeDaemonLog`. Killed by `log.test.ts`.
+- `M6`: Skip truncation check in `writeDaemonLog`. Killed by `log.test.ts`.
+- `M7`: Invert `isProcessAlive` check in `acquireLock`. Killed by `lock.test.ts` & `singleton.test.ts`.
+- `M8`: Set lock staleness threshold to 0 in `acquireLock`. Killed by `lock.test.ts`.
+- `M9`: Skip pid check in `releaseLock`. Killed by `lock.test.ts`.
+- `M10`: Reuse cached secret instead of generating fresh in `writeRunFile`. Killed by `run-file.test.ts`.
+Result: **10 killed / 0 survived**.
+
+**RDD Fallback & Independent Verification.** The ordinary review was unassessable/declined, triggering the RDD fallback. Independent verification confirmed:
+- Full test suite: **521 tests** (520 pass, 1 skip), `test:static` **8/8**.
+- 22 new tests added across six twins.
+- Provenance scanner: clean (12 entries in `test/fixtures/v1-provenance.json`).
+- Repository scan (PT-22): clean.
+- All figures and claims verified.
+
+
