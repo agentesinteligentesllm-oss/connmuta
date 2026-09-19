@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -165,6 +166,78 @@ test("the write is atomic: it leaves exactly one committed file and no `.tmp` le
 		await store.set(BOT_ID, replacement);
 		assert.deepEqual(readdirSync(secretsDir(home)), [TOKEN_FILE_NAME]);
 		assert.equal(await store.get(BOT_ID), replacement);
+	});
+});
+
+test("concurrent writes for the same botId do not collide on temp files", async () => {
+	await inHome(async (home) => {
+		const store = createFileFallbackStore(home);
+		const writes = Array.from({ length: 20 }, (_, i) =>
+			store.set(BOT_ID, `${BOT_ID}:${String(i).padStart(35, "0")}`),
+		);
+		await Promise.all(writes);
+		const finalToken = await store.get(BOT_ID);
+		assert.ok(finalToken !== null && finalToken.startsWith(`${BOT_ID}:`));
+		const files = readdirSync(secretsDir(home));
+		assert.deepEqual(files, [TOKEN_FILE_NAME], "no temp files should remain after concurrent writes");
+	});
+});
+
+test("delete cleans up orphaned .tmp files for that botId without touching other bots' files", async () => {
+	await inHome(async (home) => {
+		const store = createFileFallbackStore(home);
+		await store.set(BOT_ID, FIXTURE_TOKEN);
+
+		// Plant orphaned temp files for BOT_ID and another bot
+		const otherBotId = "7654321";
+		const orphanedTmp1 = join(secretsDir(home), `${BOT_ID}.${randomUUID()}.token.tmp`);
+		const orphanedTmp2 = join(secretsDir(home), `${BOT_ID}.token.tmp`);
+		const otherTmp = join(secretsDir(home), `${otherBotId}.${randomUUID()}.token.tmp`);
+		writeFileSync(orphanedTmp1, "orphan1", "utf8");
+		writeFileSync(orphanedTmp2, "orphan2", "utf8");
+		writeFileSync(otherTmp, "other-orphan", "utf8");
+
+		await store.delete(BOT_ID);
+
+		assert.equal(existsSync(tokenPath(home)), false, "committed token file must be deleted");
+		assert.equal(existsSync(orphanedTmp1), false, "orphaned UUID temp file must be cleaned up");
+		assert.equal(existsSync(orphanedTmp2), false, "orphaned legacy temp file must be cleaned up");
+		assert.equal(existsSync(otherTmp), true, "other bot's temp file must remain untouched");
+	});
+});
+
+test("path traversal and invalid characters in botId throw TypeError", async () => {
+	await inHome(async (home) => {
+		const store = createFileFallbackStore(home);
+		const invalidIds = [
+			"../bot",
+			"..\\bot",
+			"bot/1",
+			"bot\\1",
+			"bot\0null",
+			"bot..id",
+			"bot id",
+			"",
+			".",
+			"..",
+		];
+		for (const invalid of invalidIds) {
+			await assert.rejects(
+				async () => store.get(invalid),
+				{ name: "TypeError" },
+				`expected store.get(${JSON.stringify(invalid)}) to reject with TypeError`,
+			);
+			await assert.rejects(
+				async () => store.set(invalid, FIXTURE_TOKEN),
+				{ name: "TypeError" },
+				`expected store.set(${JSON.stringify(invalid)}) to reject with TypeError`,
+			);
+			await assert.rejects(
+				async () => store.delete(invalid),
+				{ name: "TypeError" },
+				`expected store.delete(${JSON.stringify(invalid)}) to reject with TypeError`,
+			);
+		}
 	});
 });
 

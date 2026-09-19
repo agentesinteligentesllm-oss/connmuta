@@ -1,9 +1,9 @@
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import fs from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { Entry } from "@napi-rs/keyring";
 
 import { KEYRING_SERVICE } from "../../src/shared/constants.js";
 import { createKeyringStore } from "../../src/secret-store/keyring.js";
@@ -59,20 +59,51 @@ test("delete then get returns null", async () => {
 
 test("the keyring never touches registry.json", async () => {
 	const store = createKeyringStore();
-	const tmp = mkdtempSync(join(tmpdir(), "conmuta-kr-"));
-	const registryPath = join(tmp, "registry.json");
+	const cwdRegistry = join(process.cwd(), "registry.json");
+	const homeRegistry = join(homedir(), "registry.json");
+	const cwdExistedBefore = fs.existsSync(cwdRegistry);
+	const homeExistedBefore = fs.existsSync(homeRegistry);
+	const cwdMtimeBefore = cwdExistedBefore ? fs.statSync(cwdRegistry).mtimeMs : null;
+	const homeMtimeBefore = homeExistedBefore ? fs.statSync(homeRegistry).mtimeMs : null;
+
+	const writeFileSyncSpy = mock.method(fs, "writeFileSync");
+	const writeFileSpy = mock.method(fs.promises, "writeFile");
+
 	try {
 		await store.set(PROBE_BOT_ID, FIXTURE_TOKEN);
 		await store.get(PROBE_BOT_ID);
 		await store.delete(PROBE_BOT_ID);
-		// The keyring store should never create or modify registry.json.
-		assert.equal(existsSync(registryPath), false, "registry.json must not exist");
 	} finally {
-		rmSync(tmp, { recursive: true, force: true });
+		writeFileSyncSpy.mock.restore();
+		writeFileSpy.mock.restore();
+		try {
+			await store.delete(PROBE_BOT_ID);
+		} catch {
+			// ignore cleanup error
+		}
+	}
+
+	assert.equal(writeFileSyncSpy.mock.callCount(), 0, "keyring store must never invoke writeFileSync");
+	assert.equal(writeFileSpy.mock.callCount(), 0, "keyring store must never invoke fs.promises.writeFile");
+	assert.equal(fs.existsSync(cwdRegistry), cwdExistedBefore, "process.cwd() registry.json presence changed");
+	assert.equal(fs.existsSync(homeRegistry), homeExistedBefore, "homedir() registry.json presence changed");
+	if (cwdExistedBefore) {
+		assert.equal(fs.statSync(cwdRegistry).mtimeMs, cwdMtimeBefore, "process.cwd() registry.json was modified");
+	}
+	if (homeExistedBefore) {
+		assert.equal(fs.statSync(homeRegistry).mtimeMs, homeMtimeBefore, "homedir() registry.json was modified");
 	}
 });
 
-test("keyring uses the KEYRING_SERVICE constant as the service name", () => {
+test("keyring uses the KEYRING_SERVICE constant as the service name and 'bot:' prefix", async () => {
 	// The constant is "conmuta" — design §6 requires Entry(KEYRING_SERVICE, "bot:<bot_id>").
 	assert.equal(KEYRING_SERVICE, "conmuta");
+	const store = createKeyringStore();
+	try {
+		await store.set(PROBE_BOT_ID, FIXTURE_TOKEN);
+		const directEntry = new Entry(KEYRING_SERVICE, `bot:${PROBE_BOT_ID}`);
+		assert.equal(directEntry.getPassword(), FIXTURE_TOKEN);
+	} finally {
+		await store.delete(PROBE_BOT_ID);
+	}
 });

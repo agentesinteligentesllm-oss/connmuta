@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { POSIX_PRIVATE_DIR_MODE, POSIX_PRIVATE_FILE_MODE } from "../shared/constants.js";
@@ -39,6 +40,17 @@ const TOKEN_SUFFIX = ".token";
 /** Suffix of the write-ahead temp file a token passes through before it is renamed into place. */
 const TEMP_SUFFIX = ".token.tmp";
 
+/**
+ * Asserts that `botId` is safe for use as a path segment in the secrets directory.
+ *
+ * Rejects path traversal (`..`, `/`, `\`), NUL bytes, or characters outside `[a-zA-Z0-9_-]`.
+ */
+function assertValidBotId(botId: string): void {
+	if (typeof botId !== "string" || !/^[a-zA-Z0-9_-]+$/.test(botId)) {
+		throw new TypeError(`Invalid botId: must be alphanumeric, hyphen, or underscore, got: ${JSON.stringify(botId)}`);
+	}
+}
+
 /** Builds the fallback store rooted at `homeDir` (the daemon's own home, not the process cwd). */
 export function createFileFallbackStore(homeDir: string): SecretStore {
 	const dir = join(homeDir, SECRETS_DIR_NAME);
@@ -47,6 +59,7 @@ export function createFileFallbackStore(homeDir: string): SecretStore {
 	return {
 		kind: "file",
 		async get(botId) {
+			assertValidBotId(botId);
 			try {
 				return readFileSync(tokenPath(botId), "utf8");
 			} catch (error) {
@@ -60,15 +73,30 @@ export function createFileFallbackStore(homeDir: string): SecretStore {
 			}
 		},
 		async set(botId, token) {
+			assertValidBotId(botId);
 			mkdirSync(dir, { recursive: true, mode: POSIX_PRIVATE_DIR_MODE });
-			const tempPath = join(dir, `${botId}${TEMP_SUFFIX}`);
+			const tempPath = join(dir, `${botId}.${randomUUID()}${TEMP_SUFFIX}`);
 			removeIfPresent(tempPath);
 			writeFileSync(tempPath, token, { encoding: "utf8", mode: POSIX_PRIVATE_FILE_MODE });
 			renameSync(tempPath, tokenPath(botId));
 		},
 		async delete(botId) {
+			assertValidBotId(botId);
 			try {
 				unlinkSync(tokenPath(botId));
+			} catch (error) {
+				if (!isErrno(error, "ENOENT")) {
+					throw error;
+				}
+			}
+			try {
+				const entries = readdirSync(dir);
+				const prefix = `${botId}.`;
+				for (const entry of entries) {
+					if (entry.startsWith(prefix) && entry.endsWith(TEMP_SUFFIX)) {
+						removeIfPresent(join(dir, entry));
+					}
+				}
 			} catch (error) {
 				if (!isErrno(error, "ENOENT")) {
 					throw error;
