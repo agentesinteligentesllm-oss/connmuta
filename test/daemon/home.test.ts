@@ -16,6 +16,7 @@ test("resolveHomeDir resolves default home ~/.conmuta when no explicit path is g
 test("resolveHomeDir resolves explicit path when provided", () => {
   const custom = join(tmpdir(), "custom-conmuta-home");
   assert.equal(resolveHomeDir(custom), resolve(custom));
+  assert.equal(resolveHomeDir("relative/path"), resolve(process.cwd(), "relative/path"));
 });
 
 test("ensureHomeDirs creates home, run, and secrets directories with POSIX mode 0o700", () => {
