@@ -4,6 +4,38 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-19 — Session 17: PR-14 (secret store: keyring, fallback, redaction) delivered and merged as #19
+
+**Closed**
+
+- **PR-14** — `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts` + five twins (`types.test.ts`,
+  `keyring.test.ts`, `file-fallback.test.ts`, `redaction.test.ts`, `index.test.ts`), the unit's `tsconfig.json`
+  and root `tsconfig.json` reference — is merged as PR **#19** (`9cc35ff`, code tip `0372661`, record tip `ff8bc03`),
+  CI green on both legs (Node 24.15 and 26), branch deleted. **19 PR blocks / 14 row ids are complete (82 of the
+  210 checkboxes)**; the remaining board is **26 blocks / 28 row ids (`PR-15…PR-42`)**. **499 tests (498 pass,
+  1 skip), `test:static` 8/8**. Budget **1,087 authored lines with a disclosed 687-line PR-14-scoped exception**
+  (386 src + 701 test). **Unit 5 `secret-store` is closed.**
+- **The audit route held for the twelfth slice.** Arena down, native SDD preflight closed, so ODD with the
+  SDD contract preserved and Judgment Day as the substitute: two blind judges (`jd-judge-a`, `jd-judge-b`)
+  over frozen tree `pr-14-audit` (`66f170f`). Round 1 returned 6 rows (1 CRITICAL, 4 WARNING, 1 SUGGESTION).
+  One fact reached independently by both judges: vacuous `the keyring never touches registry.json` test in
+  `keyring.test.ts` (`JD-A-001`/`JD-B-001`). All 6 findings corrected in `f97e856` and **100% verified on the
+  scoped re-judgment (zero survivors)**. Record: `bus-v2-f1-pr-14-audit-001`. **DN-05 remains unsatisfied for
+  all twelve.**
+- **Spike B-07 closed**: Telegram official documentation confirms that a bot with Bot-to-Bot Communication
+  Mode enabled in @BotFather and Group Privacy Mode disabled receives all bot messages in a group without
+  needing admin rights.
+- **Windows Server CI lesson**: `FORBIDDEN_GRANTEES` matching bare `BUILTIN\` or `NT AUTHORITY` falsely flags
+  `BUILTIN\Administrators` and `NT AUTHORITY\SYSTEM` on Windows Server temp directory ACLs. Refined to
+  `BUILTIN\Users` and `NT AUTHORITY\Authenticated Users` in `0372661`, which passes both locally and in CI.
+
+**Opened**
+
+- **PR-15** — `src/daemon/{node-floor,home,log}.ts`, `src/daemon/lifecycle/{lock,run-file}.ts` with six twins
+  (`node-floor.test.ts`, `home.test.ts`, `log.test.ts`, `lifecycle/lock.test.ts`, `lifecycle/singleton.test.ts`,
+  `lifecycle/run-file.test.ts`): node-floor gate, home directory, log with truncate, singleton lock election
+  and stale reclaim, run-file lifecycle (PT-12). Opens Unit 6 `daemon-lifecycle`.
+
 ## 2026-09-18 — Session 16: PR-13 (audit log, unknown senders, conditions store, retention) delivered and merged as #18
 
 **Closed**
