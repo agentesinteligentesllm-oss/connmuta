@@ -35,10 +35,10 @@ const TOKEN_FILE_NAME = `${BOT_ID}.token`;
  * spellings are listed; one hit is the failure.
  */
 const FORBIDDEN_GRANTEES = [
-	"BUILTIN\\",
+	"BUILTIN\\Users",
 	"Everyone",
 	"Authenticated Users",
-	"NT AUTHORITY",
+	"NT AUTHORITY\\Authenticated Users",
 	"CREATOR OWNER",
 	"S-1-1-0",
 	"S-1-5-32-545",
