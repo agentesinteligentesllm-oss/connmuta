@@ -513,12 +513,12 @@ Scope: `src/secret-store/types.ts`, `src/secret-store/keyring.ts`, `src/secret-s
 Requirements: `secret-store › Tokens live only in the keychain or the ACL'd fallback` (PT-09); `secret-store › Fallback file and daemon home are ACL'd` (PT-19, win-x64); `secret-store › No token in errors, logs or stacks` (PT-08, redaction consumed by PR-19).
 Runtime harness: PT-19 spawns `icacls` **in test code only** against a temp home (allowed — tests may spawn, the daemon never does); PT-09 round-trips against the real `windows-latest` keyring in CI.
 
-- [ ] 14.1 RED: write `test/secret-store/keyring.test.ts` (round trip on the keychain never touches `registry.json`) and `test/secret-store/file-fallback.test.ts` (fallback file created when keyring unavailable; POSIX mode `0600`; Windows ACL lists only the current user, asserted via `icacls` output in the test).
-- [ ] 14.2 GREEN: implement `src/secret-store/types.ts` (`SecretStore` interface), `src/secret-store/keyring.ts` (`@napi-rs/keyring`, `Entry(KEYRING_SERVICE, "bot:<bot_id>")`), `src/secret-store/file-fallback.ts` (tmp+rename write, `POSIX_PRIVATE_FILE_MODE`).
-- [ ] 14.3 RED: write `test/secret-store/redaction.test.ts` (fixture token never leaks through a classified error path) and `test/secret-store/index.test.ts` (probe-then-fallback selection raises `secret_store_fallback`).
-- [ ] 14.4 GREEN: implement `src/secret-store/redaction.ts` (`redactTokenShapes`, consumes `shared/secrets.ts` from PR-03) and `src/secret-store/index.ts` (selection probe at daemon start).
-- [ ] 14.5 Verify: `npm run build && node --test "dist/test/secret-store/**/*.test.js"`.
-- [ ] 14.6 Docs: update the file-name cell(s) of PT-08, PT-09, PT-19 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 14.1 RED: write `test/secret-store/keyring.test.ts` (round trip on the keychain never touches `registry.json`) and `test/secret-store/file-fallback.test.ts` (fallback file created when keyring unavailable; POSIX mode `0600`; Windows ACL lists only the current user, asserted via `icacls` output in the test).
+- [x] 14.2 GREEN: implement `src/secret-store/types.ts` (`SecretStore` interface), `src/secret-store/keyring.ts` (`@napi-rs/keyring`, `Entry(KEYRING_SERVICE, "bot:<bot_id>")`), `src/secret-store/file-fallback.ts` (tmp+rename write, `POSIX_PRIVATE_FILE_MODE`).
+- [x] 14.3 RED: write `test/secret-store/redaction.test.ts` (fixture token never leaks through a classified error path) and `test/secret-store/index.test.ts` (probe-then-fallback selection raises `secret_store_fallback`).
+- [x] 14.4 GREEN: implement `src/secret-store/redaction.ts` (`redactTokenShapes`, consumes `shared/secrets.ts` from PR-03) and `src/secret-store/index.ts` (selection probe at daemon start).
+- [x] 14.5 Verify: `npm run build && node --test "dist/test/secret-store/**/*.test.js"`.
+- [x] 14.6 Docs: update the file-name cell(s) of PT-08, PT-09, PT-19 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 ### Unit 6 — `daemon-lifecycle`
 
