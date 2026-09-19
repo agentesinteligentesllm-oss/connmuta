@@ -4379,3 +4379,30 @@ freeze, and it is recorded rather than argued away.
   then the ordinary native review and, if it declines, the RDD fallback — plus the independent verifier this
   file's §2.9 requires either way. Push, PR, CI matrix, merge. Then the close-out sweep, the audit-path
   record as `bus-v2-f1-pr-13-audit-001`, and the handoff for **PR-14** (the secret store).
+
+---
+
+## PR-14 — keyring, ACL'd fallback, redaction (unit 5 `secret-store`)
+
+**What landed.** The complete `secret-store` unit: `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts` with five test twins (`types.test.ts`, `keyring.test.ts`, `file-fallback.test.ts`, `redaction.test.ts`, `index.test.ts`), the unit's `tsconfig.json`, the root `tsconfig.json` reference, and the documentation update in `docs/02-architecture/THREAT-MODEL.md` §4 (PT-08, PT-09, PT-19).
+
+- `src/secret-store/types.ts`: `SecretStore` interface (`readonly kind: "keychain" | "file"`, `get(botId): Promise<string | null>`, `set(botId, token): Promise<void>`, `delete(botId): Promise<void>`).
+- `src/secret-store/keyring.ts`: `@napi-rs/keyring` adapter under `KEYRING_SERVICE` ("conmuta") and account `bot:${botId}`. Maps `getPassword()` null-return and `deletePassword()` no-throw.
+- `src/secret-store/file-fallback.ts`: atomic tmp+rename fallback store at `<homeDir>/secrets/<botId>.token`. Creates `secrets/` with `POSIX_PRIVATE_DIR_MODE` (0o700) on write; writes with `POSIX_PRIVATE_FILE_MODE` (0o600); validates `botId` against path traversal; uses unique `randomUUID()` temporary file names; cleans up orphaned `.tmp` files on delete.
+- `src/secret-store/redaction.ts`: `redactTokenShapes(text)` consuming `TELEGRAM_BOT_TOKEN_RE` from `shared/secrets.ts` (one shared regex definition).
+- `src/secret-store/index.ts`: `selectSecretStore(homeDir, options)` probing the keyring with a round-trip on `bot:__probe__`; selects fallback on throw, mismatch, or read error; raises condition `secret_store_fallback` with redacted reason.
+
+**Budget.** Measured at `1,087` authored lines (`git diff --numstat b0b4bff -- src test`: 386 src + 701 test). Carries a disclosed PR-scoped exception of **687 lines over** the 400-line budget.
+
+**Judgment Day Round 1.** Two blind judges (`jd-judge-a`, `jd-judge-b`) audited `b0b4bff..66f170f`.
+- `JD-A-001` / `JD-B-001` (CRITICAL / WARNING): Vacuous test in `test/secret-store/keyring.test.ts` for 'never touches registry.json' checked an unreferenced temp directory. Fixed: active spy on filesystem write operations plus cwd/home `registry.json` non-creation assertions.
+- `JD-B-002` (WARNING): `delete()` did not clean up orphaned `${botId}.*.token.tmp` files. Fixed: `delete()` unlinks leftover `.tmp` files matching the botId.
+- `JD-B-003` (WARNING): `keyring.test.ts` did not assert that `createKeyringStore()` actually uses `KEYRING_SERVICE` or the `bot:` prefix. Fixed: directly read back via `@napi-rs/keyring` native `Entry(KEYRING_SERVICE, \`bot:${PROBE_BOT_ID}\`)`.
+- `JD-B-004` (WARNING): Race condition on deterministic `${botId}.token.tmp` file path. Fixed: unique temp files using `randomUUID()`.
+- `JD-B-005` (SUGGESTION): Unchecked `botId` allowed path traversal. Fixed: `assertValidBotId` rejects path separators, `..`, and invalid characters.
+
+**Re-judgment (Round 1).** Both judges re-evaluated the fixes at commit `f97e856` independently:
+- `jd-judge-a`: `JD-A-001` → `verified`.
+- `jd-judge-b`: `JD-B-001` → `verified`, `JD-B-002` → `verified`, `JD-B-003` → `verified`, `JD-B-004` → `verified`, `JD-B-005` → `verified`.
+All 6 findings across both judges are **100% verified** in Round 1. Zero survivors, no round 2 needed.
+
