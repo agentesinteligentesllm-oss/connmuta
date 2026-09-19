@@ -4401,3 +4401,8 @@ freeze, and it is recorded rather than argued away.
 - `JD-B-004` (WARNING): Race condition on deterministic `${botId}.token.tmp` file path. Fixed: unique temp files using `randomUUID()`.
 - `JD-B-005` (SUGGESTION): Unchecked `botId` allowed path traversal. Fixed: `assertValidBotId` rejects path separators, `..`, and invalid characters.
 
+**Re-judgment (Round 1).** Both judges re-evaluated the fixes at commit `f97e856` independently:
+- `jd-judge-a`: `JD-A-001` → `verified`.
+- `jd-judge-b`: `JD-B-001` → `verified`, `JD-B-002` → `verified`, `JD-B-003` → `verified`, `JD-B-004` → `verified`, `JD-B-005` → `verified`.
+All 6 findings across both judges are **100% verified** in Round 1. Zero survivors, no round 2 needed.
+
