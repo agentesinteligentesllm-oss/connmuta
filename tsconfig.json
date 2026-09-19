@@ -5,6 +5,15 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo/test.tsbuildinfo"
   },
-  "include": ["test/**/*.ts"],
-  "references": [{ "path": "src/shared" }, { "path": "src/cli" }, { "path": "src/registry" }, { "path": "src/ledger" }, { "path": "src/secret-store" }]
+  "include": [
+    "test/**/*.ts"
+  ],
+  "references": [
+    { "path": "src/shared" },
+    { "path": "src/cli" },
+    { "path": "src/registry" },
+    { "path": "src/ledger" },
+    { "path": "src/secret-store" },
+    { "path": "src/daemon" }
+  ]
 }
