@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeDaemonLog } from "../../src/daemon/log.js";
-import { DAEMON_LOG_MAX_BYTES } from "../../src/shared/constants.js";
+import { DAEMON_LOG_MAX_BYTES, POSIX_PRIVATE_FILE_MODE } from "../../src/shared/constants.js";
 
 test("writeDaemonLog appends message to run/daemon.log", () => {
   const runDir = mkdtempSync(join(tmpdir(), "daemon-log-test-"));
@@ -18,6 +18,11 @@ test("writeDaemonLog appends message to run/daemon.log", () => {
     const content = readFileSync(logFile, "utf8");
     assert.ok(content.includes("First log line\n"));
     assert.ok(content.includes("Second log line\n"));
+
+    if (process.platform !== "win32") {
+      const mode = statSync(logFile).mode & 0o777;
+      assert.equal(mode, POSIX_PRIVATE_FILE_MODE, "daemon.log mode should be 0o600");
+    }
   } finally {
     rmSync(runDir, { recursive: true, force: true });
   }

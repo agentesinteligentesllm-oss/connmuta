@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -13,7 +13,11 @@ import {
   LockHeldError,
   type LockPayload,
 } from "../../../src/daemon/lifecycle/lock.js";
-import { DAEMON_LOCK_STALE_SECONDS } from "../../../src/shared/constants.js";
+import {
+  DAEMON_LOCK_STALE_SECONDS,
+  POSIX_PRIVATE_DIR_MODE,
+  POSIX_PRIVATE_FILE_MODE,
+} from "../../../src/shared/constants.js";
 
 test("acquireLock creates run/daemon.lock with pid and acquired_at", () => {
   const homeDir = mkdtempSync(join(tmpdir(), "lock-test-"));
@@ -29,6 +33,13 @@ test("acquireLock creates run/daemon.lock with pid and acquired_at", () => {
     assert.notEqual(onDisk, null);
     assert.equal(onDisk?.pid, process.pid);
     assert.equal(onDisk?.acquired_at, handle.payload.acquired_at);
+
+    if (process.platform !== "win32") {
+      const fileMode = statSync(lockPath).mode & 0o777;
+      assert.equal(fileMode, POSIX_PRIVATE_FILE_MODE, "lock file mode should be 0o600");
+      const dirMode = statSync(join(homeDir, "run")).mode & 0o777;
+      assert.equal(dirMode, POSIX_PRIVATE_DIR_MODE, "run dir mode should be 0o700");
+    }
 
     handle.release();
     assert.equal(existsSync(lockPath), false, "release() must remove lock file");

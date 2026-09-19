@@ -1,6 +1,6 @@
 import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { DAEMON_LOG_MAX_BYTES } from "../shared/constants.js";
+import { DAEMON_LOG_MAX_BYTES, POSIX_PRIVATE_FILE_MODE } from "../shared/constants.js";
 import { redactTokenShapes } from "../secret-store/redaction.js";
 
 /** Name of the daemon log file in runDir. */
@@ -22,7 +22,7 @@ export function writeDaemonLog(
   const redacted = redactTokenShapes(message);
   const line = redacted.endsWith("\n") ? redacted : redacted + "\n";
 
-  appendFileSync(logPath, line, "utf8");
+  appendFileSync(logPath, line, { encoding: "utf8", mode: POSIX_PRIVATE_FILE_MODE });
 
   try {
     const stat = statSync(logPath);
@@ -56,5 +56,5 @@ function truncateLogFile(logPath: string, maxBytes: number): void {
   }
 
   const retained = buf.subarray(sliceStart);
-  writeFileSync(logPath, retained);
+  writeFileSync(logPath, retained, { mode: POSIX_PRIVATE_FILE_MODE });
 }

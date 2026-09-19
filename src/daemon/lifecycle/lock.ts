@@ -5,7 +5,11 @@
 
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { DAEMON_LOCK_STALE_SECONDS } from "../../shared/constants.js";
+import {
+  DAEMON_LOCK_STALE_SECONDS,
+  POSIX_PRIVATE_DIR_MODE,
+  POSIX_PRIVATE_FILE_MODE,
+} from "../../shared/constants.js";
 
 /** Name of the daemon lock file. */
 const DAEMON_LOCK_FILENAME = "daemon.lock";
@@ -50,14 +54,14 @@ export function resolveLockPath(dirOrPath: string): string {
   if (dirOrPath.endsWith(".lock")) {
     const parent = dirname(dirOrPath);
     if (!existsSync(parent)) {
-      mkdirSync(parent, { recursive: true });
+      mkdirSync(parent, { recursive: true, mode: POSIX_PRIVATE_DIR_MODE });
     }
     return dirOrPath;
   }
 
   const runDir = basename(dirOrPath) === "run" ? dirOrPath : join(dirOrPath, "run");
   if (!existsSync(runDir)) {
-    mkdirSync(runDir, { recursive: true });
+    mkdirSync(runDir, { recursive: true, mode: POSIX_PRIVATE_DIR_MODE });
   }
   return join(runDir, DAEMON_LOCK_FILENAME);
 }
@@ -72,7 +76,7 @@ export function resolveLockPath(dirOrPath: string): string {
  */
 export function writeLockFile(lockPath: string): LockPayload {
   const payload: LockPayload = { pid: process.pid, acquired_at: Date.now() };
-  writeFileSync(lockPath, JSON.stringify(payload), { flag: "wx" });
+  writeFileSync(lockPath, JSON.stringify(payload), { flag: "wx", mode: POSIX_PRIVATE_FILE_MODE });
   return payload;
 }
 
@@ -213,7 +217,7 @@ export function updateHeartbeat(lockPath: string, own: LockPayload): void {
       return;
     }
     own.heartbeat_at = Date.now();
-    writeFileSync(lockPath, JSON.stringify(own), "utf8");
+    writeFileSync(lockPath, JSON.stringify(own), { encoding: "utf8", mode: POSIX_PRIVATE_FILE_MODE });
   } catch {
     // Write failed or file removed — safe to ignore.
   }
