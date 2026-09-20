@@ -4447,4 +4447,45 @@ Result: **10 killed / 0 survived**.
 - Repository scan (PT-22): clean.
 - All figures and claims verified.
 
+---
+
+## PR-16 — heartbeat, idle, bootstrap, main (unit 6 `daemon-lifecycle` part 2)
+
+**What landed.** The second half of the `daemon-lifecycle` unit:
+- `src/daemon/lifecycle/heartbeat.ts`: `startHeartbeatTimer(homeDir, ownPid, options)` executing periodic ticks every `HEARTBEAT_PERIOD_MS` (5,000 ms), updating lock heartbeat, invoking `onTick`, and executing ledger retention sweep when due per design §7.1 (`JD-B-004`).
+- `src/daemon/lifecycle/idle.ts`: `shouldShutdownForIdle(homeDir, ledger, now)` checking open threads and last session activity against `IDLE_SHUTDOWN_HOURS` (4 hours; `JD-A-003`, `JD-A-005`, `JD-B-005`), with `getLastSessionSeenAt` querying `max(last_seen_at)` from `client_cursors` in the ledger (`JD-B-003`).
+- `src/daemon/bootstrap.ts`: `startDaemon(options)` composition root implementing the full startup sequence from design §7.1, with deduplicated concurrent `stop()` in-flight promise (`JD-A-002`, `JD-B-002`), signal handling, and clean shutdown.
+- `src/daemon/main.ts`: CLI entry point checking node-floor before dynamic import of `bootstrap.js` (D-25), with `handleSignal` re-entrancy guard.
+- Five test twins: `test/daemon/lifecycle/heartbeat.test.ts`, `test/daemon/lifecycle/idle.test.ts`, `test/daemon/bootstrap.test.ts`, `test/daemon/main.test.ts`, and `test/daemon/no-emission.test.ts` (with non-vacuous control tests; `JD-A-001`, `JD-B-001`).
+- Documentation & build: `src/daemon/tsconfig.json` updated with references.
+
+**Budget.** Estimated ≈340 lines; measured at **1,056 authored lines** (`git diff --numstat 937b932..HEAD -- src test`: 349 src + 707 test) across four modules and five test twins. Carries a disclosed PR-scoped exception of **656 lines over** the 400-line budget, authorized by the Director's session-wide delegation.
+
+**Judgment Day Round 1 & Re-judgment.** Two blind judges (`jd-judge-a`, `jd-judge-b`) audited the slice (`bus-v2-f1-pr-16-audit-001`):
+- `JD-A-001` / `JD-B-001`: Non-vacuous control tests in `no-emission.test.ts` verifying that fake clients record zero sends in an idle window while active sends are detected.
+- `JD-A-002` / `JD-B-002`: Concurrent `stop()` calls deduplicated via in-flight promise.
+- `JD-B-003`: `getLastSessionSeenAt` querying `max(last_seen_at)` from `client_cursors` in the ledger.
+- `JD-B-004`: Retention sweep executed on heartbeat ticks when due per design §7.1.
+- `JD-A-003` / `JD-A-005` / `JD-B-005`: Named constants and clean fallback in `idle.ts`.
+- `main.ts`: `handleSignal` re-entrancy guard.
+Re-judgment: **5 verified / 0 regression** from both judges independently.
+
+**Mutant Sweep.** 8 mutants evaluated against the test suite:
+- `M1`: Invert idle shutdown thread check condition.
+- `M2`: Omit `max(last_seen_at)` query in `getLastSessionSeenAt`.
+- `M3`: Skip retention sweep check in `heartbeat.ts`.
+- `M4`: Disable `stop()` in-flight promise deduplication.
+- `M5`: Omit heartbeat lock update in `heartbeat.ts`.
+- `M6`: Skip signal re-entrancy guard in `main.ts`.
+- `M7`: Invert idle window emission check in `no-emission.test.ts`.
+- `M8`: Omit node-floor check in `main.ts`.
+Result: **8 killed / 0 survived**.
+
+**RDD Fallback & Independent Verification.** The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed:
+- Full test suite: **546 tests** (545 pass, 1 skip), `test:static` **8/8**.
+- 25 new tests added across five twins.
+- Windows 11 console-flash check observed: `{detached: true, windowsHide: true}` spawn in `main.test.ts` executes without visual console popup on Windows 11.
+- Unit 6 `daemon-lifecycle` is complete (21 PR blocks / 16 row ids merged, 95/210 tasks).
+
+
 
