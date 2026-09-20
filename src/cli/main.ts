@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 
 import { EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
 import { SERVER_VERSION } from "../shared/version.js";
+import { stopDaemon } from "./daemon-stop.js";
 import { validateText } from "./validate.js";
 
 /**
@@ -26,7 +27,7 @@ export interface CliIo {
 }
 
 /**
- * One line per invocation form this build wires; `mcp`, `daemon stop` and `migrate-v1` land later.
+ * One line per invocation form this build wires; `mcp` and `migrate-v1` land later.
  *
  * The usage text describes what **this build accepts**, not the requirement's bracket notation: the
  * spec spells the surface `conmuta validate [<path> | --stdin]`, and this CLI refuses a bare
@@ -35,7 +36,9 @@ export interface CliIo {
  */
 const USAGE_LINES = [
 	`usage: ${PRODUCT_NAME} validate <path> | --stdin`,
+	`       ${PRODUCT_NAME} daemon stop [--home <dir>]`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
+	`  daemon stop   stop the running daemon after confirming identity (D-29)`,
 ];
 
 /** Report a usage failure: a short reason, then the usage block. Always {@link EXIT_USAGE}. */
@@ -61,13 +64,48 @@ function usageError(io: CliIo, reason?: string): number {
  * neither target, more than one path, an unreadable path — is a usage error and never a silent
  * success: a hook or a host that mis-invokes this command must not read exit 0 as "clean file".
  */
-export function runCli(argv: readonly string[], io: CliIo): number {
+export function runCli(argv: readonly string[], io: CliIo): number | Promise<number> {
 	const [command, ...rest] = argv;
 	if (command === undefined) {
 		return usageError(io);
 	}
-	// Only `validate` is wired in F1's first CLI slice. The reserved subcommands are named so a
-	// caller that tries one gets a usage error instead of a stub that pretends to work.
+
+	if (command === "daemon") {
+		const [subcommand, ...subArgs] = rest;
+		if (subcommand === undefined) {
+			return usageError(io);
+		}
+		if (subcommand !== "stop") {
+			return usageError(io, `unknown daemon subcommand '${subcommand}'`);
+		}
+
+		let explicitHome: string | undefined;
+		for (let i = 0; i < subArgs.length; i++) {
+			const arg = subArgs[i];
+			if (arg === "--home") {
+				if (i + 1 >= subArgs.length || subArgs[i + 1].startsWith("--")) {
+					return usageError(io, "--home requires a directory");
+				}
+				explicitHome = subArgs[++i];
+			} else if (arg.startsWith("--home=")) {
+				explicitHome = arg.slice("--home=".length);
+				if (explicitHome.length === 0) {
+					return usageError(io, "--home requires a directory");
+				}
+			} else if (arg.startsWith("--")) {
+				return usageError(io, `unknown option '${arg}'`);
+			} else {
+				return usageError(io, `unexpected argument '${arg}'`);
+			}
+		}
+
+		return stopDaemon({ homeDir: explicitHome, io: { out: io.out, err: io.err } }).then(
+			(result) => result.exitCode,
+		);
+	}
+
+	// Only `validate` and `daemon stop` are wired in this CLI slice. The reserved subcommands are
+	// named so a caller that tries one gets a usage error instead of a stub that pretends to work.
 	if (command !== "validate") {
 		return usageError(io, `unknown command '${command}'`);
 	}
@@ -135,5 +173,5 @@ function isDirectlyExecuted(): boolean {
 if (isDirectlyExecuted()) {
 	// `exitCode` rather than `process.exit`: the stdio streams must flush, and an abrupt exit can
 	// truncate the very lines a hook reads.
-	process.exitCode = runCli(process.argv.slice(2), createProcessIo());
+	process.exitCode = await runCli(process.argv.slice(2), createProcessIo());
 }
