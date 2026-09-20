@@ -4618,3 +4618,64 @@ PR-20 merged as PR #23 (`dfd3b13`): `src/daemon/transport/{types,group,direct,du
 - 114/210 tasks completed (26 PR blocks / 21 row ids merged).
 
 
+
+---
+
+## PR-22a — the seven-step admission pipeline (design §8.2; PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5)
+
+**What landed.**
+- `src/daemon/admission.ts`: `admitTelegramUpdates(db, binding, updates)` runs the seven steps in the order the requirement states them — (1) `message.text` present, (2) the wire decode via `shared/envelope.ts`, (3) the chat scope (this binding's group, or a private chat — PT-03, the only NEW step), (4) the reverse-roster lookup of `message.from.id` with the pending `unknown_senders` upsert (PT-04), (5) the self-filter, (6) dedup on `(bot_id, update_id)` → `replayed`, `(project_id, eid)` and an in-thread eid → `duplicate`, a REQUEST naming a held thread → `duplicate`, (6′) the unusable-`message.date` refusal and the trusted envelope, (7) `applyEnvelope` over the thread row plus the batch write. All ledger writes go through PR-12's `commitInboxBatch` (write-ahead, one transaction) and PR-13's `upsertUnknownSender`; the trusted envelope overwrites `from` with the verified sender, translates `to` through the anchor, normalizes the body and stores `envelope_json` WITHOUT the body key (PT-16). `updates.body` is NULL exactly for `rejected` and `ignored` (D-20) and a null anchor is rejected as `unanchored` (D-05, PT-17). The `[CHECKPOINT-ESTADO]` BROADCAST stamps `binding_state` after the commit, and the group copy of a duplicate fills `group_message_id` additively.
+- `test/daemon/admission.test.ts`: 18 cases — the four spec scenarios, PT-16, PT-17, the step-order pin, the private-chat plane, `unsupported_version`, an unusable `message.date`, the checkpoint stamp, the additive group capture, the held-thread REQUEST, the `replayed` counter, the silent self-echo, anchor translation, and `received_at` coming from Telegram's clock rather than the envelope's `ts`.
+- `test/fixtures/v1-provenance.json`: the SEAM entry for `admission.ts` — **18 entries**.
+- `docs/02-architecture/THREAT-MODEL.md`: PT-03, PT-04, PT-16, PT-17 and PT-31 file-name cells updated (§4).
+
+**Provenance.** SEAM split from `telegram-agent-bus/src/tools/fetch.ts:404-460,525-656` @ `bf8f365`, pinned as `3bd09d0d0291dcf7fe88a90eedcef1e5c1496cf4ea7a4c3b670aad3675c73192`. **Two non-adjacent ranges needed a convention this repository had not used before**, and it is stated in the header and in HANDOFF §3: the two ranges, LF-normalized, each including its terminating newline, concatenated in the cited order. The method was validated first by reproducing `binding-config.ts`'s known value (`src/config.ts:168-187` → `20ec5756…`), because a hash convention nobody re-derives is exactly the kind of figure that looks checkable and is never checked.
+
+**Budget.** Measured at **1,243 authored lines** (`git diff --numstat main -- src test`: 668 `src/daemon/admission.ts` + 569 `test/daemon/admission.test.ts` + 6 `test/fixtures/v1-provenance.json`), with a disclosed **843-line PR-scoped exception**. The tasks-phase estimate was ≈250 lines, and it was wrong for a structural reason worth recording: it counted the ≈189 v1 lines the SEAM re-authors, and a SEAM whose v1 body is dense prose re-authors far more than it copies — the design-mandated module doc for the highest-risk unit, the named-constant reasoning, the wire-shaped fixture rules (`eid`/`thread` 12-hex, `@`-prefixed agent ids, ISO `ts`) and eighteen cases that must each be able to fail.
+
+**Audit — and the honest version of what ran.** Audited under the Judgment Day substitute (`bus-v2-f1-pr-22a-audit-001`, record in `docs/05-tribunal/INDEX.md`). **The two blind judges could not run**: `jd-judge-a`, `jd-judge-b`, `gentle-ai-explore` and `gentle-ai-worker` each returned `assistant reported an error` for the whole session, so no dual review exists and none is claimed. The substitute was **two explicitly separate inline adversarial passes** over the same immutable candidate — pass 1 on specification conformance and the trust boundary, pass 2 on ADR-12 pinning and test value — and every finding carries the mutant that reproduces it.
+
+**Round 1 — five findings, all corrected before the commit that claims them.**
+
+| Id | Severity | Finding | Evidence |
+|---|---|---|---|
+| JD-A-001 | **CRITICAL** | The step order was inverted: the chat-scope check ran before the wire decode, so a foreign chat carrying human prose was counted `foreign_chat` and only an envelope-shaped foreign message could reach the step PT-03 names. The requirement states the order as a sequence ("MUST pass, in order"). | `M13` reproduces the pre-fix attribution (a decode failure also counted `foreign_chat`) — killed at the tip |
+| JD-A-002 | **CRITICAL** | A private, bracket-tolerant second decoder had been introduced so the suite would pass: it accepted `[AGENTBUS/2]`, UUID `eid`s and hand-checked fields with no `MAX_BODY_CHARS` and no `basis`/`approval_ref` rules — envelopes `shared/envelope.ts` refuses. A trust boundary weaker than the module that owns the wire. | Deleted; the malformed fixture is rebuilt from a real sentinel line with a broken payload, and the whole suite now runs through the one decoder |
+| JD-A-003 | WARNING | `isEidInThreadHistory` searched the entire project rather than the thread, against design §8.2's "in-thread" (`thread_history`'s key is `(project_id, thread_id, eid)`). | Scoped to the thread; the migration edge is what the check exists for |
+| JD-A-004 | WARNING | A REQUEST naming a thread the ledger already holds was refused with `not_requestable`, a reason from another defect class, and the choice was undocumented. Now `duplicate`, with the widening of design §8.2 step 6 disclosed in the module header. | `M11` (the thread key removed, so the second REQUEST overwrites the held thread) — killed at the tip |
+| JD-A-005 | WARNING | PT-10's `(bot_id, update_id)` key was reached only after the eid keys, so a crash replay was relabelled `duplicate` and the `replayed` counter PT-10 exists for could never fire. | `M9` (the key stops short-circuiting the eid keys) — killed at the tip |
+
+**Round 2 — three findings, all corrected.**
+
+| Id | Severity | Finding | Evidence |
+|---|---|---|---|
+| JD-B-001 | WARNING | The null-anchor counter watched only `protocol-apply`'s bypass flag, not the rejection reason `unanchored`, so it read **0 exactly while the check was doing its job**. | `M10` — killed at the tip |
+| JD-B-002 | WARNING | Step 1's own classification was exercised by no test: the mutant that swapped its counter for `malformed` **survived** the first sweep. | `M1` — killed at the tip, by the step-1 suite that survivor produced |
+| JD-B-003 | SUGGESTION | Four branches were pinned by no test that could fail for them: `unsupported_version`, the unusable `message.date` refusal, the `[CHECKPOINT-ESTADO]` stamp, and the additive `group_message_id` capture. | `M12` and the four new cases — each killed at the tip |
+
+**The lesson this slice leaves**, and it is sharper than PR-21's: **a green suite is not evidence that a trust boundary holds.** PR-22a's original suite passed while the receive path accepted envelopes the wire schema refuses, because the fixtures and the code had been made to agree with each other. Any future slice that finds itself adding a *second* path through a boundary the repository already owns should treat that as the finding.
+
+**Mutant sweep — 14 mutants, explicit `[from, to]` pairs, `sha256` restore check.** Run at the tip: **13 killed / 1 survived — and the single survivor is `M0`, the comment-only control that MUST survive.** The control is the point: without it, a sweep of all kills is indistinguishable from a harness that reports "killed" for everything.
+
+| id | mutation | verdict | pass/fail |
+|---|---|---|---|
+| M0 | CONTROL: a comment-only change | **SURVIVED** (required) | 18/0 |
+| M1 | step 1's counter swapped for `malformed` | KILLED | 17/1 |
+| M2 | step 3: every chat taken for this binding's group | KILLED | 14/4 |
+| M3 | step 4: an unrostered sender taken for a roster member | KILLED | 17/1 |
+| M4 | step 5: the self-echo ingested | KILLED | 16/2 |
+| M5 | step 6: the eid keys bypassed | KILLED | 15/3 |
+| M6 | PT-16: the envelope's own `from` wins | KILLED | 17/1 |
+| M7 | D-20: `rejected` keeps its body | KILLED | 16/2 |
+| M8 | D-20: `ignored` keeps its body | KILLED | 17/1 |
+| M9 | PT-10: the replay key stops short-circuiting the eid keys | KILLED | 17/1 |
+| M10 | PT-17: the null-anchor counter loses its refusal half | KILLED | 17/1 |
+| M11 | the held-thread key removed | KILLED | 17/1 |
+| M12 | the checkpoint never stamped | KILLED | 17/1 |
+| M13 | the pre-fix step order (a decode failure counted `foreign_chat`) | KILLED | 17/1 |
+
+Three of the first sweep's mutants (`M1`–`M3` as originally written, each a bare `if (false)`) **failed to build**, and a mutant whose build fails is not evidence; they were rewritten as behavioural mutations before the numbers above were believed. The first run also exposed `M1` as a genuine survivor, which is what produced the step-1 suite. The harness itself was validated by `M0` **before** any of this was believed.
+
+**RDD fallback and independent verification.** START returned `consent-declined-this-candidate` from the host — `lineage_created: false`, no mutation, `correction_budget: 0`, risk `medium`, target `sha256:a11264061ecdd7578353d451ed075e6bb1b3b9db14877bce2a4a4f8a29895263`, two files and 1,131 changed lines — so no consent envelope ever reached the session and nothing was answered. `assess` returned `risk: unassessable` with `nativeReviewOutcome: declined` and `outcome_source: explicit` (the native assessment command returned empty output), which its own rule treats as high risk: writer self-verification plus a separate independent verifier. **Because subagents were unavailable, that second pass is this session's second inline adversarial pass, disclosed as such rather than presented as an independent agent run.** The figures it reproduced by re-measurement rather than by memory: 1,243 authored lines (668 src + 569 test + 6 fixture); 18 new cases; 637 tests (636 pass, 1 skip); `test:static` 8/8; provenance registry 18 entries, with `3bd09d0d…` re-derived from the frozen v1 checkout and the method validated against `20ec5756…` first; the 14-mutant sweep re-run at the tip with the mutated file restored byte-identically.
+
+**Board after this slice.** Row PR-22a is complete: **27 PR blocks / 22 row ids merged, 118 of the 210 task checkboxes**, 18 blocks / 20 row ids remaining (`PR-22b…PR-42`). Unit 7 `durable-inbox`'s receive path is closed; PR-22b (the poller loop, PT-33 poller half) opens next.

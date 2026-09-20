@@ -66,6 +66,12 @@
     "verdict": "SEAM"
   },
   {
+    "v2Path": "src/daemon/admission.ts",
+    "v1Path": "src/tools/fetch.ts:404-460,525-656",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
+  },
+  {
     "v2Path": "src/daemon/binding-config.ts",
     "v1Path": "src/config.ts:168-187",
     "commit": "bf8f365",

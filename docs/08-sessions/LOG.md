@@ -4,6 +4,19 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 25 — PR-22a: seven-step admission pipeline (PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5)
+
+- **Date**: 2026-09-20
+- **Slice**: PR-22a (`src/daemon/admission.ts`, `test/daemon/admission.test.ts`, `test/fixtures/v1-provenance.json`).
+- **PR**: PR-22a merged as PR #25 (branch `f1/22a-admission`).
+- **Outcome**: 637 tests (636 pass, 1 skip), `test:static` 8/8, provenance registry 18 entries. 118/210 task checkboxes; 27 PR blocks / 22 row ids merged.
+- **Module**: `src/daemon/admission.ts` — the seven steps in the requirement's own order (text → wire decode → chat scope → roster reverse lookup → self-filter → dedup → apply), the trusted envelope (`from` overwritten by the verified sender, `to` translated through the anchor, body normalized, `envelope_json` without the body key), D-20's body/outcome coupling, D-05's fail-closed anchor, the `unknown_senders` upsert, the additive `group_message_id` capture and the `[CHECKPOINT-ESTADO]` stamp. SEAM from `v1:src/tools/fetch.ts:404-460,525-656`, hash-pinned with a new multi-range convention documented in HANDOFF §3.
+- **Audit**: Judgment Day substitute (`bus-v2-f1-pr-22a-audit-001`). **The two blind judges could not run** — `jd-judge-a`, `jd-judge-b`, `gentle-ai-explore` and `gentle-ai-worker` all returned `assistant reported an error` for the session — so the audit is **two explicitly separate inline adversarial passes**, disclosed rather than claimed. Round 1 found two CRITICALs: the step order was inverted against the requirement's "MUST pass, in order" clause, and a private bracket-tolerant decoder had been introduced to make the suite pass while accepting envelopes the wire schema refuses. Both fixed; the malformed fixture was rebuilt from a real sentinel line.
+- **Mutant sweep**: 14 mutants with explicit `[from, to]` pairs, **13 killed / 1 survived, the survivor being `M0`, the comment-only harness control that must survive**. `M1` (step 1's counter) survived the first run and is killed at the tip by the step-1 suite it forced.
+- **RDD fallback**: START returned `consent-declined-this-candidate` from the host (`lineage_created: false`, no mutation, medium risk, 2 files / 1,131 changed lines) and `assess` returned `unassessable` with `nativeReviewOutcome` `declined` / `outcome_source` `explicit`, so the high-risk plan ran (writer self-verification plus a second adversarial pass).
+- **Budget**: 1,243 authored lines (668 src + 569 test + 6 fixture) with a disclosed **843-line PR-scoped exception** against a ≈250 estimate.
+- **Next**: PR-22b (`src/daemon/poller.ts`, the loop that consumes `admission.ts`, PT-33 poller half).
+
 ## Session 24 — PR-21: room guard (D-22), binding config, bindings reconciliation (PT-01 wrong-room defense)
 
 - **Date**: 2026-09-20
