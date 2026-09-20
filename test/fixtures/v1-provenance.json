@@ -70,5 +70,29 @@
     "v1Path": "src/state.ts",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/daemon/transport/types.ts",
+    "v1Path": "src/transport/types.ts",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
+  },
+  {
+    "v2Path": "src/daemon/transport/group.ts",
+    "v1Path": "src/transport/group.ts",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
+  },
+  {
+    "v2Path": "src/daemon/transport/direct.ts",
+    "v1Path": "src/transport/direct.ts",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
+  },
+  {
+    "v2Path": "src/daemon/transport/dual.ts",
+    "v1Path": "src/transport/dual.ts",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
   }
 ]
