@@ -36,6 +36,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-pr-18-audit-001` | 2026-09-19 | Audit substitute for PR-18 (daemon/telegram.ts part 1: client construction + request plumbing): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-19-audit-001` | 2026-09-19 | Audit substitute for PR-19 (daemon/telegram.ts part 2: error classification + redaction, PT-08): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-20-audit-001` | 2026-09-20 | Audit substitute for PR-20 (daemon/transport AS-IS vendoring): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
+| `bus-v2-f1-pr-21-audit-001` | 2026-09-20 | Audit substitute for PR-21 (transport/room-guard.ts, binding-config.ts, bindings.ts, PT-01 wrong-room defense, D-22): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record

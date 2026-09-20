@@ -4591,3 +4591,30 @@ Result: **8 killed / 0 survived**.
 
 PR-20 merged as PR #23 (`dfd3b13`): `src/daemon/transport/{types,group,direct,dual}.ts` vendored AS-IS from v1 (hash-pinned, 732 lines excluded under size:exception), test twins in `test/daemon/transport/`, fake client in `test/fakes/telegram.ts`, error classification helpers in `src/daemon/telegram.ts`. Audited under Judgment Day (`bus-v2-f1-pr-20-audit-001`, DN-05 unsatisfied). 8-mutant sweep 8/8 killed. Total suite: 594 tests (593 pass, 1 skip). Next: PR-21.
 
+---
+
+## PR-21 — room guard (D-22), binding config, bindings reconciliation
+
+**What landed.**
+- `src/daemon/transport/room-guard.ts`: D-22 decorator wrapping the binding's transport, enforcing numeric `chat_id` equals `binding.group_id`, and string `chat_id` equals `@<username>` of a roster member (PT-01 wrong-room defense, inside `transport/` so PT-28's call-site confinement holds).
+- `src/daemon/binding-config.ts`: `BindingConfig` materialized per binding (SEAM from `telegram-agent-bus/src/config.ts:168-187` minus `bot_token`).
+- `src/daemon/bindings.ts`: registry hot-reload reconciliation, starting pollers for new active bindings, stopping pollers for removed/suspended bindings, writing `BINDING_CHANGED` audit rows per delta.
+- Twins: `test/daemon/transport/room-guard.test.ts`, `test/daemon/binding-config.test.ts`, `test/daemon/bindings.test.ts`.
+- `docs/02-architecture/THREAT-MODEL.md`: updated PT-01 file-name cell in §4.
+- Merged as PR **#24** (`0572b4e`, branch `f1/21-room-guard-bindings`).
+
+**Budget.** Measured at **1,240 authored lines** (493 src + 747 test) with a disclosed 840-line PR-scoped exception.
+
+**Judgment Day Round 1 & Re-judgment.** Audited under Judgment Day dual review (`bus-v2-f1-pr-21-audit-001`), substituting for the tribunal debate while the Arena bridge is down (DN-05 unsatisfied).
+- Findings addressed in Round 1: 11 findings (5 Judge A, 6 Judge B).
+- Round 2 scoped re-judgment: 100% verified (5/5 Judge A, 6/6 Judge B, 0 regressions, 0 survivors).
+
+**Mutant Sweep.** 8 mutants evaluated against the test suite:
+- Result: **8 killed / 0 survived**.
+
+**RDD Fallback & Independent Verification.** The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed:
+- Full test suite: **619 tests** (618 pass, 1 skip), `test:static` **8/8**.
+- 25 new tests added across three twins.
+- 114/210 tasks completed (26 PR blocks / 21 row ids merged).
+
+

@@ -4,6 +4,19 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 24 — PR-21: room guard (D-22), binding config, bindings reconciliation (PT-01 wrong-room defense)
+
+- **Date**: 2026-09-20
+- **Slice**: PR-21 (`src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `src/daemon/bindings.ts`, twins `test/daemon/transport/room-guard.test.ts`, `test/daemon/binding-config.test.ts`, `test/daemon/bindings.test.ts`).
+- **PR**: PR-21 merged as PR #24 (`0572b4e`, branch `f1/21-room-guard-bindings`).
+- **Outcome**: Merged into `main`. 619 tests passing (618 pass, 1 skip), `test:static` 8/8.
+- **Modules**: `src/daemon/transport/room-guard.ts` (D-22 room-guard decorator wrapping binding transport, PT-01 wrong-room defense, inside `transport/` for PT-28 call-site confinement), `src/daemon/binding-config.ts` (`BindingConfig` materialized per binding from `telegram-agent-bus/src/config.ts:168-187` minus `bot_token`), `src/daemon/bindings.ts` (registry hot-reload reconciliation, poller lifecycle management, `BINDING_CHANGED` audit logging).
+- **Twins**: Added twins `test/daemon/transport/room-guard.test.ts`, `test/daemon/binding-config.test.ts`, `test/daemon/bindings.test.ts`. Updated PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4.
+- **Budget**: Authored diff 1,240 lines (493 src + 747 test) with a disclosed 840-line PR-scoped exception.
+- **Audit**: Judgment Day substitute (`bus-v2-f1-pr-21-audit-001`), 11 findings in Round 1 (5 Judge A, 6 Judge B); Round 2 scoped re-judgment: 100% verified (5/5 Judge A, 6/6 Judge B, 0 regressions, 0 survivors). 8-mutant sweep executed: **8 killed / 0 survived**.
+- **RDD fallback**: assess returned unassessable/declined, writer self-verification + independent verification passed.
+- **Next**: PR-22a (`src/daemon/admission.ts`, seven-step admission pipeline, PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5).
+
 ## Session 23 — PR-20: `daemon/transport/{types,group,direct,dual}.ts` (AS-IS hash-pinned vendoring, Unit 7 `durable-inbox` transport foundation)
 
 - **Date**: 2026-09-20

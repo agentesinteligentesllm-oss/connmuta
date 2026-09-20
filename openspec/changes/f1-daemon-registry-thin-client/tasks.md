@@ -622,12 +622,14 @@ Scope: `src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `sr
 Requirements: `send-path › chat_id must equal the binding's group_id or the send is refused` (PT-01 mechanism, wired end-to-end in PR-27/PR-41); registry-to-poller reconciliation half of `project-binding › Machine registry schema and invariants`.
 Runtime harness: N/A here — the two-binding wrong-room CI scenario runs end-to-end in PR-41.
 
-- [ ] 21.1 RED: write `test/daemon/transport/room-guard.test.ts` ("forced mismatch yields WRONG_ROOM": numeric `chat_id` must equal `binding.group_id`, string `chat_id` must be `@<username>` of a roster member, violation throws before the call).
-- [ ] 21.2 GREEN: implement `src/daemon/transport/room-guard.ts` (D-22 decorator wrapping the binding's transport, inside `transport/` so PT-28's call-site confinement holds).
-- [ ] 21.3 RED: write `test/daemon/binding-config.test.ts` (`BindingConfig` = v1 `Config` minus `bot_token`, materialized per binding) and `test/daemon/bindings.test.ts` ("pollers start for new active bindings and stop for removed/suspended ones; a `BINDING_CHANGED` audit row is written per delta").
-- [ ] 21.4 GREEN: implement `src/daemon/binding-config.ts` (SEAM from `telegram-agent-bus/src/config.ts:168-187`, read-only source) and `src/daemon/bindings.ts` (registry hot-reload reconciliation, consumes PR-09's loader).
-- [ ] 21.5 Verify: `npm run build && node --test "dist/test/daemon/transport/room-guard.test.js" "dist/test/daemon/binding-config.test.js" "dist/test/daemon/bindings.test.js"`.
-- [ ] 21.6 Docs: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 21.1 RED: write `test/daemon/transport/room-guard.test.ts` ("forced mismatch yields WRONG_ROOM": numeric `chat_id` must equal `binding.group_id`, string `chat_id` must be `@<username>` of a roster member, violation throws before the call).
+- [x] 21.2 GREEN: implement `src/daemon/transport/room-guard.ts` (D-22 decorator wrapping the binding's transport, inside `transport/` so PT-28's call-site confinement holds).
+- [x] 21.3 RED: write `test/daemon/binding-config.test.ts` (`BindingConfig` = v1 `Config` minus `bot_token`, materialized per binding) and `test/daemon/bindings.test.ts` ("pollers start for new active bindings and stop for removed/suspended ones; a `BINDING_CHANGED` audit row is written per delta").
+- [x] 21.4 GREEN: implement `src/daemon/binding-config.ts` (SEAM from `telegram-agent-bus/src/config.ts:168-187`, read-only source) and `src/daemon/bindings.ts` (registry hot-reload reconciliation, consumes PR-09's loader).
+- [x] 21.5 Verify: `npm run build && node --test "dist/test/daemon/transport/room-guard.test.js" "dist/test/daemon/binding-config.test.js" "dist/test/daemon/bindings.test.js"`.
+- [x] 21.6 Docs: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Audit & Verification.* Audited under Judgment Day dual review (`bus-v2-f1-pr-21-audit-001`), substituting for the tribunal debate while the Arena bridge is down (DN-05 unsatisfied). Findings addressed in Round 1: 11 findings (5 Judge A, 6 Judge B); Round 2 scoped re-judgment: 100% verified (5/5 Judge A, 6/6 Judge B, 0 regressions, 0 survivors). 8-mutant sweep executed: **8 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 619 tests (618 pass, 1 skip), `test:static` 8/8. Authored diff: 1,240 lines (493 src + 747 test) with a disclosed 840-line PR-scoped exception. Merged as PR #24.
 
 #### PR-22a — seven-step admission pipeline
 Branch `f1/22a-admission` → `main`. Depends: PR-21. Size: ≈250 lines, no exception (pre-split from the poller so the highest-risk code — invariants 1, 4, 5 — gets its own review; tribunal `bus-v2-f1-tasks-001` item 4).

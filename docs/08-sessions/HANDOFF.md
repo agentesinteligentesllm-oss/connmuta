@@ -18,12 +18,12 @@
 for a debate**. The Pi-native SDD preflight gate is also closed and only a human can open it (§2), so
 slices run **ODD with the full SDD contract preserved** and are audited by **Judgment Day**. That route
 has now been proven end to end on PR-06, PR-07a, PR-07b, PR-08a, PR-08b, PR-09a, PR-09b, PR-10, PR-11,
-PR-12, PR-13, PR-14, PR-15, PR-16, PR-17, PR-18, PR-19 and **PR-20** — eighteen slices, eighteen records in the tribunal index.
+PR-12, PR-13, PR-14, PR-15, PR-16, PR-17, PR-18, PR-19, PR-20 and **PR-21** — nineteen slices, nineteen records in the tribunal index.
 
 **Copy-paste prompt to start the next session:**
 
 ```text
-Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-21 (`src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `src/daemon/bindings.ts`, PT-01 wrong-room defense, D-22 room-guard, binding lifecycle): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
+Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-22a (`src/daemon/admission.ts`, seven-step admission pipeline, PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
 La ruta ya está decidida (ODD con el contrato SDD preservado + auditoría Judgment Day); la Arena de debate no está disponible, así que nada depende de un debate ni de una acción en la TUI.
 ```
 
@@ -37,7 +37,7 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 
 The working tree must be **clean** at the start of this session except for an untracked `odd/` directory if
 a previous session left one. The status command must print
-`nextRecommended: apply`, `completed: 108` of `210`, `blockedReasons: []`. Anything else: stop and report.
+`nextRecommended: apply`, `completed: 114` of `210`, `blockedReasons: []`. Anything else: stop and report.
 (`verifyReport: missing` is **expected and correct** while `apply` runs.)
 
 ---
@@ -46,13 +46,13 @@ a previous session left one. The status command must print
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-20** (PR-20 merged as PR #23 `dfd3b13`). **Next slice: PR-21** — `src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `src/daemon/bindings.ts`. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **25 blocks / 20 row ids** (`PR-01…PR-20`). Remaining: **20 blocks / 22 row ids** (`PR-21…PR-42`). Checkboxes: **108 of 210**. | `tasks.md` |
-| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **108/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
-| Unit 7 `durable-inbox` — **open** | `src/daemon/telegram.ts` completed and merged (PR-18, PR-19). Transport modules AS-IS merged (PR-20). PR-21 (`src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `src/daemon/bindings.ts`) follows. | `INDEX.md` `bus-v2-f1-pr-20-audit-001` |
-| Code on `main` / current | `src/shared/*` (16 modules), `src/cli/{main,validate,daemon-stop}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, `src/daemon/{node-floor,home,log,bootstrap,main,telegram}.ts` and `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, and `src/daemon/transport/{types,group,direct,dual}.ts`, all with twins — **594 tests** (593 pass, 1 skip), `test:static` **8/8** | PRs `#1`–`#23` |
+| Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-21** (PR-21 merged as PR #24 `0572b4e`). **Next slice: PR-22a** — `src/daemon/admission.ts` (seven-step admission pipeline, PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5). | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **26 blocks / 21 row ids** (`PR-01…PR-21`). Remaining: **19 blocks / 21 row ids** (`PR-22a…PR-42`). Checkboxes: **114 of 210**. | `tasks.md` |
+| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **114/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
+| Unit 7 `durable-inbox` — **open** | `src/daemon/telegram.ts` completed and merged (PR-18, PR-19). Transport modules AS-IS merged (PR-20). Room guard, binding config and reconciliation merged (PR-21). PR-22a (`src/daemon/admission.ts`) follows. | `INDEX.md` `bus-v2-f1-pr-21-audit-001` |
+| Code on `main` / current | `src/shared/*` (16 modules), `src/cli/{main,validate,daemon-stop}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, `src/daemon/{node-floor,home,log,bootstrap,main,telegram,binding-config,bindings}.ts` and `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, and `src/daemon/transport/{types,group,direct,dual,room-guard}.ts`, all with twins — **619 tests** (618 pass, 1 skip), `test:static` **8/8** | PRs `#1`–`#24` |
 | Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**`; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **16 entries** (12 previous + 4 AS-IS transport entries: `types.ts`, `group.ts`, `direct.ts`, `dual.ts`). | `test/security/provenance.test.ts` |
-| Audit status | **DN-05 is unsatisfied for PR-06..PR-20** (all eighteen audited by Judgment Day substitute), one record each in the tribunal index. | [`INDEX.md`](../05-tribunal/INDEX.md) |
+| Audit status | **DN-05 is unsatisfied for PR-06..PR-21** (all nineteen audited by Judgment Day substitute), one record each in the tribunal index. | [`INDEX.md`](../05-tribunal/INDEX.md) |
 
 ---
 
@@ -76,9 +76,8 @@ that no `sdd-apply` phase envelope exists. **One variant is permitted**: if a hu
 in parallel over one immutable frozen tree, graph-v1 shapes only (discovery returns only `{"rows":[…]}`;
 a scoped re-judgment returns only `{"resolutions":[…]}`), then a bounded correction round and **at most
 two scoped re-judgments — the budget is two, and a round-two survivor escalates**. Record the audit path
-in the tribunal index the way the eighteen existing records do, and state plainly that DN-05 is unsatisfied.
-PR-20's lesson: 8-mutant sweep killed 8/8; 0 findings across both blind judges in Round 1 (0 Judge A, 0 Judge B),
-0 survivors. Merged as PR #23 (`dfd3b13`).
+in the tribunal index the way the nineteen existing records do, and state plainly that DN-05 is unsatisfied.
+PR-21's lesson: 8-mutant sweep killed 8/8; 11 findings in Round 1 (5 Judge A, 6 Judge B); Round 2 scoped re-judgment: 100% verified (5/5 Judge A, 6/6 Judge B, 0 regressions, 0 survivors). Merged as PR #24 (`0572b4e`).
 Carry forward previous rules:
 
 - **Ask before round 1** (the skill requires it). If the Director's standing instruction for the session is
@@ -97,15 +96,15 @@ Carry forward previous rules:
   its own parts. Recount from the file or command, never from memory.
 
 **3. PT-cell discipline.** A PR updates the file-name cell of the PT rows it **actually pins**, and only
-those; an over-claimed cell is a defect. PR-20 provides the foundation for PT-28 (call-site confinement);
-PR-21 pins PT-01 (numeric `chat_id` must equal `binding.group_id`, string `chat_id` must be `@<username>` of a roster member, room-guard WRONG_ROOM).
+those; an over-claimed cell is a defect. PR-21 pinned PT-01 (`test/daemon/transport/room-guard.test.ts`). PR-22a pins PT-03, PT-04, PT-16, PT-17, PT-31 (`test/daemon/admission.test.ts`).
 
 **4. Budget policy.** 400 lines of *authored* src+test, measured as `git diff --numstat -- src test`, with
 disclosed PR-scoped exceptions otherwise. Precedents: PR-06b 26, PR-07a 20, PR-07b 154, PR-08a 348, PR-08b 272,
 PR-09a 866, PR-09b 375, PR-10 957, PR-11 876, PR-12 1,664, PR-13 1,868, PR-14 687, PR-15 608, PR-16 656,
 PR-17 378 (within budget without exception), PR-18 386 (within budget without exception), PR-19 108 (within budget
-without exception), PR-20 308 (within budget with 732 lines AS-IS vendored body excluded under `size:exception (AS-IS hash-pinned)`).
-PR-21 is estimated at ≈340 lines, within the 400-line budget without exception.
+without exception), PR-20 308 (within budget with 732 lines AS-IS vendored body excluded under `size:exception (AS-IS hash-pinned)`),
+PR-21 1,240 (disclosed 840-line PR-scoped exception; 493 src + 747 test).
+PR-22a is estimated at ≈250 lines, within the 400-line budget without exception.
 - Measure after every correction, in the same pass as the edit, and again at the tip that ships.
 - Always label a figure with the tip it belongs to.
 - Never write a computed figure as if it were measured, and never leave a superseded figure unlabelled.
@@ -204,35 +203,30 @@ Older values (envelope, secrets, protocol-apply, protocol-select, thread-record,
 ## §5 — Next session, exact sequence
 
 1. **§0**: confirm `main` is clean and current, `rm -rf dist`, read SDD status. Then read
-   [`../../AGENTS.md`](../../AGENTS.md) §1–§2, this file's §2, `tasks.md`'s **PR-21 block**, design
-   **§6.1, §6.2, §18 D-22**, and `src/daemon/transport/`.
-2. **Create the ODD feature doc** (`odd/tasks/pr-21-room-guard-bindings.md`, untracked, deleted at close), its
-   Engram mirror (`odd/pr-21-room-guard-bindings/tasks`) and the visible `todo` list, **before** the first write.
+   [`../../AGENTS.md`](../../AGENTS.md) §1–§2, this file's §2, `tasks.md`'s **PR-22a block**, design
+   **§6.2, §8.1, §18 D-20**, and `src/daemon/admission.ts`.
+2. **Create the ODD feature doc** (`odd/tasks/pr-22a-admission.md`, untracked, deleted at close), its
+   Engram mirror (`odd/pr-22a-admission/tasks`) and the visible `todo` list, **before** the first write.
    State the plan in one line and proceed; do not ask the Director to choose a workflow and do not wait on
    the TUI.
-3. **Branch** `f1/21-room-guard-bindings` from `main`. Then follow the block exactly:
-   - **21.1 RED**: write `test/daemon/transport/room-guard.test.ts` ("forced mismatch yields WRONG_ROOM":
-     numeric `chat_id` must equal `binding.group_id`, string `chat_id` must be `@<username>` of a roster
-     member, violation throws before the call).
-   - **21.2 GREEN**: implement `src/daemon/transport/room-guard.ts` (D-22 decorator wrapping the binding's
-     transport, inside `transport/` so PT-28's call-site confinement holds).
-   - **21.3 RED**: write `test/daemon/binding-config.test.ts` (`BindingConfig` = v1 `Config` minus `bot_token`,
-     materialized per binding) and `test/daemon/bindings.test.ts` ("pollers start for new active bindings and
-     stop for removed/suspended ones; a `BINDING_CHANGED` audit row is written per delta").
-   - **21.4 GREEN**: implement `src/daemon/binding-config.ts` (SEAM from `telegram-agent-bus/src/config.ts:168-187`,
-     read-only source) and `src/daemon/bindings.ts` (registry hot-reload reconciliation, consumes PR-09's loader).
-   - **21.5 Verify**: `npm run build && node --test "dist/test/daemon/transport/room-guard.test.js" "dist/test/daemon/binding-config.test.js" "dist/test/daemon/bindings.test.js"`.
-   - **21.6 Docs**: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the
-     test files this PR adds (`test/daemon/transport/room-guard.test.ts`).
+3. **Branch** `f1/22a-admission` from `main`. Then follow the block exactly:
+   - **22a.1 RED**: write `test/daemon/admission.test.ts` covering the four spec scenarios ("foreign chat
+     dropped and audited without a body", "unknown sender recorded, never surfaced", "mixed batch isolates
+     human chat text", "`updates.body` is NULL for rejected/ignored, kept for not_mine/noted").
+   - **22a.2 GREEN**: implement `src/daemon/admission.ts` (SEAM split from `telegram-agent-bus/src/tools/fetch.ts:404-460,525-656`,
+     read-only source, ≈189 lines; step 3 chat-scope check is new, ledger writes via PR-12, `unknown_senders` upsert via PR-13).
+   - **22a.3 Verify**: `npm run build && node --test "dist/test/daemon/admission.test.js"`.
+   - **22a.4 Docs**: update the file-name cell(s) of PT-03, PT-04, PT-16, PT-17, PT-31 in `docs/02-architecture/THREAT-MODEL.md` §4
+     with the test files this PR adds (`test/daemon/admission.test.ts`).
 4. **Verify** from a frozen worktree (never the working tree): full suite and `test:static`, plus a mutant
    sweep on a cleaned `dist/` with an explicit-pair harness (§2.2). Report every survivor with its reason.
-5. **Measure the real diff** (`git diff --numstat -- src test`), budget policy (target: ≤400 lines, ≈340 lines
+5. **Measure the real diff** (`git diff --numstat -- src test`), budget policy (target: ≤400 lines, ≈250 lines
    budget, no exception). Read every new file in full. Label every figure with its tip.
 6. **Commit** as work units — put any record/`tasks.md` correction in the *same* commit as the thing it describes.
 7. **Audit** (§2.2) over the frozen committed range, then **the ordinary native review** (§2.5) and, if it
    declines, the RDD fallback — **and run an independent verifier either way** (§2.9). Correct every finding
    **before** the commit that claims it is corrected. Push, open the PR, wait for CI, and merge.
-8. **Close**: rewrite this file (for **PR-22a**, seven-step admission pipeline, PT-03, PT-04, PT-16, PT-17, PT-31),
+8. **Close**: rewrite this file (for **PR-22b**, poller loop, PT-33),
    prepend to [`LOG.md`](./LOG.md), add the audit record to [`INDEX.md`](../05-tribunal/INDEX.md), sweep status
    lines across docs and YAML files (**parse both YAML files after editing**), delete the ODD tree, run
    `mem_session_summary`, commit on `main`, and push.
@@ -246,8 +240,8 @@ Older values (envelope, secrets, protocol-apply, protocol-select, thread-record,
   are closed** (all sub-tasks `[x]`).
 - Provenance hash rule, registry and range convention are ratified — §3. `constants.ts:3` is settled (B-19, `done`).
 - **Doc-hygiene rule**: never quote a matched-and-rejected secret-shaped literal in `apply-progress.md`.
-- **PR-01…PR-20 are complete; do not re-slice, re-audit or re-open them.** PR-08b's, PR-09a's, PR-10's, PR-11's,
-  PR-13's, PR-14's, PR-15's, PR-16's, PR-17's, PR-18's, PR-19's and PR-20's native reviews/audits are settled; advisory findings (B-21, B-22, B-32, B-36)
+- **PR-01…PR-21 are complete; do not re-slice, re-audit or re-open them.** PR-08b's, PR-09a's, PR-10's, PR-11's,
+  PR-13's, PR-14's, PR-15's, PR-16's, PR-17's, PR-18's, PR-19's, PR-20's and PR-21's native reviews/audits are settled; advisory findings (B-21, B-22, B-32, B-36)
   are recorded, not actioned. No third round exists for Judgment Day.
 - **Unit 4 (`ledger`), Unit 5 (`secret-store`) and Unit 6 (`daemon-lifecycle`) are closed. Unit 7 opened with PR-18.**
   A defect in any merged module is its own slice with its own audit, not a drive-by edit.
@@ -298,7 +292,7 @@ Older values (envelope, secrets, protocol-apply, protocol-select, thread-record,
 ## §8 — Environment facts not to re-measure
 
 - Machine: Windows 11, Node 24.16.0, npm 11.5, gentle-ai 3.0.2 CLI, gentle-pi 3.1.1, TypeScript 7.0.2
-  pinned, SQLite 3.53.0 through `node:sqlite`. **594 tests** (593 pass, 1 skip), `test:static` **8/8**. Receipt-driven
+  pinned, SQLite 3.53.0 through `node:sqlite`. **619 tests** (618 pass, 1 skip), `test:static` **8/8**. Receipt-driven
   development is **on** (`gentle-ai review mode status`: global on, clone-local unset).
 - Line endings: `eol=lf` forced through `.gitattributes`. Check with `git ls-files --eol`.
 - `node:sqlite` measured facts: `DatabaseSync.isTransaction` flips on `BEGIN IMMEDIATE`; constraint codes
