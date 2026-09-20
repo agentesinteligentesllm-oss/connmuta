@@ -64,5 +64,11 @@
     "v1Path": "src/tools/fetch.ts:65-348",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/daemon/lifecycle/lock.ts",
+    "v1Path": "src/state.ts",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]

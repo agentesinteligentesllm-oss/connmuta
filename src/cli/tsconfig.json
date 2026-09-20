@@ -10,5 +10,5 @@
   // PR-15): a referenced composite project with no inputs is TS18003, and `npm run build` builds
   // every project this one references. Re-add each `{ "path": ... }` in the slice that writes its
   // first source file (HANDOFF §4 "src/cli/ must join the root references").
-  "references": [{ "path": "../shared" }]
+  "references": [{ "path": "../shared" }, { "path": "../daemon" }]
 }

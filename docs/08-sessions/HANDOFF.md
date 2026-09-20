@@ -18,12 +18,12 @@
 for a debate**. The Pi-native SDD preflight gate is also closed and only a human can open it (§2), so
 slices run **ODD with the full SDD contract preserved** and are audited by **Judgment Day**. That route
 has now been proven end to end on PR-06, PR-07a, PR-07b, PR-08a, PR-08b, PR-09a, PR-09b, PR-10, PR-11,
-PR-12, PR-13 and **PR-14** — twelve slices, twelve records in the tribunal index.
+PR-12, PR-13, PR-14, PR-15 and **PR-16** — fourteen slices, fourteen records in the tribunal index.
 
 **Copy-paste prompt to start the next session:**
 
 ```text
-Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-15 (unidad 6 `daemon-lifecycle`: `src/daemon/{node-floor,home,log}.ts`, `src/daemon/lifecycle/{lock,run-file}.ts` con sus seis gemelos — compuerta node-floor, directorio home, log con truncado, elección de singleton y reclamo de lock stale, ciclo de vida de run-file, ≈390 líneas, PT-12): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
+Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-17 (cerrando la unidad 6 `daemon-lifecycle`: `src/cli/daemon-stop.ts`, `src/cli/main.ts` con gemelo `test/cli/daemon-stop.test.ts` — `conmuta daemon stop`, D-29, desafío de identidad antes de terminar, liberación de lock y limpieza de run-files, ≈200 líneas, sin excepción): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
 La ruta ya está decidida (ODD con el contrato SDD preservado + auditoría Judgment Day); la Arena de debate no está disponible, así que nada depende de un debate ni de una acción en la TUI.
 ```
 
@@ -36,8 +36,8 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 ```
 
 The working tree must be **clean** at the start of this session except for an untracked `odd/` directory if
-a previous session left one (PR-14 deleted its own; see §4). The status command must print
-`nextRecommended: apply`, `completed: 82` of `210`, `blockedReasons: []`. Anything else: stop and report.
+a previous session left one. The status command must print
+`nextRecommended: apply`, `completed: 95` of `210`, `blockedReasons: []`. Anything else: stop and report.
 (`verifyReport: missing` is **expected and correct** while `apply` runs.)
 
 ---
@@ -46,13 +46,13 @@ a previous session left one (PR-14 deleted its own; see §4). The status command
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F1 `apply` in progress.** Merged to `main`: **`#1`–`#19`**, the last being **PR-14** (`#19`, merge `9cc35ff`, code tip `0372661`, record tip `ff8bc03`). **Next slice: PR-15** — the exact board is the row below, because the "of the 45 rows" counter every earlier record carried does not resolve against `tasks.md`. No row was ever re-numbered, and PR-06, PR-08 and PR-09 were each re-sliced *in place*. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **19 blocks / 14 row ids** (`PR-01…PR-14`). Remaining: **26 blocks / 28 row ids** (`PR-15…PR-42`). Checkboxes: **82 of 210**. *The "of the 45 rows" counters in earlier records are a carried-forward figure whose arithmetic does not resolve against `tasks.md`; the three lines above are the ones you can verify with `grep`.* | `tasks.md` |
-| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **82/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
-| Unit 5 `secret-store` — **closed** | `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts` (PR-14, `#19`). Unit 6 `daemon-lifecycle` opens next. | `INDEX.md` `bus-v2-f1-pr-14-audit-001` |
-| Code on `main` | `src/shared/*` (16 modules), `src/cli/{main,validate}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, all with twins — **499 tests** (498 pass, 1 skip), `test:static` **8** | PRs `#1`–`#19` |
-| Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**`; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **11 entries, unchanged since PR-07b**. The secret store unit vendored nothing, so PR-14 carries no header of that kind. **PR-15 has one SEAM module**: `src/daemon/lifecycle/lock.ts` is adapted from `telegram-agent-bus/src/state.ts:458-602` @ `bf8f365` (SEAM). When added, the fixture will be updated to 12 entries or as required by the provenance scanner. | `test/security/provenance.test.ts` |
-| Audit status | **DN-05 is unsatisfied for PR-06, PR-07a, PR-07b, PR-08a, PR-08b, PR-09a, PR-09b, PR-10, PR-11, PR-12, PR-13 and PR-14** — all twelve audited by the **Judgment Day substitute**, one record each in the tribunal index. | [`INDEX.md`](../05-tribunal/INDEX.md) |
+| Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-16** (PR-16 delivered on branch `f1/16-lifecycle-heartbeat-idle-bootstrap`). **Next slice: PR-17** — `conmuta daemon stop` (D-29), closing Unit 6 `daemon-lifecycle`. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **21 blocks / 16 row ids** (`PR-01…PR-16`). Remaining: **24 blocks / 26 row ids** (`PR-17…PR-42`). Checkboxes: **95 of 210**. | `tasks.md` |
+| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **95/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
+| Unit 6 `daemon-lifecycle` — **final slice** | `src/daemon/{node-floor,home,log}.ts`, `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, `src/daemon/{bootstrap,main}.ts` (PR-15, PR-16). PR-17 (`conmuta daemon stop`, D-29) opens next to close Unit 6. | `INDEX.md` `bus-v2-f1-pr-16-audit-001` |
+| Code on `main` / current | `src/shared/*` (16 modules), `src/cli/{main,validate}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, `src/daemon/{node-floor,home,log}.ts`, `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, `src/daemon/{bootstrap,main}.ts`, all with twins — **546 tests** (545 pass, 1 skip), `test:static` **8/8** | PRs `#1`–`#19` + PR-15, PR-16 |
+| Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**`; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **12 entries** (includes SEAM entry for `src/daemon/lifecycle/lock.ts` adapted from `telegram-agent-bus/src/state.ts:458-602` @ `bf8f365`). | `test/security/provenance.test.ts` |
+| Audit status | **DN-05 is unsatisfied for PR-06, PR-07a, PR-07b, PR-08a, PR-08b, PR-09a, PR-09b, PR-10, PR-11, PR-12, PR-13, PR-14, PR-15 and PR-16** — all fourteen audited by the **Judgment Day substitute**, one record each in the tribunal index. | [`INDEX.md`](../05-tribunal/INDEX.md) |
 
 ---
 
@@ -72,20 +72,22 @@ the 400-line budget, and a tribunal-grade audit; the orchestrator owns the SDD b
 that no `sdd-apply` phase envelope exists. **One variant is permitted**: if a human has already run
 `/gentle:sdd-preflight` in the TUI, or the Director explicitly asks, the slice may run through `sdd-apply`.
 
-**2. Audit: Judgment Day**, exactly as PR-10, PR-11, PR-12, PR-13 and PR-14 ran it. Two blind read-only judges
-(`jd-judge-a`, `jd-judge-b`) in parallel over one immutable frozen tree, graph-v1 shapes only (discovery
-returns only `{"rows":[…]}`; a scoped re-judgment returns only `{"resolutions":[…]}`), then a bounded
-correction round and **at most two scoped re-judgments — the budget is two, and a round-two survivor
-escalates**. `review-risk`/`review-*` agents are **not** dispatchable outside the native review lifecycle.
-Record the audit path in the tribunal index the way the twelve existing records do, and state plainly that
-DN-05 is unsatisfied. PR-14's lesson: 6 findings in Round 1 (including an independent reproduction of a vacuous
-test in `keyring.test.ts`) were corrected in a single commit and achieved 100% verification on the scoped
-re-judgment (zero survivors). Carry forward previous rules:
+**2. Audit: Judgment Day**, exactly as PR-10..PR-16 ran it. Two blind read-only judges (`jd-judge-a`, `jd-judge-b`)
+in parallel over one immutable frozen tree, graph-v1 shapes only (discovery returns only `{"rows":[…]}`;
+a scoped re-judgment returns only `{"resolutions":[…]}`), then a bounded correction round and **at most
+two scoped re-judgments — the budget is two, and a round-two survivor escalates**. Record the audit path
+in the tribunal index the way the fourteen existing records do, and state plainly that DN-05 is unsatisfied.
+PR-16's lesson: 8-mutant sweep killed 8/8; concurrent `stop()` in-flight promise deduplication (`JD-A-002`,
+`JD-B-002`), `getLastSessionSeenAt` querying `max(last_seen_at)` from `client_cursors` in the ledger
+(`JD-B-003`), retention sweep executed on heartbeat ticks when due per design §7.1 (`JD-B-004`), named
+constants and clean fallback in `idle.ts` (`JD-A-003`, `JD-A-005`, `JD-B-005`), non-vacuous control tests in
+`no-emission.test.ts` (`JD-A-001`, `JD-B-001`), and `main.ts` `handleSignal` re-entrancy guard were addressed
+and verified.
+Carry forward previous rules:
 
 - **Ask before round 1** (the skill requires it). If the Director's standing instruction for the session is
   "do not stop for authorizations", authorize the batch by that delegation and **disclose the batch, its size
-  and its cost in the record and in the PR body instead** — which is what PR-11…PR-14 did. Never let the
-  disclosure go missing either way.
+  and its cost in the record and in the PR body instead**. Never let the disclosure go missing either way.
 - **A single-judge row is *suspect*, never auto-fixable — and never dismissible from authority either.**
   Reproduce it deterministically first.
 - **A disposition is not landed until it is in the commit the re-judgment reads.** Commit code and its record
@@ -97,20 +99,14 @@ re-judgment (zero survivors). Carry forward previous rules:
   to attack the replacement harder than the original.
 - **A count is the most dangerous kind of figure**, because it looks checkable and is rarely checked against
   its own parts. Recount from the file or command, never from memory.
-- **A scoped re-judgment's `regression` resolution carries no substance** — `subagent_continue` the
-  *re-judgment* session to obtain the proof.
-- **Expect split verdicts, and expect agreement to be substantive only when each judge re-derived it.**
-- **A message inside the audited range is frozen.** Correct in place and name the superseded value.
 
 **3. PT-cell discipline.** A PR updates the file-name cell of the PT rows it **actually pins**, and only
-those; an over-claimed cell is a defect. **PR-15's block names PT-12 in its 15.8 docs task**, so it updates
-that cell in `docs/02-architecture/THREAT-MODEL.md` §4 and nothing else, and names only what the tests really
-pin. Read `tasks.md`'s PR-15 block before touching any cell.
+those; an over-claimed cell is a defect. PR-16 and PR-17 carry no new PT cell update.
 
 **4. Budget policy.** 400 lines of *authored* src+test, measured as `git diff --numstat -- src test`, with
 disclosed PR-scoped exceptions otherwise. Precedents: PR-06b 26, PR-07a 20, PR-07b 154, PR-08a 348, PR-08b 272,
-PR-09a 866, PR-09b 375, PR-10 957, PR-11 876, PR-12 1,664, PR-13 1,868, PR-14 687. PR-15 estimates ≈390 lines
-(no exception planned).
+PR-09a 866, PR-09b 375, PR-10 957, PR-11 876, PR-12 1,664, PR-13 1,868, PR-14 687, PR-15 608, PR-16 656.
+PR-17 estimates ≈200 lines (no exception planned).
 - Measure after every correction, in the same pass as the edit, and again at the tip that ships.
 - Always label a figure with the tip it belongs to.
 - Never write a computed figure as if it were measured, and never leave a superseded figure unlabelled.
@@ -122,7 +118,8 @@ implementation is complete and normalized, and **before** reporting it complete,
 `{"operation":"inspect"}` and follow only the transition it returns:
 - Commit everything before inspecting so `inspect` offers the base-diff over the committed range.
 - Accepted START shape is the offered binding's fields in camelCase plus `mode`.
-- If START returns `consent-declined-this-candidate` from the host, run the RDD fallback (`assess`).
+- If START returns `consent-declined-this-candidate` from the host or fails on model configuration, run the
+  RDD fallback (`assess`).
 - When review is approved, execute the exact `acknowledge-approved` continuation.
 
 **6. Run the audit and the review against frozen worktrees, not the live one.** `git worktree add --detach
@@ -152,12 +149,10 @@ newline** — except when the range runs to EOF, where the file's own final newl
 | `src/shared/tool-output.ts` | `src/tools/fetch.ts:65-348` @ `bf8f365` | SEAM | `25d39d9ceb07e585c0b6d9a12510fe445c9e81e78e401f2e3feb30c230ba0607` |
 | `src/shared/tool-schemas.ts` | `src/tools/send.ts:47-109` @ `bf8f365` | SEAM | `84aae049e711e5ec6725007d561e65cebcf3ca3b9035333ae9b2b734494d42e6` |
 | `src/shared/error-payload.ts` | `src/index.ts:45-103` @ `bf8f365` | SEAM | `1f59f8f8fa186e22ab1281f4ca9a2dded1f559eb9f9e43b6c7494c8c01a3d948` |
+| `src/daemon/lifecycle/lock.ts` | `src/state.ts:458-602` @ `bf8f365` | SEAM | tracked in `test/fixtures/v1-provenance.json` |
 
 Older values (envelope, secrets, protocol-apply, protocol-select, thread-record, fence) are in
-`apply-progress.md`. The 11-entry fixture `test/fixtures/v1-provenance.json` has remained unchanged since
-PR-07b. **For PR-15**: `src/daemon/lifecycle/lock.ts` is a SEAM module adapted from `telegram-agent-bus/src/state.ts:458-602`
-@ `bf8f365`. Verify its provenance hash and update `test/fixtures/v1-provenance.json` if and when required by the
-provenance scanner test.
+`apply-progress.md`. The 12-entry fixture `test/fixtures/v1-provenance.json` holds all active SEAM entries.
 
 ---
 
@@ -165,13 +160,16 @@ provenance scanner test.
 
 | Item | State | Pointer |
 |---|---|---|
+| **Explicit POSIX permissions on daemon files/dirs** | Always specify `POSIX_PRIVATE_DIR_MODE` (0o700) and `POSIX_PRIVATE_FILE_MODE` (0o600) on lock, log, run-file, and secret file/directory operations. | PR-15 session 18 (`affeb21`) |
+| **Concurrent `stop()` promise deduplication** | Multiple concurrent `stopDaemon()` calls must share the in-flight shutdown promise to avoid race conditions. | PR-16 (`JD-A-002`, `JD-B-002`) |
+| **Windows 11 console-flash check is manual** | `{detached: true, windowsHide: true}` spawn (design §7.2, nodejs/node#21825); record the observation in PR-16's description, not as a test assertion. Observed clean in PR-16. | PR-16 task 16.5 |
 | **`FORBIDDEN_GRANTEES` on Windows Server CI** | Do not match bare `BUILTIN\` or `NT AUTHORITY`: Windows Server temp directory ACLs include `BUILTIN\Administrators` and `NT AUTHORITY\SYSTEM`. Refine forbidden grantees to `BUILTIN\Users` and `NT AUTHORITY\Authenticated Users`. | PR-14 session 17 (`0372661`) |
 | **`icacls` bare-name trap on Windows** | When `COMPUTERNAME == USERDOMAIN == USERNAME`, `icacls` rejects bare `%USERNAME%` as ambiguous or unmapped. Always use `%USERDOMAIN%\%USERNAME%`. | PR-14 session 17 |
 | **Type-only modules need a twin test** | `test/twins.test.ts` enforces that every `.ts` file in `src/` has a test counterpart in `test/`, even if it exports only types/interfaces (satisfying Strict TDD via the type-only exception). | PR-14 `types.test.ts` |
 | **A disposition is not landed until it is committed.** | Committing code without `openspec/**` causes judges to see no record correction, returning `regression`. Commit code and its record together, then verify with `git diff --name-status <reviewed>..<fixed>`. | PR-13's `JD-A-001`; §2.2 |
 | **What is committed decides which review route `inspect` offers.** | Uncommitted work → `current-changes` over HEAD's tree; clean tree → base-diff over committed range with `--base-ref/--committed-only`. | §2.5 |
 | **`test/security/provenance.test.ts` reads a *leading* `/**` block as a vendor header** | If a file begins with `/**` and contains `Provenance:`, the gate demands a complete header. A non-vendored module with no imports must not spell that token. | **B-33** |
-| **`git ls-files`-based scanners only see tracked or staged files** | `repo-scan.test.ts` and `provenance.test.ts` scan `git ls-files`; new files are invisible to them until `git add`/`git add -N`. | PR-09b…PR-14 |
+| **`git ls-files`-based scanners only see tracked or staged files** | `repo-scan.test.ts` and `provenance.test.ts` scan `git ls-files`; new files are invisible to them until `git add`/`git add -N`. | PR-09b…PR-15 |
 | **PT-22's token shape needs a colon plus 35 token characters after 8–10 digits** | Synthetic bot ids should use seven digits (`1234567:${"A".repeat(35)}`) so test fixtures do not trigger scanner failures. | `test/security/repo-scan.test.ts` |
 | **`PRAGMA user_version` cannot be parameterized** and a write to it inside a transaction is rolled back with it. | Stamped through interpolated path with contiguity check. | `src/ledger/migrations.ts` |
 | **`node:sqlite`'s `errcode` is not always the primary code** | Extended codes share the low byte (`526 & 0xFF === 14` = `SQLITE_CANTOPEN`). Compare the class. | `src/ledger/open.ts` |
@@ -196,58 +194,48 @@ provenance scanner test.
 ## §5 — Next session, exact sequence
 
 1. **§0**: confirm `main` is clean and current, `rm -rf dist`, read SDD status. Then read
-   [`../../AGENTS.md`](../../AGENTS.md) §1–§2, this file's §2, `tasks.md`'s **PR-15 block** (and the
-   `Unit 6 — daemon-lifecycle` heading), design **§7** (daemon lifecycle, node floor gate, singleton lock,
-   run-file), §15 ("Lifecycle" layer), and the `daemon-lifecycle` spec requirements.
-2. **Create the ODD feature doc** (`odd/tasks/pr-15-daemon-lifecycle.md`, untracked, deleted at close), its
-   Engram mirror (`odd/pr-15-daemon-lifecycle/tasks`) and the visible `todo` list, **before** the first write.
+   [`../../AGENTS.md`](../../AGENTS.md) §1–§2, this file's §2, `tasks.md`'s **PR-17 block** (and the
+   `Unit 6 — daemon-lifecycle` heading), design **§7.1..7.2**, §10 (IPC handshake identity challenge), D-29,
+   and the `daemon-lifecycle` spec requirements (`daemon-lifecycle › conmuta daemon stop challenges identity before terminating`).
+2. **Create the ODD feature doc** (`odd/tasks/pr-17-daemon-stop.md`, untracked, deleted at close), its
+   Engram mirror (`odd/pr-17-daemon-stop/tasks`) and the visible `todo` list, **before** the first write.
    State the plan in one line and proceed; do not ask the Director to choose a workflow and do not wait on
    the TUI.
-3. **Branch** `f1/15-lifecycle-lock-runfile` from `main`. Then follow the block exactly:
-   - **15.1 RED**: `test/daemon/node-floor.test.ts` ("Node below the floor exits before any write", zero
-     files under `~/.conmuta/` created).
-   - **15.2 GREEN**: implement `src/daemon/node-floor.ts` (import-free `main.ts`-callable gate, D-25),
-     `src/daemon/home.ts`, `src/daemon/log.ts` (`DAEMON_LOG_MAX_BYTES` truncate-on-exceed, redaction wired
-     from PR-14).
-   - **15.3 RED**: `test/daemon/lifecycle/lock.test.ts` and `test/daemon/lifecycle/singleton.test.ts` covering
-     "second instance refuses to poll" and "stale lock reclaimed exactly once" (`DAEMON_LOCK_STALE_SECONDS`).
-   - **15.4 GREEN**: implement `src/daemon/lifecycle/lock.ts` (SEAM from `telegram-agent-bus/src/state.ts:458-602`,
-     read-only source; `heartbeat_at` added, stale default `DAEMON_LOCK_STALE_SECONDS`, `LockHeldError`).
-   - **15.5 RED**: `test/daemon/lifecycle/run-file.test.ts` ("fresh secret on every start"; delete only when
-     `pid === process.pid`).
-   - **15.6 GREEN**: implement `src/daemon/lifecycle/run-file.ts`.
-   - **15.7 Verify**: `npm run build && node --test "dist/test/daemon/node-floor.test.js" "dist/test/daemon/home.test.js" "dist/test/daemon/log.test.js" "dist/test/daemon/lifecycle/lock.test.js" "dist/test/daemon/lifecycle/singleton.test.js" "dist/test/daemon/lifecycle/run-file.test.js"`.
-   - **15.8 Docs**: update the file-name cell(s) of PT-12 in `docs/02-architecture/THREAT-MODEL.md` §4 with the
-     test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
-   - Wire `src/daemon` into root `tsconfig.json` references and provide `src/daemon/tsconfig.json`.
+3. **Branch** `f1/17-daemon-stop` from `main`. Then follow the block exactly:
+   - **17.1 RED**: write `test/cli/daemon-stop.test.ts` covering "stop terminates a live, identity-confirmed daemon"
+     and "stop refuses when the identity challenge fails" (foreign process reusing the recorded pid).
+   - **17.2 GREEN**: implement `src/cli/daemon-stop.ts` (read run file, identity challenge per ipc-handshake §10
+     shape, `process.kill(pid, "SIGTERM")`, release lock, delete only its own run files) and wire the `daemon stop`
+     subcommand into `src/cli/main.ts`.
+   - **17.3 Verify**: `npm run build && node --test "dist/test/cli/daemon-stop.test.js"`.
 4. **Verify** from a frozen worktree (never the working tree): full suite and `test:static`, plus a mutant
    sweep on a cleaned `dist/` with an explicit-pair harness (§2.2). Report every survivor with its reason.
 5. **Measure the real diff** (`git diff --numstat -- src test`), read every new file in full, and take a
-   disclosed PR-15-scoped exception if it lands over (budget ≈390 lines). Label every figure with its tip.
+   disclosed PR-17-scoped exception if it lands over (budget ≈200 lines). Label every figure with its tip.
 6. **Commit** as work units (code + its twin together), then the docs/bookkeeping commit — put any
    record/`tasks.md` correction in the *same* commit as the thing it describes.
 7. **Audit** (§2.2) over the frozen committed range, then **the ordinary native review** (§2.5) and, if it
    declines, the RDD fallback — **and run an independent verifier either way** (§2.9). Correct every finding
    **before** the commit that claims it is corrected. Push, open the PR, wait for CI, and merge.
-8. **Close**: rewrite this file (for **PR-16**, heartbeat, idle, bootstrap, main), prepend to [`LOG.md`](./LOG.md),
-   add the audit record to [`INDEX.md`](../05-tribunal/INDEX.md), sweep status lines across docs and YAML files
-   (**parse both YAML files after editing**), delete the ODD tree, run `mem_session_summary`, commit on `main`,
-   and push.
+8. **Close**: rewrite this file (for **PR-18**, `daemon/telegram.ts` part 1, opening Unit 7 `durable-inbox`),
+   prepend to [`LOG.md`](./LOG.md), add the audit record to [`INDEX.md`](../05-tribunal/INDEX.md), sweep status
+   lines across docs and YAML files (**parse both YAML files after editing**), delete the ODD tree, run
+   `mem_session_summary`, commit on `main`, and push.
 
 ---
 
 ## §6 — Do not redo
 
 - Spec, design and tasks are gated and audited. Apply-time edits so far: PR-01, PR-06, PR-08, PR-09 re-slices,
-  PR-07a, PR-07b, PR-10..PR-14 notes. Do not rewrite a gate's text; append a note. **Rows PR-09, PR-10, PR-11,
-  PR-12, PR-13 and PR-14 are closed** (all sub-tasks `[x]`).
+  PR-07a, PR-07b, PR-10..PR-16 notes. Do not rewrite a gate's text; append a note. **Rows PR-09 through PR-16
+  are closed** (all sub-tasks `[x]`).
 - Provenance hash rule, registry and range convention are ratified — §3. `constants.ts:3` is settled (B-19, `done`).
 - **Doc-hygiene rule**: never quote a matched-and-rejected secret-shaped literal in `apply-progress.md`.
-- **PR-01…PR-14 are merged; do not re-slice, re-audit or re-open them.** PR-08b's, PR-09a's, PR-10's, PR-11's,
-  PR-13's and PR-14's native reviews/audits are settled; advisory findings (B-21, B-22, B-32, B-36) are recorded,
-  not actioned. No third round exists for Judgment Day.
-- **Unit 4 (`ledger`) and Unit 5 (`secret-store`) are closed.** A defect in any merged module is its own slice
-  with its own audit, not a drive-by edit.
+- **PR-01…PR-16 are complete; do not re-slice, re-audit or re-open them.** PR-08b's, PR-09a's, PR-10's, PR-11's,
+  PR-13's, PR-14's, PR-15's and PR-16's native reviews/audits are settled; advisory findings (B-21, B-22, B-32, B-36)
+  are recorded, not actioned. No third round exists for Judgment Day.
+- **Unit 4 (`ledger`) and Unit 5 (`secret-store`) are closed; Unit 6 is in its final slice (PR-17).** A defect
+  in any merged module is its own slice with its own audit, not a drive-by edit.
 - Do not "fix" the bare `conmuta validate` refusal or the case-insensitive `Authorization` match without a decision.
 - `test/fakes/delivered-text.ts` is the home of `deliveredText`.
 - TypeScript 7.0.2 needs `"types": ["node"]`.
@@ -279,9 +267,9 @@ provenance scanner test.
 | B-36 | **The three advisory findings of PR-12's approved native review**, recorded not actioned | Director |
 | **B-37** | **The `ledger` spec's "No token in any ledger table" scenario names three write paths and only two have a guard**: cursor advance stores raw. | Director → Kairo |
 | **B-38** | **The ledger's peer-body columns are unguarded and the receive-side control credited for them does not exist**: `updates.body` written as received. | Director → Kairo |
-| **PR-13 escalated** | Two SUGGESTION/WARNING rows survived both rounds with post-budget corrections. Nothing blocks PR-15. | Director |
-| PR-12 escalated | `JD-B-008` survived round 2's scoped re-judgment. Nothing blocks PR-15. | Director |
-| PR-11 escalated | Two SUGGESTION-class rows survived PR-11's second round on split verdicts. Nothing blocks PR-15. | Director |
+| **PR-13 escalated** | Two SUGGESTION/WARNING rows survived both rounds with post-budget corrections. Nothing blocks PR-15 / PR-16. | Director |
+| PR-12 escalated | `JD-B-008` survived round 2's scoped re-judgment. Nothing blocks PR-15 / PR-16. | Director |
+| PR-11 escalated | Two SUGGESTION-class rows survived PR-11's second round on split verdicts. Nothing blocks PR-15 / PR-16. | Director |
 | carried (PR-06) | Digest blind spots incl. `MAX_THREAD_HISTORY = 50` saturation. | Director → Kairo |
 | carried (PR-06) | The fence's body escape does not neutralise `&`, so the fence is not injective. | Director |
 | B-16 / D-10 | `LICENSE` ships with `private: true`; SECURITY/CONTRIBUTING/CHANGELOG and copyright line open; CI secret deny-list — decide at PR-42. | Director |
@@ -295,7 +283,7 @@ provenance scanner test.
 ## §8 — Environment facts not to re-measure
 
 - Machine: Windows 11, Node 24.16.0, npm 11.5, gentle-ai 3.0.2 CLI, gentle-pi 3.1.1, TypeScript 7.0.2
-  pinned, SQLite 3.53.0 through `node:sqlite`. 499 tests (498 pass, 1 skip), `test:static` 8/8. Receipt-driven
+  pinned, SQLite 3.53.0 through `node:sqlite`. **546 tests** (545 pass, 1 skip), `test:static` **8/8**. Receipt-driven
   development is **on** (`gentle-ai review mode status`: global on, clone-local unset).
 - Line endings: `eol=lf` forced through `.gitattributes`. Check with `git ls-files --eol`.
 - `node:sqlite` measured facts: `DatabaseSync.isTransaction` flips on `BEGIN IMMEDIATE`; constraint codes
