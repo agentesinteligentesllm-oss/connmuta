@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startDaemon } from "../../src/daemon/bootstrap.js";
+import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
 import { LockHeldError, readLockFile } from "../../src/daemon/lifecycle/lock.js";
 import { readRunFile } from "../../src/daemon/lifecycle/run-file.js";
 import type { SecretStore } from "../../src/secret-store/types.js";
@@ -120,6 +120,96 @@ test("bootstrap: accepts injected secretStore", async () => {
   try {
     const daemon = await startDaemon({ homeDir, secretStore: fakeStore });
     assert.equal(daemon.secretStore, fakeStore);
+    await daemon.stop();
+  } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: concurrent stop() calls return the same in-flight promise and await completion", async () => {
+  const homeDir = createTempHome();
+
+  try {
+    const daemon = await startDaemon({ homeDir });
+    const p1 = daemon.stop();
+    const p2 = daemon.stop();
+    assert.equal(p1, p2, "concurrent stop() calls must return the identical promise instance");
+    await Promise.all([p1, p2]);
+
+    // Verify shutdown occurred
+    assert.equal(readRunFile(daemon.dirs.runDir), null);
+  } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: getLastSessionSeenAt reflects client_cursors.last_seen_at in the ledger", async () => {
+  const homeDir = createTempHome();
+
+  try {
+    const daemon = await startDaemon({ homeDir });
+    const db = daemon.ledger.db;
+
+    // Initially with empty client_cursors, returns null
+    assert.equal(getLastSessionSeenAt(db), null);
+
+    // Insert a client cursor
+    const time1 = "2026-04-12T10:00:00.000Z";
+    db.prepare(
+      `INSERT INTO client_cursors (client_id, project_id, host, pid, started_at, last_seen_at, inbox_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run("client-1", "proj-1", "host-1", 1001, time1, time1, 0);
+
+    assert.equal(getLastSessionSeenAt(db), Date.parse(time1));
+
+    // Insert a second cursor with a later last_seen_at
+    const time2 = "2026-04-12T12:30:00.000Z";
+    db.prepare(
+      `INSERT INTO client_cursors (client_id, project_id, host, pid, started_at, last_seen_at, inbox_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run("client-2", "proj-1", "host-1", 1002, time1, time2, 0);
+
+    assert.equal(getLastSessionSeenAt(db), Date.parse(time2));
+
+    await daemon.stop();
+  } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: retention sweep runs when due during heartbeat tick", async () => {
+  const homeDir = createTempHome();
+
+  try {
+    // Start daemon with fast heartbeat (15ms)
+    const daemon = await startDaemon({
+      homeDir,
+      heartbeatPeriodMs: 15,
+    });
+    const db = daemon.ledger.db;
+
+    // Insert a stale client_cursor (older than CLIENT_SESSION_STALE_HOURS = 24h)
+    const staleTime = "2020-01-01T00:00:00.000Z";
+    db.prepare(
+      `INSERT INTO client_cursors (client_id, project_id, host, pid, started_at, last_seen_at, inbox_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run("stale-client", "proj-1", "host-1", 1001, staleTime, staleTime, 0);
+
+    // Verify row is present
+    const beforeCount = db
+      .prepare("SELECT count(*) as c FROM client_cursors WHERE client_id = ?")
+      .get("stale-client") as { c: number };
+    assert.equal(beforeCount.c, 1);
+
+    // Wait for heartbeat tick to trigger retention sweep
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Stale row should have been deleted by retention sweep
+    const afterCount = db
+      .prepare("SELECT count(*) as c FROM client_cursors WHERE client_id = ?")
+      .get("stale-client") as { c: number };
+    assert.equal(afterCount.c, 0, "stale cursor should be swept on heartbeat tick");
+
     await daemon.stop();
   } finally {
     cleanupTempHome(homeDir);

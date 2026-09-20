@@ -9,6 +9,37 @@ import { IDLE_SHUTDOWN_HOURS } from "../../src/shared/constants.js";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
+test("no-emission: control test proves assertion fails if outbound send is triggered (non-vacuous)", () => {
+  const recordedSends: Array<{ method: string; payload: unknown }> = [];
+  const fakeClient = {
+    sendMessage: (payload: unknown) => {
+      recordedSends.push({ method: "sendMessage", payload });
+    },
+    sendPhoto: (payload: unknown) => {
+      recordedSends.push({ method: "sendPhoto", payload });
+    },
+  };
+
+  const assertZeroSends = () => {
+    assert.equal(
+      recordedSends.length,
+      0,
+      `expected 0 outbound sends, but recorded: ${JSON.stringify(recordedSends)}`,
+    );
+  };
+
+  // Initially zero sends passes
+  assertZeroSends();
+
+  // Triggering an outbound send causes assertZeroSends to fail
+  fakeClient.sendMessage({ chat_id: 123, text: "erroneous outbound message" });
+  assert.throws(
+    () => assertZeroSends(),
+    /expected 0 outbound sends/,
+    "assertion must fail when an outbound send is recorded",
+  );
+});
+
 test("no-emission: simulated idle window and heartbeat ticks trigger zero outbound sends (ADR-0029, CONSTITUTION layer 2)", async () => {
   // Fake telegram/client recorder tracking outbound sends
   const recordedSends: Array<{ method: string; payload: unknown }> = [];
@@ -21,14 +52,14 @@ test("no-emission: simulated idle window and heartbeat ticks trigger zero outbou
     },
   };
 
-  // Run simulated heartbeat ticks
+  // Run simulated heartbeat ticks with fake client in scope
   let tickCount = 0;
   const heartbeatHandle = startHeartbeat({
     periodMs: 10,
     onTick: () => {
       tickCount++;
       // A legitimate heartbeat tick does internal bookkeeping (e.g. lock heartbeat, registry check),
-      // but never invokes fakeClient.sendMessage or any outbound send
+      // and never invokes fakeClient.sendMessage or any outbound send
     },
   });
 

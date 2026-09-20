@@ -1,7 +1,9 @@
 import { createServer, type Server } from "node:http";
+import type { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { HEARTBEAT_PERIOD_MS, IPC_EPHEMERAL_PORT } from "../shared/constants.js";
 import { openLedger, type LedgerOpenResult } from "../ledger/open.js";
+import { isRetentionSweepDue, sweepRetention } from "../ledger/retention.js";
 import { createRegistryLoader, type RegistryLoader } from "../registry/loader.js";
 import { selectSecretStore } from "../secret-store/index.js";
 import type { SecretStore } from "../secret-store/types.js";
@@ -20,6 +22,7 @@ export interface DaemonOptions {
   readonly secretStore?: SecretStore;
   readonly telegramClientFactory?: (binding: unknown) => unknown;
   readonly port?: number;
+  readonly heartbeatPeriodMs?: number;
 }
 
 /**
@@ -42,6 +45,20 @@ export function loadRegistry(homeDir: string): RegistryLoader {
   const loader = createRegistryLoader({ path: join(homeDir, "registry.json") });
   loader.sync();
   return loader;
+}
+
+/**
+ * Reads the latest session activity timestamp from the ledger.
+ */
+export function getLastSessionSeenAt(db: DatabaseSync): number | null {
+  try {
+    const row = db
+      .prepare("SELECT max(last_seen_at) as m FROM client_cursors")
+      .get() as { m: string | null } | undefined;
+    return row?.m ? Date.parse(row.m) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -85,40 +102,49 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     const runFile = writeRunFile(dirs.runDir, assignedPort);
 
     const startedAt = options?.now ? options.now() : Date.now();
-    let lastSessionSeenAt: number | null = null;
 
-    let stopped = false;
-    const stop = async (): Promise<void> => {
-      if (stopped) return;
-      stopped = true;
-
-      heartbeat.stop();
-
-      await new Promise<void>((resolve) => {
-        server!.close(() => resolve());
-      });
-
-      deleteRunFile(dirs.runDir, runFile.pid);
-      lock.release();
-
-      try {
-        ledger!.db.close();
-      } catch {
-        // Already closed or unavailable
-      }
+    let stopPromise: Promise<void> | null = null;
+    const stop = (): Promise<void> => {
+      if (stopPromise) return stopPromise;
+      stopPromise = (async () => {
+        heartbeat.stop();
+        await new Promise<void>((resolve) => {
+          server!.close(() => resolve());
+        });
+        deleteRunFile(dirs.runDir, runFile.pid);
+        lock.release();
+        try {
+          ledger!.db.close();
+        } catch {
+          // Already closed or unavailable
+        }
+      })();
+      return stopPromise;
     };
 
+    let lastSweepAt: string | null = null;
     const heartbeat = startHeartbeat({
-      periodMs: HEARTBEAT_PERIOD_MS,
+      periodMs: options?.heartbeatPeriodMs ?? HEARTBEAT_PERIOD_MS,
       updateLockHeartbeat: () => {
         lock.updateHeartbeat();
       },
       onTick: () => {
         registry.sync();
+
+        const nowIso = new Date(options?.now ? options.now() : Date.now()).toISOString();
+        if (isRetentionSweepDue(lastSweepAt, nowIso)) {
+          try {
+            sweepRetention(ledger!.db, { now: nowIso });
+            lastSweepAt = nowIso;
+          } catch {
+            // Retention sweep failure must not crash heartbeat
+          }
+        }
+
         checkIdleShutdown({
           now: options?.now,
           startedAt,
-          getLastSessionSeenAt: () => lastSessionSeenAt,
+          getLastSessionSeenAt: () => getLastSessionSeenAt(ledger!.db),
           getOpenThreadCount: () => {
             try {
               const row = ledger!.db

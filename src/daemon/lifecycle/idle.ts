@@ -1,5 +1,8 @@
 import { IDLE_SHUTDOWN_HOURS } from "../../shared/constants.js";
 
+const MS_PER_HOUR = 3600 * 1000;
+const DEFAULT_IDLE_CHECK_INTERVAL_MS = 60_000;
+
 /**
  * Dependencies for idle check calculation.
  */
@@ -35,7 +38,7 @@ export function checkIdleShutdown(deps: IdleCheckDeps): boolean {
   const now = deps.now ? deps.now() : Date.now();
   const lastActivity = deps.getLastSessionSeenAt() ?? deps.startedAt ?? now;
   const idleMs = now - lastActivity;
-  const idleThresholdMs = IDLE_SHUTDOWN_HOURS * 3600 * 1000;
+  const idleThresholdMs = IDLE_SHUTDOWN_HOURS * MS_PER_HOUR;
 
   if (idleMs >= idleThresholdMs) {
     deps.onIdle?.();
@@ -51,10 +54,15 @@ export function checkIdleShutdown(deps: IdleCheckDeps): boolean {
 export function startIdleCheck(
   deps: IdleCheckDeps & { readonly checkIntervalMs?: number },
 ): IdleCheckHandle {
-  const intervalMs = deps.checkIntervalMs ?? 60_000;
+  const intervalMs = deps.checkIntervalMs ?? DEFAULT_IDLE_CHECK_INTERVAL_MS;
+  const startedAt = deps.startedAt ?? (deps.now ? deps.now() : Date.now());
+  const effectiveDeps: IdleCheckDeps = {
+    ...deps,
+    startedAt,
+  };
 
   const timer = setInterval(() => {
-    if (checkIdleShutdown(deps)) {
+    if (checkIdleShutdown(effectiveDeps)) {
       clearInterval(timer);
     }
   }, intervalMs);

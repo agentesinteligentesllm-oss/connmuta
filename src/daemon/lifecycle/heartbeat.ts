@@ -8,7 +8,6 @@ export interface HeartbeatOptions {
   readonly onTick: () => void | Promise<void>;
   readonly updateLockHeartbeat?: () => void;
   readonly onError?: (err: unknown) => void;
-  readonly now?: () => number;
 }
 
 /**

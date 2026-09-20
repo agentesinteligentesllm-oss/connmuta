@@ -17,7 +17,10 @@ if (homeIdx !== -1 && homeIdx + 1 < process.argv.length) {
 try {
   const daemon = await startDaemon({ homeDir: explicitHome });
 
+  let shuttingDown = false;
   const handleSignal = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     await daemon.stop();
     process.exit(0);
   };

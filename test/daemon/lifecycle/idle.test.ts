@@ -78,6 +78,45 @@ test("idle: falls back to startedAt when no session was seen", () => {
   assert.equal(onIdleCalled, true);
 });
 
+test("idle: falls back to now when both getLastSessionSeenAt and startedAt are absent", () => {
+  let onIdleCalled = false;
+  const now = 1_000_000_000;
+
+  const shouldShutdown = checkIdleShutdown({
+    now: () => now,
+    // startedAt is undefined
+    getLastSessionSeenAt: () => null,
+    getOpenThreadCount: () => 0,
+    onIdle: () => {
+      onIdleCalled = true;
+    },
+  });
+
+  assert.equal(shouldShutdown, false, "idle elapsed should be 0 when neither last seen nor startedAt is provided");
+  assert.equal(onIdleCalled, false);
+});
+
+test("idle: startIdleCheck defaults startedAt when not provided", async () => {
+  let idleTriggered = false;
+  const now = 1_000_000_000;
+
+  // With startedAt defaulted to now, idle window is not elapsed, so onIdle is not called
+  const handle = startIdleCheck({
+    checkIntervalMs: 15,
+    now: () => now,
+    getLastSessionSeenAt: () => null,
+    getOpenThreadCount: () => 0,
+    onIdle: () => {
+      idleTriggered = true;
+    },
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  handle.stop();
+
+  assert.equal(idleTriggered, false, "defaulted startedAt (now) means idle window has not elapsed");
+});
+
 test("idle: startIdleCheck runs periodically and triggers onIdle, and stops on .stop()", async () => {
   let idleTriggered = false;
   const now = 1_000_000_000;
