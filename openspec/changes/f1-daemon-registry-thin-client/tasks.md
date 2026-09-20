@@ -571,9 +571,11 @@ Scope: `src/cli/daemon-stop.ts`, `src/cli/main.ts` (add `daemon stop` subcommand
 Requirements: `daemon-lifecycle › conmuta daemon stop challenges identity before terminating` (D-29). Depends conceptually on ipc-handshake's identity challenge (§10), stubbed against a fake daemon here and re-verified end-to-end once PR-30 lands.
 Runtime harness: real child process daemon + real `process.kill`.
 
-- [ ] 17.1 RED: write `test/cli/daemon-stop.test.ts` covering "stop terminates a live, identity-confirmed daemon" and "stop refuses when the identity challenge fails" (foreign process reusing the recorded pid).
-- [ ] 17.2 GREEN: implement `src/cli/daemon-stop.ts` (read run file, identity challenge per ipc-handshake §10 shape, `process.kill(pid, "SIGTERM")`, release lock, delete only its own run files) and wire the `daemon stop` subcommand into `src/cli/main.ts`.
-- [ ] 17.3 Verify: `npm run build && node --test "dist/test/cli/daemon-stop.test.js"`.
+- [x] 17.1 RED: write `test/cli/daemon-stop.test.ts` covering "stop terminates a live, identity-confirmed daemon" and "stop refuses when the identity challenge fails" (foreign process reusing the recorded pid).
+- [x] 17.2 GREEN: implement `src/cli/daemon-stop.ts` (read run file, identity challenge per ipc-handshake §10 shape, `process.kill(pid, "SIGTERM")`, release lock, delete only its own run files) and wire the `daemon stop` subcommand into `src/cli/main.ts`.
+- [x] 17.3 Verify: `npm run build && node --test "dist/test/cli/daemon-stop.test.js"`.
+
+*Audit & Verification.* Audited under Judgment Day dual review (`bus-v2-f1-pr-17-audit-001`), substituting for the tribunal debate while the Arena bridge is down (DN-05 unsatisfied). Findings addressed in Round 1: bounded poll loop awaiting daemon process termination before lock release and run-file cleanup (`JD-A-001`, `JD-B-001`), named constants with documented reasoning (`JD-A-002`, `JD-B-004`), graceful handling of non-ESRCH signal errors (`JD-A-003`, `JD-B-003`), test coverage for HTTP 500 error status and timeout refusal (`JD-A-004`, `JD-B-005`), dynamic import of `daemon-stop.js` in `main.ts` per design §2.2 (`JD-B-002`), and CLI dispatch validation (`JD-B-006`, `JD-B-007`). 7-mutant sweep executed: **7 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 557 tests (556 pass, 1 skip), `test:static` 8/8. Authored diff: 378 lines (within 400-line budget, no exception).
 
 ### Unit 7 — `durable-inbox`
 

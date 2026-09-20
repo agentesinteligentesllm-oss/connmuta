@@ -157,7 +157,7 @@ test("a subcommand reserved for a later slice is a usage error, not a stub that 
   }
 });
 
-test("the usage line names the commands this build wires, and only the forms it accepts", () => {
+test("the usage line names the one command this build wires, and only the forms it accepts", () => {
   const captured = makeIo();
   runCli([], captured.io);
   const text = captured.err.join("\n");
@@ -172,30 +172,30 @@ test("the usage line names the commands this build wires, and only the forms it 
 
 // --- daemon stop subcommand dispatch ---
 
-test("`daemon` with an unknown subcommand is a usage error", () => {
+test("`daemon` with an unknown subcommand is a usage error", async () => {
   const captured = makeIo();
-  assert.equal(runCli(["daemon", "start"], captured.io), EXIT_USAGE);
+  assert.equal(await runCli(["daemon", "start"], captured.io), EXIT_USAGE);
   assert.match(captured.err.join("\n"), /unknown daemon subcommand 'start'/);
   assert.match(captured.err.join("\n"), /usage:/);
 });
 
-test("`daemon stop` with an unknown option is a usage error", () => {
+test("`daemon stop` with an unknown option is a usage error", async () => {
   const captured = makeIo();
-  assert.equal(runCli(["daemon", "stop", "--verbose"], captured.io), EXIT_USAGE);
+  assert.equal(await runCli(["daemon", "stop", "--verbose"], captured.io), EXIT_USAGE);
   assert.match(captured.err.join("\n"), /unknown option '--verbose'/);
   assert.match(captured.err.join("\n"), /usage:/);
 });
 
-test("`daemon stop` with --home missing its argument is a usage error", () => {
+test("`daemon stop` with --home missing its argument is a usage error", async () => {
   const captured = makeIo();
-  assert.equal(runCli(["daemon", "stop", "--home"], captured.io), EXIT_USAGE);
+  assert.equal(await runCli(["daemon", "stop", "--home"], captured.io), EXIT_USAGE);
   assert.match(captured.err.join("\n"), /--home requires a directory/);
   assert.match(captured.err.join("\n"), /usage:/);
 });
 
-test("`daemon stop` with extra positional arguments is a usage error", () => {
+test("`daemon stop` with extra positional arguments is a usage error", async () => {
   const captured = makeIo();
-  assert.equal(runCli(["daemon", "stop", "unexpected-arg"], captured.io), EXIT_USAGE);
+  assert.equal(await runCli(["daemon", "stop", "unexpected-arg"], captured.io), EXIT_USAGE);
   assert.match(captured.err.join("\n"), /unexpected argument 'unexpected-arg'/);
   assert.match(captured.err.join("\n"), /usage:/);
 });

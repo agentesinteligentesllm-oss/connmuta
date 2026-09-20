@@ -22,6 +22,13 @@ const runDir = path.join(dir, "run");
 fs.mkdirSync(runDir, { recursive: true });
 const secret = crypto.randomBytes(32).toString("hex");
 const s = http.createServer((req, res) => {
+  if (b === "http-error") {
+    res.writeHead(500, { "Content-Type": "application/json" }).end(JSON.stringify({ error: "internal error" }));
+    return;
+  }
+  if (b === "timeout") {
+    return;
+  }
   const nonce = new URL(req.url, "http://127.0.0.1").searchParams.get("nonce") || "";
   const proof = b === "wrong-proof"
     ? "00".repeat(32)
@@ -93,6 +100,44 @@ test("stop refuses when the identity challenge fails (pid mismatch) (D-29)", asy
     assert.equal(result.exitCode, 1);
     assert.match(err.join("\n"), /identity/i);
     assert.ok(isProcessAlive(pid));
+  } finally {
+    if (isProcessAlive(pid)) try { child.kill("SIGKILL"); } catch {}
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stop refuses when the identity challenge fails (HTTP 500 error) (D-29)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-stop-http-err-"));
+  const { child, pid } = await spawnFakeDaemon(dir, "http-error");
+  try {
+    const err: string[] = [];
+    const result = await stopDaemon({ homeDir: dir, io: { out: () => {}, err: (m) => err.push(m) } });
+    assert.equal(result.exitCode, 1);
+    assert.match(err.join("\n"), /identity/i);
+    assert.ok(isProcessAlive(pid));
+    assert.ok(existsSync(resolveLockPath(dir)));
+    assert.ok(existsSync(join(dir, "run", "daemon.json")));
+  } finally {
+    if (isProcessAlive(pid)) try { child.kill("SIGKILL"); } catch {}
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stop refuses when the identity challenge times out (D-29)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-stop-timeout-"));
+  const { child, pid } = await spawnFakeDaemon(dir, "timeout");
+  try {
+    const err: string[] = [];
+    const result = await stopDaemon({
+      homeDir: dir,
+      timeoutMs: 50,
+      io: { out: () => {}, err: (m) => err.push(m) },
+    });
+    assert.equal(result.exitCode, 1);
+    assert.match(err.join("\n"), /identity/i);
+    assert.ok(isProcessAlive(pid));
+    assert.ok(existsSync(resolveLockPath(dir)));
+    assert.ok(existsSync(join(dir, "run", "daemon.json")));
   } finally {
     if (isProcessAlive(pid)) try { child.kill("SIGKILL"); } catch {}
     rmSync(dir, { recursive: true, force: true });

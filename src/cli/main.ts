@@ -10,7 +10,6 @@ import { pathToFileURL } from "node:url";
 
 import { EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
 import { SERVER_VERSION } from "../shared/version.js";
-import { stopDaemon } from "./daemon-stop.js";
 import { validateText } from "./validate.js";
 
 /**
@@ -99,9 +98,11 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 			}
 		}
 
-		return stopDaemon({ homeDir: explicitHome, io: { out: io.out, err: io.err } }).then(
-			(result) => result.exitCode,
-		);
+		return (async () => {
+			const { stopDaemon } = await import("./daemon-stop.js");
+			const result = await stopDaemon({ homeDir: explicitHome, io: { out: io.out, err: io.err } });
+			return result.exitCode;
+		})();
 	}
 
 	// Only `validate` and `daemon stop` are wired in this CLI slice. The reserved subcommands are

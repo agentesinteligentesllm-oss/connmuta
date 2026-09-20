@@ -4487,5 +4487,41 @@ Result: **8 killed / 0 survived**.
 - Windows 11 console-flash check observed: `{detached: true, windowsHide: true}` spawn in `main.test.ts` executes without visual console popup on Windows 11.
 - Unit 6 `daemon-lifecycle` is complete (21 PR blocks / 16 row ids merged, 95/210 tasks).
 
+---
+
+## PR-17 — `conmuta daemon stop` (D-29, closes Unit 6 `daemon-lifecycle`)
+
+**What landed.** The final slice of Unit 6 `daemon-lifecycle`:
+- `src/cli/daemon-stop.ts`: `stopDaemon(options)` implementation executing `conmuta daemon stop` per D-29 and design §7.3, §10. Reads `run/daemon.json`, sends GET `/identity?nonce=...` challenge, verifies HMAC-SHA256 proof with `timingSafeEqual` in constant time, checks pid match, refuses without signaling on mismatch/error/timeout, signals `SIGTERM` on confirmed identity, polls for process termination up to `SHUTDOWN_WAIT_TIMEOUT_MS` (5000ms), and only releases `run/daemon.lock` and deletes `run/daemon.json` after termination is confirmed.
+- `src/cli/main.ts`: wired `daemon stop [--home <dir>]` subcommand via dynamic `import("./daemon-stop.js")` per design §2.2, keeping the IDE client closure clean.
+- `src/cli/tsconfig.json`: added project reference to `../daemon`.
+- Two test twins: `test/cli/daemon-stop.test.ts` (covering identity-confirmed termination, proof mismatch, pid mismatch, HTTP 500 error, timeout, custom kill injection, and not-running report) and `test/cli/main.test.ts` (covering `daemon stop` CLI argument dispatch).
+
+**Budget.** Measured at **378 authored lines** (`git diff --numstat main -- src test`: 171 src + 201 test across 5 files). Completely within the 400-line budget; no exception needed.
+
+**Judgment Day Round 1 & Re-judgment.** Two blind judges (`jd-judge-a`, `jd-judge-b`) audited the slice (`bus-v2-f1-pr-17-audit-001`):
+- `JD-A-001` / `JD-B-001` (CRITICAL / WARNING): Bounded poll loop awaiting daemon process termination before lock release and run-file cleanup.
+- `JD-A-002` / `JD-B-004` (WARNING): Named constants `DEFAULT_STOP_TIMEOUT_MS = 5000`, `SHUTDOWN_WAIT_TIMEOUT_MS = 5000`, `SHUTDOWN_POLL_INTERVAL_MS = 50` with documented reasoning.
+- `JD-A-003` / `JD-B-003` (WARNING): Graceful handling of non-ESRCH signal errors without throwing or unhandled rejections.
+- `JD-A-004` / `JD-B-005` (WARNING): Test coverage for HTTP 500 error status and timeout refusal.
+- `JD-B-002` (WARNING): Dynamic import of `daemon-stop.js` in `main.ts` per design §2.2.
+- `JD-B-006` / `JD-B-007` (SUGGESTION): `runCli` contract and CLI dispatch validation.
+All findings addressed in Round 1.
+
+**Mutant Sweep.** 7 mutants evaluated against the test suite:
+- `M1`: Invert confirmed check in `stopDaemon`.
+- `M2`: Eliminate process kill in `stopDaemon`.
+- `M3`: Invert payload null check in `stopDaemon`.
+- `M4`: Eliminate `releaseLock` in `stopDaemon`.
+- `M5`: Eliminate `deleteRunFile` in `stopDaemon`.
+- `M6`: Bypass proof comparison in `stopDaemon`.
+- `M7`: Bypass pid comparison in `stopDaemon`.
+Result: **7 killed / 0 survived**.
+
+**RDD Fallback & Independent Verification.** The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed:
+- Full test suite: **557 tests** (556 pass, 1 skip), `test:static` **8/8**.
+- 11 new tests added across two twins.
+- Unit 6 `daemon-lifecycle` is complete (22 PR blocks / 17 row ids merged, 98/210 tasks).
+
 
 
