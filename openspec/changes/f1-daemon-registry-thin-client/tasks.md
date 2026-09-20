@@ -610,9 +610,11 @@ Scope: `src/daemon/transport/types.ts`, `src/daemon/transport/group.ts`, `src/da
 Requirements: underlies `send-path › One DualWriteTransport per binding` (consumed by PR-27).
 Runtime harness: N/A at this PR (transport unit tests only; room-guard wiring and live send-path behavior land in PR-21/PR-27).
 
-- [ ] 20.1 RED: write the four provenance fixture entries and confirm `test/security/provenance.test.ts` (PR-02) fails against them before vendoring.
-- [ ] 20.2 GREEN: vendor `src/daemon/transport/{types,group,direct,dual}.ts` AS-IS from `telegram-agent-bus/src/transport/{types,group,direct,dual}.ts` (read-only source, 111+97+67+62=337 lines) and their twins from `telegram-agent-bus/test/transport/{group,direct,dual}.test.ts` (read-only source, 104+113+178=395 lines), each with its provenance header — `provenance.test.ts` passes.
-- [ ] 20.3 Verify: `npm run build && node --test "dist/test/daemon/transport/**/*.test.js" "dist/test/security/provenance.test.js"`.
+- [x] 20.1 RED: write the four provenance fixture entries and confirm `test/security/provenance.test.ts` (PR-02) fails against them before vendoring.
+- [x] 20.2 GREEN: vendor `src/daemon/transport/{types,group,direct,dual}.ts` AS-IS from `telegram-agent-bus/src/transport/{types,group,direct,dual}.ts` (read-only source, 111+97+67+62=337 lines) and their twins from `telegram-agent-bus/test/transport/{group,direct,dual}.test.ts` (read-only source, 104+113+178=395 lines), each with its provenance header — `provenance.test.ts` passes.
+- [x] 20.3 Verify: `npm run build && node --test "dist/test/daemon/transport/**/*.test.js" "dist/test/security/provenance.test.js"`.
+
+*Audit & Verification.* Audited under Judgment Day dual review (`bus-v2-f1-pr-20-audit-001`), substituting for the tribunal debate while the Arena bridge is down (DN-05 unsatisfied). Findings addressed in Round 1: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep executed: **8 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 594 tests (593 pass, 1 skip), `test:static` 8/8. Authored diff: 308 lines (97 src + 211 test), with 732 lines of AS-IS vendored body (337 src + 395 test) excluded under `size:exception (AS-IS hash-pinned)`. Merged as PR #23.
 
 #### PR-21 — room guard (D-22), binding config, bindings reconciliation
 Branch `f1/21-room-guard-bindings` → `main`. Depends: PR-20. Size: ≈340 lines, no exception.
