@@ -312,6 +312,8 @@ Older values (envelope, secrets, protocol-apply, protocol-select, thread-record,
 | B-11 | Trademark screening; `PRODUCT_NAME` is the single rename constant. | Director |
 | B-12 / B-13 | macOS scope; migration runbook closes when PR-38 merges. | Director + Kairo |
 | — | T22 bytes-per-hour ceiling and origin-label organisation marker (PR-42 close-out). | Director |
+| **B-39** | **CI is intermittently red on `main` itself** (two wall-clock-sensitive tests: `heartbeat: ticks at periodMs`, `main: starts daemon process and exits cleanly on SIGTERM`). A red leg is not evidence by itself; re-run the failed job once and record the re-run. Three dispositions in the checklist. | Director → Kairo |
+| **B-38 update** | **PR-22a — the slice B-38's disposition named — closed WITHOUT adding the receive-side scan**, deliberately: the gated design names seven steps and no scan. The placement is still open. | Director |
 | B-05, B-08, B-09 | gentle-ai installer study; Windows IPC/DACL; MCP notification rendering per host — F0 spikes, still open. | Director + Kairo |
 
 ---
