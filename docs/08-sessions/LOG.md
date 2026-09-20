@@ -4,6 +4,17 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 22 — PR-19: `daemon/telegram.ts` part 2 (error classification + redaction, PT-08, completing `telegram.ts`)
+
+- **Date**: 2026-09-19
+- **Slice**: PR-19 (`src/daemon/telegram.ts` part 2 with twin `test/daemon/telegram.test.ts`, completing the file).
+- **PR**: #22 (`eb76f12`, branch `f1/19-telegram-client-p2`, commit `5e774d4`).
+- **Outcome**: Merged into `main`. 567 tests (566 pass, 1 skip), `test:static` 8/8.
+- **Budget**: 128 authored lines (38 src + 90 test), within the 400-line budget without exception (budget ≈210 lines).
+- **Audit**: Judgment Day substitute (`bus-v2-f1-pr-19-audit-001`), 0 findings across both blind judges in Round 1 (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep killed 8/8.
+- **RDD fallback**: assess returned unassessable/declined, writer self-verification + independent verification passed.
+- **Next**: PR-20 (`daemon/transport/{types,group,direct,dual}.ts`, size:exception, AS-IS hash-pinned).
+
 ## Session 21 — PR-18: `daemon/telegram.ts` part 1 (client construction + request plumbing, SEAM, Unit 7 `durable-inbox` opened)
 
 - **Date**: 2026-09-19
