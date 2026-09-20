@@ -4,6 +4,38 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## 2026-09-19 — Session 19: PR-16 (daemon lifecycle: heartbeat, idle, bootstrap, main) delivered
+
+**Closed**
+
+- **PR-16** — `src/daemon/lifecycle/{heartbeat,idle}.ts`, `src/daemon/{bootstrap,main}.ts` + five twins
+  (`lifecycle/heartbeat.test.ts`, `lifecycle/idle.test.ts`, `bootstrap.test.ts`, `main.test.ts`,
+  `no-emission.test.ts`), `src/daemon/tsconfig.json` — completes row PR-16 on branch
+  `f1/16-lifecycle-heartbeat-idle-bootstrap`. **21 PR blocks / 16 row ids are complete (95 of the 210
+  checkboxes)**; the remaining board is **24 blocks / 26 row ids (`PR-17…PR-42`)**. **546 tests (545 pass,
+  1 skip), `test:static` 8/8**. Budget **1,056 authored lines with a disclosed 656-line PR-16-scoped exception**
+  (349 src + 707 test).
+- **The audit route held for the fourteenth slice.** Arena down, native SDD preflight closed, so ODD with the
+  SDD contract preserved and Judgment Day as the substitute: two blind judges audited the slice. Round 1
+  findings addressed: concurrent `stop()` in-flight promise deduplication (`JD-A-002`, `JD-B-002`),
+  `getLastSessionSeenAt` querying `max(last_seen_at)` from `client_cursors` in the ledger (`JD-B-003`),
+  retention sweep executed on heartbeat ticks when due per design §7.1 (`JD-B-004`), named constants and clean
+  fallback in `idle.ts` (`JD-A-003`, `JD-A-005`, `JD-B-005`), non-vacuous control tests in
+  `no-emission.test.ts` (`JD-A-001`, `JD-B-001`), and `main.ts` `handleSignal` re-entrancy guard. Re-judgment:
+  **5 verified / 0 regression** from both judges independently. **`JUDGMENT: APPROVED`**. An 8-mutant sweep
+  executed: **8 killed / 0 survived**. Record: `bus-v2-f1-pr-16-audit-001`. **DN-05 remains unsatisfied for all
+  fourteen.**
+- **Windows 11 console-flash check observed**: `{detached: true, windowsHide: true}` spawn executes without
+  visual console popup on Windows 11.
+- **RDD fallback & independent verification**: ordinary native review unassessable/declined, writer
+  self-verification plus independent verification pass confirmed all figures and verified 0 regressions.
+
+**Opened**
+
+- **PR-17** — `src/cli/daemon-stop.ts`, `src/cli/main.ts` (wire `daemon stop` subcommand),
+  `test/cli/daemon-stop.test.ts`: `conmuta daemon stop` (D-29), identity challenge before terminating,
+  releasing lock and cleaning run files. Closes Unit 6 `daemon-lifecycle`.
+
 ## 2026-09-19 — Session 18: PR-15 (daemon lifecycle: node-floor, home, log, lock, run-file) delivered
 
 **Closed**
