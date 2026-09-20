@@ -597,10 +597,12 @@ Scope: `src/daemon/telegram.ts` (completes the file), `test/daemon/telegram.test
 Requirements: `secret-store › No token in errors, logs or stacks` (PT-08, redaction wiring); `daemon-lifecycle` Telegram 409 scenario; `send-path › Rate discipline` (429 classification half, consumed by PR-22b/PR-28).
 Runtime harness: fake HTTP transport injecting 409/429/network/protocol errors.
 
-- [ ] 19.1 RED: complete `test/daemon/telegram.test.ts` with `TelegramConflictError` (409), `RateLimitedError` (429, `retry_after_s`), network/protocol error classification, and `GroupMigratedError` surfaced on send but never followed (PT-25).
-- [ ] 19.2 GREEN: complete `src/daemon/telegram.ts` — every error constructor's message passes through `redactTokenShapes` from PR-14 (THREAT-MODEL residual "undici `cause` may embed the URL", PT-08).
-- [ ] 19.3 Verify: `npm run build && node --test "dist/test/daemon/telegram.test.js"`.
-- [ ] 19.4 Docs: update the file-name cell(s) of PT-08 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 19.1 RED: complete `test/daemon/telegram.test.ts` with `TelegramConflictError` (409), `RateLimitedError` (429, `retry_after_s`), network/protocol error classification, and `GroupMigratedError` surfaced on send but never followed (PT-25).
+- [x] 19.2 GREEN: complete `src/daemon/telegram.ts` — every error constructor's message passes through `redactTokenShapes` from PR-14 (THREAT-MODEL residual "undici `cause` may embed the URL", PT-08).
+- [x] 19.3 Verify: `npm run build && node --test "dist/test/daemon/telegram.test.js"`.
+- [x] 19.4 Docs: update the file-name cell(s) of PT-08 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Audit & Verification.* Audited under Judgment Day dual review (`bus-v2-f1-pr-19-audit-001`), substituting for the tribunal debate while the Arena bridge is down (DN-05 unsatisfied). Findings addressed in Round 1: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep executed: **8 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 567 tests (566 pass, 1 skip), `test:static` 8/8. Authored diff: 108 lines (38 src + 70 test), within 400-line budget without exception (budget ≈210 lines). Merged as PR #22.
 
 #### PR-20 — `daemon/transport/{types,group,direct,dual}.ts` (size:exception, AS-IS hash-pinned)
 Branch `f1/20-transport-asis` → `main`. Depends: PR-19. Size: ≈30 new authored lines (provenance headers/fixture entries) + 337 AS-IS vendored body + 395 AS-IS vendored twin body, excluded.
