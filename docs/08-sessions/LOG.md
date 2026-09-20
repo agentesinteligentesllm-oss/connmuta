@@ -4,6 +4,17 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 21 — PR-18: `daemon/telegram.ts` part 1 (client construction + request plumbing, SEAM, Unit 7 `durable-inbox` opened)
+
+- **Date**: 2026-09-19
+- **Slice**: PR-18 (`src/daemon/telegram.ts` part 1 with twin `test/daemon/telegram.test.ts`).
+- **PR**: #21 (`4e71cab`, branch `f1/18-telegram-client-p1`, code tip `3f4b054`).
+- **Outcome**: Merged into `main`. 566 tests (565 pass, 1 skip), `test:static` 8/8.
+- **Budget**: 386 authored lines (185 src + 201 test), within the 400-line budget without exception.
+- **Audit**: Judgment Day substitute (`bus-v2-f1-pr-18-audit-001`), 0 findings across both blind judges in Round 1 (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep killed 8/8.
+- **RDD fallback**: assess returned unassessable/declined, writer self-verification + independent verification passed.
+- **Next**: PR-19 (`src/daemon/telegram.ts` part 2: error classification + redaction, PT-08, completing the file).
+
 ## Session 20 — PR-17: `conmuta daemon stop` (D-29, Unit 6 `daemon-lifecycle` closed)
 
 - **Date**: 2026-09-19

@@ -585,9 +585,11 @@ Scope: `src/daemon/telegram.ts` (partial), `test/daemon/telegram.test.ts` (parti
 Requirements: underlies every admission/send scenario; no standalone spec requirement by itself.
 Runtime harness: fake HTTP transport (adapted from `telegram-agent-bus/test/fakes/telegram.ts`, read-only reference, 154 lines, placeholders only per PT-22).
 
-- [ ] 18.1 RED: write the construction/request half of `test/daemon/telegram.test.ts` (`TelegramApiClient` constructed per binding, `getUpdates`/`sendMessage` request shape, `requestTimeoutMs` budget).
-- [ ] 18.2 GREEN: implement the corresponding half of `src/daemon/telegram.ts` (SEAM from `telegram-agent-bus/src/telegram.ts`, read-only source, 428 lines total across PR-18/PR-19; `LOCK_STALE_SECONDS` import dropped).
-- [ ] 18.3 Verify: `npm run build && node --test "dist/test/daemon/telegram.test.js"`.
+- [x] 18.1 RED: write the construction/request half of `test/daemon/telegram.test.ts` (`TelegramApiClient` constructed per binding, `getUpdates`/`sendMessage` request shape, `requestTimeoutMs` budget).
+- [x] 18.2 GREEN: implement the corresponding half of `src/daemon/telegram.ts` (SEAM from `telegram-agent-bus/src/telegram.ts`, read-only source, 428 lines total across PR-18/PR-19; `LOCK_STALE_SECONDS` import dropped).
+- [x] 18.3 Verify: `npm run build && node --test "dist/test/daemon/telegram.test.js"`.
+
+*Audit & Verification.* Audited under Judgment Day dual review (`bus-v2-f1-pr-18-audit-001`), substituting for the tribunal debate while the Arena bridge is down (DN-05 unsatisfied). Findings addressed in Round 1: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep executed: **8 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 566 tests (565 pass, 1 skip), `test:static` 8/8. Authored diff: 386 lines (185 src + 201 test), within 400-line budget without exception. Merged as PR #21 (`4e71cab`).
 
 #### PR-19 — `daemon/telegram.ts` part 2: error classification + redaction (SEAM, completes the file)
 Branch `f1/19-telegram-client-p2` → `main`. Depends: PR-18. Size: ≈210 lines, no exception.

@@ -4523,5 +4523,37 @@ Result: **7 killed / 0 survived**.
 - 11 new tests added across two twins.
 - Unit 6 `daemon-lifecycle` is complete (22 PR blocks / 17 row ids merged, 98/210 tasks).
 
+---
+
+## PR-18 — `daemon/telegram.ts` part 1: client construction + request plumbing (SEAM, opens Unit 7 `durable-inbox`)
+
+**What landed.** The first half of the Telegram Bot API client:
+- `src/daemon/telegram.ts` (part 1): SEAM from `telegram-agent-bus/src/telegram.ts` @ `bf8f365`; client construction (`TelegramApiClient`), configuration validation (`TelegramConfig`), request plumbing (`post`, `getUpdates`, `sendMessage`), budget timeout handling via `requestTimeoutMs`, dropped unused `LOCK_STALE_SECONDS` import.
+- `test/daemon/telegram.test.ts` (part 1): fake HTTP transport exercising client construction per binding, request payload formatting, response unwrapping, and timeout enforcement.
+- Merged as PR **#21** (`4e71cab`, branch `f1/18-telegram-client-p1`, code tip `3f4b054`).
+
+**Budget.** Measured at **386 authored lines** (`git diff --numstat main^..3f4b054 -- src test`: 185 src + 201 test). Completely within the 400-line budget without exception.
+
+**Judgment Day Round 1 & Re-judgment.** Two blind judges (`jd-judge-a`, `jd-judge-b`) audited the slice (`bus-v2-f1-pr-18-audit-001`):
+- Findings addressed in Round 1: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors.
+- `JUDGMENT: APPROVED` on Round 1.
+
+**Mutant Sweep.** 8 mutants evaluated against the test suite:
+- `M1`: Invert timeout check or zero out `requestTimeoutMs`.
+- `M2`: Omit bot token in request URL path.
+- `M3`: Drop headers in request construction.
+- `M4`: Invert `ok` field handling on response parsing.
+- `M5`: Omit `offset` parameter in `getUpdates` payload.
+- `M6`: Omit `timeout` parameter in `getUpdates` payload.
+- `M7`: Alter `sendMessage` payload shape or drop `chat_id`.
+- `M8`: Drop `text` field in `sendMessage` payload.
+Result: **8 killed / 0 survived**.
+
+**RDD Fallback & Independent Verification.** The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed:
+- Full test suite: **566 tests** (565 pass, 1 skip), `test:static` **8/8**.
+- 9 new tests added in `test/daemon/telegram.test.ts`.
+- Unit 7 `durable-inbox` is opened (23 PR blocks / 18 row ids merged, 101/210 tasks).
+
+
 
 

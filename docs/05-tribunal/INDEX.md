@@ -33,6 +33,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-pr-15-audit-001` | 2026-09-19 | Audit substitute for PR-15 (unit 6 daemon-lifecycle: node-floor, home, log, lock, run-file): Judgment Day dual review + 10-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-16-audit-001` | 2026-09-19 | Audit substitute for PR-16 (unit 6 daemon-lifecycle: heartbeat, idle, bootstrap, main): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-17-audit-001` | 2026-09-19 | Audit substitute for PR-17 (conmuta daemon stop, D-29): Judgment Day dual review + 7-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
+| `bus-v2-f1-pr-18-audit-001` | 2026-09-19 | Audit substitute for PR-18 (daemon/telegram.ts part 1: client construction + request plumbing): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -688,6 +689,21 @@ visible.
 | Left open, carried to the Director | None from PR-17. B-22 to B-38 stand as PR-16 left them. |
 | Consequence | **DN-05 is not satisfied for PR-17 either**, and row PR-17 is complete: **22 PR blocks / 17 row ids are merged (98 of the 210 task checkboxes), 23 blocks / 25 row ids remain (`PR-18…PR-42`)**. Unit 6 `daemon-lifecycle` is completely closed; PR-18 opens next (opening Unit 7 `durable-inbox`). |
 | Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 378 authored lines (177 src, 201 test, within 400-line budget without exception), 557 tests (556 pass, 1 skip), `test:static` 8/8, 7 mutants killed (7/7). |
+
+### `bus-v2-f1-pr-18-audit-001` — PR-18 audit substitute (Judgment Day + RDD fallback)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-19 |
+| Subject | PR-18 (`src/daemon/telegram.ts` part 1 with twin `test/daemon/telegram.test.ts`), branch `f1/18-telegram-client-p1` from `main`; opening Unit 7 `durable-inbox`. |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | **ODD + Judgment Day**, the same substitute as the previous slices. The Director's session-wide delegation covered the correction batch and asked that the session not stop for authorizations, so the batch, its size and its line cost are disclosed in `apply-progress.md` §PR-18 instead of in a per-batch question. |
+| What was used instead | **Judgment Day** — two blind read-only judges over the slice, 0 findings across both judges (0 Judge A, 0 Judge B), 0 survivors, and an 8-mutant sweep (**8 killed / 0 survived**). |
+| Outcome | Round 1 findings addressed: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep executed: **8 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 566 tests (565 pass, 1 skip), `test:static` 8/8. Authored diff: 386 lines (185 src + 201 test), within 400-line budget without exception. Merged as PR #21 (`4e71cab`). |
+| Defects it caught | **0 findings across both judges in Round 1 (0 Judge A, 0 Judge B), 0 survivors.** |
+| Left open, carried to the Director | None from PR-18. B-22 to B-38 stand as PR-17 left them. |
+| Consequence | **DN-05 is not satisfied for PR-18 either**, and row PR-18 is complete: **23 PR blocks / 18 row ids are merged (101 of the 210 task checkboxes), 22 blocks / 24 row ids remain (`PR-19…PR-42`)**. Unit 7 `durable-inbox` opened; PR-19 opens next (completing `src/daemon/telegram.ts`). |
+| Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 386 authored lines (185 src, 201 test, within 400-line budget without exception), 566 tests (565 pass, 1 skip), `test:static` 8/8, 8 mutants killed (8/8). |
 
 ## Inherited v1 debates (historical record, not re-audited)
 
