@@ -8,6 +8,7 @@ import {
   TelegramApiClient,
   TelegramApiError,
   TelegramConflictError,
+  TelegramError,
   TelegramNetworkError,
   TelegramProtocolError,
   requestTimeoutMs,
@@ -199,3 +200,92 @@ test("TelegramApiClient maps error responses to typed error classes", async () =
     return true;
   });
 });
+
+test("every Telegram error constructor redacts bot tokens from message and cause (PT-08)", async () => {
+  // Use a synthetic 7-digit bot ID so the test file itself does not match the repo-scan scanner
+  const rawToken = `1234567:${"A".repeat(35)}`;
+  const tokenUrl = `https://api.telegram.org/bot${rawToken}/getUpdates`;
+
+  // 1. TelegramError base class
+  const baseErr = new TelegramError(`Error with token ${rawToken} in path`);
+  assert.ok(!baseErr.message.includes(rawToken));
+  assert.ok(baseErr.message.includes("<redacted>"));
+
+  // 2. TelegramConflictError (409)
+  const conflictErr = new TelegramConflictError(`conflict on ${rawToken}`);
+  assert.ok(!conflictErr.message.includes(rawToken));
+  assert.ok(conflictErr.message.includes("<redacted>"));
+
+  // 3. TelegramApiError
+  const apiErr = new TelegramApiError(500, `Internal server error for ${rawToken}`);
+  assert.ok(!apiErr.message.includes(rawToken));
+  assert.ok(apiErr.message.includes("<redacted>"));
+
+  // 4. GroupMigratedError
+  const migratedErr = new GroupMigratedError(400, `migrated ${rawToken}`, -100999);
+  assert.ok(!migratedErr.message.includes(rawToken));
+  assert.ok(migratedErr.message.includes("<redacted>"));
+
+  const migratedErrWithDesc = new GroupMigratedError(400, "description with " + rawToken, -100999);
+  assert.ok(!migratedErrWithDesc.message.includes(rawToken));
+  assert.ok(migratedErrWithDesc.message.includes("<redacted>"));
+
+  // 5. TelegramNetworkError with undici-like cause containing URL
+  const undiciCause = new TypeError(`fetch failed: connect ECONNREFUSED to ${tokenUrl}`);
+  void undiciCause.stack;
+  const netErr = new TelegramNetworkError("getUpdates", undiciCause);
+  assert.ok(!netErr.message.includes(rawToken));
+  assert.ok(netErr.message.includes("<redacted>"));
+  assert.ok(netErr.cause instanceof Error);
+  assert.ok(!(netErr.cause as Error).message.includes(rawToken));
+  assert.ok((netErr.cause as Error).message.includes("<redacted>"));
+  if ((netErr.cause as Error).stack) {
+    assert.ok(!(netErr.cause as Error).stack!.includes(rawToken));
+    assert.ok((netErr.cause as Error).stack!.includes("<redacted>"));
+  }
+
+  // 6. TelegramProtocolError with undici-like cause containing URL
+  const protocolCause = new SyntaxError(`Unexpected token < in JSON at position 0 from ${tokenUrl}`);
+  void protocolCause.stack;
+  const protoErr = new TelegramProtocolError("sendMessage", 502, protocolCause);
+  assert.ok(!protoErr.message.includes(rawToken));
+  assert.ok(protoErr.message.includes("<redacted>"));
+  assert.ok(protoErr.cause instanceof Error);
+  assert.ok(!(protoErr.cause as Error).message.includes(rawToken));
+  assert.ok((protoErr.cause as Error).message.includes("<redacted>"));
+  if ((protoErr.cause as Error).stack) {
+    assert.ok(!(protoErr.cause as Error).stack!.includes(rawToken));
+    assert.ok((protoErr.cause as Error).stack!.includes("<redacted>"));
+  }
+
+  // 7. End-to-end client with raw token: network error with token in URL / cause is redacted
+  const client = new TelegramApiClient(rawToken, {
+    fetchImpl: async (url) => {
+      throw new TypeError(`connect ECONNREFUSED ${url}`);
+    },
+  });
+  await assert.rejects(
+    () => client.getUpdates(),
+    (err: unknown) => {
+      assert.ok(err instanceof TelegramNetworkError);
+      assert.ok(!err.message.includes(rawToken));
+      assert.ok(err.message.includes("<redacted>"));
+      return true;
+    },
+  );
+
+  // 8. End-to-end client with raw token: protocol error with token in response / URL
+  const protoClient = new TelegramApiClient(rawToken, {
+    fetchImpl: async () => new Response(`<html>Bad gateway from ${tokenUrl}</html>`, { status: 502 }),
+  });
+  await assert.rejects(
+    () => protoClient.sendMessage({ chat_id: 123, text: "hi" }),
+    (err: unknown) => {
+      assert.ok(err instanceof TelegramProtocolError);
+      assert.ok(!err.message.includes(rawToken));
+      assert.ok(err.message.includes("<redacted>"));
+      return true;
+    },
+  );
+});
+

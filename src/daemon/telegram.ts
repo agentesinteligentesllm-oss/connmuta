@@ -1,4 +1,5 @@
 import { MAX_LONGPOLL_SECONDS, REQUEST_OVERHEAD_SECONDS } from "../shared/constants.js";
+import { redactTokenShapes } from "../secret-store/redaction.js";
 
 export interface TelegramUser {
   id: number;
@@ -41,10 +42,26 @@ export interface TelegramClient {
   getChat(chatId: number | string): Promise<TelegramChat>;
 }
 
+function sanitizeCause(cause: Error): Error {
+  try {
+    cause.message = redactTokenShapes(cause.message);
+  } catch {
+    // ignore if message property is non-writable
+  }
+  if (typeof cause.stack === "string") {
+    try {
+      cause.stack = redactTokenShapes(cause.stack);
+    } catch {
+      // ignore if stack property is non-writable
+    }
+  }
+  return cause;
+}
+
 /** Base class for any error surfaced by a TelegramClient implementation. */
 export class TelegramError extends Error {
   constructor(message: string) {
-    super(message);
+    super(redactTokenShapes(message));
     this.name = "TelegramError";
   }
 }
@@ -84,9 +101,11 @@ export class GroupMigratedError extends TelegramApiError {
     super(statusCode, description);
     this.name = "GroupMigratedError";
     this.new_chat_id = newChatId;
-    this.message = `${this.message} — the group was upgraded to a supergroup, so the configured chat_id is dead ` +
+    this.message = redactTokenShapes(
+      `${this.message} — the group was upgraded to a supergroup, so the configured chat_id is dead ` +
       `and every further post to it will fail. Set "chat_id": ${newChatId} in configuration and restart. ` +
-      `This is NOT followed automatically: chat_id is an access-control boundary.`;
+      `This is NOT followed automatically: chat_id is an access-control boundary.`,
+    );
   }
 }
 
@@ -96,7 +115,7 @@ export class TelegramNetworkError extends TelegramError {
     const reason = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
     super(`Telegram ${method} request failed before any response: ${reason}`);
     this.name = "TelegramNetworkError";
-    this.cause = cause;
+    this.cause = cause instanceof Error ? sanitizeCause(cause) : cause;
   }
 }
 
@@ -104,10 +123,11 @@ export class TelegramNetworkError extends TelegramError {
 export class TelegramProtocolError extends TelegramError {
   readonly statusCode: number;
   constructor(method: string, statusCode: number, cause: unknown) {
-    super(`Telegram ${method} returned a non-JSON body with HTTP ${statusCode} — an intermediary answered instead of the Bot API`);
+    const reason = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+    super(`Telegram ${method} returned a non-JSON body with HTTP ${statusCode} — an intermediary answered instead of the Bot API: ${reason}`);
     this.name = "TelegramProtocolError";
     this.statusCode = statusCode;
-    this.cause = cause;
+    this.cause = cause instanceof Error ? sanitizeCause(cause) : cause;
   }
 }
 
@@ -165,11 +185,21 @@ export class TelegramApiClient implements TelegramClient {
       throw new TelegramNetworkError(method, err);
     }
 
+    let responseText = "";
+    try {
+      responseText = await response.text();
+    } catch {
+      // ignore
+    }
+
     let payload: TelegramApiResponse<T>;
     try {
-      payload = (await response.json()) as TelegramApiResponse<T>;
+      payload = JSON.parse(responseText) as TelegramApiResponse<T>;
     } catch (err) {
-      throw new TelegramProtocolError(method, response.status, err);
+      const cause = responseText
+        ? new Error(`${err instanceof Error ? err.message : String(err)}: ${responseText}`, { cause: err })
+        : err;
+      throw new TelegramProtocolError(method, response.status, cause);
     }
 
     if (payload.ok) return payload.result;

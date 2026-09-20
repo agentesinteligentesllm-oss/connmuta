@@ -705,6 +705,21 @@ visible.
 | Consequence | **DN-05 is not satisfied for PR-18 either**, and row PR-18 is complete: **23 PR blocks / 18 row ids are merged (101 of the 210 task checkboxes), 22 blocks / 24 row ids remain (`PR-19…PR-42`)**. Unit 7 `durable-inbox` opened; PR-19 opens next (completing `src/daemon/telegram.ts`). |
 | Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 386 authored lines (185 src, 201 test, within 400-line budget without exception), 566 tests (565 pass, 1 skip), `test:static` 8/8, 8 mutants killed (8/8). |
 
+### `bus-v2-f1-pr-19-audit-001` — PR-19 audit substitute (Judgment Day + RDD fallback)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-19 |
+| Subject | PR-19 (`src/daemon/telegram.ts` part 2 with twin `test/daemon/telegram.test.ts`, completing the file with error classification and token redaction, PT-08), branch `f1/19-telegram-client-p2` from `main`; completing Unit 7 `durable-inbox` client half. |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | **ODD + Judgment Day**, the same substitute as the previous slices. The Director's session-wide delegation covered the correction batch and asked that the session not stop for authorizations, so the batch, its size and its line cost are disclosed in `apply-progress.md` §PR-19 instead of in a per-batch question. |
+| What was used instead | **Judgment Day** — two blind read-only judges over the slice, 0 findings across both judges (0 Judge A, 0 Judge B), 0 survivors, and an 8-mutant sweep (**8 killed / 0 survived**). |
+| Outcome | Round 1 findings addressed: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep executed: **8 killed / 0 survived**. RDD fallback executed with writer self-verification and independent verification pass. Total suite: 567 tests (566 pass, 1 skip), `test:static` 8/8. Authored diff: 108 lines (38 src + 70 test), within 400-line budget without exception (budget ≈210 lines). Merged as PR #22. |
+| Defects it caught | **0 findings across both judges in Round 1 (0 Judge A, 0 Judge B), 0 survivors.** |
+| Left open, carried to the Director | None from PR-19. B-22 to B-38 stand as PR-18 left them. |
+| Consequence | **DN-05 is not satisfied for PR-19 either**, and row PR-19 is complete: **24 PR blocks / 19 row ids are merged (105 of the 210 task checkboxes), 21 blocks / 23 row ids remain (`PR-20…PR-42`)**. `src/daemon/telegram.ts` is completely merged; PR-20 opens next (`daemon/transport/{types,group,direct,dual}.ts`). |
+| Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 108 authored lines (38 src, 70 test, within 400-line budget without exception), 567 tests (566 pass, 1 skip), `test:static` 8/8, 8 mutants killed (8/8). |
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an

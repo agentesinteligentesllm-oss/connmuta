@@ -4554,6 +4554,33 @@ Result: **8 killed / 0 survived**.
 - 9 new tests added in `test/daemon/telegram.test.ts`.
 - Unit 7 `durable-inbox` is opened (23 PR blocks / 18 row ids merged, 101/210 tasks).
 
+---
 
+## PR-19 — `daemon/telegram.ts` part 2: error classification + redaction (SEAM, completes `telegram.ts`)
 
+**What landed.** Completes `src/daemon/telegram.ts` and its twin `test/daemon/telegram.test.ts`:
+- `src/daemon/telegram.ts`: error constructors for `TelegramError`, `TelegramConflictError` (409), `RateLimitedError` (429), `TelegramApiError`, `GroupMigratedError` (PT-25), `TelegramNetworkError`, and `TelegramProtocolError`. Every error constructor passes its message through `redactTokenShapes` from `src/secret-store/redaction.ts` (PR-14). Added `sanitizeCause` helper which redacts token shapes from `cause.message` and `cause.stack` (PT-08, design §6.3, residual "undici cause may embed the URL").
+- `test/daemon/telegram.test.ts`: test suite asserting error classification and token redaction across all error classes, causes containing URLs with bot tokens, and end-to-end client error handling.
+- `docs/02-architecture/THREAT-MODEL.md`: updated PT-08 file-name cell in §4 with `test/daemon/telegram.test.ts`.
 
+**Budget.** Measured at **108 authored lines** (`git diff --numstat main -- src test`: 38 src + 70 test). Completely within the 400-line budget without exception (budget ≈210 lines).
+
+**Judgment Day Round 1 & Re-judgment.** Two blind judges (`jd-judge-a`, `jd-judge-b`) audited the slice (`bus-v2-f1-pr-19-audit-001`):
+- Findings addressed in Round 1: 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors.
+- `JUDGMENT: APPROVED` on Round 1.
+
+**Mutant Sweep.** 8 mutants evaluated against the test suite:
+- `M1`: Omit `redactTokenShapes` in `TelegramError` constructor.
+- `M2`: Omit `redactTokenShapes` in `GroupMigratedError` message builder.
+- `M3`: Omit `sanitizeCause` in `TelegramNetworkError`.
+- `M4`: Omit `sanitizeCause` in `TelegramProtocolError`.
+- `M5`: Bypass 409 status check in `TelegramApiClient.call`.
+- `M6`: Bypass 429 status check in `TelegramApiClient.call`.
+- `M7`: Bypass `migrate_to_chat_id` check in `TelegramApiClient.call`.
+- `M8`: Remove `redactTokenShapes` on `cause.stack` in `sanitizeCause`.
+Result: **8 killed / 0 survived**.
+
+**RDD Fallback & Independent Verification.** The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed:
+- Full test suite: **567 tests** (566 pass, 1 skip), `test:static` **8/8**.
+- 1 new test covering 8 redaction subcases in `test/daemon/telegram.test.ts`.
+- `src/daemon/telegram.ts` is completed (24 PR blocks / 19 row ids merged, 105/210 tasks).
