@@ -32,6 +32,7 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | bus-v2-f1-pr-14-audit-001 | 2026-09-19 | Audit substitute for PR-14 (unit 5 secret-store): Judgment Day dual review + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-15-audit-001` | 2026-09-19 | Audit substitute for PR-15 (unit 6 daemon-lifecycle: node-floor, home, log, lock, run-file): Judgment Day dual review + 10-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-16-audit-001` | 2026-09-19 | Audit substitute for PR-16 (unit 6 daemon-lifecycle: heartbeat, idle, bootstrap, main): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
+| `bus-v2-f1-pr-17-audit-001` | 2026-09-19 | Audit substitute for PR-17 (conmuta daemon stop, D-29): Judgment Day dual review + 7-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -672,6 +673,21 @@ visible.
 | Left open, carried to the Director | None from PR-16. B-22 to B-38 stand as PR-15 left them. |
 | Consequence | **DN-05 is not satisfied for PR-16 either**, and row PR-16 is complete: **21 PR blocks / 16 row ids are merged (95 of the 210 task checkboxes), 24 blocks / 26 row ids remain (`PR-17…PR-42`)**. Unit 6 `daemon-lifecycle` is closed; PR-17 opens next. |
 | Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 1,056 authored lines (349 src, 707 test with a disclosed 656-line exception), 546 tests (545 pass, 1 skip), `test:static` 8/8, 8 mutants killed (8/8), and Windows 11 console-flash check observed cleanly. |
+
+### `bus-v2-f1-pr-17-audit-001` — PR-17 audit substitute (Judgment Day + RDD fallback)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-19 |
+| Subject | PR-17 (`src/cli/daemon-stop.ts`, `src/cli/main.ts`, `src/cli/tsconfig.json` with two twins: `test/cli/daemon-stop.test.ts`, `test/cli/main.test.ts`), branch `f1/17-daemon-stop` from `main`; completing row PR-17 and closing unit 6 `daemon-lifecycle`. |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | **ODD + Judgment Day**, the same substitute as the previous slices. The Director's session-wide delegation covered the correction batch and asked that the session not stop for authorizations, so the batch, its size and its line cost are disclosed in `apply-progress.md` §PR-17 instead of in a per-batch question. |
+| What was used instead | **Judgment Day** — two blind read-only judges over the slice, one writer-applied correction batch addressing `JD-A-001..004` and `JD-B-001..007`, and a 7-mutant sweep (**7 killed / 0 survived**). |
+| Outcome | Round 1 findings addressed: bounded poll loop awaiting daemon process termination before lock release and run-file cleanup (`JD-A-001`, `JD-B-001`), named constants with documented reasoning (`JD-A-002`, `JD-B-004`), graceful handling of non-ESRCH signal errors (`JD-A-003`, `JD-B-003`), test coverage for HTTP 500 error status and timeout refusal (`JD-A-004`, `JD-B-005`), dynamic import of `daemon-stop.js` in `main.ts` per design §2.2 (`JD-B-002`), and CLI dispatch validation (`JD-B-006`, `JD-B-007`). Re-judgment: **11 verified / 0 regression** across both judges independently (4/4 Judge A, 7/7 Judge B). **`JUDGMENT: APPROVED`**, with no BLOCKER and no CRITICAL surviving. |
+| Defects it caught | **11 findings across two judges (JD-A-001..004, JD-B-001..007), every one verified.** (1) Process termination awaiting poll loop (`JD-A-001`, `JD-B-001`). (2) Named constants (`JD-A-002`, `JD-B-004`). (3) Non-ESRCH signal error handling (`JD-A-003`, `JD-B-003`). (4) HTTP error status and timeout test coverage (`JD-A-004`, `JD-B-005`). (5) Dynamic import of `daemon-stop.js` in `main.ts` (`JD-B-002`). (6) CLI dispatch validation (`JD-B-006`, `JD-B-007`). |
+| Left open, carried to the Director | None from PR-17. B-22 to B-38 stand as PR-16 left them. |
+| Consequence | **DN-05 is not satisfied for PR-17 either**, and row PR-17 is complete: **22 PR blocks / 17 row ids are merged (98 of the 210 task checkboxes), 23 blocks / 25 row ids remain (`PR-18…PR-42`)**. Unit 6 `daemon-lifecycle` is completely closed; PR-18 opens next (opening Unit 7 `durable-inbox`). |
+| Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 378 authored lines (177 src, 201 test, within 400-line budget without exception), 557 tests (556 pass, 1 skip), `test:static` 8/8, 7 mutants killed (7/7). |
 
 ## Inherited v1 debates (historical record, not re-audited)
 

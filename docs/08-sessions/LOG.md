@@ -4,6 +4,17 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 20 — PR-17: `conmuta daemon stop` (D-29, Unit 6 `daemon-lifecycle` closed)
+
+- **Date**: 2026-09-19
+- **Slice**: PR-17 (`src/cli/daemon-stop.ts`, `src/cli/main.ts`, `src/cli/tsconfig.json` with twins `test/cli/daemon-stop.test.ts`, `test/cli/main.test.ts`).
+- **PR**: #20 (`c7ab4f4`, code tip `c1eaac9`).
+- **Outcome**: Merged into `main`. 557 tests (556 pass, 1 skip), `test:static` 8/8.
+- **Budget**: 378 authored lines (177 src + 201 test), within the 400-line budget without exception.
+- **Audit**: Judgment Day substitute (`bus-v2-f1-pr-17-audit-001`), 11 findings across both judges in Round 1 (4/4 Judge A, 7/7 Judge B), 100% verified, 0 regressions, 0 survivors. 7-mutant sweep killed 7/7.
+- **RDD fallback**: assess returned unassessable/declined, writer self-verification + independent verification passed.
+- **Next**: PR-18 (`src/daemon/telegram.ts` part 1, opening Unit 7 `durable-inbox`).
+
 ## 2026-09-19 — Session 19: PR-16 (daemon lifecycle: heartbeat, idle, bootstrap, main) delivered
 
 **Closed**
