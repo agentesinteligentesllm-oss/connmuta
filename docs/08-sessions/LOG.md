@@ -4,6 +4,19 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 23 — PR-20: `daemon/transport/{types,group,direct,dual}.ts` (AS-IS hash-pinned vendoring, Unit 7 `durable-inbox` transport foundation)
+
+- **Date**: 2026-09-20
+- **Slice**: PR-20 (`src/daemon/transport/{types,group,direct,dual}.ts`, `test/daemon/transport/*`, `test/fakes/telegram.ts`, `test/fixtures/v1-provenance.json`).
+- **PR**: PR-20 merged as PR #23 (`dfd3b13`, branch `f1/20-transport-asis`).
+- **Outcome**: Merged into `main`. 594 tests passing (593 pass, 1 skip), `test:static` 8/8.
+- **Vendored**: Vendored `src/daemon/transport/{types,group,direct,dual}.ts` AS-IS from v1 (hash-pinned).
+- **Twins & Fakes**: Added twins `test/daemon/transport/{types,group,direct,dual}.test.ts`, fake client `test/fakes/telegram.ts`, error classification in `src/daemon/telegram.ts`.
+- **Budget**: Authored diff 308 lines (97 src + 211 test), with 732 lines of AS-IS vendored body excluded under `size:exception (AS-IS hash-pinned)`.
+- **Audit**: Judgment Day substitute (`bus-v2-f1-pr-20-audit-001`), 0 findings across both blind judges in Round 1 (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep killed 8/8.
+- **RDD fallback**: assess returned unassessable/declined, writer self-verification + independent verification passed.
+- **Next**: PR-21 (`src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `src/daemon/bindings.ts`).
+
 ## Session 22 — PR-19: `daemon/telegram.ts` part 2 (error classification + redaction, PT-08, completing `telegram.ts`)
 
 - **Date**: 2026-09-19

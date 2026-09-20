@@ -34,6 +34,8 @@ only as `CONSENSUS` or `ESCALATED`; the derived ADRs are linked in
 | `bus-v2-f1-pr-16-audit-001` | 2026-09-19 | Audit substitute for PR-16 (unit 6 daemon-lifecycle: heartbeat, idle, bootstrap, main): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-17-audit-001` | 2026-09-19 | Audit substitute for PR-17 (conmuta daemon stop, D-29): Judgment Day dual review + 7-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-f1-pr-18-audit-001` | 2026-09-19 | Audit substitute for PR-18 (daemon/telegram.ts part 1: client construction + request plumbing): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
+| `bus-v2-f1-pr-19-audit-001` | 2026-09-19 | Audit substitute for PR-19 (daemon/telegram.ts part 2: error classification + redaction, PT-08): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
+| `bus-v2-f1-pr-20-audit-001` | 2026-09-20 | Audit substitute for PR-20 (daemon/transport AS-IS vendoring): Judgment Day dual review + 8-mutant sweep + RDD fallback; DN-05 unsatisfied | accepted |
 | `bus-v2-referee-001` | reserved | Kairo, Alpha or Betelgeuse; Director | — | not started | — | B-01, B-02, B-03 (F7) |
 
 ## `bus-v2-landing-architecture-001` — full record
@@ -719,6 +721,21 @@ visible.
 | Left open, carried to the Director | None from PR-19. B-22 to B-38 stand as PR-18 left them. |
 | Consequence | **DN-05 is not satisfied for PR-19 either**, and row PR-19 is complete: **24 PR blocks / 19 row ids are merged (105 of the 210 task checkboxes), 21 blocks / 23 row ids remain (`PR-20…PR-42`)**. `src/daemon/telegram.ts` is completely merged; PR-20 opens next (`daemon/transport/{types,group,direct,dual}.ts`). |
 | Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 108 authored lines (38 src, 70 test, within 400-line budget without exception), 567 tests (566 pass, 1 skip), `test:static` 8/8, 8 mutants killed (8/8). |
+
+### `bus-v2-f1-pr-20-audit-001` — PR-20 audit substitute (Judgment Day + RDD fallback)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-20 |
+| Subject | PR-20 (`src/daemon/transport/{types,group,direct,dual}.ts`, `test/daemon/transport/*`, `test/fakes/telegram.ts`, `test/fixtures/v1-provenance.json`), branch `f1/20-transport-asis` from `main`; Unit 7 `durable-inbox` transport foundation. |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | **ODD + Judgment Day**, the same substitute as the previous slices. The Director's session-wide delegation covered the correction batch and asked that the session not stop for authorizations, so the batch, its size and its line cost are disclosed in `apply-progress.md` §PR-20 instead of in a per-batch question. |
+| What was used instead | **Judgment Day** — two blind read-only judges over the slice, 0 findings across both judges (0 Judge A, 0 Judge B), 0 survivors, and an 8-mutant sweep (**8 killed / 0 survived**). |
+| Outcome | 0 findings across both blind judges (0 Judge A, 0 Judge B), 0 survivors. 8-mutant sweep 8/8 killed. Total suite: 594 tests (593 pass, 1 skip), `test:static` 8/8. Authored diff: 308 lines (97 src + 211 test), with 732 lines of AS-IS vendored body excluded under `size:exception (AS-IS hash-pinned)`. PASS. Merged as PR #23 (`dfd3b13`). |
+| Defects it caught | **0 findings across both judges in Round 1 (0 Judge A, 0 Judge B), 0 survivors.** |
+| Left open, carried to the Director | None from PR-20. B-22 to B-38 stand as PR-19 left them. |
+| Consequence | **DN-05 is not satisfied for PR-20 either**, and row PR-20 is complete: **25 PR blocks / 20 row ids are merged (108 of the 210 task checkboxes), 20 blocks / 22 row ids remain (`PR-21…PR-42`)**. Transport modules are merged; PR-21 opens next (`src/daemon/transport/room-guard.ts`, `src/daemon/binding-config.ts`, `src/daemon/bindings.ts`). |
+| Independence from ordinary review | The ordinary review was unassessable/declined, triggering the RDD fallback. Writer self-verification plus independent verification confirmed: 308 authored lines (97 src, 211 test), 732 lines of AS-IS vendored body excluded under `size:exception (AS-IS hash-pinned)`, 594 tests (593 pass, 1 skip), `test:static` 8/8, 8 mutants killed (8/8). |
 
 ## Inherited v1 debates (historical record, not re-audited)
 

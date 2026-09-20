@@ -4584,3 +4584,10 @@ Result: **8 killed / 0 survived**.
 - Full test suite: **567 tests** (566 pass, 1 skip), `test:static` **8/8**.
 - 1 new test covering 8 redaction subcases in `test/daemon/telegram.test.ts`.
 - `src/daemon/telegram.ts` is completed (24 PR blocks / 19 row ids merged, 105/210 tasks).
+
+---
+
+## PR-20 — `daemon/transport/{types,group,direct,dual}.ts` (size:exception, AS-IS hash-pinned)
+
+PR-20 merged as PR #23 (`dfd3b13`): `src/daemon/transport/{types,group,direct,dual}.ts` vendored AS-IS from v1 (hash-pinned, 732 lines excluded under size:exception), test twins in `test/daemon/transport/`, fake client in `test/fakes/telegram.ts`, error classification helpers in `src/daemon/telegram.ts`. Audited under Judgment Day (`bus-v2-f1-pr-20-audit-001`, DN-05 unsatisfied). 8-mutant sweep 8/8 killed. Total suite: 594 tests (593 pass, 1 skip). Next: PR-21.
+
