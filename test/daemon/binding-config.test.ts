@@ -101,4 +101,33 @@ describe("BindingConfig (DATA-MODEL §1, SEAM from v1 config.ts:168-187)", () =>
       (err: unknown) => err instanceof BindingConfigError
     );
   });
+
+  it("refuses null or undefined botOrUsername (JD-A-005)", () => {
+    assert.throws(
+      () => materializeBindingConfig(sampleBinding, null as unknown as string),
+      (err: unknown) => {
+        assert(err instanceof BindingConfigError);
+        assert.match(err.message, /bot or username is required/);
+        return true;
+      }
+    );
+
+    assert.throws(
+      () => materializeBindingConfig(sampleBinding, undefined as unknown as string),
+      (err: unknown) => {
+        assert(err instanceof BindingConfigError);
+        assert.match(err.message, /bot or username is required/);
+        return true;
+      }
+    );
+
+    assert.throws(
+      () => materializeBindingConfig(sampleBinding, { username: "" }),
+      (err: unknown) => {
+        assert(err instanceof BindingConfigError);
+        assert.match(err.message, /bot username is required/);
+        return true;
+      }
+    );
+  });
 });

@@ -41,9 +41,19 @@ export class BindingConfigError extends Error {
  */
 export function materializeBindingConfig(
   binding: RegistryBinding,
-  botOrUsername: RegistryBot | { username: string } | string
+  botOrUsername: RegistryBot | { username: string } | string | null | undefined
 ): BindingConfig {
+  if (!botOrUsername) {
+    throw new BindingConfigError(
+      `Cannot materialize BindingConfig for project ${binding.project_id}: bot or username is required`
+    );
+  }
   const bot_username = typeof botOrUsername === "string" ? botOrUsername : botOrUsername.username;
+  if (!bot_username) {
+    throw new BindingConfigError(
+      `Cannot materialize BindingConfig for project ${binding.project_id}: bot username is required`
+    );
+  }
   const roster: Record<string, BindingRosterEntry> = {};
   const entries = binding.roster_snapshot ?? [];
   for (const entry of entries) {

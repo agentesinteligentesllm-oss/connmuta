@@ -40,7 +40,6 @@ export interface ManagedBinding {
   readonly transport?: Transport;
   readonly roomGuard?: RoomGuardClient;
   readonly poller?: PollerHandle;
-  stop?(): Promise<void> | void;
 }
 
 export interface ReconcileResult {
@@ -52,12 +51,48 @@ export interface ReconcileResult {
   readonly invalid?: boolean;
 }
 
+function areRosterSnapshotsEquivalent(
+  a: readonly ProjectRosterEntry[],
+  b: readonly ProjectRosterEntry[]
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (
+      a[i].agent_id !== b[i].agent_id ||
+      a[i].user_id !== b[i].user_id ||
+      a[i].username !== b[i].username
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function areSettingsEquivalent(
+  a?: { reminder_window_hours?: number; secret_markers?: readonly string[] },
+  b?: { reminder_window_hours?: number; secret_markers?: readonly string[] }
+): boolean {
+  const aHours = a?.reminder_window_hours;
+  const bHours = b?.reminder_window_hours;
+  if (aHours !== bHours) return false;
+
+  const aMarkers = a?.secret_markers ?? [];
+  const bMarkers = b?.secret_markers ?? [];
+  if (aMarkers.length !== bMarkers.length) return false;
+  const aSet = new Set(aMarkers);
+  for (const m of bMarkers) {
+    if (!aSet.has(m)) return false;
+  }
+  return true;
+}
+
 function areBindingsEquivalent(a: RegistryBinding, b: RegistryBinding): boolean {
   if (a.bot_id !== b.bot_id) return false;
   if (a.group_id !== b.group_id) return false;
   if (a.agent_id !== b.agent_id) return false;
   if (a.roster_hash !== b.roster_hash) return false;
-  if (JSON.stringify(a.settings) !== JSON.stringify(b.settings)) return false;
+  if (!areRosterSnapshotsEquivalent(a.roster_snapshot, b.roster_snapshot)) return false;
+  if (!areSettingsEquivalent(a.settings, b.settings)) return false;
   return true;
 }
 
@@ -138,16 +173,9 @@ export class BindingsReconciler {
 
     if (!targetRegistry && this.loader) {
       const syncResult = this.loader.sync();
-      if (syncResult.status === "unchanged") {
-        return {
-          changed: false,
-          added: [],
-          removed: [],
-          updated: [],
-          active: this.getActiveBindings(),
-        };
-      }
-      if (syncResult.status === "invalid") {
+      if (syncResult.status === "loaded") {
+        targetRegistry = syncResult.registry;
+      } else if (syncResult.status === "invalid") {
         // Keep last-good bindings active; do not stop or mutate (ADR-0030)
         return {
           changed: false,
@@ -157,10 +185,29 @@ export class BindingsReconciler {
           active: this.getActiveBindings(),
           invalid: true,
         };
+      } else if (syncResult.status === "unchanged") {
+        if (this.managedBindings.size === 0) {
+          // First reconciliation after loader was already synced: read current()
+          targetRegistry = this.loader.current();
+          if (!targetRegistry) {
+            return {
+              changed: false,
+              added: [],
+              removed: [],
+              updated: [],
+              active: this.getActiveBindings(),
+            };
+          }
+        } else {
+          return {
+            changed: false,
+            added: [],
+            removed: [],
+            updated: [],
+            active: this.getActiveBindings(),
+          };
+        }
       }
-      targetRegistry = syncResult.registry;
-    } else if (!targetRegistry && this.loader?.current) {
-      targetRegistry = this.loader.current();
     }
 
     if (!targetRegistry) {
@@ -182,9 +229,6 @@ export class BindingsReconciler {
       if (!activeMap.has(projectId)) {
         if (managed.poller?.stop) {
           await managed.poller.stop();
-        }
-        if (managed.stop) {
-          await managed.stop();
         }
         this.writeAuditRow(managed.binding);
         this.managedBindings.delete(projectId);
@@ -212,27 +256,30 @@ export class BindingsReconciler {
         });
         this.writeAuditRow(binding);
         added.push(binding);
-      } else if (!areBindingsEquivalent(current.binding, binding)) {
-        // Updated active binding
-        if (current.poller?.stop) {
-          await current.poller.stop();
-        }
-        if (current.stop) {
-          await current.stop();
-        }
+      } else {
+        const currentBotUsername = current.config.bot_username;
+        const newBotUsername = bot?.username ?? "unknown_bot";
+        const botUsernameChanged = currentBotUsername !== newBotUsername;
 
-        const { transport, roomGuard } = await this.buildTransport(binding, config, bot);
-        const poller = this.createPoller ? await this.createPoller(binding, config, transport) : undefined;
+        if (!areBindingsEquivalent(current.binding, binding) || botUsernameChanged) {
+          // Updated active binding
+          if (current.poller?.stop) {
+            await current.poller.stop();
+          }
 
-        this.managedBindings.set(projectId, {
-          binding,
-          config,
-          transport,
-          roomGuard,
-          poller,
-        });
-        this.writeAuditRow(binding);
-        updated.push(binding);
+          const { transport, roomGuard } = await this.buildTransport(binding, config, bot);
+          const poller = this.createPoller ? await this.createPoller(binding, config, transport) : undefined;
+
+          this.managedBindings.set(projectId, {
+            binding,
+            config,
+            transport,
+            roomGuard,
+            poller,
+          });
+          this.writeAuditRow(binding);
+          updated.push(binding);
+        }
       }
     }
 
@@ -249,9 +296,6 @@ export class BindingsReconciler {
     for (const managed of this.managedBindings.values()) {
       if (managed.poller?.stop) {
         await managed.poller.stop();
-      }
-      if (managed.stop) {
-        await managed.stop();
       }
     }
     this.managedBindings.clear();

@@ -49,7 +49,10 @@ export class RoomGuardClient implements TelegramClient {
       : Object.values(options.roster);
     for (const entry of entries) {
       if (entry?.username) {
-        usernames.add(entry.username.toLowerCase());
+        const normalized = entry.username.startsWith("@")
+          ? entry.username.slice(1).toLowerCase()
+          : entry.username.toLowerCase();
+        usernames.add(normalized);
       }
     }
     this.rosterUsernames = usernames;

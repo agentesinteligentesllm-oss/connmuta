@@ -130,6 +130,28 @@ describe("RoomGuardClient (PT-01, D-22)", () => {
     assert.equal(mock.sent.length, 0, "underlying client must not be called");
   });
 
+  it("normalizes roster usernames with leading @ so string chat_id matches with or without leading @ in roster (JD-A-004)", async () => {
+    const mock = createMockTelegramClient();
+    const rosterWithAt: readonly RosterEntry[] = [
+      { agent_id: "@alice", user_id: 111, username: "@alice_bot" },
+      { agent_id: "@bob", user_id: 222, username: "bob_bot" },
+    ];
+    const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster: rosterWithAt });
+
+    const res1 = await guard.sendMessage({
+      chat_id: "@alice_bot",
+      text: "hello alice",
+    });
+    assert.equal(res1.message_id, 100);
+
+    const res2 = await guard.sendMessage({
+      chat_id: "@bob_bot",
+      text: "hello bob",
+    });
+    assert.equal(res2.message_id, 100);
+    assert.equal(mock.sent.length, 2);
+  });
+
   it("delegates getUpdates, getMe, and getChat transparently to the underlying client", async () => {
     const mock = createMockTelegramClient();
     const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
