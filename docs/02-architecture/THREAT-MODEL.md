@@ -121,7 +121,7 @@ Proposed identifiers. The F1 SDD spec assigns real file names; Strict TDD applie
 
 | id | assertion that must be able to fail | scope | v1 precedent | phase |
 |---|---|---|---|---|
-| PT-01 | **Wrong-room CI test.** Two bindings on one daemon with a fake Telegram client that records `chat_id` per call; N sends from client A and N from client B → zero calls with A's `chat_id` carry B's content and vice versa; a forced mismatch yields `WRONG_ROOM` and an audit row. | daemon integration | none — new | F1 |
+| PT-01 | **Wrong-room CI test.** Two bindings on one daemon with a fake Telegram client that records `chat_id` per call; N sends from client A and N from client B → zero calls with A's `chat_id` carry B's content and vice versa; a forced mismatch yields `WRONG_ROOM` and an audit row. | daemon integration · `test/daemon/transport/room-guard.test.ts` (room-guard unit half: numeric chat_id must strictly equal binding.group_id, string chat_id must be `@<username>` in roster, throws `WrongRoomError` before any call; the full two-binding daemon CI test runs in PR-41) | none — new | F1 |
 | PT-02 | The `send` input schema has no `chat_id`, `bot`, `group` or `to_chat` key (schema-shape assertion). | client unit · `test/shared/tool-schemas.test.ts` | `from` schema-shape assertion, v1:src/tools/send.ts:36-50 | F1 |
 | PT-03 | An update from a non-private chat whose id ≠ `binding.group_id` is counted `foreign_chat`, produces no `needs_action`, no reply, and an audit row without body. | daemon unit | DM from a non-roster bot dropped, v1 tasks.md:101 | F1 |
 | PT-04 | A sender present in binding A's roster but absent from B's is dropped by B as `unknown_sender`. | daemon unit | v1:src/tools/fetch.ts:540-544 | F1 |
