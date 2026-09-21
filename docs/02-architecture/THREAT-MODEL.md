@@ -153,7 +153,7 @@ Proposed identifiers. The F1 SDD spec assigns real file names; Strict TDD applie
 | PT-30 | Doorbell events expose exactly the pinned key set and no body field. | adapter unit | v1 `channel/notify.test.ts` | F4 |
 | PT-31 | Mixed batch (human chat, envelopes, malformed, self-echo, duplicate): human text is counted and absent from every output list and from every audit body. | daemon unit · `test/daemon/admission.test.ts` | v1:test/tools/fetch.test.ts mixed batch | F1 |
 | PT-32 | Doctor flags a roster bot whose `getChatMember` status is `administrator` or `creator`. | installer unit | non-admin rule, v1:README.md:69-71 | F2 |
-| PT-33 | HTTP 429 → `RATE_LIMITED{retry_after_s}` with no auto-retry and an unmoved cursor; consecutive AUDIT+COUNTER turns are coalesced into one group post. | daemon unit | v1 tasks.md:80 | F1, F5 |
+| PT-33 | HTTP 429 → `RATE_LIMITED{retry_after_s}` with no auto-retry and an unmoved cursor; consecutive AUDIT+COUNTER turns are coalesced into one group post. | daemon unit · `test/daemon/poller.test.ts` (poller half) | v1 tasks.md:80 | F1, F5 |
 
 ## 5. Focus areas
 
