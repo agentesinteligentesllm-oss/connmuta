@@ -18,12 +18,12 @@
 for a debate**. The Pi-native SDD preflight gate is also closed and only a human can open it (§2), so
 slices run **ODD with the full SDD contract preserved** and are audited by **Judgment Day**. That route
 has now been proven end to end on PR-06, PR-07a, PR-07b, PR-08a, PR-08b, PR-09a, PR-09b, PR-10, PR-11,
-PR-12, PR-13, PR-14, PR-15, PR-16, PR-17, PR-18, PR-19, PR-20, **PR-21** and **PR-22a** — twenty slices, twenty records in the tribunal index.
+PR-12, PR-13, PR-14, PR-15, PR-16, PR-17, PR-18, PR-19, PR-20, **PR-21**, **PR-22a** and **PR-22b** — twenty-one slices, twenty-one records in the tribunal index.
 
 **Copy-paste prompt to start the next session:**
 
 ```text
-Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-22b (`src/daemon/poller.ts`, the poller loop that consumes `admission.ts`, PT-33 poller half; invariant 3): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
+Continúa el cambio SDD `f1-daemon-registry-thin-client` en su rebanada PR-23 (`src/daemon/serve/fetch.ts`, D-02 fetch long-poll against the ledger, D-15 fence application site): lee primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
 La ruta ya está decidida (ODD con el contrato SDD preservado + auditoría Judgment Day); la Arena de debate no está disponible, así que nada depende de un debate ni de una acción en la TUI.
 ```
 
@@ -37,7 +37,7 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 
 The working tree must be **clean** at the start of this session except for an untracked `odd/` directory if
 a previous session left one. The status command must print
-`nextRecommended: apply`, `completed: 118` of `210`, `blockedReasons: []`. Anything else: stop and report.
+`nextRecommended: apply`, `completed: 120` of `210`, `blockedReasons: []`. Anything else: stop and report.
 (`verifyReport: missing` is **expected and correct** while `apply` runs.)
 
 ---
@@ -46,13 +46,13 @@ a previous session left one. The status command must print
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-22a** (PR-22a merged as PR #25). **Next slice: PR-22b** — `src/daemon/poller.ts` (the poller loop that consumes `admission.ts`, PT-33 poller half; invariant 3). | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **27 blocks / 22 row ids** (`PR-01…PR-22a`). Remaining: **18 blocks / 20 row ids** (`PR-22b…PR-42`). Checkboxes: **118 of 210**. | `tasks.md` |
-| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **118/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
-| Unit 7 `durable-inbox` — **open** | `src/daemon/telegram.ts` completed and merged (PR-18, PR-19). Transport modules AS-IS merged (PR-20). Room guard, binding config and reconciliation merged (PR-21). PR-22a (`src/daemon/admission.ts`) is merged; PR-22b (`src/daemon/poller.ts`) follows. | `INDEX.md` `bus-v2-f1-pr-21-audit-001` |
-| Code on `main` / current | `src/shared/*` (16 modules), `src/cli/{main,validate,daemon-stop}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, `src/daemon/{node-floor,home,log,bootstrap,main,telegram,binding-config,bindings,admission}.ts` and `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, and `src/daemon/transport/{types,group,direct,dual,room-guard}.ts`, all with twins — **637 tests** (636 pass, 1 skip), `test:static` **8/8** | PRs `#1`–`#25` |
-| Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**`; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **18 entries** (13 SEAM splits + 4 AS-IS transport modules + 1 SEAM `admission.ts` added by PR-22a). The previous handoffs said 16 — that figure was already wrong by one before this session (13 + 4 = 17), and the registry is now 18. | `test/security/provenance.test.ts` |
-| Audit status | **DN-05 is unsatisfied for PR-06..PR-22a** (twenty slices), one record each in the tribunal index. Nineteen were audited by the Judgment Day substitute; **PR-22a's judges could not run** (subagents returned `assistant reported an error` all session), so its audit is two explicitly separate inline adversarial passes, disclosed in `bus-v2-f1-pr-22a-audit-001`. | [`INDEX.md`](../05-tribunal/INDEX.md) |
+| Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-22b** (PR-22b merged as PR #26). **Next slice: PR-23** — `src/daemon/serve/fetch.ts` (D-02 `fetch` long-poll against the ledger, D-15 fence application site). | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **28 blocks / 23 row ids** (`PR-01…PR-22b`). Remaining: **17 blocks / 19 row ids** (`PR-23…PR-42`). Checkboxes: **120 of 210**. | `tasks.md` |
+| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **120/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
+| Unit 7 `durable-inbox` — **open** | `src/daemon/telegram.ts` completed and merged (PR-18, PR-19). Transport modules AS-IS merged (PR-20). Room guard, binding config and reconciliation merged (PR-21). PR-22a (`src/daemon/admission.ts`) and PR-22b (`src/daemon/poller.ts`) are both merged; PR-23 (`src/daemon/serve/fetch.ts`) follows. | `INDEX.md` `bus-v2-f1-pr-22b-audit-001` |
+| Code on `main` / current | `src/shared/*` (16 modules), `src/cli/{main,validate,daemon-stop}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, `src/daemon/{node-floor,home,log,bootstrap,main,telegram,binding-config,bindings,admission,poller}.ts` and `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, and `src/daemon/transport/{types,group,direct,dual,room-guard}.ts`, all with twins — **642 tests** (641 pass, 1 skip), `test:static` **8/8** | PRs `#1`–`#26` |
+| Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**`; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **18 entries** (13 SEAM splits + 4 AS-IS transport modules + 1 SEAM `admission.ts` added by PR-22a). `poller.ts` is new code (not vendored from v1) and needs no provenance entry. | `test/security/provenance.test.ts` |
+| Audit status | **DN-05 is unsatisfied for PR-06..PR-22b** (twenty-one slices), one record each in the tribunal index. Nineteen were audited by the Judgment Day substitute; **PR-22a and PR-22b's judges could not run** (subagents returned `assistant reported an error`), so their audits are two explicitly separate inline adversarial passes each, disclosed in `bus-v2-f1-pr-22a-audit-001` and `bus-v2-f1-pr-22b-audit-001`. | [`INDEX.md`](../05-tribunal/INDEX.md) |
 
 ---
 
@@ -79,7 +79,7 @@ two scoped re-judgments — the budget is two, and a round-two survivor escalate
 in the tribunal index the way the nineteen existing records do, and state plainly that DN-05 is unsatisfied.
 PR-21's lesson: 8-mutant sweep killed 8/8; 11 findings in Round 1 (5 Judge A, 6 Judge B); Round 2 scoped re-judgment: 100% verified (5/5 Judge A, 6/6 Judge B, 0 regressions, 0 survivors). Merged as PR #24 (`0572b4e`).
 **PR-22a's lesson, and it is the sharper one: a suite can pass by weakening the trust boundary.** Two CRITICALs came out of its audit — the seven steps ran out of the requirement's own "MUST pass, in order" order (the chat-scope check before the wire decode, so a foreign chat carrying human prose was counted `foreign_chat` and the counter PT-03 exists for was answering a different question), and a second, private decoder had been introduced specifically so the suite would pass: it tolerated `[AGENTBUS/2]` and accepted envelopes `shared/envelope.ts` refuses (UUID eids, no `MAX_BODY_CHARS`, no `basis`/`approval_ref` rules). The malformed fixture is now built from a **real** sentinel line with a broken payload, and there is one decoder. **The audit instrument was therefore not the two blind judges**: `jd-judge-a`, `jd-judge-b`, `gentle-ai-explore` and `gentle-ai-worker` each returned `assistant reported an error` for the whole session, so the writer ran two explicitly separate adversarial passes (specification conformance and trust boundary; then ADR-12 pinning and test value) and every finding carries the mutant that reproduces it. That substitution is disclosed in the tribunal record rather than papered over.
-**PR-22a's sweep: 14 mutants with explicit `[from, to]` pairs, 13 killed / 1 survivor, and the survivor is `M0` — a comment-only change that MUST survive.** That control is what proves the harness can report a survivor at all, and it is now part of the sweep. `M1` (step 1's counter) initially survived, which is the finding that produced the step-1 suite, and it is killed at the tip. Restore is sha256-checked every time.
+**PR-22b — the poller loop — landed at 494 authored lines (213 src + 281 test) with a disclosed 94-line PR-scoped exception.** Its inline adversarial audit (`bus-v2-f1-pr-22b-audit-001`) found 0 CRITICAL, 0 WARNING, 1 SUGGESTION (test gap for `retry_after_until` re-read on restart; non-blocking). 11-mutant sweep: 10 killed, M0 control survived. Merged as PR #26 (`3966d39`).
 Carry forward previous rules:
 
 - **Ask before round 1** (the skill requires it). If the Director's standing instruction for the session is
