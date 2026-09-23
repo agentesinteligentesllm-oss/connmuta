@@ -618,8 +618,10 @@ test("close() ends a kept-alive connection that is still open", async () => {
     });
     req.on("error", reject);
     req.end("{}");
+  }).finally(async () => {
+    agent.destroy();
+    await server.close();
   });
-  agent.destroy();
   assert.equal(socketClosed, true);
 });
 
@@ -635,6 +637,11 @@ Content-Length: 10
 `);
       });
       socket.resume();
+      socket.setTimeout(3000);
+      socket.on("timeout", () => {
+        socket.destroy();
+        resolve(false);
+      });
       socket.on("close", () => resolve(true));
       socket.on("error", () => {});
     });

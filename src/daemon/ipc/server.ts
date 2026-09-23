@@ -14,9 +14,11 @@
  * {@link ipcErrorSchema}-shaped body and one of this contract's transport codes.
  *
  * **Connection handling on a refusal.** A refusal raised BEFORE the request body has been fully read
- * (`Host` mismatch, unknown route) closes the connection afterwards (`Connection: close`, which
- * already makes Node end the socket once the response has flushed; the explicit destroy after the
- * flush is belt-and-braces and not separately observable): the leftover, unread request bytes would
+ * (`Host` mismatch, unknown route) closes the connection afterwards: `Connection: close`, then an
+ * immediate `destroy()` once the response has flushed. Node already ends a `Connection: close`
+ * socket after the response on its own (a graceful `destroySoon`), so the test suite cannot tell the
+ * explicit destroy apart; it is kept because it tears the socket down at once instead of waiting on
+ * a client that still owes body bytes: the leftover, unread request bytes would
  * otherwise corrupt whatever the client sends next on a kept-alive socket. A refusal raised AFTER the
  * body has already been fully drained (wrong content type, malformed JSON, a body on `GET`/`DELETE`,
  * a handler that threw) answers on the same connection normally, because there is nothing left unread

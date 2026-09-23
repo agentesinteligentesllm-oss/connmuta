@@ -5553,3 +5553,18 @@ survived (`C0` control)**.
 
 **At the round-1 tip:** **1,600 authored lines (642 src + 958 test), a disclosed 1,200-line PR-scoped exception**; `rm -rf
 dist && npm test` **858 tests (857 pass, 1 skip)**; `test:static` **8/8**; the two twins **57/57**.
+
+**Scoped re-judgment of round 1** (both judges, `145e3f1..f193ea7`): **every ledger row verified by both judges, 0
+regressions.** New rows from the delta: `JD-AB-R2-001` (SUGGESTION, **both judges**): the doc called the surviving
+destroy mutant equivalent "because `Connection: close` already makes Node end the socket", which blurs two different
+operations — Node's own close is a graceful `destroySoon`, the code's is an immediate `destroy()`. **Corrected**: the doc
+now says the suite cannot tell them apart and why the explicit destroy is kept; the mutant is recorded as **not observable
+by the suite**, not as mechanically equivalent. `JD-A-R2-002` (WARNING, judge A; reproduced by reading the test): the new
+early-refusal socket test waited on `close` with no timeout, so a regression would hang instead of failing. **Corrected**:
+a 3 s socket timeout resolves `false`. Judge B also noted that the kept-alive `close()` test left its server open on the
+error path; **corrected** with a `finally` that destroys the agent and closes the server.
+
+**Round 2** (parent, inline; test and doc only, no behavioural source change). At the round-2 tip: **1,609 authored lines
+(644 src + 965 test), a disclosed 1,209-line PR-scoped exception**; the two twins **57/57**; `npm test` **858 tests (857
+pass, 1 skip)** on the second run — the first run failed `heartbeat: ticks at periodMs` once (**B-39**, the known
+wall-clock flake; the file alone passed 6/6 and the full re-run was green); `test:static` **8/8**.
