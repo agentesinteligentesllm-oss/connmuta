@@ -5075,3 +5075,83 @@ was used.
 **Board after this slice.** Row PR-25 complete: **31 PR blocks / 26 row ids merged, 132 of the 210 task checkboxes**,
 14 blocks / 16 row ids remaining (`PR-26…PR-42`). **Unit 7 `durable-inbox` is closed**; unit 8 `send-path` opens with
 PR-26 (`daemon/send/validate.ts`).
+
+## PR-26 — `daemon/send/validate.ts` (SEAM from `v1:src/tools/send.ts:113-192,205-378`; PT-02 half, PT-15; opens unit 8 `send-path`)
+
+**Route.** ODD with the SDD contract preserved (HANDOFF §2.1), session 28: one delegated read-only mapper, one delegated
+writer (`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent
+readback and sweep. No `sdd-apply` phase envelope exists.
+
+**Decisions (orchestrator, session 28), stated in the module doc.** (1) The four stages are composed into one exported
+`validateSend(input, deps)` in the spec's order — schema and normalization, loop prevention, secret backstop over `body`
+and `approval_ref`, recipient/roster check — because v1 composed them inside `sendTool` (`:523-535`, send-path's range).
+(2) Loop prevention reads one row with `readThreadRecord(db, project_id, thread)`; a thread that exists only under another
+project is `UNKNOWN_THREAD` (invariant 1). (3) The encoded-length guard and the `wire` gauge (v1 `:563-574`, `:642-649`,
+outside the cited ranges) are lifted into the pure `guardEncodedLength(envelope)`: the spec lists the guard as the
+pipeline's last stage and task 26.1/PT-15 pin it here, while the envelope it measures is only built in PR-27, which calls
+it. The lifted lines are disclosed in `Changes:` and are not part of the pinned hash; `tasks.md` carries the apply-time
+note. (4) `BRIDGE_BUSY` removed from `SendErrorCode`; `obligations` removed from `SendToolOutput` (design §12 send-path
+change (4)); `TRANSPORT_ERROR` kept in the union for PR-27. (5) `IN_THREAD_TYPES` is re-declared locally —
+`shared/tool-schemas.ts` keeps its copy module-private and this slice does not reopen that pinned module. (6) The config
+dependency is `Pick<BindingConfig, "agent_id" | "roster" | "secret_markers">`. (7) The caller must hold the binding's
+mutex (PR-27): nothing here locks the row it read.
+
+**Provenance.** SEAM, `v1 body sha256 771f968e…` over lines 113-192 then 205-378, each LF-normalized with its terminating
+newline, concatenated — computed by the parent after reproducing `admission.ts`'s `3bd09d0d…` with the same method, and
+independently by the writer. Registry: **22 entries**.
+
+**TDD evidence.** The writer's RED was compile-level (`TS2307` on the missing module) before GREEN. The parent's first
+sweep then found two behavioural gaps: **`M1`** (raw length check `>` → `>=`) and **`M11`** (the reply's other party
+always the addressee) **survived**; two tests now pin them — a body of exactly `MAX_BODY_CHARS` is accepted, and a REPLY
+from the addressee back to the originator succeeds — and both mutants die. Six first-form mutants (`M3`, `M9`, `M10`,
+`M14`–`M16`, each an `&& false`) failed to build under TypeScript's narrowing and were rewritten with a runtime-opaque
+condition before any number was believed.
+
+**Parent readback correction.** The module doc named PR-27's file `daemon/send/send.ts`; it is `daemon/send/send-path.ts`
+(tasks.md PR-27 scope). Corrected before the candidate was frozen.
+
+**Mutant sweep** (`odd/sweep.mjs` + `odd/mutants-validate.json`, outside the repository in the untracked ODD tree, deleted
+at session close; explicit `[from, to]` pairs, BUILD-FAIL reported apart, sha256 restore check): **31 mutants, 30 killed /
+1 survived (`M0`, the control)**, 0 build failures.
+
+| # | Mutant | Outcome |
+|---|---|---|
+| `M0` | control: comment only | SURVIVED |
+| `M1` | raw length check uses `>=` | KILLED (survived before its test) |
+| `M2` | raw length check skipped | KILLED |
+| `M3` | schema failure accepted | KILLED |
+| `M4` | raw body returned instead of normalized | KILLED |
+| `M5` | empty-after-normalization accepted | KILLED |
+| `M6` | raw input returned (stray keys survive) | KILLED |
+| `M7` | ACK skips loop prevention | KILLED |
+| `M8` | lookup not scoped to project | KILLED |
+| `M9` | BROADCAST-opened thread requestable | KILLED |
+| `M10` | non-participant may reply | KILLED |
+| `M11` | other party always the addressee | KILLED (survived before its test) |
+| `M12` | reply to the wrong party accepted | KILLED |
+| `M13` | reply reopens a resolved thread | KILLED |
+| `M14` | anyone may abandon | KILLED |
+| `M15` | abandonment to any peer | KILLED |
+| `M16` | non-addressee may ACK/RESOLVE | KILLED |
+| `M17` | RESOLVED on a resolved thread accepted | KILLED |
+| `M18` | `approval_ref` not scanned | KILLED |
+| `M19` | configured markers ignored | KILLED |
+| `M20` | secret message echoes the field | KILLED |
+| `M21` | BROADCAST includes the caller | KILLED |
+| `M22` | roster check skipped | KILLED |
+| `M23` | secret stage after the roster stage | KILLED |
+| `M24` | `existingThread` dropped | KILLED |
+| `M25` | guard never rejects | KILLED |
+| `M26` | headroom computed from the raw body | KILLED |
+| `M27` | gauge `chars` off by one | KILLED |
+| `M28` | guard measures the raw body, not the encoding | KILLED |
+| `M29` | id generator draws fewer bytes | KILLED |
+| `M30` | error class loses its name | KILLED |
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **999 authored lines (383 src + 610 test + 6 fixture)**
+against a ≈330 estimate — a disclosed **599-line PR-scoped exception**; plus 2/2 lines in THREAT-MODEL §4 (task 26.4). The
+estimate priced the ≈254 v1 lines; the test prices one case per loop-prevention branch, the four secret rules, the stage
+order and the guard.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **739 tests (738 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test dist/test/daemon/send/validate.test.js`: **38/38**.
