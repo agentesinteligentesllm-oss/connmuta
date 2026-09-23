@@ -683,14 +683,15 @@ Runtime harness: in-process daemon with a fake Telegram client recording zero ca
 
 #### PR-25 — `daemon/serve/thread.ts` (D-15 fence consumer)
 Branch `f1/25-serve-thread` → `main`. Depends: PR-24. Size: ≈300 lines, no exception.
+*Size reconciliation (session 27).* Estimated ≈300; **measured 584 authored lines (226 src + 352 test + 6 fixture) at the candidate, a disclosed 184-line PR-scoped exception**, plus the two THREAT-MODEL cells of task 25.4 — see `apply-progress.md` §PR-25. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/serve/thread.ts`, `test/daemon/serve/thread.test.ts`.
 Requirements: `thin-client-tools › status and thread are local, no-network reads` (thread half); `thin-client-tools › Fence soundness and origin labels` (PT-13, PT-14, daemon-side of the D-15 amendment).
 Runtime harness: in-process daemon over a real ledger temp file.
 
-- [ ] 25.1 RED: write `test/daemon/serve/thread.test.ts` ("fence cannot be forged by peer content", "origin label reflects the verified sender" regardless of the envelope's own `from` claim).
-- [ ] 25.2 GREEN: implement `src/daemon/serve/thread.ts` (SEAM from `telegram-agent-bus/src/tools/thread.ts`, read-only source, 164 lines; fence with origin applied here per D-15, consumes `shared/fence.ts` from PR-06).
-- [ ] 25.3 Verify: `npm run build && node --test "dist/test/daemon/serve/thread.test.js"`.
-- [ ] 25.4 Docs: update the file-name cell(s) of PT-13, PT-14 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 25.1 RED: write `test/daemon/serve/thread.test.ts` ("fence cannot be forged by peer content", "origin label reflects the verified sender" regardless of the envelope's own `from` claim).
+- [x] 25.2 GREEN: implement `src/daemon/serve/thread.ts` (SEAM from `telegram-agent-bus/src/tools/thread.ts`, read-only source, 164 lines; fence with origin applied here per D-15, consumes `shared/fence.ts` from PR-06).
+- [x] 25.3 Verify: `npm run build && node --test "dist/test/daemon/serve/thread.test.js"`.
+- [x] 25.4 Docs: update the file-name cell(s) of PT-13, PT-14 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 ### Unit 8 — `send-path`
 
