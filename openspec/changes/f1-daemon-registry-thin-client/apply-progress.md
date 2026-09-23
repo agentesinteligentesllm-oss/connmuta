@@ -4972,7 +4972,8 @@ deterministic proof (`protocol-apply.ts:82` plus `admission.ts`'s `translateAddr
 `to`), that the round-1 text claimed "the `threads` table holds no thread between two other agents", which is false
 for an addressee this roster cannot resolve. The parent had reached the same finding independently while the judges
 ran. `JD-B-002`: both judges noted that the ledger handed to them said "one remaining §8.4 mention" while `status.ts`
-keeps two (lines 18 and 201) and its twin one — all three about `fetch`'s `gap_warning`, which §8.4 does define.
+keeps two (lines 18 and 201), both about `fetch`'s `gap_warning`, which §8.4 does define, and its twin one that
+cited §8.4 for `status` itself — the one the round-2 edit below re-points at §12.
 
 **Round 2** (parent, inline; record text and one test-file doc line). The `JD-B-001` paragraph above now states the
 real predicate, including the `misaddressed` case, and why listing that thread is intended. The twin's module doc
@@ -4980,3 +4981,12 @@ cited "design §8.4/§12" for `status` itself and now cites §12; after that edi
 mentions (lines 18 and 201), both about `fetch`'s `gap_warning`, and the twin **none**. No source byte changed, so the
 round-1 sweep (27 mutants, 26 killed, `M0` survives) and the figures at the round-1 tip stand; the twin's line count
 is unchanged (one line edited in place).
+
+**Final scoped re-judgment** (both judges, `d221098..443609d`, the second and last of the budget). Judge B: **no
+findings**. Judge A: both ledger rows **verified**, plus one NEW WARNING (inferential): the "Scoped re-judgment of
+round 1" paragraph described all three §8.4 mentions as being about `fetch`'s `gap_warning`, while the "Round 2"
+paragraph (correctly) said the twin's cited §8.4 for `status` itself — the record contradicted itself about the defect
+it fixed. With the budget exhausted and no severe row surviving, the verdict is **JUDGMENT: APPROVED** for
+`5a28378..443609d`; that sentence was corrected after the budget (the paragraph now says two mentions about
+`gap_warning` in `status.ts` and one self-citation in the twin), **checked against `grep -n '§8.4'` over both files
+but not re-judged**, as PR-11..PR-13 disclosed theirs.
