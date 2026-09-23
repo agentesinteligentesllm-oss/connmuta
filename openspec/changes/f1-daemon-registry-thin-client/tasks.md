@@ -713,14 +713,17 @@ Runtime harness: N/A — pure pipeline unit test.
 
 #### PR-27 — send path, room guard integration, `DualWriteTransport`
 Branch `f1/27-send-path` → `main`. Depends: PR-26. Size: ≈350 lines, no exception.
+*Size reconciliation (session 28).* Estimated ≈350; **measured 1,384 authored lines (452 src + 926 test + 6 fixture) at the candidate, a disclosed 984-line PR-scoped exception** — see `apply-progress.md` §PR-27. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/send/send-path.ts`, `test/daemon/send/send-path.test.ts`.
 Requirements: `send-path › chat_id must equal the binding's group_id or the send is refused` (PT-01 unit half — full two-binding CI job in PR-41); `send-path › One DualWriteTransport per binding` (BROADCAST never crosses bindings); `send-path › Send input carries no destination` (stamping half — `from`/`to_user_id` never inputs).
 Runtime harness: `FakeTelegramClient` per token driving a real `send-path.ts` instance over the ledger.
 
-- [ ] 27.1 RED: write `test/daemon/send/send-path.test.ts` covering "BROADCAST never crosses bindings" and a room-guard-integration variant of "forced mismatch yields WRONG_ROOM" at the send-path level (audit row, zero `sendMessage` calls).
-- [ ] 27.2 GREEN: implement `src/daemon/send/send-path.ts` (SEAM from `telegram-agent-bus/src/tools/send.ts:380-660`, read-only source, ≈281 lines; lock→`BindingMutex`, `saveState`→transaction, room guard from PR-21 wired in, `obligations` removed).
-- [ ] 27.3 Verify: `npm run build && node --test "dist/test/daemon/send/send-path.test.js"`.
-- [ ] 27.4 Docs: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 27.1 RED: write `test/daemon/send/send-path.test.ts` covering "BROADCAST never crosses bindings" and a room-guard-integration variant of "forced mismatch yields WRONG_ROOM" at the send-path level (audit row, zero `sendMessage` calls).
+- [x] 27.2 GREEN: implement `src/daemon/send/send-path.ts` (SEAM from `telegram-agent-bus/src/tools/send.ts:380-660`, read-only source, ≈281 lines; lock→`BindingMutex`, `saveState`→transaction, room guard from PR-21 wired in, `obligations` removed).
+- [x] 27.3 Verify: `npm run build && node --test "dist/test/daemon/send/send-path.test.js"`.
+- [x] 27.4 Docs: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Apply-time note (session 28).* Four points the gated text does not settle, decided by the orchestrator under the Director's session-28 delegation and recorded in `apply-progress.md` §PR-27: (1) the room guard as wired by PR-21 cannot meet this block's "zero `sendMessage` calls": the AS-IS `GroupTransport` turns a guard refusal into a soft group failure and the DMs still go out. The send path therefore pre-checks every target with no network call through a new `RoomGuardClient.assertTarget`, extracted from `sendMessage` in `src/daemon/transport/room-guard.ts` (outside the Scope line; same rules and messages), and `WRONG_ROOM` joins `SendErrorCode` in `src/daemon/send/validate.ts`. (2) Design §12's send-path change (5), rate discipline, is left to PR-28, whose block owns `send/rate.ts`; the design's `TELEGRAM_RATE_LIMITED` against the spec's and DATA-MODEL's `RATE_LIMITED` is PR-28's to settle. (3) THREAT-MODEL's PT-25 cell assigns the `migrate_to_chat_id` half to `daemon/send/send-path`, which this block's RED list does not name; it is pinned here and the cell updated. (4) Design §8.2 says a migration's new id surfaces in "the audit row"; `audit_log` has no column for it and DATA-MODEL's closed `reason` enum no code, so the row records `degraded` — left to PR-42 task 42.1's enum alignment, as is the absence of an audit row for `TRANSPORT_ERROR`.
 
 #### PR-28 — send rate discipline
 Branch `f1/28-send-rate` → `main`. Depends: PR-27. Size: ≈220 lines, no exception.

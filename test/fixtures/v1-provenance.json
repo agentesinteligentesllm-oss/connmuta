@@ -130,5 +130,11 @@
     "v1Path": "src/tools/send.ts:113-192,205-378",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/daemon/send/send-path.ts",
+    "v1Path": "src/tools/send.ts:380-660",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]

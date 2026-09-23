@@ -58,39 +58,48 @@ export class RoomGuardClient implements TelegramClient {
     this.rosterUsernames = usernames;
   }
 
-  async sendMessage(params: SendMessageParams): Promise<TelegramMessage> {
-    if (typeof params.chat_id === "number") {
-      if (params.chat_id !== this.expectedGroupId) {
+  /**
+   * The D-22 room-guard check on its own, with no network call — extracted from {@link sendMessage}
+   * (PR-27) so the send path can pre-check a group post and every recipient's `@username` before
+   * `transport.send` runs, instead of discovering a mismatch only after the group post already went
+   * out. Same rules, same {@link WrongRoomError}s, same messages as before the extraction.
+   */
+  assertTarget(chat_id: number | string): void {
+    if (typeof chat_id === "number") {
+      if (chat_id !== this.expectedGroupId) {
         throw new WrongRoomError(
-          `Numeric chat_id ${params.chat_id} does not match binding group_id ${this.expectedGroupId}`,
-          params.chat_id,
+          `Numeric chat_id ${chat_id} does not match binding group_id ${this.expectedGroupId}`,
+          chat_id,
           this.expectedGroupId
         );
       }
-    } else if (typeof params.chat_id === "string") {
-      if (!params.chat_id.startsWith("@")) {
+    } else if (typeof chat_id === "string") {
+      if (!chat_id.startsWith("@")) {
         throw new WrongRoomError(
-          `String chat_id "${params.chat_id}" must be @<username> of a roster member`,
-          params.chat_id,
+          `String chat_id "${chat_id}" must be @<username> of a roster member`,
+          chat_id,
           this.expectedGroupId
         );
       }
-      const username = params.chat_id.slice(1).toLowerCase();
+      const username = chat_id.slice(1).toLowerCase();
       if (!this.rosterUsernames.has(username)) {
         throw new WrongRoomError(
-          `Target username "${params.chat_id}" is not present in the roster`,
-          params.chat_id,
+          `Target username "${chat_id}" is not present in the roster`,
+          chat_id,
           this.expectedGroupId
         );
       }
     } else {
       throw new WrongRoomError(
-        `Invalid chat_id type: ${typeof params.chat_id}`,
-        params.chat_id,
+        `Invalid chat_id type: ${typeof chat_id}`,
+        chat_id,
         this.expectedGroupId
       );
     }
+  }
 
+  async sendMessage(params: SendMessageParams): Promise<TelegramMessage> {
+    this.assertTarget(params.chat_id);
     return await this.client.sendMessage(params);
   }
 
