@@ -12,8 +12,9 @@ import { ensureClientCursor, advanceClientCursor, markThreadsSurfaced, readClien
 import { raiseCondition, DAEMON_CONDITION_SCOPE } from "../../../src/ledger/conditions-store.js";
 import type { ThreadRecord } from "../../../src/shared/thread-record.js";
 import { computeRosterHash } from "../../../src/shared/roster-hash.js";
-import { BOT_API_RETENTION_HOURS, FLOOR_NEW, MAX_SURFACED_THREADS, PROTOCOL_SENTINEL, RETENTION_WARNING_HOURS } from "../../../src/shared/constants.js";
+import { BOT_API_RETENTION_HOURS, FLOOR_NEW, FLOOR_REMINDER, MAX_SURFACED_THREADS, PROTOCOL_SENTINEL, RETENTION_WARNING_HOURS } from "../../../src/shared/constants.js";
 import { SERVER_VERSION } from "../../../src/shared/version.js";
+import { computeAgeHours } from "../../../src/shared/protocol-select.js";
 import { FakeTelegramClient } from "../../fakes/telegram.js";
 import { serveStatus, type StatusDaemonFacts, type StatusServeBinding } from "../../../src/daemon/serve/status.js";
 
@@ -322,6 +323,7 @@ test("retention_warning is raised from offsets.last_poll_ok_at, never merely bec
 			{ db, binding: sampleBinding(), session: { client_id: "client-still-never-fetched" }, daemon: sampleDaemon(), now: () => new Date(NOW) },
 		);
 		assert.ok(atThreshold.retention_warning, "exactly at RETENTION_WARNING_HOURS must already warn");
+		assert.equal(atThreshold.retention_warning?.hours_since_last_fetch, 18, "the hours since the daemon last polled OK");
 		assert.equal(atThreshold.retention_warning?.hours_remaining, BOT_API_RETENTION_HOURS - 18);
 		assert.equal(atThreshold.retention_warning?.retention_hours, BOT_API_RETENTION_HOURS);
 
@@ -461,5 +463,57 @@ test("open_threads: this client's own surfaced stamps move threads out of the fr
 		);
 		assert.equal(result.omitted_open_threads, 1);
 		assert.equal(result.omitted_open_threads_by_tier.new, 0, "nothing in the never-surfaced tier was withheld");
+	});
+});
+
+test("open_threads: each entry reports acked and the thread's age from opened_at; reminder_window_hours echoes the binding", async () => {
+	await withLedger(async (db) => {
+		writeThread(db, "thread-acked", { opened_at: NOW, ack_count: 2, acked_at: LATER });
+		writeThread(db, "thread-unacked", { opened_at: LATER, ack_count: 0 });
+
+		const result = await serveStatus(
+			{},
+			{ db, binding: sampleBinding({ reminder_window_hours: 36 }), session: { client_id: "client-a" }, daemon: sampleDaemon(), now: () => new Date(LATER2) },
+		);
+
+		assert.deepEqual(
+			result.open_threads.map((entry) => [entry.thread, entry.acked, entry.age_hours]),
+			[
+				["thread-acked", true, computeAgeHours(NOW, new Date(LATER2))],
+				["thread-unacked", false, computeAgeHours(LATER, new Date(LATER2))],
+			],
+		);
+		assert.ok(result.open_threads[0].age_hours > 0, "ten minutes open is a positive age");
+		assert.equal(result.reminder_window_hours, 36);
+	});
+});
+
+test("open_threads: the reminder floor reserves slots for overdue threads this client already saw, even under a burst of new ones", async () => {
+	await withLedger(async (db) => {
+		const overdueAt = EARLIER_40H;
+		const overdue: string[] = [];
+		for (let i = 0; i < 8; i++) {
+			writeThread(db, `thread-overdue-${i}`, { opened_at: overdueAt });
+			overdue.push(`thread-overdue-${i}`);
+		}
+		for (let i = 0; i < MAX_SURFACED_THREADS; i++) {
+			const openedAt = new Date(Date.parse(NOW) + i * 1000).toISOString();
+			writeThread(db, `thread-new-${i}`, { opened_at: openedAt }, openedAt);
+		}
+		ensureClientCursor(db, { client_id: "client-a", project_id: PROJECT_ID, started_at: NOW, now: NOW });
+		markThreadsSurfaced(db, "client-a", overdue, NOW);
+
+		const result = await serveStatus(
+			{},
+			{ db, binding: sampleBinding(), session: { client_id: "client-a" }, daemon: sampleDaemon(), now: () => new Date(LATER2) },
+		);
+
+		const listedOverdue = result.open_threads.filter((entry) => entry.thread.startsWith("thread-overdue-")).length;
+		assert.equal(listedOverdue, FLOOR_REMINDER, "exactly the reminder floor survives a burst of new threads");
+		assert.equal(result.open_threads.length, MAX_SURFACED_THREADS);
+		// The twenty new threads share the MAX_SURFACED_THREADS - FLOOR_REMINDER slots the reminder floor leaves.
+		const newWithheld = MAX_SURFACED_THREADS - (MAX_SURFACED_THREADS - FLOOR_REMINDER);
+		assert.deepEqual(result.omitted_open_threads_by_tier, { new: newWithheld, reminder: 8 - FLOOR_REMINDER });
+		assert.equal(result.omitted_open_threads, 8);
 	});
 });

@@ -4936,5 +4936,29 @@ both (likely PR-25, which needs the same reads).
 **Budget.** `git diff --numstat -- src test` at the candidate: **801 authored lines (330 src + 465 test + 6
 fixture)** against a ≈300 estimate — a disclosed **401-line PR-scoped exception**.
 
-**Verification at the candidate.** `rm -rf dist && npm test`: **688 tests (687 pass, 1 skip)**; `npm run
+**Verification at the candidate `5a28378`.** `rm -rf dist && npm test`: **688 tests (687 pass, 1 skip)**; `npm run
 test:static`: **8/8**; `node --test dist/test/daemon/serve/status.test.js`: **16/16**.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-24-audit-001`; both blind judges over a frozen worktree at `5a28378`).
+Judge A: 1 WARNING (`tasks.md` still says "no exception" for a slice this record discloses at 801 lines — the
+same gap PR-23's block carries on `main`), 1 SUGGESTION (two `offsets` reads per call). Judge B: 1 WARNING,
+**inferential** (`open_threads` lists every open REQUEST thread without a participation filter), 1 SUGGESTION (three
+"design §8.4" citations for `status`, whose design row is §12). The inferential WARNING is recorded as **info,
+not actioned**, because Judge A's own sweep refuted it with evidence — admission writes a thread only for traffic
+that is this agent's business (`isOurBusiness` in `shared/protocol-apply.ts`), so the `threads` table of a binding
+holds no thread between two other agents — and v1's predicate is the same. The other three were corrected: a
+reconciling size note in `tasks.md` for PR-23 and PR-24, one `offsets` read feeding both `poller` and
+`retention_warning`, and the citations re-pointed at design §12.
+
+**Independent verifier** (separate agent, its own worktree at `5a28378`, run in parallel with the judges): every
+figure reproduced — 801 (330 + 465 + 6), 688 / 687 / 1, `test:static` 8/8, 16/16, 20 registry entries, the
+`7745b6eb…` hash, the 21-mutant sweep. **Its six extra mutants all survived** — six output guarantees no test read:
+`open_threads[].acked`, `open_threads[].age_hours`, the `reminder_window_hours` echo, `omitted_open_threads_by_tier.reminder`,
+the `FLOOR_REMINDER` reservation, and `retention_warning.hours_since_last_fetch`. Two tests and one assertion now pin
+them: the reminder-floor test (eight overdue threads this client saw against twenty new ones) fails if the floor is
+removed and passes with exactly `FLOOR_REMINDER` overdue threads listed.
+
+**Round-1 fix tip.** The sweep now runs the parent's 21 mutants plus the verifier's six (`X1`–`X6`): **27 mutants,
+26 killed / 1 survived (`M0`)**, 0 build failures. `git diff --numstat -- src test`: **857 authored lines (332 src +
+519 test + 6 fixture)**, a disclosed **457-line PR-scoped exception**. `npm test` **690 (689 pass, 1 skip)**;
+`test:static` **8/8**; focused **18/18**.

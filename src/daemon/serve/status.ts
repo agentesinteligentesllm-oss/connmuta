@@ -115,7 +115,7 @@ export interface StatusDaemonConditions {
 	readonly ledger_quarantined: { readonly since: string; readonly reason: string } | null;
 }
 
-/** `agentbus_status` tool output (design §8.4/§12; v1: `StatusToolOutput`, `v1:src/tools/status.ts`). */
+/** `agentbus_status` tool output (design §12's `status` row; v1: `StatusToolOutput`, `v1:src/tools/status.ts`). */
 export interface StatusToolOutput {
 	agent_id: string;
 	bot_username: string;
@@ -197,12 +197,13 @@ function readPollerEntry(db: DatabaseSync, botId: number): StatusPollerEntry | n
 	return row === undefined ? null : { ...row };
 }
 
-/** `retention_warning`, re-scoped to the DAEMON's own polling gap (design §8.4, module doc Change (3)). */
-function computeRetentionWarning(db: DatabaseSync, botId: number, nowDate: Date): StatusToolOutput["retention_warning"] {
-	const row = db.prepare("SELECT last_poll_ok_at FROM offsets WHERE bot_id = ?").get(botId) as
-		| { last_poll_ok_at: string | null }
-		| undefined;
-	const lastPollOkAt = row?.last_poll_ok_at ?? null;
+/**
+ * `retention_warning`, re-scoped to the DAEMON's own polling gap the way design §8.4 re-scopes `fetch`'s
+ * `gap_warning` (module doc Change (3)). Reads the {@link StatusPollerEntry} the caller already loaded, so
+ * one `offsets` read serves both fields.
+ */
+function computeRetentionWarning(poller: StatusPollerEntry | null, nowDate: Date): StatusToolOutput["retention_warning"] {
+	const lastPollOkAt = poller?.last_poll_ok_at ?? null;
 	if (lastPollOkAt === null) {
 		return undefined;
 	}
@@ -224,7 +225,7 @@ function computeUptimeSeconds(startedAt: string, nowDate: Date): number {
 }
 
 /**
- * Serves one `status` call for one client session over the ledger (design §8.4/§12). See the module
+ * Serves one `status` call for one client session over the ledger (design §12's `status` row). See the module
  * doc. Pure read: this module calls {@link readClientCursor} and never {@link ensureClientCursor} — a
  * brand-new session is answered `cursor.next_update_id: 0` without minting a `client_cursors` row, the
  * same way v1's `statusTool` never wrote `state.json`.
@@ -283,7 +284,8 @@ export async function serveStatus(_input: Record<string, never>, deps: ServeStat
 	});
 
 	const checkpoint = readBindingCheckpoint(db, binding.project_id);
-	const retentionWarning = computeRetentionWarning(db, binding.bot_id, nowDate);
+	const poller = readPollerEntry(db, binding.bot_id);
+	const retentionWarning = computeRetentionWarning(poller, nowDate);
 	const ledgerQuarantined = readCondition(db, DAEMON_CONDITION_SCOPE, "ledger_quarantined");
 
 	const output: StatusToolOutput = {
@@ -315,7 +317,7 @@ export async function serveStatus(_input: Record<string, never>, deps: ServeStat
 			roster_hash: binding.roster_hash,
 		},
 		secret_store: { kind: daemon.secret_store_kind },
-		poller: readPollerEntry(db, binding.bot_id),
+		poller,
 		daemon_conditions: {
 			ledger_quarantined:
 				ledgerQuarantined === undefined

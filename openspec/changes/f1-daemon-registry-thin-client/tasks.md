@@ -659,6 +659,7 @@ Runtime harness: fake Telegram client (PR-18/19's fixtures) driving the poller l
 
 #### PR-23 — `daemon/serve/fetch.ts` (D-02, D-15)
 Branch `f1/23-serve-fetch` → `main`. Depends: PR-22b. Size: ≈350 lines, no exception.
+*Size reconciliation (session 27).* Estimated ≈350; **measured 1,682 authored lines (752 src + 924 test + 6 fixture) at the merged tip, a disclosed 1,282-line PR-scoped exception** — see `apply-progress.md` §PR-23. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/serve/fetch.ts`, `test/daemon/serve/fetch.test.ts`.
 Requirements: `durable-inbox › timeout_s is a long-poll against the ledger` (D-02); `durable-inbox › needs_action and seen_eids resolve DATA-MODEL's open points` (D-06 VIEW/index); D-15 fence application site (consumes `shared/fence.ts` from PR-06).
 Runtime harness: in-process daemon serving `fetch` over a real ledger temp file, waiting on the `inbox:<project_id>` event.
@@ -671,6 +672,7 @@ Runtime harness: in-process daemon serving `fetch` over a real ledger temp file,
 
 #### PR-24 — `daemon/serve/status.ts`
 Branch `f1/24-serve-status` → `main`. Depends: PR-23. Size: ≈300 lines, no exception.
+*Size reconciliation (session 27).* Estimated ≈300; **measured 857 authored lines (332 src + 519 test + 6 fixture) at the round-1 fix tip, a disclosed 457-line PR-scoped exception** — see `apply-progress.md` §PR-24. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/serve/status.ts`, `test/daemon/serve/status.test.ts`.
 Requirements: `thin-client-tools › status and thread are local, no-network reads` (status half).
 Runtime harness: in-process daemon with a fake Telegram client recording zero calls.
