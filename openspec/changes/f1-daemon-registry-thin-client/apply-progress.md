@@ -5744,7 +5744,10 @@ SUGGESTION; Judge A: WARNING, citing this project's own "every statement traces 
 to `JD-A-001`'s round-1 re-judgment in `apply-progress.md` §PR-30 instead of a nonexistent id. No further correction
 needed; re-verified `rm -rf dist && npm test` **869/868/1**, `test:static` **8/8** after the fix.
 
-**JUDGMENT: APPROVED** for `3f289c2..<final>`. Both re-judgments in the two-round budget were used. Every CRITICAL/WARNING
+**JUDGMENT: APPROVED** for `3f289c2..351c081` (the final commit, `351c081`, is the citation fix both judges asked
+for in the round just closed — mechanical, zero behavioural change, re-verified by the full suite above; not sent
+through a third re-judgment, since the budget is two and its content was already specified by both judges).
+Both re-judgments in the two-round budget were used. Every CRITICAL/WARNING
 finding from either judge across all three rounds is either resolved (`JD-A-002`, `JD-B-001`, `JD-B-002`/`JD-A-001`'s
 bound half, `JD-B-003`, `JD-B-004`, `JD-A-R2-003`/`JD-B-R2-001`) or disclosed-and-intentionally-deferred to PR-31 with
 an accurate rationale (`JD-A-001`'s revocation half). The independent verifier's `N5` (default clock never exercised)
