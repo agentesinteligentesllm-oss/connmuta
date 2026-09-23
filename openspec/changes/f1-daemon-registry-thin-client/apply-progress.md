@@ -4767,18 +4767,74 @@ and `M19`, an **equivalent** mutant: the "subscribe, then re-check" read could n
 and the module-doc sentence crediting it with race-freedom were removed and replaced by the real reason.
 
 **Mutant sweep** (`odd/sweep-fetch.mjs`, explicit `[from, to]` pairs, BUILD-FAIL reported separately from KILLED,
-sha256 restore check): **20 mutants, 19 killed / 1 survived, the survivor being `M0`, the comment-only control**;
-0 build failures.
+sha256 restore check; the script lives outside the repository, in the untracked ODD tree, and is deleted at
+session close — the same disclosure the PR-12 entry uses). **At the candidate `e276bde`: 20 mutants, 19 killed / 1 survived, the survivor
+being `M0`, the comment-only control**; 0 build failures. Listed inline, since the script is not committed:
+
+| # | Mutant | Outcome |
+|---|---|---|
+| `M0` | control: comment only (MUST SURVIVE) | SURVIVED |
+| `M1` | clamp removed | KILLED |
+| `M2` | negative wait allowed | KILLED |
+| `M3` | event does not wake the wait | KILLED |
+| `M4` | listener never removed | KILLED |
+| `M5` | clock not re-read after the wait | KILLED |
+| `M6` | peek advances the cursor | KILLED |
+| `M7` | peek writes | KILLED |
+| `M8` | log fence uses envelope-independent wrong user id | KILLED |
+| `M9` | ignored rows leak into log | KILLED |
+| `M10` | unanchored not counted | KILLED |
+| `M11` | misaddressed ignores roster | KILLED |
+| `M12` | checkpoint by position, not time | KILLED |
+| `M13` | per-entry trim disabled | KILLED |
+| `M14` | compact ignores news | KILLED |
+| `M15` | skipped window unbounded below | KILLED |
+| `M16` | gap warning never raised | KILLED |
+| `M17` | unresolved origin uses a real id | KILLED |
+| `M18` | max_batch not honoured | KILLED |
+| `M19` | rows never re-read after the wait | KILLED |
+| `M20` | aborted call still persists (added in round 1, JD-A-005) | KILLED |
+| `M21` | `max_batch` floor removed (added in round 1, JD-B-002) | KILLED |
+
+At the round-1 fix tip the three anchors the corrections moved (`M6`, `M7`, `M18`) were re-pointed at the
+equivalent new code with the same mutation intent, and `M20`/`M21` were added: **22 mutants, 21 killed / 1
+survived (`M0`)**, 0 build failures.
 
 **Disclosed limits (not defects of this slice).** `unanchored` counts only the refused half — admission never
 persists the ADR-13 "authorized despite a null anchor" flag; `skipped` windows on `audit_log.ts`, which is the
 message date, so a drop delivered late can fall before a client's window; a first peek creates the cursor row.
 
-**Budget.** `git diff --numstat -- src test` at the candidate: **1,401 authored lines (731 src + 664 test + 6
+**Budget.** `git diff --numstat -- src test` at the candidate `e276bde`: **1,401 authored lines (731 src + 664 test + 6
 fixture)** against a ≈350 estimate — a disclosed **1,001-line PR-scoped exception**. The estimate priced the 264 v1
 lines; the module also rebuilds from the ledger the `log`/`rejected`/`unapplied`/`skipped`/checkpoint half v1
 computed in the same pass (`v1:fetch.ts:500-663`, now admission's), and carries the module doc the SEAM changes
-need.
+need. At the round-1 fix tip: **1,609 authored lines (752 src + 851 test + 6 fixture)**, a disclosed **1,209-line
+PR-scoped exception** — round 1 added +21 src and +187 test, almost all of it the seven pinning tests the judges
+asked for.
 
-**Verification at the candidate.** `rm -rf dist && npm test`: **662 tests (661 pass, 1 skip)**; `npm run
-test:static`: **8/8**; `node --test dist/test/daemon/serve/fetch.test.js`: **20/20**.
+**Verification at the candidate `e276bde`.** `rm -rf dist && npm test`: **662 tests (661 pass, 1 skip)**; `npm run
+test:static`: **8/8**; `node --test dist/test/daemon/serve/fetch.test.js`: **20/20**. **At the round-1 fix tip:**
+**668 tests (667 pass, 1 skip)**, `test:static` **8/8**, focused **26/26**.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-23-audit-001`; both blind judges ran this time, over a frozen worktree at
+`e276bde`, in parallel, graph shape `{findings, evidence}`). Judge A: 0 CRITICAL, 4 WARNING, 2 SUGGESTION. Judge B:
+1 CRITICAL, 2 WARNING. Merged into eight ledger rows, **every single-judge row reproduced deterministically by the
+parent before any correction**: `JD-B-001` (CRITICAL, single judge) — `FETCH_MISSING_REJECTION_AUDIT_MESSAGE` was a
+documented refusal no test reached (ADR-12); `JD-B-002` — a negative `max_batch` bound a negative SQLite `LIMIT`,
+which SQLite reads as no limit (reproduced: `LIMIT -5` over three rows returns three), now clamped to `[1, MAX_BATCH]`
+by `MIN_FETCH_BATCH`; `JD-A-001` — the peek rule was cited to ADR-0025, which never mentions `mark_seen`; the rule is
+ADR-0016's; `JD-A-002` — D-26's import-graph claim had no test (a source-scan test now pins it; the closure scan stays
+PR-40's task 40.3); `JD-A-003` — two unpinned claims (a first-call peek bootstraps the cursor and writes nothing
+else; `misaddressed`/`unanchored` count before the checkpoint slice); `JD-A-004` — the thread listing is N+1, not
+"one indexed lookup"; `JD-A-005` (SUGGESTION, inferential) — a call whose caller aborted still advanced and stamped
+a response that may never be delivered; it now persists nothing; `JD-AB-006` (both judges) — the sweep script is
+not in the repository, now disclosed with the table above. The batch was applied by the bounded fix actor
+(`jd-fix-agent`); its size and cost are disclosed here under the Director's session-27 delegation instead of a
+per-batch question.
+
+**Native review.** `gentle-ai review assess --base-ref fc1c09f --committed-only --untracked-scope=exclude` over
+`e276bde`: risk `medium`, `review_due: true`, `review_due_reason: slice_budget_reached`, 5 paths / 1,460 changed lines.
+The native review was **not started** for this candidate: the installed `judgment-day` skill states that Judgment Day
+replaces ordinary 4R as the adversarial method for a target and that both must never run on the same one, and a
+native START would open a consent envelope only the Director may answer, in a session the Director asked to run without
+interruptions. The RDD fallback's separate independent verifier ran instead (below).

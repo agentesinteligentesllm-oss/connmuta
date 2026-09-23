@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { EventEmitter } from "node:events";
 import type { DatabaseSync } from "node:sqlite";
 
@@ -17,10 +18,13 @@ import { CHECKPOINT_MARKER, FETCH_LONGPOLL_MAX_SECONDS } from "../../../src/shar
 import {
 	effectiveWaitSeconds,
 	serveFetch,
+	FETCH_MISSING_REJECTION_AUDIT_MESSAGE,
 	UNRESOLVED_ORIGIN_USER_ID,
 	type FetchClientSession,
 	type FetchServeBinding,
 } from "../../../src/daemon/serve/fetch.js";
+
+const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
  * `daemon/serve/fetch.ts` (PR-23, design §8.4, D-02, D-06, D-15).
@@ -660,5 +664,188 @@ test("log is sliced to start at the last CHECKPOINT-ESTADO broadcast in the batc
 		assert.equal(result.checkpoint.present, true);
 		assert.equal(result.checkpoint.at, NOW);
 		assert.equal(result.checkpoint.by, PEER_AGENT_ID);
+	});
+});
+
+test("serveFetch refuses with FETCH_MISSING_REJECTION_AUDIT_MESSAGE when a rejected row has no matching audit row (JD-B-001)", async () => {
+	await withLedger(async (db) => {
+		const input: InboxUpdateInput = {
+			update_id: 1,
+			project_id: PROJECT_ID,
+			chat_id: GROUP_ID,
+			via: "group",
+			message_id: 6001,
+			message_date: Math.floor(Date.parse(NOW) / 1000),
+			from_user_id: PEER_USER_ID,
+			from_agent_id: PEER_AGENT_ID,
+			eid: "eid-missing-audit-1",
+			envelope_json: envelopeJson({ type: "REPLY", to: AGENT_ID, thread: "thread-missing-audit-1" }),
+			body: null,
+			apply_outcome: "rejected",
+			received_at: NOW,
+		};
+		// Admitted directly with no `audits` entry — a ledger this build never writes on its own (see
+		// the exported message's own doc), which is exactly the fault this refusal exists to surface.
+		commitInboxBatch(db, { bot_id: BOT_ID, entries: [{ kind: "admitted", update: input }] });
+
+		await assert.rejects(
+			() => serveFetch({}, { db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(NOW) }),
+			(error: unknown) => error instanceof Error && error.message === FETCH_MISSING_REJECTION_AUDIT_MESSAGE,
+		);
+	});
+});
+
+test("max_batch is clamped to at least MIN_FETCH_BATCH: zero or negative never disables the SQLite LIMIT (JD-B-002)", async () => {
+	await withLedger(async (db) => {
+		[1, 2, 3].forEach((n) =>
+			seedUpdateRow(db, { update_id: n, eid: `eid-clamp-${n}`, thread: `thread-clamp-${n}`, to: AGENT_ID, received_at: NOW }),
+		);
+		const binding = sampleBinding();
+
+		const negative = await serveFetch(
+			{ max_batch: -5 },
+			{ db, binding, session: sampleSession("client-clamp-neg"), now: () => new Date(NOW) },
+		);
+		assert.equal(negative.log.length, 1, "a negative max_batch must bind a bounded LIMIT, not an unbounded one");
+
+		const zero = await serveFetch(
+			{ max_batch: 0 },
+			{ db, binding, session: sampleSession("client-clamp-zero"), now: () => new Date(NOW) },
+		);
+		assert.equal(zero.log.length, 1, "max_batch: 0 must still read at least the floor of one row, or the cursor never advances");
+	});
+});
+
+test("serveFetch's own module imports nothing from telegram or transport, and never shells out (D-26, JD-A-002)", () => {
+	const fetchSrc = readFileSync(join(REPO_ROOT, "src/daemon/serve/fetch.ts"), "utf8");
+	const specifiers = [...fetchSrc.matchAll(/\bfrom\s+["']([^"']+)["']/g)].map((match) => match[1]);
+	assert.ok(specifiers.length > 0, "sanity: the module must import something for this check to be non-vacuous");
+	for (const specifier of specifiers) {
+		assert.doesNotMatch(
+			specifier,
+			/telegram|transport\/|\/send\//,
+			`import specifier must not reach telegram/transport/send: ${specifier}`,
+		);
+	}
+	assert.doesNotMatch(fetchSrc, /child_process/, "the module must never shell out");
+});
+
+test("a brand-new client's first call being a peek still creates its cursor and reads rows, but advances and stamps nothing (JD-A-003a)", async () => {
+	await withLedger(async (db) => {
+		seedUpdateRow(db, {
+			update_id: 1,
+			eid: "eid-peek-first-1",
+			thread: "thread-peek-first-1",
+			to: AGENT_ID,
+			received_at: NOW,
+			body: "hello",
+		});
+
+		const result = await serveFetch(
+			{ mark_seen: false },
+			{ db, binding: sampleBinding(), session: sampleSession("client-peek-first"), now: () => new Date(NOW) },
+		);
+
+		assert.deepEqual(
+			result.log.map((entry) => entry.eid),
+			["eid-peek-first-1"],
+			"a first-call peek still reads rows past the catch-up cursor",
+		);
+
+		const cursor = readClientCursor(db, "client-peek-first");
+		assert.ok(cursor, "the cursor row must be created even on a peek");
+		assert.equal(cursor?.inbox_seq, 0, "a fresh ledger's catch-up start is 0, and a peek must not move it");
+		assert.equal(cursor?.last_surfaced_digest, null, "a peek must not stamp a digest");
+		assert.deepEqual(
+			[...readSurfacedThreads(db, "client-peek-first")],
+			[],
+			"a peek must not stamp any surfaced thread",
+		);
+	});
+});
+
+test("misaddressed and unanchored count over the full batch, before the checkpoint slice (JD-A-003b)", async () => {
+	await withLedger(async (db) => {
+		seedUpdateRow(db, {
+			update_id: 1,
+			eid: "eid-preckpt-misaddr",
+			thread: "thread-preckpt-misaddr",
+			to: "@stranger-agent",
+			received_at: NOW,
+			body: "before checkpoint, misaddressed",
+		});
+		seedRejectedUpdate(db, {
+			update_id: 2,
+			eid: "eid-preckpt-unanch",
+			thread: "thread-preckpt-unanch",
+			reason: "unanchored",
+			received_at: NOW,
+		});
+		seedUpdateRow(db, {
+			update_id: 3,
+			eid: "eid-preckpt-ckpt",
+			thread: "thread-preckpt-ckpt",
+			type: "BROADCAST",
+			to: null,
+			received_at: LATER,
+			body: `${CHECKPOINT_MARKER} snapshot`,
+			apply_outcome: "noted",
+		});
+
+		const result = await serveFetch(
+			{},
+			{ db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(LATER2) },
+		);
+
+		assert.equal(result.log.length, 1, "the log is sliced to start at the checkpoint");
+		assert.equal(result.log[0].eid, "eid-preckpt-ckpt");
+		assert.equal(result.misaddressed, 1, "misaddressed counts the full batch, before the checkpoint slice");
+		assert.equal(result.unanchored, 1, "unanchored counts the full batch, before the checkpoint slice");
+	});
+});
+
+test("an aborted caller writes nothing, even with mark_seen true and rows that arrived during the wait (JD-A-005)", async () => {
+	await withLedger(async (db) => {
+		const binding = sampleBinding();
+		const session = sampleSession("client-abort");
+		const controller = new AbortController();
+		const delay = (_ms: number, signal: AbortSignal): Promise<void> =>
+			new Promise((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+
+		const fetchPromise = serveFetch(
+			{ timeout_s: 20 },
+			{ db, binding, session, delay, signal: controller.signal, now: () => new Date(NOW) },
+		);
+
+		await new Promise((resolve) => setImmediate(resolve));
+		seedUpdateRow(db, {
+			update_id: 1,
+			eid: "eid-abort-1",
+			thread: "thread-abort-1",
+			to: AGENT_ID,
+			received_at: NOW,
+			body: "arrived during the wait",
+		});
+		// No emit: the caller's own abort is what settles the wait, never the ledger event.
+		controller.abort();
+
+		const result = await fetchPromise;
+		assert.deepEqual(
+			result.log.map((entry) => entry.eid),
+			["eid-abort-1"],
+			"the row is still read and returned to the aborted call",
+		);
+		assert.equal(result.cursor.advanced, false, "an aborted call must report no advance");
+		assert.equal(result.cursor.next_update_id, result.cursor.previous_update_id);
+
+		const cursor = readClientCursor(db, "client-abort");
+		assert.ok(cursor, "Step 1's ensureClientCursor still creates the row regardless of the abort");
+		assert.equal(cursor?.inbox_seq, 0, "an aborted call must not advance the cursor");
+		assert.equal(cursor?.last_surfaced_digest, null, "an aborted call must not stamp a digest");
+		assert.deepEqual(
+			[...readSurfacedThreads(db, "client-abort")],
+			[],
+			"an aborted call must not stamp any surfaced thread",
+		);
 	});
 });

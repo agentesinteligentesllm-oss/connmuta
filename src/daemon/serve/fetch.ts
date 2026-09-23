@@ -33,7 +33,7 @@
  * {@link readSurfacedThreads}, {@link markThreadsSurfaced} and {@link advanceClientCursor} rather than
  * keeping a second copy of that logic. The session's row is ensured on every call, including a peek
  * (`mark_seen: false`) — a brand-new client still needs a catch-up cursor to read rows against, and
- * that bootstrap is not the "nothing is persisted" ADR-0025 promises about a peek; only the ADVANCE and
+ * that bootstrap is not the "nothing is persisted" ADR-0016 promises about a peek; only the ADVANCE and
  * the surfaced STAMPS are conditioned on `mark_seen`.
  *
  * **D-02's wait is against the LEDGER, never Telegram.** With no row past the cursor and a positive
@@ -44,7 +44,9 @@
  * its `emit` run on this same thread, so no emit can fall between them. A re-read between subscribing
  * and awaiting would therefore be dead code, and there is none. D-26 is a
  * property of this module's import graph, not a runtime check: it imports no Telegram client and no
- * transport, so nothing reachable from here can send.
+ * transport, so nothing reachable from here can send — pinned here by grepping this file's own import
+ * specifiers; the full daemon-bundle closure scan (every module reachable from the daemon, not just this
+ * one) remains PR-40's task 40.3.
  *
  * **`unanchored` is reconstructed only from what admission persisted.** `admission.ts`'s own
  * `AdmissionCounts.unanchored` counts TWO shapes — a transition the null-anchor check REFUSED (reason
@@ -67,8 +69,8 @@
  * **Threads are listed here, not exported from `ledger/threads.ts`.** That module's own doc states its
  * scope is the `ThreadRecord` adapter (read one, write one); adding a listing query there for this
  * module's sole benefit would widen an audited SEAM for one caller. `SELECT thread_id FROM threads
- * WHERE project_id = ?` plus {@link readThreadRecord} per row is the whole of it, and it costs one
- * indexed lookup per project per call.
+ * WHERE project_id = ?` plus {@link readThreadRecord} per row is the whole of it: one listing query plus
+ * one {@link readThreadRecord} call per thread (N+1), bounded by retention.
  *
  * **D-06 is not re-implemented here.** `needs_action` as a live VIEW and `seen_eids` as a UNIQUE index
  * are `ledger/schema.ts`'s DDL and `daemon/admission.ts`'s dedup respectively; this module's own
@@ -167,6 +169,12 @@ export interface ServeFetchDeps {
 	readonly now?: () => Date;
 	/** Injected for the D-02 wait; production uses an `AbortSignal`-driven `setTimeout`. */
 	readonly delay?: (ms: number, signal: AbortSignal) => Promise<void>;
+	/**
+	 * The caller's own abort signal (e.g. its IPC connection closing). When this is already aborted, or
+	 * becomes aborted by the time the D-02 wait settles, the response may never reach the caller, so
+	 * persistence is skipped even when `mark_seen` is true — no cursor advance, no surfaced stamps. See
+	 * {@link serveFetch}'s `persist` (JD-A-005).
+	 */
 	readonly signal?: AbortSignal;
 }
 
@@ -197,6 +205,15 @@ export const UNRESOLVED_ORIGIN_USER_ID = 0;
  */
 export const FETCH_MISSING_REJECTION_AUDIT_MESSAGE =
 	"serveFetch: a rejected updates row has no matching audit_log row (project_id, eid, direction='reject', outcome='rejected'); admission writes both inside one committed transaction, so a missing audit row is a data integrity fault rather than a value this handler guesses at.";
+
+/**
+ * The floor {@link FetchToolInput.max_batch} is clamped to, never zero or negative.
+ *
+ * A batch of zero rows would never advance the cursor, wedging a client that sends `max_batch: 0` at the
+ * same position forever; and SQLite reads a negative `LIMIT` as unbounded, so a negative `max_batch`
+ * would silently serve the whole remaining table instead of bounding it.
+ */
+const MIN_FETCH_BATCH = 1;
 
 /** The effective D-02 wait, in seconds: never negative, never past {@link FETCH_LONGPOLL_MAX_SECONDS}. */
 export function effectiveWaitSeconds(timeoutS: number | undefined): number {
@@ -428,7 +445,7 @@ export async function serveFetch(input: FetchToolInput, deps: ServeFetchDeps): P
 
 	// Step 1 — ensure the session's cursor (D-19 catch-up init lives in `ledger/cursors.ts`). This runs
 	// even in peek mode: a brand-new client still needs a starting position to read rows against, and
-	// that bootstrap is not what ADR-0025's "peek writes nothing" is about.
+	// that bootstrap is not what ADR-0016's "peek writes nothing" is about.
 	const cursor = ensureClientCursor(db, {
 		client_id: session.client_id,
 		project_id: binding.project_id,
@@ -441,7 +458,7 @@ export async function serveFetch(input: FetchToolInput, deps: ServeFetchDeps): P
 	const previousLastSeenAt = cursor.last_seen_at;
 	const markSeen = input.mark_seen ?? true;
 	const forceFull = input.force_full ?? false;
-	const limit = Math.min(input.max_batch ?? MAX_BATCH, MAX_BATCH);
+	const limit = Math.min(Math.max(input.max_batch ?? MAX_BATCH, MIN_FETCH_BATCH), MAX_BATCH);
 
 	// Step 2/3 — read rows past the cursor; D-02's bounded wait when the batch is empty.
 	const readRows = (): UpdateRow[] => readUpdateRows(db, binding.project_id, previous, limit);
@@ -674,10 +691,14 @@ export async function serveFetch(input: FetchToolInput, deps: ServeFetchDeps): P
 			);
 
 	const lastRowSeq = rows.length > 0 ? rows[rows.length - 1].seq : undefined;
-	const nextUpdateId = markSeen ? (lastRowSeq ?? previous) : previous;
+	// JD-A-005: a response the caller's own abort means may never be delivered must not have already
+	// moved state — the same defect class as v1's `cursor.advanced` bug — so an aborted `deps.signal` is
+	// treated as a peek for persistence, regardless of `mark_seen`.
+	const persist = markSeen && !(deps.signal?.aborted ?? false);
+	const nextUpdateId = persist ? (lastRowSeq ?? previous) : previous;
 
-	// Step 8 — ADR-0025: peek mode (`mark_seen: false`) advances and stamps nothing.
-	if (markSeen) {
+	// Step 8 — ADR-0016: peek mode (`mark_seen: false`) advances and stamps nothing; so does an aborted call.
+	if (persist) {
 		withTransaction(db, () => {
 			markThreadsSurfaced(db, session.client_id, [...emittedBodies], nowIso);
 			advanceClientCursor(db, session.client_id, {
