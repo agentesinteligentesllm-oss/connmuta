@@ -5075,3 +5075,141 @@ was used.
 **Board after this slice.** Row PR-25 complete: **31 PR blocks / 26 row ids merged, 132 of the 210 task checkboxes**,
 14 blocks / 16 row ids remaining (`PR-26…PR-42`). **Unit 7 `durable-inbox` is closed**; unit 8 `send-path` opens with
 PR-26 (`daemon/send/validate.ts`).
+
+## PR-26 — `daemon/send/validate.ts` (SEAM from `v1:src/tools/send.ts:113-192,205-378`; PT-02 half, PT-15; opens unit 8 `send-path`)
+
+**Route.** ODD with the SDD contract preserved (HANDOFF §2.1), session 28: one delegated read-only mapper, one delegated
+writer (`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent
+readback and sweep. No `sdd-apply` phase envelope exists.
+
+**Decisions (orchestrator, session 28), stated in the module doc.** (1) The four stages are composed into one exported
+`validateSend(input, deps)` in the spec's order — schema and normalization, loop prevention, secret backstop over `body`
+and `approval_ref`, recipient/roster check — because v1 composed them inside `sendTool` (`:523-535`, send-path's range).
+(2) Loop prevention reads one row with `readThreadRecord(db, project_id, thread)`; a thread that exists only under another
+project is `UNKNOWN_THREAD` (invariant 1). (3) The encoded-length guard and the `wire` gauge (v1 `:563-574`, `:642-649`,
+outside the cited ranges) are lifted into the pure `guardEncodedLength(envelope)`: the spec lists the guard as the
+pipeline's last stage and task 26.1/PT-15 pin it here, while the envelope it measures is only built in PR-27, which calls
+it. The lifted lines are disclosed in `Changes:` and are not part of the pinned hash; `tasks.md` carries the apply-time
+note. (4) `BRIDGE_BUSY` removed from `SendErrorCode`; `obligations` removed from `SendToolOutput` (design §12 send-path
+change (4)); `TRANSPORT_ERROR` kept in the union for PR-27. (5) `IN_THREAD_TYPES` is re-declared locally —
+`shared/tool-schemas.ts` keeps its copy module-private and this slice does not reopen that pinned module. (6) The config
+dependency is `Pick<BindingConfig, "agent_id" | "roster" | "secret_markers">`. (7) The caller must hold the binding's
+mutex (PR-27): nothing here locks the row it read.
+
+**Provenance.** SEAM, `v1 body sha256 771f968e…` over lines 113-192 then 205-378, each LF-normalized with its terminating
+newline, concatenated — computed by the parent after reproducing `admission.ts`'s `3bd09d0d…` with the same method, and
+independently by the writer. Registry: **22 entries**.
+
+**TDD evidence.** The writer's RED was compile-level (`TS2307` on the missing module) before GREEN. The parent's first
+sweep then found two behavioural gaps: **`M1`** (raw length check `>` → `>=`) and **`M11`** (the reply's other party
+always the addressee) **survived**; two tests now pin them — a body of exactly `MAX_BODY_CHARS` is accepted, and a REPLY
+from the addressee back to the originator succeeds — and both mutants die. Six first-form mutants (`M3`, `M9`, `M10`,
+`M14`–`M16`, each an `&& false`) failed to build under TypeScript's narrowing and were rewritten with a runtime-opaque
+condition before any number was believed.
+
+**Parent readback correction.** The module doc named PR-27's file `daemon/send/send.ts`; it is `daemon/send/send-path.ts`
+(tasks.md PR-27 scope). Corrected before the candidate was frozen.
+
+**Mutant sweep** (`odd/sweep.mjs` + `odd/mutants-validate.json`, outside the repository in the untracked ODD tree, deleted
+at session close; explicit `[from, to]` pairs, BUILD-FAIL reported apart, sha256 restore check): **31 mutants, 30 killed /
+1 survived (`M0`, the control)**, 0 build failures.
+
+| # | Mutant | Outcome |
+|---|---|---|
+| `M0` | control: comment only | SURVIVED |
+| `M1` | raw length check uses `>=` | KILLED (survived before its test) |
+| `M2` | raw length check skipped | KILLED |
+| `M3` | schema failure accepted | KILLED |
+| `M4` | raw body returned instead of normalized | KILLED |
+| `M5` | empty-after-normalization accepted | KILLED |
+| `M6` | raw input returned (stray keys survive) | KILLED |
+| `M7` | ACK skips loop prevention | KILLED |
+| `M8` | lookup not scoped to project | KILLED |
+| `M9` | BROADCAST-opened thread requestable | KILLED |
+| `M10` | non-participant may reply | KILLED |
+| `M11` | other party always the addressee | KILLED (survived before its test) |
+| `M12` | reply to the wrong party accepted | KILLED |
+| `M13` | reply reopens a resolved thread | KILLED |
+| `M14` | anyone may abandon | KILLED |
+| `M15` | abandonment to any peer | KILLED |
+| `M16` | non-addressee may ACK/RESOLVE | KILLED |
+| `M17` | RESOLVED on a resolved thread accepted | KILLED |
+| `M18` | `approval_ref` not scanned | KILLED |
+| `M19` | configured markers ignored | KILLED |
+| `M20` | secret message echoes the field | KILLED |
+| `M21` | BROADCAST includes the caller | KILLED |
+| `M22` | roster check skipped | KILLED |
+| `M23` | secret stage after the roster stage | KILLED |
+| `M24` | `existingThread` dropped | KILLED |
+| `M25` | guard never rejects | KILLED |
+| `M26` | headroom computed from the raw body | KILLED |
+| `M27` | gauge `chars` off by one | KILLED |
+| `M28` | guard measures the raw body, not the encoding | KILLED |
+| `M29` | id generator draws fewer bytes | KILLED |
+| `M30` | error class loses its name | KILLED |
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **999 authored lines (383 src + 610 test + 6 fixture)**
+against a ≈330 estimate — a disclosed **599-line PR-scoped exception**; plus 2/2 lines in THREAT-MODEL §4 (task 26.4). The
+estimate priced the ≈254 v1 lines; the test prices one case per loop-prevention branch, the four secret rules, the stage
+order and the guard.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **739 tests (738 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test dist/test/daemon/send/validate.test.js`: **38/38**.
+
+**Native review.** `gentle-ai review assess --base-ref a82ae27 --committed-only --untracked-scope=exclude` over `1c92aec`:
+risk `high` (`process_boundary`, signal `shell_process` — the test's own assertion that the module never names
+`child_process`), `review_due: true`, `review_due_reason: high_risk`, 6 paths / 1,094 changed lines. The native review was
+**not started** for this candidate, as for PR-23..PR-25: the installed `judgment-day` skill replaces ordinary 4R as the
+adversarial method for a target and both must never run on one target, and START's consent envelope belongs to the
+Director. The RDD fallback's high-risk path ran instead: writer self-verification plus the separate independent verifier
+below.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-26-audit-001`; both blind judges over a frozen worktree at `1c92aec`, the
+independent verifier in parallel over its own). Judge A: 2 WARNING, 1 SUGGESTION. Judge B: 1 CRITICAL, 1 SUGGESTION. No row
+was reported by both judges; every row was reproduced by the parent before any correction.
+
+- `JD-B-001` (CRITICAL, single judge, **pre-existing**): the `v1 body sha256` pin of a SEAM header is not machine-checked —
+  `provenance.test.ts` asserts only inequality for SEAM, so any 64-hex value passes. True, and true of all 14 SEAM
+  headers since the convention was ratified (`bus-v2-f1-pr-04-001`); the v1 checkout is not in CI, so pins are verified by
+  audit-time reproduction, which this slice's verifier did. Not candidate-caused: filed as **B-42** with three dispositions.
+- `JD-A-001` (WARNING, single judge, **pre-existing in v1, corroborated independently by the verifier's direct probe**): an
+  ACK or non-abandon RESOLVED by the correct addressee could carry any rostered `to`, and `resolveRecipients` trusted it —
+  the closing message could go to a third agent while the originator waited. Byte-identical to v1 `:320-325`. **Corrected**
+  as SEAM change (8): the message must go back to `thread.from`, else `NOT_ADDRESSEE` — the spec's "addressee correct".
+- `JD-A-002` (WARNING, introduced): "no ledger write" had no test that could fail (the import scan cannot see a
+  `writeThreadRecord` call, since `ledger/threads.js` is an allowed import). **Pinned**: `total_changes()` is unchanged
+  across two successful sends and one refusal.
+- `JD-A-003` (SUGGESTION, introduced): the `UNKNOWN_THREAD` remedy named v1's `agentbus_fetch`; this product ships
+  `${TOOL_PREFIX}fetch`. **Corrected** as change (9) and pinned. `serve/thread.ts:204` carries the same v1 string — filed
+  as **B-43**, not edited drive-by in a closed unit.
+- `JD-B-002` (SUGGESTION, introduced): the header pointed at `test/fixtures/v1-provenance.json` to reproduce a hash the
+  fixture does not carry. **Corrected** in this module; `admission.ts` carries the same pointer (B-43).
+
+**Independent verifier** (separate agent, its own frozen worktree at `1c92aec`): every figure reproduced exactly — 999
+(383 + 610 + 6), 739 / 738 / 1, `test:static` 8/8, focused 38/38, 22 registry entries, `771f968e…` from the frozen v1
+checkout after first reproducing `3bd09d0d…`, and the 31-mutant sweep (30 / 1 / 0). Of its six extra mutants three were
+killed and **three survived**: `E5` (no test reached a successful ACK or non-abandon RESOLVED), `E6` (the guard's inclusive
+boundary at exactly `TELEGRAM_MAX_TEXT_CHARS` was unpinned) and `E2` (the roster check validated only the first
+recipient). Its direct probe reproduced `JD-A-001` on the compiled module. No figure in the records was wrong.
+
+**Round 1** (parent, inline). Source: changes (8) and (9) and the header pointer. Tests: ACK and non-abandon RESOLVED
+success paths; ACK/RESOLVED to a third party refused; a third party's ACK addressed to the originator refused (added
+because `M16` **survived** once change (8) masked the older non-addressee case — the new check refused it for the other
+reason); the remedy's tool name; the no-write snapshot; the guard at exactly 4,096 characters accepted with zero headroom
+and two characters more refused. **`E2` is an equivalent mutant under the public API**: BROADCAST draws its recipients from
+the roster itself and every other type carries exactly one, so no reachable input has an unknown recipient after the
+first; it is recorded, not pinned. The sweep now runs the parent's 31, the verifier's six (with `E4` re-anchored onto the
+restructured branch) and two for the corrections (`M31` change (8) removed, `M32` v1's tool name): **39 mutants, 37 killed
+/ 2 survived (`M0`, the control, and `E2`, equivalent)**, 0 build failures.
+
+**At the round-1 tip:** **1,104 authored lines (397 src + 701 test + 6 fixture), a disclosed 704-line PR-scoped exception**;
+`rm -rf dist && npm test` **746 tests (745 pass, 1 skip)**; `test:static` **8/8**; focused **45/45**.
+
+**Scoped re-judgment of round 1** (both judges, `1c92aec..c213ef6`): **all five ledger rows and the three verifier
+dispositions verified by both judges, 0 regressions, 0 new defects**. **JUDGMENT: APPROVED** for `1c92aec..c213ef6`; one
+of the two re-judgments in the budget was used.
+
+**Board after this slice.** Row PR-26 complete: **32 PR blocks / 27 row ids merged, 136 of the 210 task checkboxes**,
+13 blocks / 15 row ids remaining (`PR-27…PR-42`). Unit 8 `send-path` continues with PR-27 (`daemon/send/send-path.ts`),
+which builds the envelope, stamps `from`/`to_user_id` from the binding, calls `validateSend` under the binding's mutex
+and `guardEncodedLength` on the envelope it builds.

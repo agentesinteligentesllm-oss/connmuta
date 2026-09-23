@@ -699,14 +699,17 @@ Runtime harness: in-process daemon over a real ledger temp file.
 
 #### PR-26 — send validation pipeline + secret backstop
 Branch `f1/26-send-validate` → `main`. Depends: PR-25. Size: ≈330 lines, no exception.
+*Size reconciliation (session 28).* Estimated ≈330; **measured 999 authored lines (383 src + 610 test + 6 fixture) at the candidate, a disclosed 599-line PR-scoped exception** (1,104 lines and a 704-line exception after Judgment Day round 1) — see `apply-progress.md` §PR-26. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/send/validate.ts`, `test/daemon/send/validate.test.ts`.
 Requirements: `send-path › Validation pipeline and secret backstop run before any network call` (PT-15); `send-path › Send input carries no destination` (PT-02 half, consumes PR-07a's schema).
 Runtime harness: N/A — pure pipeline unit test.
 
-- [ ] 26.1 RED: write `test/daemon/send/validate.test.ts` covering "secret-shaped body rejected before any network call" (names the rule, never the matched text) and "encoded length guard reports headroom" (`wire.headroom_chars` vs. a late `BODY_TOO_LONG`).
-- [ ] 26.2 GREEN: implement `src/daemon/send/validate.ts` (SEAM from `telegram-agent-bus/src/tools/send.ts:113-192,205-378`, read-only source, ≈254 lines; `BRIDGE_BUSY` removed, thread lookups against the ledger via PR-12).
-- [ ] 26.3 Verify: `npm run build && node --test "dist/test/daemon/send/validate.test.js"`.
-- [ ] 26.4 Docs: update the file-name cell(s) of PT-02, PT-15 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 26.1 RED: write `test/daemon/send/validate.test.ts` covering "secret-shaped body rejected before any network call" (names the rule, never the matched text) and "encoded length guard reports headroom" (`wire.headroom_chars` vs. a late `BODY_TOO_LONG`).
+- [x] 26.2 GREEN: implement `src/daemon/send/validate.ts` (SEAM from `telegram-agent-bus/src/tools/send.ts:113-192,205-378`, read-only source, ≈254 lines; `BRIDGE_BUSY` removed, thread lookups against the ledger via PR-12).
+- [x] 26.3 Verify: `npm run build && node --test "dist/test/daemon/send/validate.test.js"`.
+- [x] 26.4 Docs: update the file-name cell(s) of PT-02, PT-15 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Apply-time note (session 28).* Design §12 assigns this module `v1:src/tools/send.ts:113-192,205-378`, but the encoded-length guard and the `wire` gauge that task 26.1 and PT-15 pin here sit at v1 `:563-574` and `:642-649`, inside send-path's `380-660` range. The spec lists the guard as the validation pipeline's last stage, so `validate.ts` exports it as the pure `guardEncodedLength(envelope)` that PR-27 calls with the envelope it builds; the lifted lines are disclosed in the module's `Changes:` note and are outside the pinned hash. The design's table is left as gated.
 
 #### PR-27 — send path, room guard integration, `DualWriteTransport`
 Branch `f1/27-send-path` → `main`. Depends: PR-26. Size: ≈350 lines, no exception.

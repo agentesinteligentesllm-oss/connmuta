@@ -124,5 +124,11 @@
     "v1Path": "src/tools/thread.ts",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/daemon/send/validate.ts",
+    "v1Path": "src/tools/send.ts:113-192,205-378",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
