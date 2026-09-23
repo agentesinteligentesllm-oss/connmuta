@@ -5568,3 +5568,11 @@ error path; **corrected** with a `finally` that destroys the agent and closes th
 (644 src + 965 test), a disclosed 1,209-line PR-scoped exception**; the two twins **57/57**; `npm test` **858 tests (857
 pass, 1 skip)** on the second run — the first run failed `heartbeat: ticks at periodMs` once (**B-39**, the known
 wall-clock flake; the file alone passed 6/6 and the full re-run was green); `test:static` **8/8**.
+
+**Second scoped re-judgment** (both judges, `f193ea7..2a08e84`): **all three rows verified by both judges, 0 regressions, 0
+new defects** (both traced the double `close()` in the kept-alive test to the documented no-op and the `.finally` chain to
+an awaited cleanup). **JUDGMENT: APPROVED** for `145e3f1..2a08e84`; both re-judgments in the budget were used.
+
+**Board after this slice.** Row PR-29 complete: **35 PR blocks / 30 row ids merged, 147 of the 210 task checkboxes**,
+10 blocks / 12 row ids remaining (`PR-30…PR-42`). Unit 9 `ipc-handshake` continues with PR-30 (identity handshake and
+session bearer, D-14, D-04; PT-24, PT-26).
