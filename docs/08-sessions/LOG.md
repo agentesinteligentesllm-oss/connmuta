@@ -4,6 +4,20 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 28 — PR-26, PR-27, PR-28 (closes unit 8 `send-path`); B-42…B-46
+
+- **Date**: 2026-09-22 → 2026-09-23
+- **Authority**: the Director delegated the whole session with no questions ("tienes toda mi autorización"). Route: ODD with the SDD contract preserved; one delegated mapper and one delegated writer per slice, the parent reading back every candidate and running the mutant sweep before freezing it; Judgment Day with both blind judges plus a separate independent verifier per slice.
+- **PR-26** `src/daemon/send/validate.ts` — PR #30 (`cb3c356`). The four validation stages in the spec's order and the pure `guardEncodedLength`; `BRIDGE_BUSY` removed. Judge A and the verifier independently found that v1 let the correct addressee send an ACK or RESOLVED to any rostered agent — corrected (SEAM change (8)). 1,104 lines (704-line exception).
+- **PR-27** `src/daemon/send/send-path.ts` — PR #31 (`da862e7`). The guard as wired by PR-21 could not give "zero `sendMessage` calls" (the AS-IS `GroupTransport` turns a refusal into a soft failure), so `RoomGuardClient.assertTarget` was extracted and the send path pre-checks every target; `BindingMutex`; one transaction for thread, `group_outage` and the audit row; PT-25's send half. 1,493 lines (1,093-line exception).
+- **PR-28** `src/daemon/send/rate.ts` — PR #32 (`4d7c06d`). The AS-IS transports drop a 429's `retry_after_s`, so `RateLimitRecorder` records it in `offsets.retry_after_until` beneath the guard and the send path reads the column; `SendRateBudget`; tool code `RATE_LIMITED`. The change's first rows reported by **both** judges (a rate-limited abandonment unaudited; a last-write-wins backoff), corrected. **No writer RED** for this slice — disclosed; the RED came from the sweep. 1,285 lines (885-line exception).
+- **Board**: 144/210 checkboxes; 34 PR blocks / 29 row ids merged; 801 tests (800 pass, 1 skip); `test:static` 8/8; provenance registry 23 entries. All three PRs green on both CI legs at the first run.
+- **Native review**: `assess` returned `review_due: true` for all three (risk high, medium, high); not started, because the installed `judgment-day` skill forbids both adversarial methods on one target and START's consent belongs to the Director.
+- **Backlog**: B-42 (SEAM pins not machine-checked), B-43 (v1's tool name in merged modules), B-44 (a guard refusal inside a misbuilt transport degrades instead of `WRONG_ROOM`), B-45 (the poller's 429 handling against DATA-MODEL and the send path; reproduced live by PR-28's verifier), B-46 (design §9's rate-refusal name). `00-INDEX.md` gained row 10, indexing B-36…B-46 for the first time.
+- **Incident**: removing PR-26's verifier worktree after a failed junction unlink emptied the main checkout's `node_modules` (`git worktree remove --force` follows a junction). Restored with `npm ci` from the shrinkwrap, suite re-run green; the removal is now junction-first and verified (HANDOFF §2.6).
+- **Lessons**: the independent verifier again found gaps in every slice; equivalent mutants (`E2`, `R4`, `W8`) are argued and recorded, not pinned; a module that must work through hash-pinned AS-IS code needs its channel chosen explicitly (the room pre-check, the ledger as the 429 channel).
+- **Next**: PR-29 (IPC contract and HTTP server scaffolding, opens unit 9 `ipc-handshake`).
+
 ## Session 27 — PR-22b close-out repair; PR-23, PR-24, PR-25 (closes unit 7 `durable-inbox`); B-40, B-41
 
 - **Date**: 2026-09-22
