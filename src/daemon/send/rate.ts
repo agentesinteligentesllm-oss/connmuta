@@ -88,15 +88,21 @@ export function readRetryAfterUntil(db: DatabaseSync, bot_id: number): string | 
 }
 
 /**
- * Upserts `offsets.retry_after_until` for `bot_id` to `untilIso`, touching no other column — never
+ * Upserts `offsets.retry_after_until` for `bot_id`, touching no other column — never
  * `next_update_id` (the poller's own cursor) and never `last_error_code` (the poller's own
  * classification). A row for `bot_id` that does not exist yet is created with every other column at
  * its schema default; a row that already exists keeps every other column exactly as it was.
+ *
+ * **The later instant wins, never the last write.** One failed call can meet several 429s — the group
+ * post first, then each DM in turn — and Telegram may name a different wait for each. Keeping the
+ * latest instant means a short wait on a DM never erases a longer one on the group (Judgment Day
+ * `JD-AB-002`). Instants are canonical ISO strings, so the text comparison is a time comparison.
  */
 export function recordRetryAfter(db: DatabaseSync, bot_id: number, untilIso: string): void {
 	db.prepare(
 		`INSERT INTO offsets (bot_id, retry_after_until) VALUES (?, ?)
-		 ON CONFLICT(bot_id) DO UPDATE SET retry_after_until = excluded.retry_after_until`,
+		 ON CONFLICT(bot_id) DO UPDATE SET retry_after_until =
+		   MAX(COALESCE(offsets.retry_after_until, ''), excluded.retry_after_until)`,
 	).run(bot_id, untilIso);
 }
 

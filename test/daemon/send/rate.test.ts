@@ -93,6 +93,11 @@ const ENTRIES_B: readonly ProjectRosterEntry[] = [
 const NOW = "2026-05-01T10:00:00.000Z";
 /** Comfortably over `RATE_WINDOW_SECOND_MS` — advancing the clock by this much between sends never trips the per-chat window by accident. */
 const OVER_SECOND_WINDOW_MS = 1_100;
+/** Two different Telegram waits met in one call, so the test can tell which one survives. */
+const LONG_WAIT_S = 30;
+const SHORT_WAIT_S = 5;
+/** Time that passes inside the awaited call before Telegram answers. */
+const CALL_DURATION_MS = 10_000;
 
 function withLedger(run: (db: DatabaseSync) => Promise<void> | void): Promise<void> {
 	const home = mkdtempSync(join(tmpdir(), "conmuta-send-rate-"));
@@ -412,6 +417,61 @@ test("Abandonment under a full 429: the thread still closes locally (closure_del
 		assert.equal(closed!.closure_delivered, false);
 		assert.equal(closed!.resolved_by, AGENT_A);
 		assert.equal(closed!.basis, ABANDON_BASIS_VALUE);
+		assert.deepEqual(
+			auditRows(db, PROJECT_A).map((row) => [row.outcome, row.reason, row.envelope_type]),
+			[["rejected", "RATE_LIMITED", "RESOLVED"]],
+			"a rate-limited abandonment is audited like every other rate-limited send (JD-AB-001)",
+		);
+	});
+});
+
+test("one call meeting two 429s keeps the LONGER wait: a short DM wait never erases the group's (JD-AB-002)", async () => {
+	await withLedger(async (db) => {
+		const clock = controllableClock(NOW);
+		const binding = buildBinding(db, { projectId: PROJECT_A, botId: BOT_ID_A, groupId: GROUP_A_ID, agentId: AGENT_A, entries: ENTRIES_A, recorderNow: clock.nowMs });
+		const deps = buildDeps(db, binding, clock, new SendRateBudget());
+		binding.fake.failSendMessageTo(GROUP_A_ID, new RateLimitedError(LONG_WAIT_S));
+		binding.fake.failSendMessageTo(`@${ALICE_A_USERNAME}`, new RateLimitedError(SHORT_WAIT_S));
+
+		await assert.rejects(
+			() => sendPath(requestInput({ to: ALICE_A }), deps),
+			(err: unknown) => isRateLimited(err) && (err as SendToolError).retry_after_s === LONG_WAIT_S,
+		);
+		assert.equal(readRetryAfterUntil(db, BOT_ID_A), new Date(clock.nowMs() + LONG_WAIT_S * MS_PER_SECOND).toISOString());
+	});
+});
+
+test("the reactive retry_after_s is measured from a clock read AFTER the awaited call, not before it", async () => {
+	await withLedger(async (db) => {
+		const clock = controllableClock(NOW);
+		const binding = buildBinding(db, { projectId: PROJECT_A, botId: BOT_ID_A, groupId: GROUP_A_ID, agentId: AGENT_A, entries: ENTRIES_A, recorderNow: clock.nowMs });
+		// Time passes inside the call before Telegram answers 429: the wait must count from the answer.
+		const slowTransport: SendPathDeps["transport"] = {
+			send: async (text, recipients, options) => {
+				clock.advance(CALL_DURATION_MS);
+				return binding.transport.send(text, recipients, options);
+			},
+		};
+		const deps = buildDeps(db, binding, clock, new SendRateBudget(), { transport: slowTransport });
+		binding.fake.failSendMessageTo(GROUP_A_ID, new RateLimitedError(LONG_WAIT_S));
+		binding.fake.failSendMessageTo(`@${ALICE_A_USERNAME}`, new RateLimitedError(LONG_WAIT_S));
+
+		await assert.rejects(
+			() => sendPath(requestInput({ to: ALICE_A }), deps),
+			(err: unknown) => isRateLimited(err) && (err as SendToolError).retry_after_s === LONG_WAIT_S,
+		);
+	});
+});
+
+test("the group chat's own per-second window is checked, not only recorded: a second send to another peer within 1 s is refused", async () => {
+	await withLedger(async (db) => {
+		const clock = controllableClock(NOW);
+		const binding = buildBinding(db, { projectId: PROJECT_A, botId: BOT_ID_A, groupId: GROUP_A_ID, agentId: AGENT_A, entries: ENTRIES_A, recorderNow: clock.nowMs });
+		const deps = buildDeps(db, binding, clock, new SendRateBudget());
+		await sendPath(requestInput({ to: ALICE_A }), deps);
+
+		// CAROL's DM window is empty and the group minute has room: only the group chat's second window can refuse.
+		await assert.rejects(() => sendPath(requestInput({ to: CAROL_A }), deps), isRateLimited);
 	});
 });
 
@@ -632,6 +692,21 @@ test("recordRetryAfter upserts without disturbing a pre-existing row's other col
 		assert.equal(row2.next_update_id, 99);
 		assert.equal(row2.last_error_code, "TELEGRAM_NETWORK_ERROR");
 		assert.equal(row2.retry_after_until, "2026-05-01T13:00:00.000Z");
+
+		// An EARLIER instant never overwrites a later one (JD-AB-002).
+		recordRetryAfter(db, BOT_ID_A, "2026-05-01T12:30:00.000Z");
+		assert.equal(readRetryAfterUntil(db, BOT_ID_A), "2026-05-01T13:00:00.000Z");
+	});
+});
+
+test("recordRetryAfter on a bot with no offsets row creates one with every other column at its schema default", async () => {
+	await withLedger(async (db) => {
+		recordRetryAfter(db, BOT_ID_B, "2026-05-01T12:00:00.000Z");
+		const row = db.prepare("SELECT next_update_id, last_error_code, last_poll_ok_at, retry_after_until FROM offsets WHERE bot_id = ?").get(BOT_ID_B) as Record<string, unknown>;
+		assert.equal(row.next_update_id, 0);
+		assert.equal(row.last_error_code, null);
+		assert.equal(row.last_poll_ok_at, null);
+		assert.equal(row.retry_after_until, "2026-05-01T12:00:00.000Z");
 	});
 });
 

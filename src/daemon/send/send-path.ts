@@ -403,6 +403,24 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 					record: { ...applied.thread, closure_delivered: false },
 					updated_at: ts,
 				});
+				// The closure and its refusal are one fact: a rate-limited abandonment is audited like
+				// every other rate-limited send (Judgment Day `JD-AB-001`), inside the same transaction.
+				if (retryAfter !== undefined) {
+					appendAuditRow(deps.db, {
+						ts,
+						project_id: deps.project_id,
+						bot_id: deps.bot_id,
+						chat_id: deps.config.chat_id,
+						client_id: null,
+						direction: "send",
+						eid,
+						envelope_type: envelope.type,
+						from_user_id: senderUserId,
+						to_user_id: envelope.to_user_id ?? null,
+						outcome: "rejected",
+						reason: "RATE_LIMITED",
+					});
+				}
 			});
 			const closureMessage = `${err.message} — the thread was closed locally anyway (abandonment is yours alone to declare), but the peer was NEVER told. It is reported in ${TOOL_PREFIX}fetch's \`unannounced_closures\` until you re-send it.`;
 			if (retryAfter !== undefined) {

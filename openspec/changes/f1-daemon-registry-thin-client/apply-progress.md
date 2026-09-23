@@ -5390,3 +5390,42 @@ plus 1/1 line in THREAT-MODEL §4 (task 28.4, PT-33).
 
 **Verification at the candidate.** `rm -rf dist && npm test`: **797 tests (796 pass, 1 skip)**; `npm run test:static`:
 **8/8**; `node --test` over `rate`, `send-path`, `validate` and `bindings`: **101/101**.
+
+**Native review.** `gentle-ai review assess --base-ref da862e7 --committed-only --untracked-scope=exclude` over `b2c73cc`:
+risk `high` (`process_boundary`), `review_due: true`, `review_due_reason: high_risk`, 12 paths / 1,256 changed lines. Not
+started, for the reason PR-23's record gives; the high-risk RDD fallback ran instead (the independent verifier below).
+
+**Judgment Day round 1** (`bus-v2-f1-pr-28-audit-001`; both blind judges over a frozen worktree at `b2c73cc`, the
+independent verifier in parallel over its own). Judge A: 2 WARNING. Judge B: 1 CRITICAL, 1 WARNING, 1 SUGGESTION. **Two
+rows were reported by both judges** — the first corroborated findings of the session:
+
+- `JD-AB-001` (B CRITICAL, A WARNING; deterministic): the abandonment branch reclassified to `RATE_LIMITED` wrote no audit
+  row, while its sibling branch did. **Corrected**: the row is written inside the closure's own transaction; pinned.
+- `JD-AB-002` (both WARNING): `recordRetryAfter` was last-write-wins, so one call meeting a long group wait and then a
+  short DM wait kept the short one and understated the backoff. **Corrected**: the later instant wins
+  (`MAX(COALESCE(…), excluded…)` over canonical ISO text); pinned twice — in `recordRetryAfter` and end to end (group 30 s,
+  DM 5 s → `retry_after_s: 30`).
+- `JD-B-003` (SUGGESTION): design §9's `TELEGRAM_RATE_LIMITED` diverges from the shipped `RATE_LIMITED` with no backlog row.
+  Filed as **B-46**.
+
+Both confirmed rows were corrected under the Director's session-28 delegation instead of a per-batch question, as the
+installed `judgment-day` skill's gate would otherwise ask.
+
+**Independent verifier** (separate agent, its own frozen worktree at `b2c73cc`): every figure reproduced exactly (1,182 with
+the per-file split; 797 / 796 / 1; 8/8; 101/101; 23 registry entries) and all four sweeps mutant for mutant. It judged
+`R4` and `W8` **equivalent** independently, with the same arguments. It reproduced **B-45 live** (the poller's success path
+erases a still-live send-side backoff). Of its six extra mutants two were killed and **four survived**: `EX1` (a new
+`offsets` row created by `recordRetryAfter` not checked for schema defaults), `EX2` (the group chat's own second window
+recorded but not checked), `EX3` (the reactive wait measured from the pre-call clock — the doc's own claim unpinned) and
+`EX5` (`retry_after_s` defaulting for one code, latent: nothing serialises it yet). No defect in the shipped bytes.
+
+**Round 1** (parent, inline). Source: the audit row in the rate-limited abandonment branch; the later-instant upsert and its
+doc. Tests: the abandonment audit row; the two-wait call; the reactive wait measured after the awaited call; the group
+chat's own second window; a fresh `offsets` row's defaults; an earlier instant never overwriting a later one;
+`retry_after_s` absent for three more codes. Sweeps at the round-1 tip (the verifier's six added, `R16`/`W11` for the
+corrections, `R1` re-anchored): **`rate.ts` 19 mutants, 17 killed / 2 survived (`R0` control, `R4` equivalent)**; **wiring
+14, 12 / 2 (`W0` control, `W8` equivalent)**; **`bindings.ts` 3, 2 / 1 (`B0`)**; **`validate.ts` 2, 1 / 1 (`V0`)**;
+**PR-27's `send-path.ts` sweep 41, 40 / 1 (`M0`)**; 0 build failures.
+
+**At the round-1 tip:** **1,285 authored lines (425 src + 860 test), a disclosed 885-line PR-scoped exception**; `rm -rf
+dist && npm test` **801 tests (800 pass, 1 skip)**; `test:static` **8/8**; focused **105/105**.

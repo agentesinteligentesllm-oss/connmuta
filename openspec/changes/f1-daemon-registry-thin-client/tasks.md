@@ -727,7 +727,7 @@ Runtime harness: `FakeTelegramClient` per token driving a real `send-path.ts` in
 
 #### PR-28 — send rate discipline
 Branch `f1/28-send-rate` → `main`. Depends: PR-27. Size: ≈220 lines, no exception.
-*Size reconciliation (session 28).* Estimated ≈220; **measured 1,182 authored lines (401 src + 781 test) at the candidate, a disclosed 782-line PR-scoped exception** — see `apply-progress.md` §PR-28. The estimate line above is the gate's text and is left as written.
+*Size reconciliation (session 28).* Estimated ≈220; **measured 1,182 authored lines (401 src + 781 test) at the candidate, a disclosed 782-line PR-scoped exception** (1,285 lines and an 885-line exception after Judgment Day round 1) — see `apply-progress.md` §PR-28. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/send/rate.ts`, `test/daemon/send/rate.test.ts`.
 Requirements: `send-path › Rate discipline without auto-retry` (PT-33 429 half).
 Runtime harness: fake Telegram client returning a 429 with `retry_after_s`.
