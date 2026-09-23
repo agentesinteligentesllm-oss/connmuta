@@ -276,6 +276,22 @@ export function ipcTransportError(code: IpcTransportErrorCode, message: string):
   return { code, message, retryable: false };
 }
 
+/**
+ * Disclosed extension to the vocabulary above (PR-30), raised by `daemon/ipc/handshake.ts` — a route
+ * HANDLER, not `daemon/ipc/server.ts` itself — when `PendingHandshakeStore.issue` reports the
+ * pending-nonce store already holds `MAX_PENDING_HANDSHAKES` entries (design §10 "Flood" row). Kept
+ * out of {@link IPC_TRANSPORT_ERROR_CODES} rather than folded into it: that set's own contract is
+ * "raised by the transport itself" and "every member non-retryable", and this code satisfies neither
+ * — a flood clears on its own as pending nonces expire past `HANDSHAKE_NONCE_TTL_SECONDS`, with
+ * nothing for the caller to fix.
+ */
+export const IPC_HANDSHAKE_FLOOD = "IPC_HANDSHAKE_FLOOD";
+
+/** Builds an {@link ipcErrorSchema}-shaped payload for {@link IPC_HANDSHAKE_FLOOD}. Always `retryable: true` — see its own doc. */
+export function ipcHandshakeFloodError(message: string): IpcErrorPayload {
+  return { code: IPC_HANDSHAKE_FLOOD, message, retryable: true };
+}
+
 // ---------------------------------------------------------------------------
 // Route -> schema tables
 // ---------------------------------------------------------------------------

@@ -755,17 +755,70 @@ Runtime harness: real `node:http` listener on port 0 (design §15 "IPC" layer).
 *Apply-time note (session 29).* Decided by the orchestrator under the Director's session-29 delegation, recorded in `apply-progress.md` §PR-29: (1) the five `HTTP_*` names of design §3 live in `ipc-contract.ts`, plus five disclosed transport statuses (`HTTP_OK`, `HTTP_BAD_REQUEST`, `HTTP_FORBIDDEN`, `HTTP_UNSUPPORTED_MEDIA_TYPE`, `HTTP_INTERNAL_SERVER_ERROR`) and a closed six-code transport-refusal vocabulary (`IPC_*`, all non-retryable) that the client will surface as `IPC_ERROR`; (2) the server is pure transport — it validates no route body and checks no `Authorization` (PR-30/31 own both); (3) `DELETE /session` has no spec scenario, so its contract (`{ closed: true }`, no body) is **provisional** until PR-31; (4) the `Host` check's traceability gap (THREAT-MODEL cites DNS rebinding only for the F3 panel, T18/PT-29) is filed as B-47, not edited here.
 
 #### PR-30 — identity handshake + session bearer (D-14, D-04)
-Branch `f1/30-ipc-handshake-sessions` → `main`. Depends: PR-29. Size: ≈370 lines, no exception.
+Branch `f1/30-ipc-handshake-sessions` → `main`. Depends: PR-29. Size: ≈370 lines estimated; **540 authored,
+disclosed PR-scoped exception** (size reconciliation below).
 Scope: `src/daemon/ipc/handshake.ts`, `src/daemon/ipc/sessions.ts`, `test/daemon/ipc/handshake.test.ts`, `test/daemon/ipc/sessions.test.ts`.
 Requirements: `ipc-handshake › No bearer before identity proof` (PT-26); `ipc-handshake › Bearer is a per-session token, not the raw per-boot secret`; `ipc-handshake › Secret and session rotate per daemon boot` (PT-24).
 Runtime harness: in-process daemon on port 0; a fake `http` client for the excess-pending-handshakes scenario.
 
-- [ ] 30.1 RED: write `test/daemon/ipc/handshake.test.ts` covering "wrong HMAC yields no bearer" (`DAEMON_IDENTITY_MISMATCH`, one re-read, never `DAEMON_DOWN`), "valid HMAC allows the bearer", and "excess pending handshakes are refused, not queued" (`MAX_PENDING_HANDSHAKES`).
-- [ ] 30.2 GREEN: implement `src/daemon/ipc/handshake.ts` (`GET /identity`, `HMAC-SHA256(secret, "identity:"+nonce)`, D-14 domain-separated labels, `HANDSHAKE_NONCE_TTL_SECONDS`).
-- [ ] 30.3 RED: write `test/daemon/ipc/sessions.test.ts` ("session token issued at `POST /session`", "raw per-boot secret is rejected as a bearer", "stale-boot bearer rejected" with no side effect).
-- [ ] 30.4 GREEN: implement `src/daemon/ipc/sessions.ts` (per-session `SESSION_TOKEN_BYTES` bearer minted at `POST /session`, memory-only, invalidated per boot).
-- [ ] 30.5 Verify: `npm run build && node --test "dist/test/daemon/ipc/handshake.test.js" "dist/test/daemon/ipc/sessions.test.js"`.
-- [ ] 30.6 Docs: update the file-name cell(s) of PT-24, PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 30.1 RED: write `test/daemon/ipc/handshake.test.ts` covering "wrong HMAC yields no bearer" (`DAEMON_IDENTITY_MISMATCH`, one re-read, never `DAEMON_DOWN`), "valid HMAC allows the bearer", and "excess pending handshakes are refused, not queued" (`MAX_PENDING_HANDSHAKES`).
+- [x] 30.2 GREEN: implement `src/daemon/ipc/handshake.ts` (`GET /identity`, `HMAC-SHA256(secret, "identity:"+nonce)`, D-14 domain-separated labels, `HANDSHAKE_NONCE_TTL_SECONDS`).
+- [x] 30.3 RED: write `test/daemon/ipc/sessions.test.ts` ("session token issued at `POST /session`", "raw per-boot secret is rejected as a bearer", "stale-boot bearer rejected" with no side effect).
+- [x] 30.4 GREEN: implement `src/daemon/ipc/sessions.ts` (per-session `SESSION_TOKEN_BYTES` bearer minted at `POST /session`, memory-only, invalidated per boot).
+- [x] 30.5 Verify: `npm run build && node --test "dist/test/daemon/ipc/handshake.test.js" "dist/test/daemon/ipc/sessions.test.js"`.
+- [x] 30.6 Docs: update the file-name cell(s) of PT-24, PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Size reconciliation.* `git diff --numstat main -- src test`: `handshake.ts` 147, `sessions.ts` 93,
+`ipc-contract.ts` +16 (disclosed extension, see apply-time note), `handshake.test.ts` 183,
+`sessions.test.ts` 101 — **540 authored lines** against the ≈370 estimate and the 400-line budget.
+Disclosed PR-scoped `size:exception` (140 lines over), consistent with every slice since PR-26; no
+chained-PR split (delivery strategy `stacked-to-main`, one PR per slice, per HANDOFF §2/DN-06).
+
+*Apply-time note (session 30).* Decisions made by the orchestrator under the Director's session-30
+delegation (full autonomy, recorded in `apply-progress.md` §PR-30):
+1. **`DAEMON_IDENTITY_MISMATCH` is exclusively client-side vocabulary (PR-33).** Confirmed against
+   spec.md's scenario framing, design's sequence diagram (the mismatch is a `C->>C` self-message, never
+   `D->>C`), and design's client-error-taxonomy table (scoped to `shared/error-payload.ts`/
+   `client/errors.ts`). `handshake.ts` never raises or mentions this code; task 30.1's "wrong HMAC"
+   scenario is implemented as a determinism/secret-binding property of `GET /identity`'s `proof`
+   instead, verified against an independent test-side oracle (raw `createHmac`, not a re-export of the
+   module under test).
+2. **Module boundary**: `handshake.ts` owns the registered `GET /identity` handler and the
+   `PendingHandshakeStore` (single-use `server_nonce`, lazy TTL expiry, `MAX_PENDING_HANDSHAKES` bound,
+   no timers). `sessions.ts` owns only the `"session:"`-labelled HMAC verification and the memory-only
+   bearer store; it does not import `handshake.ts` and registers no HTTP route — `POST /session`'s
+   routing, binding resolution, R4 and the freeze stay PR-31's (`routes.ts`), which will call
+   `PendingHandshakeStore.consume` then `SessionStore.mint` in that order.
+3. **Disclosed extension to `shared/ipc-contract.ts`**: `IPC_HANDSHAKE_FLOOD` (+16 lines), a 7th daemon
+   vocabulary code, kept outside the existing closed 6-member `IPC_TRANSPORT_ERROR_CODES` set because it
+   is handler-raised (not transport-raised) and `retryable: true` (a flood self-clears via TTL, unlike
+   the 6 non-retryable transport codes).
+4. **PT-24 / PT-26 cell split** (THREAT-MODEL.md §4, per HANDOFF §2.4): PT-24's cell takes
+   `test/daemon/ipc/sessions.test.ts` (stale-boot-bearer half only; the no-bearer-at-all half is
+   PR-31's). PT-26's cell takes `test/daemon/ipc/handshake.test.ts` for clause (b) "wrong HMAC → no
+   bearer" only — the file's actual row reads (a) dead PID, (b) wrong HMAC → no bearer, (c) valid
+   HMAC → bearer sent; this session's own pre-reading draft note mislabelled the wrong-HMAC clause as
+   "(c)", corrected against the real file text. Clauses (a) and (c) stay PR-33's.
+5. **Parent readback fix**: `createIdentityHandler` originally let a missing/malformed `nonce` throw a
+   `ZodError` that fell through `server.ts`'s generic catch-all as a `500 IPC_INTERNAL_ERROR`. Changed
+   to `safeParse` returning `400 IPC_BAD_REQUEST` (matching `server.ts`'s own convention for its
+   equivalent malformed-input cases), pinned by a new test.
+6. **Parent mutant sweep** (`odd/sweep.mjs`, explicit `[from,to]` pairs, `M0`/`C0` comment-only controls
+   confirmed to survive): 9 mutants on `handshake.ts` (2 initial survivors), 7 on `sessions.ts` (2
+   initial survivors), 2 on the `ipc-contract.ts` addition (0 survivors past the control). Four real
+   survivors, all test gaps, pinned: (a) `PendingHandshakeStore.consume` was never tested for single-use
+   (a second consume of the same nonce); (b) the TTL boundary (`<=` vs `<`) was never exercised — no
+   test advanced the clock; (c) `sessions.test.ts`'s primary scenario computed its `claimedHmac` via
+   `sessions.ts`'s own `computeSessionProof`, making a `SESSION_PROOF_LABEL` regression tautologically
+   invisible — fixed with an independent oracle mirroring `handshake.test.ts`'s pattern; (d)
+   `hexDigestsEqual`'s constant-time length guard had no test forcing a length mismatch. Re-swept clean
+   (only the two controls survive) after the four pinning tests were added; full suite 867/866/1 (was
+   858/857/1 at PR-29's close; the known wall-clock flake B-39 reproduced once on `heartbeat: ticks at
+   periodMs`, re-ran green per HANDOFF §4, unrelated to this PR).
+7. **Backlog filed**: design §15's PT-24 pin to `daemon/ipc/server` (PR-29's file, which has no bearer
+   logic per its own module doc) looks stale against the later `ipc/{handshake,sessions,routes}` split —
+   filed as **B-48** (Director-owned, text-only), not fixed here (design is gated; apply-time notes
+   append, never rewrite gate text).
 
 #### PR-31 — session routes, freeze, roster drift, error taxonomy
 Branch `f1/31-ipc-routes` → `main`. Depends: PR-30. Size: ≈390 lines, no exception.

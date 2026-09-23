@@ -5576,3 +5576,54 @@ an awaited cleanup). **JUDGMENT: APPROVED** for `145e3f1..2a08e84`; both re-judg
 **Board after this slice.** Row PR-29 complete: **35 PR blocks / 30 row ids merged, 147 of the 210 task checkboxes**,
 10 blocks / 12 row ids remaining (`PR-30…PR-42`). Unit 9 `ipc-handshake` continues with PR-30 (identity handshake and
 session bearer, D-14, D-04; PT-24, PT-26).
+
+## PR-30 — `daemon/ipc/handshake.ts` + `daemon/ipc/sessions.ts` (new code; identity handshake + session bearer, D-14/D-04)
+
+**Route.** ODD with the SDD contract preserved, session 30: one delegated read-only mapper, one delegated writer
+(`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent readback and
+sweeps. No `sdd-apply` phase envelope exists. Both modules are new code (design §12 has no v1 row for either): no
+provenance header, registry unchanged at 23 entries.
+
+**Decisions (orchestrator, session 30), stated in the module docs and in `tasks.md`'s apply-time note.**
+(1) `DAEMON_IDENTITY_MISMATCH` is exclusively client-side vocabulary (PR-33) — `handshake.ts` never raises it; task
+30.1's "wrong HMAC" scenario is implemented as a determinism/secret-binding property of the returned `proof`.
+(2) Module boundary: `handshake.ts` owns `GET /identity` and `PendingHandshakeStore`; `sessions.ts` owns the
+`"session:"` HMAC verification and the memory-only bearer store, imports nothing from `handshake.ts`, and registers no
+HTTP route (PR-31's `routes.ts` sequences `consume` then `mint`). (3) `IPC_HANDSHAKE_FLOOD` added to
+`shared/ipc-contract.ts` (+16 lines, disclosed) as a 7th, `retryable: true` daemon code, kept outside the closed
+6-member transport-refusal set because it is handler-raised and self-clearing. (4) PT-24/PT-26 cells split per
+HANDOFF §2.4 (§THREAT-MODEL.md diff below).
+
+**TDD evidence.** Writer RED is compile-level: `test/daemon/ipc/handshake.test.ts` failed `TS2305` (`IPC_HANDSHAKE_FLOOD`
+not yet exported) and `TS2307` (`handshake.js` did not exist); `test/daemon/ipc/sessions.test.ts` failed `TS2307`
+(`sessions.js` did not exist). Writer GREEN: 5/5 on first implementation, no failed-then-fixed iteration reported. The
+behavioural RED is the parent's: the readback fix and the four sweep survivors below each got a test that fails
+without them.
+
+**Parent readback correction.** `createIdentityHandler` used `identityRequestQuerySchema.parse(...)`, so a missing or
+malformed `nonce` threw a `ZodError` that fell through `server.ts`'s generic catch-all as a misleading `500
+IPC_INTERNAL_ERROR` — a routine client mistake reported as a daemon fault, and a precedent PR-31's `POST /session`
+handler could have copied. **Corrected**: `safeParse`, returning `400 IPC_BAD_REQUEST` (`server.ts`'s own convention
+for its equivalent malformed-input cases). One test pins it (`missing` and `malformed` query cases).
+
+**Mutant sweeps** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close; `--test-timeout=5000`, 150 s process
+bound per mutant). `handshake.ts`: **9 mutants, 6 killed / 3 survived / 0 build failures** on the first pass —
+`M0` (control); `M3` (`consume` stopped deleting the nonce — single-use was never tested by a second `consume` call);
+`M4` (the TTL boundary `<=`→`<` — no test ever advanced the clock). Both pinned (a single-use test, a
+just-under/at-boundary TTL test) and re-swept: **8 killed / 1 survived (`M0` control)**. `sessions.ts`: **7 mutants, 4
+killed / 3 survived / 0 build failures** on the first pass — `M0` (control); `M1` (the `"session:"` label mutated —
+invisible because the test's `claimedHmac` was computed via `sessions.ts`'s own `computeSessionProof`, a tautology);
+`M2` (the constant-time length guard removed — no test ever passed a wrong-length claim). Both pinned (an independent
+`createHmac` oracle replacing the tautological one, mirroring `handshake.test.ts`'s own pattern; a wrong-length-claim
+test) and re-swept: **6 killed / 1 survived (`M0` control)**. `ipc-contract.ts` (the `IPC_HANDSHAKE_FLOOD` addition
+only): **2 mutants, 1 killed (`C1`, the `retryable` flag) / 1 survived (`C0` control)**. Every restore checked by
+sha256.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **540 authored lines** — `handshake.ts` 147,
+`sessions.ts` 93, `ipc-contract.ts` +16; `handshake.test.ts` 183, `sessions.test.ts` 101 — against a ≈370 estimate, a
+disclosed **140-line PR-scoped exception**. The estimate priced the two sources; JSDoc density (matching the
+codebase's established convention) and the four sweep-driven pinning tests account for most of the overrun.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **867 tests (866 pass, 1 skip)** — the first run failed
+`heartbeat: ticks at periodMs` once (**B-39**, the known wall-clock flake, unrelated to this PR), the re-run was green;
+`npm run test:static`: **8/8**; `node --test` over the two twins: **9/9**.
