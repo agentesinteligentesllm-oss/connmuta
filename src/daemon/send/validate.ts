@@ -23,7 +23,8 @@
  * `NOT_ADDRESSEE`) — v1 checked only that the caller was the addressee, so a correct addressee could
  * direct the closing message to any other roster member and the originator never received it
  * (Judgment Day `JD-A-001`, spec "addressee correct"); (9) the `UNKNOWN_THREAD` remedy names this
- * product's tool, `${TOOL_PREFIX}fetch`, not v1's `agentbus_fetch`.
+ * product's tool, `${TOOL_PREFIX}fetch`, not v1's `agentbus_fetch`; (10) `WRONG_ROOM` added for PR-27's
+ * send-path room pre-check, so both modules report through one error class.
  *
  * ---
  *
@@ -118,6 +119,7 @@ export type SendErrorCode =
 	| "NOT_PARTICIPANT"
 	| "ALREADY_RESOLVED"
 	| "UNKNOWN_RECIPIENT"
+	| "WRONG_ROOM"
 	| "TRANSPORT_ERROR";
 
 /**

@@ -5213,3 +5213,120 @@ of the two re-judgments in the budget was used.
 13 blocks / 15 row ids remaining (`PR-27…PR-42`). Unit 8 `send-path` continues with PR-27 (`daemon/send/send-path.ts`),
 which builds the envelope, stamps `from`/`to_user_id` from the binding, calls `validateSend` under the binding's mutex
 and `guardEncodedLength` on the envelope it builds.
+
+## PR-27 — `daemon/send/send-path.ts` (SEAM from `v1:src/tools/send.ts:380-660`; PT-01 unit half, PT-25 send half; unit 8 `send-path`)
+
+**Route.** ODD with the SDD contract preserved, session 28: one delegated read-only mapper, one delegated writer
+(`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent readback and
+sweep. No `sdd-apply` phase envelope exists.
+
+**Decisions (orchestrator, session 28), stated in the module doc.** (1) **Room pre-check.** PR-21 wired the guard as a
+`TelegramClient` decorator under the AS-IS transports, and `GroupTransport` turns any group-post failure — a guard refusal
+included — into a soft `{ok: false}` while the DMs still go out; the spec's "WRONG_ROOM, an audit row and zero
+`sendMessage` calls" was unreachable through it. The check is extracted from `RoomGuardClient.sendMessage` into a public,
+network-free `assertTarget(chat_id)` (same rules, same `WrongRoomError`s, same messages), and the send path runs it on the
+group chat and on every recipient's `@username` before `transport.send`. One source of truth; the decorator stays the last
+line inside the transport. (2) **`BindingMutex`** is exported from `send-path.ts` (the block's Scope names only that file):
+a promise chain per `project_id` whose stored link never rejects, so a failed call does not poison the key, and whose map
+entry is removed once the chain drains; one instance per daemon (PR-31). (3) **Rate discipline** is PR-28's
+(`send/rate.ts`), whatever design §12's change list says; the `TELEGRAM_RATE_LIMITED` / `RATE_LIMITED` naming conflict is
+left to it. (4) **Audit rows** — every row `direction: send`, bodyless: success `ok`/`degraded`, `WRONG_ROOM` and
+`SECRET_PATTERN_DETECTED` `rejected` (both in DATA-MODEL's closed `reason` enum); none on `TRANSPORT_ERROR`, which the enum
+has no code for (PR-42 task 42.1). (5) **`group_outage`** is raised with the group outcome's classification *code*, never
+its free-text error, and cleared by the next successful group post; `since` is first-wins. (6) **PT-25's send half** is
+pinned here: a `GroupMigratedError` surfaces `new_chat_id` in `delivery.group`, nothing targets the new id and the config
+is untouched. (7) **Thread bookkeeping** calls v2's `applyEnvelope` over one `ThreadRecord | undefined` and writes the
+row inside one synchronous `withTransaction` after the network call; a send type that must open or update a thread and
+yields none throws inside the transaction (rolls back) — the writer reports this guard cannot fire under the current
+rules, which is why it is a defect trap and not a handled case.
+
+**Out-of-Scope edits, disclosed.** `src/daemon/transport/room-guard.ts` (+23/−14, the extraction) with 6 new tests in
+`test/daemon/transport/room-guard.test.ts`; `src/daemon/send/validate.ts` (+3/−1: `WRONG_ROOM` in `SendErrorCode`, change
+(10) in its header). Both follow from decision (1).
+
+**Provenance.** SEAM, `v1 body sha256 25926e38…` over lines 380-660 LF-normalized with the terminating newline — computed
+by the parent from the frozen checkout and independently by the writer. Registry: **23 entries**.
+
+**TDD evidence.** The writer's RED was compile-level (`TS2307`). The parent's first sweep found three behavioural gaps —
+**`M2`** (the mutex keyed globally), **`M9`** (ACK's `acknowledged-only` basis never stamped) and **`M34`** (the map never
+drains) **survived** — and one of the parent's own mutants, the first `M15`, was a no-op and was rewritten. Three tests now
+pin them: two bindings sharing one mutex complete sends that would deadlock under a single lock; the posted ACK and
+RESOLVED carry the stamped basis; a white-box check that the map is empty once a key's chain settles, after a success and
+after a failure (it replaces a "drains" test that could not fail for its name). A five-mutant sweep over the guard
+extraction then found **`G4`** surviving — a string without `@` whose tail names a roster member (`"xalice_bot"`) would
+pass — now pinned.
+
+**Parent readback corrections (before the candidate was frozen).** The module doc said PR-27 closes unit 8 (PR-28 does);
+it credited `roomGuard.assertTarget` with reaching the network in the same sentence that said it does not; it called the
+one-range hash rule "the two-range rule"; and it cited a "binding-change row" in design §9 that does not exist — the
+migration rule is design §8.2's (line 335), which also says the new id surfaces in "the audit row", a contradiction with
+the DDL now stated in the doc and in `tasks.md`'s apply-time note. The test file's header carried the same unit claim.
+
+**Mutant sweeps** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close; explicit `[from, to]` pairs, BUILD-FAIL
+apart, sha256 restore check). `send-path.ts`: **35 mutants, 34 killed / 1 survived (`M0`)**, 0 build failures —
+`M1` mutex bypassed, `M2` keyed globally, `M3` rejection poisons the chain, `M4` no serialisation, `M5`/`M6` secret
+refusal unaudited / every refusal audited, `M7`/`M8` `from`/`to_user_id` taken from the input, `M9`/`M10` basis stamping,
+`M11` in-thread send mints a thread, `M12` guard skipped, `M13`/`M14` group/recipient pre-check skipped, `M15` wrong room
+unaudited, `M16` wrong room reported as transport error, `M17` silent never set, `M18` reply anchoring dropped, `M19`/`M20`
+abandonment not applied / marked delivered, `M21` cause lost, `M22`–`M24` outage never cleared / never raised / prose in
+detail, `M25`/`M26` stamp preference, `M27` REQUEST opens no thread, `M28` thread row not written, `M29`/`M30` audit
+outcome / eid, `M31` `stampFrom` ignores DMs, `M32` wire not the guard's, `M33` v1 tool name, `M34` never drains.
+`room-guard.ts`: **5 mutants, 4 killed / 1 survived (`G0`, the control)**.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **1,384 authored lines (452 src + 926 test + 6
+fixture)** — `send-path.ts` 411, `room-guard.ts` 37, `validate.ts` 4; `send-path.test.ts` 848, `room-guard.test.ts` 78 —
+against a ≈350 estimate, a disclosed **984-line PR-scoped exception**; plus 2/2 lines in THREAT-MODEL §4 (task 27.4:
+PT-01 and PT-25 cells).
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **774 tests (773 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test` over the three unit-8/guard test files: **80/80**.
+
+**Native review.** `gentle-ai review assess --base-ref cb3c356 --committed-only --untracked-scope=exclude` over `73cfdae`:
+risk `medium` (`executable_change`), `review_due: true`, `review_due_reason: slice_budget_reached`, 9 paths / 1,466 changed
+lines. Not started, for the reason PR-23's record gives; the RDD fallback's separate independent verifier ran instead.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-27-audit-001`; both blind judges over a frozen worktree at `73cfdae`, the
+independent verifier in parallel over its own). Judge A: 2 SUGGESTION. Judge B: 1 WARNING, 1 SUGGESTION. No row from both
+judges; every row reproduced by the parent first.
+
+- `JD-B-001` (WARNING, single judge): "a `WrongRoomError` raised inside `transport.send` is reclassified as an unaudited
+  `TRANSPORT_ERROR`". **Not reproduced as stated**: the parent's probe over the compiled module showed a `WrongRoomError`
+  never leaves `transport.send` as itself — `GroupTransport` turns it into a soft group failure and `DualWriteTransport`
+  into a generic `TransportError` when nothing landed. The residual is real and narrower: a transport built against a group
+  the guard does not hold degrades the send and raises `group_outage` instead of writing `WRONG_ROOM`, while nothing reaches
+  the wrong room. `bindings.ts` cannot build that state. **Pinned** by a test, stated in the module doc, filed as **B-44**.
+- `JD-B-002` (SUGGESTION): the migration's `degraded` audit row was claimed and not read. **Pinned** in the PT-25 test.
+- `JD-A-001` (SUGGESTION, pre-existing v1 guard): `stampFrom`'s refusal of a hollow success was unreachable through the
+  real transport. **Pinned** with a `Transport` double reporting success with nothing delivered: `TRANSPORT_ERROR`, and the
+  whole bookkeeping transaction rolls back (no thread, no audit row, no condition).
+- `JD-A-002` (SUGGESTION, pre-existing): `assertTarget`'s invalid-type branch was untested. **Pinned**.
+
+**Independent verifier** (separate agent, its own frozen worktree at `73cfdae`): every figure reproduced exactly — 1,384
+(452 + 926 + 6) with the per-file split, 774 / 773 / 1, `test:static` 8/8, focused 80/80, 23 registry entries, `25926e38…`
+from the frozen v1 checkout after first reproducing `3bd09d0d…`, and both sweeps mutant for mutant. Of its six extra
+mutants two were killed, one failed to build (`E3`: TypeScript's discriminated-union narrowing rejects keying
+`group_outage` off `degraded` — a compile-time guarantee, not a gap) and **three survived**: `E1`, `E2`, `E6` — the
+`SECRET_PATTERN_DETECTED` and `WRONG_ROOM` rows' `envelope_type`, `eid` and user ids were written correctly (its probe
+confirmed) but read by no test. Its fault-injection probe confirmed the success transaction is atomic (an audit-insert
+failure rolls back the thread write). It also noted that the pipeline order "encoded-length guard before room pre-check"
+was enforced by control flow only.
+
+**Round 1** (parent, inline). Source: the module doc's paragraph on what the decorator can and cannot report. Tests: every
+identifying field of the `WRONG_ROOM` and `SECRET_PATTERN_DETECTED` rows; an over-long send to a wrong room is
+`BODY_TOO_LONG` with nothing written (the order); the misbuilt-transport behaviour (B-44); the migration's `degraded` row;
+the hollow-success refusal; the invalid-type branch. The sweeps now run the parent's mutants, the verifier's five buildable
+ones and two for the corrections (`M35` a placeholder stamp instead of the refusal — its first form failed to build and was
+rewritten; `G5` the invalid type accepted): **`send-path.ts` 41 mutants, 40 killed / 1 survived (`M0`)**; **`room-guard.ts`
+6 mutants, 5 killed / 1 survived (`G0`)**; 0 build failures.
+
+**At the round-1 tip:** **1,493 authored lines (461 src + 1,026 test + 6 fixture), a disclosed 1,093-line PR-scoped
+exception**; `rm -rf dist && npm test` **778 tests (777 pass, 1 skip)**; `test:static` **8/8**; focused **84/84**.
+
+**Scoped re-judgment of round 1** (both judges, `73cfdae..696e6c6`): **all four ledger rows and the verifier's gaps verified
+by both judges, 0 regressions, 0 new defects**. **JUDGMENT: APPROVED** for `73cfdae..696e6c6`; one of the two re-judgments
+in the budget was used.
+
+**Board after this slice.** Row PR-27 complete: **33 PR blocks / 28 row ids merged, 140 of the 210 task checkboxes**,
+12 blocks / 14 row ids remaining (`PR-28…PR-42`). Unit 8 `send-path` closes with PR-28 (`daemon/send/rate.ts`), which
+adds the `offsets.retry_after_until` check and the per-binding message budget to the send path, immediately before
+`transport.send`, and settles the `RATE_LIMITED` naming.

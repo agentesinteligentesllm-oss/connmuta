@@ -152,6 +152,95 @@ describe("RoomGuardClient (PT-01, D-22)", () => {
     assert.equal(mock.sent.length, 2);
   });
 
+  describe("assertTarget (PR-27, the room-guard check with no network call)", () => {
+    it("accepts a numeric chat_id matching binding.group_id and makes no call on the wrapped client", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      guard.assertTarget(allowedGroupId);
+
+      assert.equal(mock.sent.length, 0, "assertTarget must never call the wrapped client");
+    });
+
+    it("accepts a string chat_id matching @<username> of a roster member and makes no call", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      guard.assertTarget("@alice_bot");
+
+      assert.equal(mock.sent.length, 0, "assertTarget must never call the wrapped client");
+    });
+
+    it("throws WrongRoomError for a numeric chat_id mismatch and makes no call", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+      const wrongGroupId = -1009999999999;
+
+      assert.throws(
+        () => guard.assertTarget(wrongGroupId),
+        (err: unknown) => {
+          assert(err instanceof WrongRoomError);
+          assert.equal(err.chat_id, wrongGroupId);
+          assert.equal(err.expected_group_id, allowedGroupId);
+          return true;
+        }
+      );
+      assert.equal(mock.sent.length, 0, "underlying client must not be called");
+    });
+
+    it("throws WrongRoomError for a string chat_id with no leading @ and makes no call", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      assert.throws(
+        () => guard.assertTarget("alice_bot"),
+        (err: unknown) => {
+          assert(err instanceof WrongRoomError);
+          assert.equal(err.chat_id, "alice_bot");
+          return true;
+        }
+      );
+      assert.equal(mock.sent.length, 0, "underlying client must not be called");
+    });
+
+    it("refuses a chat_id that is neither a number nor a string (a caller bypassing the type) and makes no call", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      assert.throws(
+        () => guard.assertTarget(null as unknown as number),
+        (err: unknown) => err instanceof WrongRoomError && err.message.includes("Invalid chat_id type"),
+      );
+      assert.equal(mock.sent.length, 0, "assertTarget must never call the wrapped client");
+    });
+
+    it("refuses a string without a leading @ even when dropping its first character would name a roster member", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      assert.throws(
+        () => guard.assertTarget("xalice_bot"),
+        (err: unknown) => err instanceof WrongRoomError && err.message.includes("must be @<username>"),
+      );
+      assert.equal(mock.sent.length, 0, "assertTarget must never call the wrapped client");
+    });
+
+    it("throws WrongRoomError for a username not present in the roster and makes no call", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      assert.throws(
+        () => guard.assertTarget("@eve_bot"),
+        (err: unknown) => {
+          assert(err instanceof WrongRoomError);
+          assert.equal(err.chat_id, "@eve_bot");
+          return true;
+        }
+      );
+      assert.equal(mock.sent.length, 0, "underlying client must not be called");
+    });
+  });
+
   it("delegates getUpdates, getMe, and getChat transparently to the underlying client", async () => {
     const mock = createMockTelegramClient();
     const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });

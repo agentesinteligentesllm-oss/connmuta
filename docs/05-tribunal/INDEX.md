@@ -832,6 +832,21 @@ visible.
 | Native review | `assess`: risk `high` (`process_boundary`), `review_due: true`. Not started, for the reason PR-23's record gives. |
 | Left open, carried to the Director | **B-42**, **B-43**. B-40 and B-41 stand. |
 | Consequence | **DN-05 is not satisfied for PR-26 either.** Row PR-26 complete: **32 PR blocks / 27 row ids merged (136 of the 210 task checkboxes), 13 blocks / 15 row ids remain (`PR-27…PR-42`)**. |
+
+### `bus-v2-f1-pr-27-audit-001` — PR-27 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-23 (session 28) |
+| Subject | PR-27 (`src/daemon/send/send-path.ts`, `test/daemon/send/send-path.test.ts`, plus the disclosed `RoomGuardClient.assertTarget` extraction in `src/daemon/transport/room-guard.ts` with its tests and `WRONG_ROOM` in `validate.ts`'s `SendErrorCode`; `test/fixtures/v1-provenance.json`; the PT-01 and PT-25 cells of THREAT-MODEL §4), branch `f1/27-send-path` from `main` `cb3c356`; the PT-01 unit half of `send-path › chat_id must equal the binding's group_id or the send is refused`, `One DualWriteTransport per binding`, and the stamping half of `Send input carries no destination`. |
+| Authority | **The Director**, who owns DN-05; session-28 delegation. |
+| Decision | **ODD + Judgment Day**, both blind judges in parallel over a frozen worktree at `73cfdae`; the independent verifier in parallel over its own. |
+| Round 1 | Judge A: 2 SUGGESTION (both pre-existing: `stampFrom`'s hollow-success refusal and `assertTarget`'s invalid-type branch unpinned). Judge B: 1 WARNING, 1 SUGGESTION. No row from both judges; every row reproduced by the parent. `JD-B-001` — a `WrongRoomError` inside `transport.send` reclassified as an unaudited `TRANSPORT_ERROR` — was **not reproduced as stated** (the AS-IS transports never let it out as itself); its narrower residual, a misbuilt transport degrading with `group_outage` instead of `WRONG_ROOM` while nothing reaches the wrong room, is pinned and filed as **B-44**. The verifier reproduced every figure and the `25926e38…` pin, confirmed the bookkeeping transaction atomic by fault injection, and found three audit-row fields no test read. Corrected by the parent in `696e6c6` (tests, one doc paragraph, records). |
+| Scoped re-judgment | `73cfdae..696e6c6`: all rows verified by both judges, 0 regressions, 0 new defects. One of two used. |
+| Outcome | **JUDGMENT: APPROVED** for `73cfdae..696e6c6`. Sweeps: **`send-path.ts` 41 mutants, 40 killed / 1 survived (`M0`)**; **`room-guard.ts` 6 mutants, 5 killed / 1 survived (`G0`)**; 0 build failures. 778 tests (777 pass, 1 skip), `test:static` 8/8. Authored diff **1,493 lines (461 src + 1,026 test + 6 fixture)**, a disclosed **1,093-line PR-scoped exception**. |
+| Native review | `assess`: risk `medium`, `review_due: true` (`slice_budget_reached`). Not started, for the reason PR-23's record gives. |
+| Left open, carried to the Director | **B-44**. The design/spec naming conflict `TELEGRAM_RATE_LIMITED` / `RATE_LIMITED` is PR-28's to settle. |
+| Consequence | **DN-05 is not satisfied for PR-27 either.** Row PR-27 complete: **33 PR blocks / 28 row ids merged (140 of the 210 task checkboxes), 12 blocks / 14 row ids remain (`PR-28…PR-42`)**. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)
