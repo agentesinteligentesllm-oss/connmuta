@@ -862,6 +862,20 @@ visible.
 | Native review | `assess`: risk `high` (`process_boundary`), `review_due: true`. Not started, for the reason PR-23's record gives. |
 | Left open, carried to the Director | **B-45**, **B-46**. |
 | Consequence | **DN-05 is not satisfied for PR-28 either.** Row PR-28 complete: **34 PR blocks / 29 row ids merged (144 of the 210 task checkboxes), 11 blocks / 13 row ids remain (`PR-29…PR-42`)**. **Unit 8 `send-path` closed.** |
+### `bus-v2-f1-pr-29-audit-001` — PR-29 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-23 (session 29) |
+| Subject | PR-29 (`src/shared/ipc-contract.ts`, `src/daemon/ipc/server.ts` and their twins; backlog B-47), branch `f1/29-ipc-contract-server` from `main` `4d5de08`; transport scaffolding under every `ipc-handshake` requirement (`Host` check, body cap `IPC_MAX_BODY_BYTES`). Opens unit 9. New code: no provenance header, registry unchanged at 23. |
+| Authority | **The Director**, who owns DN-05; session-29 delegation. |
+| Decision | **ODD + Judgment Day**, both blind judges in parallel over a frozen worktree at `145e3f1`; the independent verifier in parallel over its own. |
+| Round 1 | Judge A: 2 SUGGESTION. Judge B: 2 WARNING (documented `close()` guarantees and the early-refusal socket destroy had no test that could fail). No row from both judges, no defect in the shipped behaviour. The verifier reproduced every figure and the sweep, found no crash, hang, double response or cap bypass in its probes, and one WARNING (`V-006`: an undefined handler body sent as empty `application/json`) plus five coverage gaps. All corrected by the parent in `f193ea7`; `V-007`/`V-008` recorded as informational. |
+| Scoped re-judgments | `145e3f1..f193ea7`: every row verified, 0 regressions; one row from **both judges** (`JD-AB-R2-001`: the doc overstated the destroy mutant's equivalence) and one WARNING (`JD-A-R2-002`: a socket test that would hang on regression), corrected in `2a08e84`. `f193ea7..2a08e84`: all rows verified, 0 findings. **Both of two used.** |
+| Outcome | **JUDGMENT: APPROVED** for `145e3f1..2a08e84`. Sweeps at the round-1 tip: `server.ts` **32 mutants, 27 killed / 4 survived (`S0` control; `S9`, `S23` equivalent; `R1` not observable by the suite) / 1 build failure**; `ipc-contract.ts` **19, 18 / 1 (`C0`)**. 858 tests (857 pass, 1 skip; one B-39 flake on a first run), `test:static` 8/8. Authored diff **1,609 lines (644 src + 965 test)**, a disclosed **1,209-line PR-scoped exception**. TDD: writer RED compile-level (`TS2307`); the behavioural RED is the parent's readback fixes and sweep survivors, each pinned. |
+| Native review | `assess`: risk `medium`, `review_due: true` (`slice_budget_reached`). Not started: a Judgment Day target (HANDOFF §2.3). |
+| Left open, carried to the Director | **B-47** (THREAT-MODEL traceability of the IPC `Host` check and body cap); `DELETE /session`'s contract is provisional until PR-31. |
+| Consequence | **DN-05 is not satisfied for PR-29 either.** Row PR-29 complete: **35 PR blocks / 30 row ids merged (147 of the 210 task checkboxes), 10 blocks / 12 row ids remain (`PR-30…PR-42`)**. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)

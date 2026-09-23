@@ -743,13 +743,16 @@ Runtime harness: fake Telegram client returning a 429 with `retry_after_s`.
 
 #### PR-29 — IPC contract + HTTP server scaffolding
 Branch `f1/29-ipc-contract-server` → `main`. Depends: PR-28. Size: ≈310 lines, no exception.
+*Size reconciliation (session 29).* Estimated ≈310; **measured 1,468 authored lines (627 src + 841 test) at the candidate, a disclosed 1,068-line PR-scoped exception** (1,600 lines and a 1,200-line exception after Judgment Day round 1; 1,609 and 1,209 after round 2) — see `apply-progress.md` §PR-29. The estimate line above is the gate's text and is left as written.
 Scope: `src/shared/ipc-contract.ts`, `src/daemon/ipc/server.ts`, `test/shared/ipc-contract.test.ts`, `test/daemon/ipc/server.test.ts`.
 Requirements: transport scaffolding underlying every `ipc-handshake` requirement (`Host` DNS-rebinding check, body cap `IPC_MAX_BODY_BYTES`).
 Runtime harness: real `node:http` listener on port 0 (design §15 "IPC" layer).
 
-- [ ] 29.1 RED: write `test/daemon/ipc/server.test.ts` (request with a wrong `Host` header refused; body over `IPC_MAX_BODY_BYTES` returns `HTTP_PAYLOAD_TOO_LARGE`).
-- [ ] 29.2 GREEN: implement `src/shared/ipc-contract.ts` (zod schemas for every request/response) and `src/daemon/ipc/server.ts` (`node:http` on `127.0.0.1:IPC_EPHEMERAL_PORT`, JSON-only, `Host` check).
-- [ ] 29.3 Verify: `npm run build && node --test "dist/test/shared/ipc-contract.test.js" "dist/test/daemon/ipc/server.test.js"`.
+- [x] 29.1 RED: write `test/daemon/ipc/server.test.ts` (request with a wrong `Host` header refused; body over `IPC_MAX_BODY_BYTES` returns `HTTP_PAYLOAD_TOO_LARGE`).
+- [x] 29.2 GREEN: implement `src/shared/ipc-contract.ts` (zod schemas for every request/response) and `src/daemon/ipc/server.ts` (`node:http` on `127.0.0.1:IPC_EPHEMERAL_PORT`, JSON-only, `Host` check).
+- [x] 29.3 Verify: `npm run build && node --test "dist/test/shared/ipc-contract.test.js" "dist/test/daemon/ipc/server.test.js"`.
+
+*Apply-time note (session 29).* Decided by the orchestrator under the Director's session-29 delegation, recorded in `apply-progress.md` §PR-29: (1) the five `HTTP_*` names of design §3 live in `ipc-contract.ts`, plus five disclosed transport statuses (`HTTP_OK`, `HTTP_BAD_REQUEST`, `HTTP_FORBIDDEN`, `HTTP_UNSUPPORTED_MEDIA_TYPE`, `HTTP_INTERNAL_SERVER_ERROR`) and a closed six-code transport-refusal vocabulary (`IPC_*`, all non-retryable) that the client will surface as `IPC_ERROR`; (2) the server is pure transport — it validates no route body and checks no `Authorization` (PR-30/31 own both); (3) `DELETE /session` has no spec scenario, so its contract (`{ closed: true }`, no body) is **provisional** until PR-31; (4) the `Host` check's traceability gap (THREAT-MODEL cites DNS rebinding only for the F3 panel, T18/PT-29) is filed as B-47, not edited here.
 
 #### PR-30 — identity handshake + session bearer (D-14, D-04)
 Branch `f1/30-ipc-handshake-sessions` → `main`. Depends: PR-29. Size: ≈370 lines, no exception.

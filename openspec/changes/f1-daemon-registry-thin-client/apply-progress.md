@@ -5438,3 +5438,141 @@ poller-written value, and that the abandonment branch writes exactly one row). *
 **Board after this slice.** Row PR-28 complete: **34 PR blocks / 29 row ids merged, 144 of the 210 task checkboxes**,
 11 blocks / 13 row ids remaining (`PR-29…PR-42`). **Unit 8 `send-path` is closed.** Unit 9 `ipc-handshake` opens with PR-29
 (IPC contract and HTTP server scaffolding).
+
+## PR-29 — `shared/ipc-contract.ts` + `daemon/ipc/server.ts` (new code; IPC contract and HTTP transport; opens unit 9 `ipc-handshake`)
+
+**Route.** ODD with the SDD contract preserved, session 29: one delegated read-only mapper, one delegated writer
+(`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent readback and
+sweeps. No `sdd-apply` phase envelope exists. Both modules are new code (design §12 has no v1 row for them): no
+provenance header, registry unchanged at 23 entries.
+
+**Decisions (orchestrator, session 29), stated in the module docs.** (1) **HTTP numbers live in `ipc-contract.ts`**
+(design §3: "named once in `ipc-contract.ts`"; task 1b.2 deferred them here): the five design names plus five disclosed
+transport statuses — `HTTP_OK` 200, `HTTP_BAD_REQUEST` 400, `HTTP_FORBIDDEN` 403 (the `Host` refusal),
+`HTTP_UNSUPPORTED_MEDIA_TYPE` 415, `HTTP_INTERNAL_SERVER_ERROR` 500. (2) **A closed transport-refusal vocabulary** —
+`IPC_HOST_REJECTED`, `IPC_PAYLOAD_TOO_LARGE`, `IPC_UNSUPPORTED_MEDIA_TYPE`, `IPC_BAD_REQUEST`, `IPC_ROUTE_NOT_FOUND`,
+`IPC_INTERNAL_ERROR`, all `retryable: false`, carried in an `ipcErrorSchema` that mirrors `ToolErrorPayload` exactly; these
+are the daemon's refusals, not client codes (the client surfaces any non-contract failure as `IPC_ERROR`, PR-33/34).
+(3) **Schemas for all seven routes** (design §10 / D-13) in `IPC_REQUEST_SCHEMAS`/`IPC_RESPONSE_SCHEMAS`; the four tool
+routes reference `shared/tool-schemas.ts`'s schema objects (identity, not copies); a tool success body is an opaque JSON
+object (shapes owned by `shared/tool-output.ts` and `daemon/serve/*`). (4) **`DELETE /session` is provisional** — no spec
+scenario names it — as `{ closed: true }` with no request body; PR-31 owns the behaviour. (5) **The server is pure
+transport**: it validates no route body and checks no `Authorization` (PR-30/31), starts no timer and emits nothing.
+Pipeline per request: `Host` must equal `127.0.0.1:<bound port>` (403, before any body byte is read); route lookup (404
+for an unknown route or one with no registered handler); body cap (a declared `Content-Length` over `IPC_MAX_BODY_BYTES`
+refused unread, a streamed count refused the moment it crosses the cap, exactly the cap accepted); `POST` needs
+`application/json` (415) and valid JSON (400); `GET`/`DELETE` must carry no body (400); a handler throw answers 500 with a
+generic message and hands only the thrown message to the injected logger (`writeDaemonLog` redacts token shapes).
+(6) **`host` in `POST /session`** is DATA-MODEL's informational MCP-host label (`client_cursors.host`), bounded by
+`IPC_SESSION_HOST_MAX_CHARS` = 64.
+
+**Known limits, disclosed.** Node's HTTP/1.1 parser refuses a request with no `Host` line itself (a bare 400) before the
+daemon's check runs; the daemon's own 403 for an absent header is reachable only over HTTP/1.0, which the suite uses. A
+client still writing far past the cap may meet a connection reset instead of reading the 413 (unread bytes at close);
+the cap bounds the daemon's memory, the server stays up, and the thin client never sends a body near it. The
+threat-model traceability of the `Host` check (THREAT-MODEL cites DNS rebinding only for the F3 panel) is filed as
+**B-47**.
+
+**TDD evidence.** Writer RED is compile-level: `npm run build` with both tests written and no sources gave `TS2307`
+for `../../../src/shared/ipc-contract.js`, `../../../src/daemon/ipc/server.js` and `../../src/shared/ipc-contract.js`; the
+first implementation left 2 of 41 failing (a Host-less HTTP/1.1 request answered by Node, not the daemon; a race on the
+declared-oversized case), both corrected by the writer. The behavioural RED is the parent's: the readback fixes and the
+sweep survivors below each got a test that fails without them.
+
+**Parent readback corrections.** `close()` rejected when called twice (`ERR_SERVER_NOT_RUNNING`) although its doc
+promised it was safe; a handler result that `JSON.stringify` cannot serialise threw after `writeHead`, and the second
+response attempt rejected the fire-and-forget request promise — an unhandled rejection that would end the daemon
+(fixed: serialise before the head; a last-resort `.catch` destroys the socket); `host` was described as `os.hostname()`
+stored in `client_surfaced` (it is the MCP-host label in `client_cursors`) and bounded at 253 on a DNS argument; the
+`Host` check was attributed to D-13 (the route table) instead of design §10's transport line; an invented
+`schema_invalid` wording; a literal `64` in the roster-hash pattern (now `SHA256_HEX_LENGTH`). Two tests pin the two
+code defects.
+
+**Mutant sweeps** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close; `--test-timeout=5000` and a 150 s
+process bound per mutant, because a mutant that breaks the `Host` check leaves test clients waiting). `server.ts`:
+**24 mutants, 18 killed (three by timeout: `S2`, `S5`, `S13`) / 5 survived / 1 build failure (`S14`)**. Survivors: `S0`
+(control); `S9`, **equivalent** (an empty `POST` body fails `JSON.parse` with the same 400 and message); `S7` (media type
+compared case-sensitively) and `S17` (`Connection: close` dropped on an early refusal), each now pinned and killed;
+`S23` (`cleanup()` removed after a streamed refusal) was unobservable — the code now also returns at the top of `onData`
+once settled, so the mutant is equivalent by construction. `ipc-contract.ts`: **19 mutants, 14 killed / 4 survived / 1
+build failure (`C2`)**; survivors `C8` (non-hex roster digest), `C10` (bearer longer than `SESSION_TOKEN_BYTES`), `C18`
+(`project_id` unchecked) pinned and killed, and `C2` re-anchored and killed; `C0` (control) survives. Every restore
+checked by sha256.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **1,468 authored lines (627 src + 841 test)** —
+`server.ts` 309, `ipc-contract.ts` 318; `server.test.ts` 585, `ipc-contract.test.ts` 256 — against a ≈310 estimate, a
+disclosed **1,068-line PR-scoped exception**. The estimate priced the two sources; the runtime harness (raw sockets,
+HTTP/1.0 framing, chunked decoding) is most of the test weight.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **850 tests (849 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test` over the two twins: **49/49**.
+
+**Native review.** `gentle-ai review assess --base-ref 4d5de08 --committed-only --untracked-scope=exclude` over `145e3f1`:
+risk `medium`, `review_due: true`, `review_due_reason: slice_budget_reached`, 1,548 changed lines. Not started: the target
+is a Judgment Day target, and the installed `judgment-day` skill states both must never run on one target (HANDOFF §2.3).
+The independent verifier below ran in its place.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-29-audit-001`; both blind judges over a frozen worktree at `145e3f1`, the
+independent verifier in parallel over its own). Judge A: 2 SUGGESTION. Judge B: 2 WARNING. No row from both judges, no
+defect in the shipped behaviour:
+
+- `JD-A-001` (SUGGESTION): `respondJsonAndClose` serialised after `writeHead`, unlike `respondJson`. **Corrected**: both
+  serialise first through one `serializeBody`.
+- `JD-A-002` (SUGGESTION): the far-past-the-cap test's name claimed "never grows the server", which no assertion measures.
+  **Corrected**: renamed to what it asserts (413 or reset, then the server keeps serving).
+- `JD-B-001` (WARNING): `close()`'s two documented guarantees (safe before `listen()`; ends open connections) had no test
+  that could fail. **Corrected**: close before listen; close while a handler is still pending ends its connection (the
+  mutant swapping `closeAllConnections` for `closeIdleConnections` now dies by timeout).
+- `JD-B-002` (WARNING): the socket destroy after an early refusal had no test that could fail. A test now shows the socket
+  closes while the client still owes its body; the mutant removing the explicit `destroy()` still survives and is
+  **equivalent** — `Connection: close` already makes Node end the socket after the flush (`destroySoon`); the module doc now
+  says so.
+
+Both judges' rows were corrected under the Director's session-29 delegation instead of a per-batch question.
+
+**Independent verifier** (separate agent, its own frozen worktree at `145e3f1`): every figure reproduced exactly (1,468 with
+the per-file split; 850 / 849 / 1; 8/8; 49/49; 23 registry entries; no `Provenance:`); the claimed server mutants reproduced
+verdict for verdict, `S9` and `S23` judged equivalent independently; the contract mutants, whose exact texts lived in the
+untracked sweep files, were reconstructed from their meanings and reproduced. Its probes found no crash, hang, double
+response or cap bypass (duplicate, negative or garbage `Content-Length` and `Transfer-Encoding` with `Content-Length` are
+refused by Node's parser; Host with a trailing dot, upper case or IPv6 form is refused 403; absolute-form targets cannot
+bypass the Host check). Of its six mutants one was killed and five survived — the socket destroy (`JD-B-002`'s row), `DELETE`
+never driven through the server, 415-before-400 precedence, a prefix media-type match, and a missing `Content-Type` — each now
+pinned and killed except the equivalent destroy. `V-006` (WARNING): a handler returning `body: undefined` sent an empty body
+labelled `application/json`; **corrected** — `serializeBody` refuses it and the request takes the 500 path. `V-007`
+(informational: a non-integer handler status is coerced by Node) and `V-008` (informational: `//identity` lands on 404
+because WHATWG `URL` reads it as protocol-relative) are recorded, not actioned: handlers are daemon code (PR-30/31) and both
+fail closed.
+
+**Round 1** (parent, inline). Source: `serializeBody` for both response helpers; the doc on the socket close. Tests: seven —
+close before listen, close with a pending handler, the early-refusal socket close, `DELETE` with and without a body, a
+missing or prefix-only media type, 415 before 400, and an undefined handler body — plus the rename. Sweeps at the round-1
+tip (`S12` re-anchored; the round's `R` mutants added): **`server.ts` 32 mutants, 27 killed (four by timeout) / 4 survived
+(`S0` control; `S9`, `S23`, `R1` equivalent) / 1 build failure (`S14`)**; **`ipc-contract.ts` 19 mutants, 18 killed / 1
+survived (`C0` control)**.
+
+**At the round-1 tip:** **1,600 authored lines (642 src + 958 test), a disclosed 1,200-line PR-scoped exception**; `rm -rf
+dist && npm test` **858 tests (857 pass, 1 skip)**; `test:static` **8/8**; the two twins **57/57**.
+
+**Scoped re-judgment of round 1** (both judges, `145e3f1..f193ea7`): **every ledger row verified by both judges, 0
+regressions.** New rows from the delta: `JD-AB-R2-001` (SUGGESTION, **both judges**): the doc called the surviving
+destroy mutant equivalent "because `Connection: close` already makes Node end the socket", which blurs two different
+operations — Node's own close is a graceful `destroySoon`, the code's is an immediate `destroy()`. **Corrected**: the doc
+now says the suite cannot tell them apart and why the explicit destroy is kept; the mutant is recorded as **not observable
+by the suite**, not as mechanically equivalent. `JD-A-R2-002` (WARNING, judge A; reproduced by reading the test): the new
+early-refusal socket test waited on `close` with no timeout, so a regression would hang instead of failing. **Corrected**:
+a 3 s socket timeout resolves `false`. Judge B also noted that the kept-alive `close()` test left its server open on the
+error path; **corrected** with a `finally` that destroys the agent and closes the server.
+
+**Round 2** (parent, inline; test and doc only, no behavioural source change). At the round-2 tip: **1,609 authored lines
+(644 src + 965 test), a disclosed 1,209-line PR-scoped exception**; the two twins **57/57**; `npm test` **858 tests (857
+pass, 1 skip)** on the second run — the first run failed `heartbeat: ticks at periodMs` once (**B-39**, the known
+wall-clock flake; the file alone passed 6/6 and the full re-run was green); `test:static` **8/8**.
+
+**Second scoped re-judgment** (both judges, `f193ea7..2a08e84`): **all three rows verified by both judges, 0 regressions, 0
+new defects** (both traced the double `close()` in the kept-alive test to the documented no-op and the `.finally` chain to
+an awaited cleanup). **JUDGMENT: APPROVED** for `145e3f1..2a08e84`; both re-judgments in the budget were used.
+
+**Board after this slice.** Row PR-29 complete: **35 PR blocks / 30 row ids merged, 147 of the 210 task checkboxes**,
+10 blocks / 12 row ids remaining (`PR-30…PR-42`). Unit 9 `ipc-handshake` continues with PR-30 (identity handshake and
+session bearer, D-14, D-04; PT-24, PT-26).
