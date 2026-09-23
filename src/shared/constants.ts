@@ -259,6 +259,18 @@ export const HANDSHAKE_NONCE_TTL_SECONDS = REQUEST_OVERHEAD_SECONDS;
 export const MAX_PENDING_HANDSHAKES = 64;
 
 /**
+ * Maximum live session bearers the daemon holds at once (new, PR-30 Judgment Day correction — both
+ * judges independently flagged the session store as the only per-boot map in this PR with no bound).
+ * A session can only be minted after consuming a pending handshake nonce, so reusing
+ * {@link MAX_PENDING_HANDSHAKES} as the same conservative ceiling needs no separately-argued number —
+ * but unlike that TTL-swept map, nothing here expires: once the bound is hit it stays hit for the rest
+ * of the boot until a bearer is revoked (`DELETE /session`, still `daemon/ipc/routes.ts`'s job, PR-31)
+ * or the daemon restarts. This is a coarse memory-growth ceiling, not a self-healing one — sharpened in
+ * `JD-A-001`'s round-1 re-judgment (`apply-progress.md` §PR-30).
+ */
+export const MAX_ACTIVE_SESSIONS = MAX_PENDING_HANDSHAKES;
+
+/**
  * Maximum bytes accepted in one IPC request body.
  *
  * The largest legitimate request — a send body of {@link MAX_BODY_CHARS} in worst-case UTF-8 plus
