@@ -675,9 +675,9 @@ Scope: `src/daemon/serve/status.ts`, `test/daemon/serve/status.test.ts`.
 Requirements: `thin-client-tools › status and thread are local, no-network reads` (status half).
 Runtime harness: in-process daemon with a fake Telegram client recording zero calls.
 
-- [ ] 24.1 RED: write `test/daemon/serve/status.test.ts` ("status makes no Telegram call"; response includes daemon uptime, last poll per bot, binding identity, secret-store kind, conditions from the table).
-- [ ] 24.2 GREEN: implement `src/daemon/serve/status.ts` (SEAM from `telegram-agent-bus/src/tools/status.ts`, read-only source, 162 lines; ledger reads via PR-13's `conditions-store.ts`).
-- [ ] 24.3 Verify: `npm run build && node --test "dist/test/daemon/serve/status.test.js"`.
+- [x] 24.1 RED: write `test/daemon/serve/status.test.ts` ("status makes no Telegram call"; response includes daemon uptime, last poll per bot, binding identity, secret-store kind, conditions from the table).
+- [x] 24.2 GREEN: implement `src/daemon/serve/status.ts` (SEAM from `telegram-agent-bus/src/tools/status.ts`, read-only source, 162 lines; ledger reads via PR-13's `conditions-store.ts`).
+- [x] 24.3 Verify: `npm run build && node --test "dist/test/daemon/serve/status.test.js"`.
 
 #### PR-25 — `daemon/serve/thread.ts` (D-15 fence consumer)
 Branch `f1/25-serve-thread` → `main`. Depends: PR-24. Size: ≈300 lines, no exception.

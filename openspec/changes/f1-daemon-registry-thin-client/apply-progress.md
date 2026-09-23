@@ -4867,3 +4867,74 @@ rewritten.
 proven by a mutant that survived before it and dies after it (`M22`–`M26`), and the "seven" is corrected. At the
 round-2 tip: **1,682 authored lines (752 src + 924 test + 6 fixture), a disclosed 1,282-line PR-scoped exception**;
 `rm -rf dist && npm test` **672 tests (671 pass, 1 skip)**; `test:static` **8/8**; focused **30/30**.
+
+## PR-24 — `daemon/serve/status.ts` (SEAM from `v1:src/tools/status.ts`, whole file)
+
+**Route.** ODD with the SDD contract preserved. The mapping for PR-24 and PR-25 was delegated once (read-only);
+one delegated writer (`general-purpose`, sonnet) wrote `src/daemon/serve/status.ts`, its twin and the fixture
+entry against a brief in which the orchestrator fixed the open decisions below; then a parent readback and sweep.
+
+**Decisions made by the orchestrator (session 27, under the Director's delegation), each stated in the module doc.**
+(1) `status` is a pure read: it calls `readClientCursor` and never `ensureClientCursor`, so a session with no row is
+answered `cursor.next_update_id: 0` and nothing is created. (2) "Last poll per bot" is the binding bot's own
+`offsets` row only — a session never learns another project's bot (invariant 1). (3) `retention_warning` is
+re-scoped like `fetch`'s `gap_warning`: it is raised from `offsets.last_poll_ok_at`, because the Bot API window
+is lost when the daemon stops polling, not when one client stops fetching; the field keeps its frozen name.
+(4) Daemon uptime, pid and the secret-store kind arrive as injected `StatusDaemonFacts`: `DaemonInstance`
+(`bootstrap.ts`, unit 6, closed) exposes no start time, and wiring it is the IPC slice's job, not a drive-by edit
+of a closed unit. (5) `ledger_quarantined` (design §5.1, daemon scope) is reported in `daemon_conditions`.
+The `daemon-lifecycle` 409 scenario's status half is pinned here: `poller.last_error_code` carries
+`TELEGRAM_CONFLICT`.
+
+**Found while planning, filed as B-41.** Design §6 says the secret-store selection raises condition
+`secret_store_fallback`; `bootstrap.ts` drops it, `conditions-store` has no contract for it and the `Conditions`
+shape no member — the same class as B-40. `status.secret_store.kind` carries the fact; the reason is surfaced nowhere.
+
+**TDD evidence.** The writer's RED was compile-level (`TS2307` on the missing module) before GREEN. The parent's
+sweep then found **`M10` surviving** — the per-client surfaced set could be ignored and every test still passed,
+because the existing tier test ("another client's stamp does not exclude the thread") holds with or without tiering.
+A new test (twenty threads this client already saw, one it never saw and is the newest of twenty-one) fails under
+`M10` and passes at the tip: that is this slice's behavioural RED.
+
+**Provenance.** SEAM, bare v1 path `src/tools/status.ts` (the whole file, as design §12 names it; the provenance
+gate's regex accepts it), `v1 body sha256 7745b6eb…` over its 162 lines LF-normalized with the terminating newline —
+reproduced by the parent from the frozen checkout. Registry: **20 entries**.
+
+**Mutant sweep** (`odd/sweep.mjs` + `odd/mutants-status.json`, generic harness, explicit `[from, to]` pairs,
+BUILD-FAIL apart from KILLED, sha256 restore; the files live outside the repository in the untracked ODD tree and
+are deleted at session close): **21 mutants, 20 killed / 1 survived (`M0`, the control)**, 0 build failures —
+after `M15` was rewritten twice, because its first two forms did not compile and a build failure is not evidence.
+
+| # | Mutant | Outcome |
+|---|---|---|
+| `M0` | control: comment only | SURVIVED |
+| `M1` | uptime may go negative | KILLED |
+| `M2` | uptime rounds up | KILLED |
+| `M3` | poller reads any bot | KILLED |
+| `M4` | retention warning from a missing poll | KILLED |
+| `M5` | retention threshold moved | KILLED |
+| `M6` | `hours_remaining` not clamped | KILLED |
+| `M7` | status creates the cursor | KILLED |
+| `M8` | BROADCAST threads listed | KILLED |
+| `M9` | resolved threads listed | KILLED |
+| `M10` | per-client surfaced set ignored | KILLED (survived before the new tier test) |
+| `M11` | direction inverted | KILLED |
+| `M12` | `chat_id` is not the group | KILLED |
+| `M13` | secret-store kind fixed | KILLED |
+| `M14` | project conditions dropped | KILLED |
+| `M15` | daemon condition never read | KILLED |
+| `M16` | checkpoint dropped | KILLED |
+| `M17` | `roster_hash` dropped | KILLED |
+| `M18` | cursor ignores the client | KILLED |
+| `M19` | `last_fetch_at` ignores the client | KILLED |
+| `M20` | omitted total dropped | KILLED |
+
+**Known debt (not a defect).** `listThreadIds` and `readBindingCheckpoint` are duplicated from `serve/fetch.ts`;
+extracting them would edit a merged module and add a file with its own twin — left for the slice that next touches
+both (likely PR-25, which needs the same reads).
+
+**Budget.** `git diff --numstat -- src test` at the candidate: **801 authored lines (330 src + 465 test + 6
+fixture)** against a ≈300 estimate — a disclosed **401-line PR-scoped exception**.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **688 tests (687 pass, 1 skip)**; `npm run
+test:static`: **8/8**; `node --test dist/test/daemon/serve/status.test.js`: **16/16**.
