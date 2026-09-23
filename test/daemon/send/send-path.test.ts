@@ -99,6 +99,8 @@ const ENTRIES_ISO_B: readonly ProjectRosterEntry[] = [
 ];
 
 const WRONG_GROUP_ID = -1009999999;
+/** A body under the raw cap whose encoding exceeds Telegram's ceiling (see `validate.test.ts`). */
+const OVER_ENCODED_BODY_CHARS = 2500;
 /** How long the cross-binding concurrency test waits before declaring the two sends serialised. */
 const CROSS_BINDING_DEADLINE_MS = 2000;
 const DRIFTED_GROUP_ID = -1008888888;
@@ -333,6 +335,63 @@ test("Forced mismatch (a): a room guard built with the wrong group id refuses be
 		assert.equal(rows[0].outcome, "rejected");
 		assert.equal(rows[0].reason, "WRONG_ROOM");
 		assert.equal(rows[0].chat_id, GROUP_MAIN_ID);
+		// Every identifying field of the refusal row (verifier E2): the eid the send minted, the stamped
+		// identities, the binding's bot and the direction — and nothing that carries a body.
+		assert.equal(rows[0].direction, "send");
+		assert.equal(rows[0].eid, hexId(1), "the first id the sequential generator mints is the envelope's eid");
+		assert.equal(rows[0].envelope_type, "REQUEST");
+		assert.equal(rows[0].bot_id, BOT_ID_MAIN);
+		assert.equal(rows[0].from_user_id, BOB_USER_ID);
+		assert.equal(rows[0].to_user_id, ALICE_USER_ID);
+	});
+});
+
+test("the encoded-length guard runs before the room pre-check: an over-long send to a wrong room is BODY_TOO_LONG and writes nothing", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({
+			projectId: PROJECT_MAIN,
+			botId: BOT_ID_MAIN,
+			groupId: GROUP_MAIN_ID,
+			agentId: BOB,
+			entries: ENTRIES_MAIN,
+			guardGroupId: WRONG_GROUP_ID,
+		});
+		const deps = buildDeps(db, binding);
+
+		await assert.rejects(
+			() => sendPath(requestInput({ to: ALICE, body: "x".repeat(OVER_ENCODED_BODY_CHARS) }), deps),
+			(err: unknown) => err instanceof SendToolError && err.code === "BODY_TOO_LONG",
+		);
+		assert.equal(binding.telegram.sentMessages.length, 0);
+		assert.equal(auditRows(db, PROJECT_MAIN).length, 0);
+	});
+});
+
+test("a refusal by the decorator INSIDE a misbuilt transport never reaches the wrong room; the send degrades and raises group_outage (JD-B-001, B-44)", async () => {
+	await withLedger(async (db) => {
+		// The guard and config.chat_id agree, so the pre-check passes; only the GroupTransport itself
+		// targets another group — a construction defect `bindings.ts`'s buildTransport cannot produce,
+		// since it builds both from one `group_id`. The decorator still refuses that post before any call.
+		const telegram = new FakeTelegramClient();
+		const roomGuard = new RoomGuardClient(telegram, { groupId: GROUP_MAIN_ID, roster: ENTRIES_MAIN });
+		const transport = new DualWriteTransport(
+			new GroupTransport(roomGuard, WRONG_GROUP_ID),
+			new DirectTransport(roomGuard, toDirectRoster(ENTRIES_MAIN)),
+		);
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
+		const deps = buildDeps(db, binding, { transport, roomGuard });
+
+		const result = await sendPath(requestInput({ to: ALICE }), deps);
+
+		assert.equal(telegram.sentMessages.some((m) => m.chat_id === WRONG_GROUP_ID), false, "nothing reaches the wrong room");
+		assert.equal(result.delivery.group.ok, false);
+		assert.equal(result.delivery.degraded, true);
+		assert.ok(readCondition(db, PROJECT_MAIN, "group_outage"), "the refusal is visible as a group outage");
+		assert.deepEqual(
+			auditRows(db, PROJECT_MAIN).map((row) => [row.outcome, row.reason]),
+			[["degraded", null]],
+			"documented limit: the decorator's refusal is not a WRONG_ROOM row (B-44)",
+		);
 	});
 });
 
@@ -568,6 +627,11 @@ test("PT-25 half: GroupMigratedError reports new_chat_id informationally, never 
 		}
 		assert.equal(binding.telegram.sentMessages.some((m) => m.chat_id === NEW_CHAT_ID), false);
 		assert.equal(deps.config.chat_id, GROUP_MAIN_ID);
+		assert.deepEqual(
+			auditRows(db, PROJECT_MAIN).map((row) => [row.outcome, row.reason]),
+			[["degraded", null]],
+			"the migration is recorded as a degraded send and nothing more (module doc, design §8.2)",
+		);
 
 		const before = binding.telegram.sentMessages.length;
 		await sendPath(broadcastInput(), deps);
@@ -651,12 +715,37 @@ test("SECRET_PATTERN_DETECTED writes one rejected audit row and makes no network
 		assert.equal(rows[0]!.outcome, "rejected");
 		assert.equal(rows[0]!.reason, "SECRET_PATTERN_DETECTED");
 		assert.equal(rows[0]!.eid, null);
+		// Verifier E1/E6: the row names the type and the binding, and no identity — nothing was stamped yet.
+		assert.equal(rows[0]!.direction, "send");
+		assert.equal(rows[0]!.envelope_type, "BROADCAST");
+		assert.equal(rows[0]!.bot_id, BOT_ID_MAIN);
+		assert.equal(rows[0]!.chat_id, GROUP_MAIN_ID);
+		assert.equal(rows[0]!.from_user_id, null);
+		assert.equal(rows[0]!.to_user_id, null);
 
 		await assert.rejects(
 			() => sendPath({ type: "REQUEST", body: "clean body" } as unknown as SendToolInput, deps),
 			(err: unknown) => err instanceof SendToolError && err.code === "VALIDATION_ERROR",
 		);
 		assert.equal(auditRows(db, PROJECT_MAIN).length, 1, "a VALIDATION_ERROR must write no audit row");
+	});
+});
+
+test("a Transport that reports success with nothing delivered is TRANSPORT_ERROR and records nothing (stampFrom's guard, JD-A-001)", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
+		const hollowTransport: SendPathDeps["transport"] = {
+			send: async () => ({ group: { ok: false, error: "none", code: "TRANSPORT_ERROR" }, direct: [], degraded: true }),
+		};
+		const deps = buildDeps(db, binding, { transport: hollowTransport });
+
+		await assert.rejects(
+			() => sendPath(requestInput({ to: ALICE }), deps),
+			(err: unknown) => err instanceof SendToolError && err.code === "TRANSPORT_ERROR",
+		);
+		assert.equal(threadCount(db, PROJECT_MAIN), 0);
+		assert.equal(auditRows(db, PROJECT_MAIN).length, 0);
+		assert.equal(readCondition(db, PROJECT_MAIN, "group_outage"), undefined, "the whole bookkeeping transaction rolled back");
 	});
 });
 

@@ -713,7 +713,7 @@ Runtime harness: N/A — pure pipeline unit test.
 
 #### PR-27 — send path, room guard integration, `DualWriteTransport`
 Branch `f1/27-send-path` → `main`. Depends: PR-26. Size: ≈350 lines, no exception.
-*Size reconciliation (session 28).* Estimated ≈350; **measured 1,384 authored lines (452 src + 926 test + 6 fixture) at the candidate, a disclosed 984-line PR-scoped exception** — see `apply-progress.md` §PR-27. The estimate line above is the gate's text and is left as written.
+*Size reconciliation (session 28).* Estimated ≈350; **measured 1,384 authored lines (452 src + 926 test + 6 fixture) at the candidate, a disclosed 984-line PR-scoped exception** (1,493 lines and a 1,093-line exception after Judgment Day round 1) — see `apply-progress.md` §PR-27. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/send/send-path.ts`, `test/daemon/send/send-path.test.ts`.
 Requirements: `send-path › chat_id must equal the binding's group_id or the send is refused` (PT-01 unit half — full two-binding CI job in PR-41); `send-path › One DualWriteTransport per binding` (BROADCAST never crosses bindings); `send-path › Send input carries no destination` (stamping half — `from`/`to_user_id` never inputs).
 Runtime harness: `FakeTelegramClient` per token driving a real `send-path.ts` instance over the ledger.

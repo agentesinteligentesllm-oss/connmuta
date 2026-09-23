@@ -203,6 +203,17 @@ describe("RoomGuardClient (PT-01, D-22)", () => {
       assert.equal(mock.sent.length, 0, "underlying client must not be called");
     });
 
+    it("refuses a chat_id that is neither a number nor a string (a caller bypassing the type) and makes no call", () => {
+      const mock = createMockTelegramClient();
+      const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });
+
+      assert.throws(
+        () => guard.assertTarget(null as unknown as number),
+        (err: unknown) => err instanceof WrongRoomError && err.message.includes("Invalid chat_id type"),
+      );
+      assert.equal(mock.sent.length, 0, "assertTarget must never call the wrapped client");
+    });
+
     it("refuses a string without a leading @ even when dropping its first character would name a roster member", () => {
       const mock = createMockTelegramClient();
       const guard = new RoomGuardClient(mock, { groupId: allowedGroupId, roster });

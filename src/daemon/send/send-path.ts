@@ -34,7 +34,16 @@
  * **No direct Telegram send call anywhere in this file (PT-28).** The one call here that reaches the
  * network is `transport.send`; `roomGuard.assertTarget` is a pure pre-check that makes no call at all.
  * The network call sites stay confined to `transport/{group,direct,room-guard}.ts`, and this module
- * never constructs or holds a `TelegramClient`. The only caller of {@link sendPath}
+ * never constructs or holds a `TelegramClient`.
+ *
+ * **What the decorator inside the transport can and cannot report.** The pre-check and the decorator
+ * share one rule set (`assertTarget`), and the transport `bindings.ts` builds targets the same group the
+ * guard holds, so after the pre-check passes the decorator has nothing left to refuse. If a transport
+ * were built against another group, the decorator would still refuse that post before any call — no
+ * message reaches the wrong room — but the AS-IS `GroupTransport` reports it as a soft group failure
+ * without the `WrongRoomError` underneath, so the send degrades and raises `group_outage` instead of
+ * writing a `WRONG_ROOM` row (a test pins exactly this; backlog B-44). A `WrongRoomError` never
+ * propagates out of `transport.send` as itself. The only caller of {@link sendPath}
  * will be PR-31's IPC route.
  *
  * **No rate check yet.** Design §9's rate-discipline row (`offsets.retry_after_until`, the

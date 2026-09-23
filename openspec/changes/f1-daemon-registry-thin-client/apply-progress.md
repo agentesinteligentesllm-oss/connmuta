@@ -5280,3 +5280,44 @@ PT-01 and PT-25 cells).
 
 **Verification at the candidate.** `rm -rf dist && npm test`: **774 tests (773 pass, 1 skip)**; `npm run test:static`:
 **8/8**; `node --test` over the three unit-8/guard test files: **80/80**.
+
+**Native review.** `gentle-ai review assess --base-ref cb3c356 --committed-only --untracked-scope=exclude` over `73cfdae`:
+risk `medium` (`executable_change`), `review_due: true`, `review_due_reason: slice_budget_reached`, 9 paths / 1,466 changed
+lines. Not started, for the reason PR-23's record gives; the RDD fallback's separate independent verifier ran instead.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-27-audit-001`; both blind judges over a frozen worktree at `73cfdae`, the
+independent verifier in parallel over its own). Judge A: 2 SUGGESTION. Judge B: 1 WARNING, 1 SUGGESTION. No row from both
+judges; every row reproduced by the parent first.
+
+- `JD-B-001` (WARNING, single judge): "a `WrongRoomError` raised inside `transport.send` is reclassified as an unaudited
+  `TRANSPORT_ERROR`". **Not reproduced as stated**: the parent's probe over the compiled module showed a `WrongRoomError`
+  never leaves `transport.send` as itself — `GroupTransport` turns it into a soft group failure and `DualWriteTransport`
+  into a generic `TransportError` when nothing landed. The residual is real and narrower: a transport built against a group
+  the guard does not hold degrades the send and raises `group_outage` instead of writing `WRONG_ROOM`, while nothing reaches
+  the wrong room. `bindings.ts` cannot build that state. **Pinned** by a test, stated in the module doc, filed as **B-44**.
+- `JD-B-002` (SUGGESTION): the migration's `degraded` audit row was claimed and not read. **Pinned** in the PT-25 test.
+- `JD-A-001` (SUGGESTION, pre-existing v1 guard): `stampFrom`'s refusal of a hollow success was unreachable through the
+  real transport. **Pinned** with a `Transport` double reporting success with nothing delivered: `TRANSPORT_ERROR`, and the
+  whole bookkeeping transaction rolls back (no thread, no audit row, no condition).
+- `JD-A-002` (SUGGESTION, pre-existing): `assertTarget`'s invalid-type branch was untested. **Pinned**.
+
+**Independent verifier** (separate agent, its own frozen worktree at `73cfdae`): every figure reproduced exactly — 1,384
+(452 + 926 + 6) with the per-file split, 774 / 773 / 1, `test:static` 8/8, focused 80/80, 23 registry entries, `25926e38…`
+from the frozen v1 checkout after first reproducing `3bd09d0d…`, and both sweeps mutant for mutant. Of its six extra
+mutants two were killed, one failed to build (`E3`: TypeScript's discriminated-union narrowing rejects keying
+`group_outage` off `degraded` — a compile-time guarantee, not a gap) and **three survived**: `E1`, `E2`, `E6` — the
+`SECRET_PATTERN_DETECTED` and `WRONG_ROOM` rows' `envelope_type`, `eid` and user ids were written correctly (its probe
+confirmed) but read by no test. Its fault-injection probe confirmed the success transaction is atomic (an audit-insert
+failure rolls back the thread write). It also noted that the pipeline order "encoded-length guard before room pre-check"
+was enforced by control flow only.
+
+**Round 1** (parent, inline). Source: the module doc's paragraph on what the decorator can and cannot report. Tests: every
+identifying field of the `WRONG_ROOM` and `SECRET_PATTERN_DETECTED` rows; an over-long send to a wrong room is
+`BODY_TOO_LONG` with nothing written (the order); the misbuilt-transport behaviour (B-44); the migration's `degraded` row;
+the hollow-success refusal; the invalid-type branch. The sweeps now run the parent's mutants, the verifier's five buildable
+ones and two for the corrections (`M35` a placeholder stamp instead of the refusal — its first form failed to build and was
+rewritten; `G5` the invalid type accepted): **`send-path.ts` 41 mutants, 40 killed / 1 survived (`M0`)**; **`room-guard.ts`
+6 mutants, 5 killed / 1 survived (`G0`)**; 0 build failures.
+
+**At the round-1 tip:** **1,493 authored lines (461 src + 1,026 test + 6 fixture), a disclosed 1,093-line PR-scoped
+exception**; `rm -rf dist && npm test` **778 tests (777 pass, 1 skip)**; `test:static` **8/8**; focused **84/84**.
