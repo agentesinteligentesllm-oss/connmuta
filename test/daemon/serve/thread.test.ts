@@ -58,6 +58,7 @@ const ROSTER = [
 
 const NOW = "2026-04-01T12:00:00.000Z";
 const LATER = "2026-04-01T14:00:00.000Z";
+const LATER2 = "2026-04-01T15:00:00.000Z";
 
 function withLedger(run: (db: DatabaseSync) => Promise<void> | void): Promise<void> {
 	const home = mkdtempSync(join(tmpdir(), "conmuta-thread-"));
@@ -137,12 +138,19 @@ function assertFenceIsSound(wrapped: string, message: string): void {
 interface TableSnapshot {
 	readonly threads: unknown[];
 	readonly thread_history: unknown[];
+	readonly client_cursors: unknown[];
+	readonly client_surfaced: unknown[];
+	/** Every row this connection has ever inserted, updated or deleted — any write at all moves it. */
+	readonly total_changes: unknown;
 }
 
 function snapshotTables(db: DatabaseSync): TableSnapshot {
 	return {
 		threads: db.prepare("SELECT * FROM threads ORDER BY project_id, thread_id").all(),
 		thread_history: db.prepare("SELECT * FROM thread_history ORDER BY project_id, thread_id, eid").all(),
+		client_cursors: db.prepare("SELECT * FROM client_cursors ORDER BY client_id").all(),
+		client_surfaced: db.prepare("SELECT * FROM client_surfaced ORDER BY client_id, thread_id").all(),
+		total_changes: db.prepare("SELECT total_changes() AS n").get(),
 	};
 }
 
@@ -329,14 +337,14 @@ test("serveThread's own module imports nothing from telegram, transport or send,
 	for (const specifier of specifiers) {
 		assert.doesNotMatch(
 			specifier,
-			/telegram|transport\/|\/send\/|node:fs/,
-			`import specifier must not reach telegram/transport/send/node:fs: ${specifier}`,
+			/telegram|transport\/|\/send\/|node:fs|ledger\/cursors/,
+			`import specifier must not reach telegram/transport/send/node:fs or the per-client cursors: ${specifier}`,
 		);
 	}
 	assert.doesNotMatch(threadSrc, /child_process/, "the module must never shell out");
 });
 
-test("serveThread writes nothing: the threads and thread_history tables are unchanged before and after", async () => {
+test("serveThread writes nothing: no table it could touch changes, and the connection records no write at all", async () => {
 	await withLedger(async (db) => {
 		const threadId = "thread-writes-nothing";
 		writeThread(db, PROJECT_ID, threadId, {
@@ -347,6 +355,36 @@ test("serveThread writes nothing: the threads and thread_history tables are unch
 		await serveThread({ thread_id: threadId }, { db, binding: sampleBinding(), now: () => new Date(LATER) });
 
 		const after = snapshotTables(db);
-		assert.deepEqual(after, before, "serveThread must not mutate threads or thread_history");
+		assert.deepEqual(after, before, "serveThread must not write: not threads, history, cursors or surfaced stamps");
+	});
+});
+
+test("each transcript entry carries its own eid, type, sender, time and plane, opening first", async () => {
+	await withLedger(async (db) => {
+		const threadId = "thread-transcript-fields";
+		writeThread(db, PROJECT_ID, threadId, {
+			opened_eid: "open-eid-1",
+			opened_type: "REQUEST",
+			from: ALICE_AGENT_ID,
+			to: AGENT_ID,
+			body: "please review",
+			opened_at: NOW,
+			via: "direct",
+			history: [
+				{ eid: "hist-eid-a", type: "ACK", from: AGENT_ID, body: "on it", at: LATER, via: "group" },
+				{ eid: "hist-eid-b", type: "REPLY", from: AGENT_ID, body: "done", at: LATER2, via: "direct" },
+			],
+		});
+
+		const result = await serveThread({ thread_id: threadId }, { db, binding: sampleBinding(), now: () => new Date(LATER2) });
+
+		assert.deepEqual(
+			result.messages.map(({ eid, type, from, at, via }) => ({ eid, type, from, at, via })),
+			[
+				{ eid: "open-eid-1", type: "REQUEST", from: ALICE_AGENT_ID, at: NOW, via: "direct" },
+				{ eid: "hist-eid-a", type: "ACK", from: AGENT_ID, at: LATER, via: "group" },
+				{ eid: "hist-eid-b", type: "REPLY", from: AGENT_ID, at: LATER2, via: "direct" },
+			],
+		);
 	});
 });

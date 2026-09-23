@@ -5051,3 +5051,19 @@ against a ≈300 estimate — a disclosed **184-line PR-scoped exception**; plus
 
 **Verification at the candidate.** `rm -rf dist && npm test`: **700 tests (699 pass, 1 skip)**; `npm run test:static`:
 **8/8**; `node --test dist/test/daemon/serve/thread.test.js`: **10/10**.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-25-audit-001`; both blind judges over a frozen worktree at `9984ff5`, the
+independent verifier in parallel over its own). Judge B: **no findings**. Judge A: 1 SUGGESTION (inferential) — the
+module doc says no `ledger/cursors.ts` call belongs here, and neither the import scan nor the "writes nothing" snapshot
+(threads and history only) would fail if one were added. The verifier reproduced every figure (584 = 226 + 352 + 6, the
+`900f8be9…` hash, 700 / 699 / 1, 8/8, 10/10, 21 entries, the 20-mutant sweep) and **five of its six extra mutants
+survived**: no test read a transcript entry's `eid`, `type` or `at` (opening or history), nor its `via`. It also
+noted that design §15's PT→file map names only `shared/fence` for PT-13 and `daemon/serve/fetch` for PT-14; the
+map is gated design text, so the note below in `tasks.md` records the extension instead of rewriting it.
+
+**Round 1** (parent, inline; test file and records only). A transcript test pins `eid`/`type`/`from`/`at`/`via` for an
+opening and two history entries; the import scan now refuses `ledger/cursors`; the "writes nothing" snapshot adds
+`client_cursors`, `client_surfaced` and `total_changes()`, so any write on the connection fails it. The sweep now runs
+the parent's 20, the verifier's six and two more on `via`: **28 mutants, 27 killed / 1 survived (`M0`)**, 0 build
+failures. At the round-1 tip: **622 authored lines (226 src + 390 test + 6 fixture), a disclosed 222-line PR-scoped
+exception**; `npm test` **701 (700 pass, 1 skip)**; `test:static` **8/8**; focused **11/11**. No source byte changed.
