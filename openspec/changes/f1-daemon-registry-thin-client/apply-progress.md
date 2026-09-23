@@ -4729,3 +4729,56 @@ documentation commit ran green on both legs.
 
 **Board after this slice.** Row PR-22b is complete: **28 PR blocks / 23 row ids merged, 122 of the 210 task
 checkboxes**, 17 blocks / 19 row ids remaining (`PR-23…PR-42`). PR-23 (`src/daemon/serve/fetch.ts`) opens next.
+
+## PR-23 — `daemon/serve/fetch.ts` (design §8.4; D-02, D-06, D-15, D-19; SEAM from `v1:src/tools/fetch.ts:664-927`)
+
+**Route.** ODD with the SDD contract preserved (HANDOFF §2.1). Session 27 ran it as the parent orchestrator: one
+delegated read-only mapper (API signatures, v1 range, DDL), one delegated writer (`general-purpose`, sonnet) for
+`src/daemon/serve/fetch.ts`, `test/daemon/serve/fetch.test.ts` and the provenance fixture entry, then a parent
+readback that corrected the candidate before it was frozen (below). No `sdd-apply` phase envelope exists.
+
+**TDD evidence, stated as it happened.** The writer's RED was a compile-level RED — the implementation file moved
+aside, `tsc -b` failing with `TS2307` on the missing module — observed before GREEN, not a behavioural RED per
+case. The parent's three corrections below each came with a test that fails without them (the sweep's `M5`,
+`M12`, `M3`/`M4` kill them), which is the behavioural evidence for those clauses.
+
+**What the module does.** `serveFetch(input, deps)` serves one client over the ledger: `ensureClientCursor` (D-19
+catch-up), rows past `inbox_seq` bounded by `min(max_batch, MAX_BATCH)`, the D-02 wait on `inbox:<project_id>`
+bounded by `effectiveWaitSeconds` (`[0, FETCH_LONGPOLL_MAX_SECONDS]`), `log` fenced with the verified origin
+(`updates.from_user_id`, D-15), `rejected` with its audit reason, `unapplied` from `ignored` rows, `misaddressed`,
+the rejected half of `unanchored`, `skipped` from `audit_log` inside the client's `(last_seen_at, now]` window,
+checkpoint windowing, and v1's needs-action tiering, waiting-on-peer, unannounced closures, A4 digest and ADR-22
+per-entry trimming over the per-client `client_surfaced` set; `mark_seen: false` writes nothing but the first-call
+cursor bootstrap. Provenance: SEAM, `v1 body sha256 077561ae…` over lines 664-927 LF-normalized with the
+terminating newline; the method was validated first by reproducing `admission.ts`'s `3bd09d0d…`. Registry: **19
+entries**.
+
+**Parent readback corrections (before the candidate was frozen).** (1) The clock was read once, BEFORE the D-02
+wait (up to 50 s), so `last_seen_at`, the surfaced stamps, ages, the gap check and the `skipped` upper bound
+described when the call arrived, not when the response was built; it is now read again after the wait. (2)
+Checkpoint windowing chose the last checkpoint by `seq` position under a written claim that `seq` order is time
+order, which nothing guarantees; it now uses v1's `received_at >=` comparison. (3) The test named "fetch blocks
+against new ledger rows" could not fail for its name: with the real 20-second `setTimeout`, a wait the event never
+woke would still re-read and find the row; the delay is now injected and never elapses on its own. The first
+20-mutant sweep then left four survivors besides the control: `M4` (listener leak on a timed-out wait), `M6`
+(peek reporting the cursor it would have taken), `M18` (`max_batch` ignored) — three test gaps, each now pinned —
+and `M19`, an **equivalent** mutant: the "subscribe, then re-check" read could never observe a row, because no
+`await` separates the empty read from the subscription and the poller emits on the same thread. The dead re-read
+and the module-doc sentence crediting it with race-freedom were removed and replaced by the real reason.
+
+**Mutant sweep** (`odd/sweep-fetch.mjs`, explicit `[from, to]` pairs, BUILD-FAIL reported separately from KILLED,
+sha256 restore check): **20 mutants, 19 killed / 1 survived, the survivor being `M0`, the comment-only control**;
+0 build failures.
+
+**Disclosed limits (not defects of this slice).** `unanchored` counts only the refused half — admission never
+persists the ADR-13 "authorized despite a null anchor" flag; `skipped` windows on `audit_log.ts`, which is the
+message date, so a drop delivered late can fall before a client's window; a first peek creates the cursor row.
+
+**Budget.** `git diff --numstat -- src test` at the candidate: **1,401 authored lines (731 src + 664 test + 6
+fixture)** against a ≈350 estimate — a disclosed **1,001-line PR-scoped exception**. The estimate priced the 264 v1
+lines; the module also rebuilds from the ledger the `log`/`rejected`/`unapplied`/`skipped`/checkpoint half v1
+computed in the same pass (`v1:fetch.ts:500-663`, now admission's), and carries the module doc the SEAM changes
+need.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **662 tests (661 pass, 1 skip)**; `npm run
+test:static`: **8/8**; `node --test dist/test/daemon/serve/fetch.test.js`: **20/20**.

@@ -663,9 +663,9 @@ Scope: `src/daemon/serve/fetch.ts`, `test/daemon/serve/fetch.test.ts`.
 Requirements: `durable-inbox › timeout_s is a long-poll against the ledger` (D-02); `durable-inbox › needs_action and seen_eids resolve DATA-MODEL's open points` (D-06 VIEW/index); D-15 fence application site (consumes `shared/fence.ts` from PR-06).
 Runtime harness: in-process daemon serving `fetch` over a real ledger temp file, waiting on the `inbox:<project_id>` event.
 
-- [ ] 23.1 RED: write `test/daemon/serve/fetch.test.ts` covering "fetch blocks against new ledger rows, not Telegram", "timeout_s is clamped" to `FETCH_LONGPOLL_MAX_SECONDS`, and "`needs_action` reflects threads without a write-behind step".
-- [ ] 23.2 GREEN: implement `src/daemon/serve/fetch.ts` (per-client `inbox_seq`/`client_surfaced` reads from PR-12, D-02 bounded wait on the poller's event emitter, fence applied at this boundary per D-15).
-- [ ] 23.3 Verify: `npm run build && node --test "dist/test/daemon/serve/fetch.test.js"`.
+- [x] 23.1 RED: write `test/daemon/serve/fetch.test.ts` covering "fetch blocks against new ledger rows, not Telegram", "timeout_s is clamped" to `FETCH_LONGPOLL_MAX_SECONDS`, and "`needs_action` reflects threads without a write-behind step".
+- [x] 23.2 GREEN: implement `src/daemon/serve/fetch.ts` (per-client `inbox_seq`/`client_surfaced` reads from PR-12, D-02 bounded wait on the poller's event emitter, fence applied at this boundary per D-15).
+- [x] 23.3 Verify: `npm run build && node --test "dist/test/daemon/serve/fetch.test.js"`.
 
 #### PR-24 — `daemon/serve/status.ts`
 Branch `f1/24-serve-status` → `main`. Depends: PR-23. Size: ≈300 lines, no exception.
