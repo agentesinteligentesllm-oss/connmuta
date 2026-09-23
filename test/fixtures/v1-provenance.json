@@ -112,5 +112,11 @@
     "v1Path": "src/tools/fetch.ts:664-927",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/daemon/serve/status.ts",
+    "v1Path": "src/tools/status.ts",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
