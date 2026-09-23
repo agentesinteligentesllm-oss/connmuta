@@ -5693,3 +5693,39 @@ survived (`M0` control)**; **`ipc-contract.ts`** unchanged, **2 mutants, 1 kille
 113, `constants.ts` +8, `ipc-contract.ts` +16, `handshake.test.ts` 200, `sessions.test.ts` 119) — a disclosed
 **213-line PR-scoped exception**; `rm -rf dist && npm test` **869 tests (868 pass, 1 skip)**, clean on the first run (no
 B-39 flake this time); `test:static` **8/8**; the two twins **11/11**.
+
+**Scoped re-judgment of round 1** (both judges, `3f289c2..4662654`; frozen worktree moved to the round-1 tip). Both
+judges independently confirmed `JD-A-002`/`JD-B-003`/`JD-B-004` resolved as claimed, and independently reached the
+**same new finding** from the earlier round-1 correction itself: `validate()`'s rewrite (the `JD-B-001` fix) still
+early-returned on the first matching stored bearer, so its *total* running time varied with the match's position in
+the store even though each individual `hexDigestsEqual` call stayed constant-time — the new JSDoc's "costs the same
+regardless of which stored value matches" claim was false by direct inspection of the loop it described
+(`JD-A-R2-003` / `JD-B-R2-001`, both WARNING). Judge B additionally supplied the exact fix pattern
+(`found = hexDigestsEqual(stored, bearer) || found`, never returning early, `hexDigestsEqual` still called for every
+stored entry). Judge A alone also sharpened `JD-A-001` (NOT RESOLVED, as expected — revocation stays PR-31's):
+`MAX_ACTIVE_SESSIONS`'s reasoning comment borrowed `MAX_PENDING_HANDSHAKES`'s number without noting that
+`SessionStore`'s bound, unlike that TTL-swept one, does not self-heal — once hit, `mint()` refuses every session for
+the rest of the boot, a materially different failure mode. Judge B's `JD-B-R2-003` (resolving `JD-B-003`) noted a
+minor non-blocking test-completeness gap: the only test exercising `PendingHandshakeStore.size`'s own sweep also
+calls `issue()` immediately beforehand, whose own sweep runs first and masks whether `.size`'s sweep call does
+anything on its own — informational, not actioned (the getter has no production call site in this PR).
+
+- `JD-A-R2-003` + `JD-B-R2-001` (WARNING, **both judges independently**): **corrected**. `validate()` rewritten to
+  scan every stored bearer unconditionally (`found = hexDigestsEqual(stored, bearer) || found`, no early return), so
+  total running time is genuinely independent of match position — not just each individual comparison. Disclosed in
+  the new doc comment: an early-return version is functionally identical on every input (same return value for every
+  possible input), so no functional test — mutation-based or otherwise — can tell the two apart; this specific
+  property is enforced by code review, not a regression test, and that limitation is stated rather than hidden.
+- `JD-A-001`'s sharpened nuance: **disclosed, not fixed** (same disposition as round 1 — revocation is PR-31's
+  `DELETE /session`). `MAX_ACTIVE_SESSIONS`'s reasoning comment corrected to state plainly that the bound does not
+  self-heal, unlike `MAX_PENDING_HANDSHAKES`.
+- `JD-B-R2-003`'s test-completeness note: **disclosed, not actioned** — matches the verifier's own `N5` disposition
+  (informational, no production call site yet).
+
+Re-swept at the round-2 tip (`M5` re-anchored after the O(N) rewrite): **`sessions.ts` 9 mutants, 8 killed / 1 survived
+(`M0` control)**; `handshake.ts` and `ipc-contract.ts` unaffected by this round, unchanged from the round-1 sweep.
+
+**At the round-2 tip:** `git diff --numstat main -- src test`: **619 authored lines** (`handshake.ts` 157,
+`sessions.ts` 115, `constants.ts` +12, `ipc-contract.ts` +16, `handshake.test.ts` 200, `sessions.test.ts` 119) — a
+disclosed **219-line PR-scoped exception**; `rm -rf dist && npm test` **869 tests (868 pass, 1 skip)**; `test:static`
+**8/8**; the two twins **11/11**. No new tests this round (implementation and doc-comment changes only).

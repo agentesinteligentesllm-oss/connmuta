@@ -93,17 +93,19 @@ export class SessionStore {
 
   /**
    * Whether `bearer` was minted by this exact store instance. Compares against every stored bearer
-   * with {@link hexDigestsEqual} rather than `Set.has`, so a lookup on a 256-bit bearer credential
-   * costs the same regardless of which stored value (if any) matches — this PR's Judgment Day found
-   * that every other secret-derived comparison here was already constant-time except this one.
+   * with {@link hexDigestsEqual} rather than `Set.has`, and never returns early on a match, so a
+   * lookup on a 256-bit bearer credential costs the same regardless of which stored value (if any)
+   * matches — Judgment Day found this file's other secret-derived comparisons were constant-time per
+   * call but this loop still leaked a match's position through its total running time (an
+   * early-return version is functionally identical to this one on every input, so no test in this
+   * suite can tell the two apart; this property is enforced by code review, not a regression test).
    */
   validate(bearer: string): boolean {
+    let found = false;
     for (const stored of this.bearers) {
-      if (hexDigestsEqual(stored, bearer)) {
-        return true;
-      }
+      found = hexDigestsEqual(stored, bearer) || found;
     }
-    return false;
+    return found;
   }
 
   /** Number of live bearers this store holds — a testability accessor, not part of the wire contract. */
