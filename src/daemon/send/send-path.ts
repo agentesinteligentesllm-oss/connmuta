@@ -14,8 +14,13 @@
  * `GroupTransport` turns a guard refusal into a soft group failure and the DMs would still go out —
  * the spec requires `WRONG_ROOM`, an audit row and zero `sendMessage` calls; the decorator stays the
  * last line inside the transport (PT-28); (4) `obligations` removed from the output (design §12's
- * send-path row, change (4)); (5) rate discipline is PR-28's (`send/rate.ts`) — this module has no
- * rate check yet; (6) validation stages come from `validateSend` and the encoded-length guard from
+ * send-path row, change (4)); (5) rate discipline (`send/rate.ts`, PR-28) is wired in: a local
+ * pre-check against `offsets.retry_after_until` and `SendRateBudget`'s timestamp-window budget runs
+ * after the room pre-check and before `transport.send`, and a 429 surfacing from the call itself —
+ * via the `RateLimitRecorder` decorator `bindings.ts` wraps around the raw Telegram client, deep
+ * inside the transport stack this module cannot see through — is detected by re-reading
+ * `offsets.retry_after_until` around the call and reclassified from `TRANSPORT_ERROR` to
+ * `RATE_LIMITED`; (6) validation stages come from `validateSend` and the encoded-length guard from
  * `guardEncodedLength` (PR-26), called once each instead of v1's inline stages; (7) the
  * `unannounced_closures` remedy names `${TOOL_PREFIX}fetch`, not v1's `agentbus_fetch`; (8)
  * `IN_THREAD_TYPES` re-declared locally, as PR-26 did.
@@ -46,9 +51,23 @@
  * propagates out of `transport.send` as itself. The only caller of {@link sendPath}
  * will be PR-31's IPC route.
  *
- * **No rate check yet.** Design §9's rate-discipline row (`offsets.retry_after_until`, the
- * `GROUP_MESSAGES_PER_MINUTE`/`CHAT_MESSAGES_PER_SECOND` budget) is `send/rate.ts` — PR-28's slice,
- * not this one's.
+ * **Rate discipline (PR-28, `send/rate.ts`).** Two independent gates run after the room pre-check and
+ * before `transport.send`: the ledger's own `offsets.retry_after_until` (set by
+ * `RateLimitRecorder`, which `bindings.ts`'s `buildTransport` wraps around the raw `TelegramClient`
+ * whenever a 429 lands on `sendMessage`, group or direct) and, only when that column has nothing to
+ * say, `deps.rateBudget`'s in-memory `GROUP_MESSAGES_PER_MINUTE`/`CHAT_MESSAGES_PER_SECOND`
+ * timestamp-window budget. A refusal from either gate makes zero network calls, writes one
+ * `rejected`/`RATE_LIMITED` audit row, and throws `SendToolError("RATE_LIMITED", …, { retry_after_s })`;
+ * a pass consumes the budget immediately, before the call, whether or not the call itself lands — an
+ * attempted post spends budget regardless of outcome. A 429 that instead surfaces FROM
+ * `transport.send` — `RateLimitRecorder` sits underneath `RoomGuardClient`, deep inside the transport
+ * stack this module cannot see through directly — is detected by re-reading
+ * `offsets.retry_after_until` around the call and reclassifying the resulting `TRANSPORT_ERROR` into
+ * the same `RATE_LIMITED`, `retry_after_s` and all; a delivery that only PARTLY landed is still a
+ * success (`degraded`, exactly as today), never promoted into this error, and the recorded column
+ * simply gates the next send. `offsets.next_update_id` — the one cursor DATA-MODEL.md defines on this
+ * side of the ledger — is never named by any of this: a rate-limited send, local or reclassified,
+ * advances nothing (spec "leaves the relevant cursor unmoved").
  *
  * **No audit row on `TRANSPORT_ERROR`.** DATA-MODEL's closed `audit_log.reason` enum has no code for
  * a transport failure; PR-42 task 42.1 aligns the enum. Recording one here would mean inventing a
@@ -84,6 +103,7 @@ import {
 	type SendToolOutput,
 	type SendValidationDeps,
 } from "./validate.js";
+import { readRetryAfterUntil, retryAfterSeconds, type SendRateBudget } from "./rate.js";
 
 /**
  * Serialises calls under the same `key`; calls under different keys run concurrently.
@@ -132,6 +152,7 @@ export interface SendPathDeps {
 	readonly transport: Transport;
 	readonly roomGuard: Pick<RoomGuardClient, "assertTarget">;
 	readonly mutex: BindingMutex;
+	readonly rateBudget: SendRateBudget;
 	readonly now?: () => Date;
 	readonly generateId?: () => string;
 }
@@ -188,6 +209,22 @@ function stampFrom(result: DualWriteResult, prefer: "direct" | "group"): { messa
 		);
 	}
 	return stamp;
+}
+
+/**
+ * Whether `offsets.retry_after_until` CHANGED during a `transport.send` call that just failed, and
+ * still names a future instant — the one signal a 429 recorded by `RateLimitRecorder`, deep inside
+ * the transport stack, leaves for this module to find (module doc). `before` is read just before the
+ * call so a value already in place before this send started is never misattributed to it; `nowMs` is
+ * read fresh by the caller rather than reused from earlier in the pipeline, since real time passed
+ * during the awaited call.
+ */
+function rateLimitedDuring(db: DatabaseSync, bot_id: number, before: string | null, nowMs: number): number | undefined {
+	const after = readRetryAfterUntil(db, bot_id);
+	if (after === null || after === before) {
+		return undefined;
+	}
+	return retryAfterSeconds(after, nowMs);
 }
 
 /** Runs the whole pipeline for one send, assuming the binding's mutex is already held. */
@@ -282,6 +319,47 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 		);
 	}
 
+	// Rate discipline (PR-28, `send/rate.ts`, module doc "Two independent gates"). The ledger's own
+	// `offsets.retry_after_until` — Telegram's own word this bot is throttled — is checked first; only
+	// when it has nothing to say does the in-memory `SendRateBudget` get asked. Either refusing means
+	// zero network calls and one `rejected`/`RATE_LIMITED` audit row.
+	const recipientChats = recipients.map((to) => `@${deps.config.roster[to]!.username}`);
+	const rateCheckMs = now().getTime();
+	const wait =
+		retryAfterSeconds(readRetryAfterUntil(deps.db, deps.bot_id), rateCheckMs) ??
+		deps.rateBudget.check(deps.bot_id, deps.config.chat_id, [deps.config.chat_id, ...recipientChats], rateCheckMs);
+	if (wait !== undefined) {
+		withTransaction(deps.db, () => {
+			appendAuditRow(deps.db, {
+				ts,
+				project_id: deps.project_id,
+				bot_id: deps.bot_id,
+				chat_id: deps.config.chat_id,
+				client_id: null,
+				direction: "send",
+				eid,
+				envelope_type: envelope.type,
+				from_user_id: senderUserId,
+				to_user_id: envelope.to_user_id ?? null,
+				outcome: "rejected",
+				reason: "RATE_LIMITED",
+			});
+		});
+		throw new SendToolError(
+			"RATE_LIMITED",
+			`Send refused: rate-limited for ${wait}s — nothing was sent and this call will not retry automatically.`,
+			{ retry_after_s: wait },
+		);
+	}
+	// A pass spends budget immediately, before the call: an ATTEMPTED post costs the same whether or
+	// not it lands (module doc); a locally-refused send above never reaches here and spends nothing.
+	deps.rateBudget.record(deps.bot_id, deps.config.chat_id, [deps.config.chat_id, ...recipientChats], rateCheckMs);
+
+	// Read just before the call: `RateLimitRecorder`, wrapped around the raw client deep inside the
+	// transport stack (`bindings.ts`'s `buildTransport`), is the only place a 429 from THIS call could
+	// still record against this same column, so a value already there is never misattributed below.
+	const retryBefore = readRetryAfterUntil(deps.db, deps.bot_id);
+
 	let deliveryResult: DualWriteResult;
 	try {
 		// The transport carries the HTML presentation (ADR-05c); the canonical `text` `guardEncodedLength`
@@ -296,6 +374,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 		if (!(err instanceof TransportError)) {
 			throw err;
 		}
+		const retryAfter = rateLimitedDuring(deps.db, deps.bot_id, retryBefore, now().getTime());
 		// D6 — the ONE undelivered transition applied locally anyway. `abandoned` asserts nothing about
 		// the peer and touches no repository (`shared/envelope.ts`), so it is the only basis a failed
 		// transport may still close locally.
@@ -324,11 +403,56 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 					record: { ...applied.thread, closure_delivered: false },
 					updated_at: ts,
 				});
+				// The closure and its refusal are one fact: a rate-limited abandonment is audited like
+				// every other rate-limited send (Judgment Day `JD-AB-001`), inside the same transaction.
+				if (retryAfter !== undefined) {
+					appendAuditRow(deps.db, {
+						ts,
+						project_id: deps.project_id,
+						bot_id: deps.bot_id,
+						chat_id: deps.config.chat_id,
+						client_id: null,
+						direction: "send",
+						eid,
+						envelope_type: envelope.type,
+						from_user_id: senderUserId,
+						to_user_id: envelope.to_user_id ?? null,
+						outcome: "rejected",
+						reason: "RATE_LIMITED",
+					});
+				}
+			});
+			const closureMessage = `${err.message} — the thread was closed locally anyway (abandonment is yours alone to declare), but the peer was NEVER told. It is reported in ${TOOL_PREFIX}fetch's \`unannounced_closures\` until you re-send it.`;
+			if (retryAfter !== undefined) {
+				throw new SendToolError(
+					"RATE_LIMITED",
+					`${closureMessage} Telegram rate-limited this bot for ${retryAfter}s during this call — nothing further will be retried automatically.`,
+					{ cause: err, retry_after_s: retryAfter },
+				);
+			}
+			throw new SendToolError("TRANSPORT_ERROR", closureMessage, { cause: err });
+		}
+		if (retryAfter !== undefined) {
+			withTransaction(deps.db, () => {
+				appendAuditRow(deps.db, {
+					ts,
+					project_id: deps.project_id,
+					bot_id: deps.bot_id,
+					chat_id: deps.config.chat_id,
+					client_id: null,
+					direction: "send",
+					eid,
+					envelope_type: envelope.type,
+					from_user_id: senderUserId,
+					to_user_id: envelope.to_user_id ?? null,
+					outcome: "rejected",
+					reason: "RATE_LIMITED",
+				});
 			});
 			throw new SendToolError(
-				"TRANSPORT_ERROR",
-				`${err.message} — the thread was closed locally anyway (abandonment is yours alone to declare), but the peer was NEVER told. It is reported in ${TOOL_PREFIX}fetch's \`unannounced_closures\` until you re-send it.`,
-				{ cause: err },
+				"RATE_LIMITED",
+				`Send refused: Telegram rate-limited this bot for ${retryAfter}s during this call — nothing was delivered and this call will not retry automatically.`,
+				{ cause: err, retry_after_s: retryAfter },
 			);
 		}
 		throw new SendToolError("TRANSPORT_ERROR", err.message, { cause: err });

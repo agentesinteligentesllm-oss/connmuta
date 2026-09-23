@@ -5,7 +5,7 @@ import { LEDGER_SCHEMA_DDL } from "../../src/ledger/schema.js";
 import { REGISTRY_VERSION } from "../../src/shared/constants.js";
 import type { Registry, RegistryBinding, RegistryBot } from "../../src/registry/schema.js";
 import type { RegistryLoader, RegistrySyncResult } from "../../src/registry/loader.js";
-import type { TelegramClient } from "../../src/daemon/telegram.js";
+import { RateLimitedError, type TelegramClient } from "../../src/daemon/telegram.js";
 import { RoomGuardClient } from "../../src/daemon/transport/room-guard.js";
 import { DualWriteTransport } from "../../src/daemon/transport/dual.js";
 import {
@@ -403,6 +403,73 @@ describe("BindingsReconciler (registry hot-reload, poller lifecycle, BINDING_CHA
       },
       async sendMessage() {
         return { message_id: 1, chat: { id: -1001234567890, type: "group" }, date: 1, text: "hi" };
+      },
+      async getMe() {
+        return { id: 1234567, is_bot: true, username: "test_bot" };
+      },
+      async getChat() {
+        return { id: -1001234567890, type: "group" };
+      },
+    };
+
+    const reconciler = new BindingsReconciler({
+      createTelegramClient: () => fakeClient,
+    });
+
+    await reconciler.reconcile(baseRegistry);
+    const managed = reconciler.getBinding("prj-alpha");
+    assert(managed !== undefined);
+    assert(managed.transport instanceof DualWriteTransport);
+    assert(managed.roomGuard instanceof RoomGuardClient);
+  });
+
+  it("buildTransport wraps the client with RateLimitRecorder when db is set: a 429 records offsets.retry_after_until (PR-28)", async () => {
+    const db = createTestDatabase();
+    const fakeClient: TelegramClient = {
+      async getUpdates() {
+        return [];
+      },
+      async sendMessage() {
+        throw new RateLimitedError(30);
+      },
+      async getMe() {
+        return { id: 1234567, is_bot: true, username: "test_bot" };
+      },
+      async getChat() {
+        return { id: -1001234567890, type: "group" };
+      },
+    };
+
+    const reconciler = new BindingsReconciler({
+      db,
+      createTelegramClient: () => fakeClient,
+    });
+
+    await reconciler.reconcile(baseRegistry);
+    const managed = reconciler.getBinding("prj-alpha");
+    assert(managed !== undefined);
+
+    // No recipients: the group post soft-fails (a 429 is not a message-level 400) and, with nothing
+    // else to attempt, DualWriteTransport.send rejects with "nothing was delivered". That rejection is
+    // expected; the side effect this test cares about — offsets.retry_after_until — is recorded by
+    // RateLimitRecorder, wired underneath RoomGuardClient, before that rejection ever surfaces.
+    await assert.rejects(() => managed!.transport!.send("hello", []));
+
+    const row = db
+      .prepare("SELECT retry_after_until FROM offsets WHERE bot_id = ?")
+      .get(sampleBot.bot_id) as { retry_after_until: string | null } | undefined;
+    assert.ok(row?.retry_after_until, "offsets.retry_after_until must be set after a 429");
+    const deltaS = (Date.parse(row!.retry_after_until!) - Date.now()) / 1000;
+    assert.ok(deltaS > 25 && deltaS <= 31, `expected roughly 30s ahead, got ${deltaS}s`);
+  });
+
+  it("buildTransport leaves the raw client unwrapped when db is absent — no RateLimitRecorder (PR-28)", async () => {
+    const fakeClient: TelegramClient = {
+      async getUpdates() {
+        return [];
+      },
+      async sendMessage() {
+        throw new RateLimitedError(30);
       },
       async getMe() {
         return { id: 1234567, is_bot: true, username: "test_bot" };
