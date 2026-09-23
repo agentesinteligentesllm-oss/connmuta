@@ -4990,3 +4990,88 @@ it fixed. With the budget exhausted and no severe row surviving, the verdict is 
 `5a28378..443609d`; that sentence was corrected after the budget (the paragraph now says two mentions about
 `gap_warning` in `status.ts` and one self-citation in the twin), **checked against `grep -n '§8.4'` over both files
 but not re-judged**, as PR-11..PR-13 disclosed theirs.
+
+## PR-25 — `daemon/serve/thread.ts` (SEAM from `v1:src/tools/thread.ts`, whole file; D-15 fence consumer; PT-13, PT-14)
+
+**Route.** ODD with the SDD contract preserved: one delegated writer (`general-purpose`, sonnet) against a brief with the
+decisions below fixed by the orchestrator, then a parent readback and sweep. Closes unit 7 `durable-inbox`.
+
+**Decisions (orchestrator, session 27), stated in the module doc.** (1) The thread is read with
+`readThreadRecord(db, binding.project_id, thread_id)`: an id that exists only under another project is
+`UNKNOWN_THREAD` (invariant 1). (2) D-15 at this boundary: every body not authored by `binding.agent_id` is fenced with
+`{ project_id: binding.project_id, agent_id: <stored from>, user_id: <roster_snapshot lookup, else fetch's exported
+UNRESOLVED_ORIGIN_USER_ID> }`; the stored `from` of a thread row and of every history entry is the verified sender,
+because admission overwrote the envelope's own claim. (3) This agent's own bodies stay raw, as v1's `renderBody` did.
+
+**PT-13 and PT-14.** PT-13 is pinned at this boundary with a peer body carrying the literal closing label and
+`<script>`. **PT-14 is pinned end to end**: the test drives the real `admitTelegramUpdates` with a Telegram sender
+that resolves to `@alice-agent` and an envelope whose own `from` claims `@bob-agent`, then reads the thread back —
+the opening's `from` and its fence label name alice and alice's numeric id, never bob's. Task 25.4 updated both cells in
+`docs/02-architecture/THREAT-MODEL.md` §4: PT-13 adds `test/daemon/serve/thread.test.ts`; PT-14 names that file and
+`test/daemon/serve/fetch.test.ts` for the fetch `log` half PR-23 pinned (design §15 maps PT-14 to `serve/fetch`).
+
+**TDD evidence.** The writer's RED was compile-level (`TS2307`) before GREEN. The parent's sweep then found **`M17`
+surviving** (`awaiting` dropped: the only assertion read a `null` the mutant also produces) and three refusal details
+no test read (the error's `name` and the id in its message); each is now pinned and its mutant dies — this slice's
+behavioural RED. `M10` did not compile in its first form and was rewritten; the first `M18` was an equivalent mutant
+of the parent's own making (a type assertion over the same string) and was replaced.
+
+**Provenance.** SEAM, bare v1 path `src/tools/thread.ts` (the whole file, as design §12 names it), `v1 body sha256
+900f8be9…` over its 164 lines LF-normalized with the terminating newline — reproduced by the parent from the frozen
+checkout. Registry: **21 entries**.
+
+**Mutant sweep** (`odd/sweep.mjs` + `odd/mutants-thread.json`, outside the repository in the untracked ODD tree, deleted at
+session close): **20 mutants, 19 killed / 1 survived (`M0`, the control)**, 0 build failures.
+
+| # | Mutant | Outcome |
+|---|---|---|
+| `M0` | control: comment only | SURVIVED |
+| `M1` | own bodies fenced too | KILLED |
+| `M2` | peer bodies left raw | KILLED |
+| `M3` | origin `agent_id` from the binding, not the sender | KILLED |
+| `M4` | origin `user_id` of the binding agent | KILLED |
+| `M5` | origin `project_id` not the binding's | KILLED |
+| `M6` | unresolved sentinel replaced by a real id | KILLED |
+| `M7` | `opening` flag dropped | KILLED |
+| `M8` | history dropped | KILLED |
+| `M9` | history body fenced as the opener | KILLED |
+| `M10` | unknown thread answered instead of refused | KILLED |
+| `M11` | direction inverted | KILLED |
+| `M12` | peer always the opener | KILLED |
+| `M13` | age not from `opened_at` | KILLED |
+| `M14` | `acked` ignores `ack_count` | KILLED |
+| `M15` | `closure_delivered` forced true | KILLED |
+| `M16` | `resolved_by` dropped | KILLED |
+| `M17` | `awaiting` dropped | KILLED (survived before its assertion) |
+| `M18` | error class loses its name | KILLED |
+| `M19` | refusal message drops the id | KILLED |
+
+**Budget.** `git diff --numstat -- src test` at the candidate: **584 authored lines (226 src + 352 test + 6 fixture)**
+against a ≈300 estimate — a disclosed **184-line PR-scoped exception**; plus 2/2 lines in THREAT-MODEL §4 (task 25.4).
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **700 tests (699 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test dist/test/daemon/serve/thread.test.js`: **10/10**.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-25-audit-001`; both blind judges over a frozen worktree at `9984ff5`, the
+independent verifier in parallel over its own). Judge B: **no findings**. Judge A: 1 SUGGESTION (inferential) — the
+module doc says no `ledger/cursors.ts` call belongs here, and neither the import scan nor the "writes nothing" snapshot
+(threads and history only) would fail if one were added. The verifier reproduced every figure (584 = 226 + 352 + 6, the
+`900f8be9…` hash, 700 / 699 / 1, 8/8, 10/10, 21 entries, the 20-mutant sweep) and **five of its six extra mutants
+survived**: no test read a transcript entry's `eid`, `type` or `at` (opening or history), nor its `via`. It also
+noted that design §15's PT→file map names only `shared/fence` for PT-13 and `daemon/serve/fetch` for PT-14; the
+map is gated design text, so the note below in `tasks.md` records the extension instead of rewriting it.
+
+**Round 1** (parent, inline; test file and records only). A transcript test pins `eid`/`type`/`from`/`at`/`via` for an
+opening and two history entries; the import scan now refuses `ledger/cursors`; the "writes nothing" snapshot adds
+`client_cursors`, `client_surfaced` and `total_changes()`, so any write on the connection fails it. The sweep now runs
+the parent's 20, the verifier's six and two more on `via`: **28 mutants, 27 killed / 1 survived (`M0`)**, 0 build
+failures. At the round-1 tip: **622 authored lines (226 src + 390 test + 6 fixture), a disclosed 222-line PR-scoped
+exception**; `npm test` **701 (700 pass, 1 skip)**; `test:static` **8/8**; focused **11/11**. No source byte changed.
+
+**Scoped re-judgment of round 1** (both judges, `9984ff5..3e314a0`): **all three rows verified by both judges, 0
+regressions, 0 new defects**. **JUDGMENT: APPROVED** for `9984ff5..3e314a0`; one of the two re-judgments in the budget
+was used.
+
+**Board after this slice.** Row PR-25 complete: **31 PR blocks / 26 row ids merged, 132 of the 210 task checkboxes**,
+14 blocks / 16 row ids remaining (`PR-26…PR-42`). **Unit 7 `durable-inbox` is closed**; unit 8 `send-path` opens with
+PR-26 (`daemon/send/validate.ts`).

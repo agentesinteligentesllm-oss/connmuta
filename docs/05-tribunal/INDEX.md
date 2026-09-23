@@ -802,6 +802,21 @@ visible.
 | Native review | Not started, for the reason PR-23's record gives (`judgment-day` forbids both methods on one target; START's consent belongs to the Director). |
 | Left open, carried to the Director | **B-41** (new): design §6's `secret_store_fallback` condition has no contract and is dropped by `bootstrap.ts`; `status.secret_store.kind` carries the fact. B-40 stands. |
 | Consequence | **DN-05 is not satisfied for PR-24 either.** Row PR-24 complete: **30 PR blocks / 25 row ids merged (128 of the 210 task checkboxes), 15 blocks / 17 row ids remain (`PR-25…PR-42`)**. |
+
+### `bus-v2-f1-pr-25-audit-001` — PR-25 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-22 (session 27) |
+| Subject | PR-25 (`src/daemon/serve/thread.ts`, `test/daemon/serve/thread.test.ts`, `test/fixtures/v1-provenance.json`, the PT-13 and PT-14 cells of THREAT-MODEL §4), branch `f1/25-serve-thread` from `main` `1cc2ef6`; the `thread` half of `thin-client-tools › status and thread are local, no-network reads` and `Fence soundness and origin labels` (PT-13, PT-14). Closes unit 7. |
+| Authority | **The Director**, who owns DN-05; session-27 delegation. |
+| Decision | **ODD + Judgment Day**, both blind judges in parallel over a frozen worktree at `9984ff5`; the independent verifier in parallel over its own. |
+| Round 1 | Judge B: **no findings**. Judge A: 1 SUGGESTION (the "no `ledger/cursors` call" claim unpinned). The verifier reproduced every figure and found transcript fields no test read (`eid`, `type`, `at`, `via`; five of its six mutants survived) and design §15's PT map not naming `serve/thread` (gated; recorded as an apply-time note). Corrected by the parent in `3e314a0` (tests and records only; no source byte changed). |
+| Scoped re-judgment | `9984ff5..3e314a0`: all three rows verified by both judges, 0 regressions, 0 new defects. One of two used. |
+| Outcome | **JUDGMENT: APPROVED** for `9984ff5..3e314a0`. PT-14 pinned **end to end through admission** (a forged envelope `from` against a Telegram-verified sender). Sweep: **28 mutants (20 parent + 6 verifier + 2 on `via`), 27 killed / 1 survived (`M0`, the control)**, 0 build failures. 701 tests (700 pass, 1 skip), `test:static` 8/8. Authored diff **622 lines (226 src + 390 test + 6 fixture)**, a disclosed **222-line PR-scoped exception**. |
+| Native review | Not started, for the reason PR-23's record gives. |
+| Left open, carried to the Director | None new. B-40 and B-41 stand. |
+| Consequence | **DN-05 is not satisfied for PR-25 either.** Row PR-25 complete: **31 PR blocks / 26 row ids merged (132 of the 210 task checkboxes), 14 blocks / 16 row ids remain (`PR-26…PR-42`)**. Unit 7 `durable-inbox` closed. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)
