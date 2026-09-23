@@ -14,8 +14,9 @@
  * {@link ipcErrorSchema}-shaped body and one of this contract's transport codes.
  *
  * **Connection handling on a refusal.** A refusal raised BEFORE the request body has been fully read
- * (`Host` mismatch, unknown route) closes the connection afterwards (`Connection: close`, then the
- * socket is destroyed once the response has flushed): the leftover, unread request bytes would
+ * (`Host` mismatch, unknown route) closes the connection afterwards (`Connection: close`, which
+ * already makes Node end the socket once the response has flushed; the explicit destroy after the
+ * flush is belt-and-braces and not separately observable): the leftover, unread request bytes would
  * otherwise corrupt whatever the client sends next on a kept-alive socket. A refusal raised AFTER the
  * body has already been fully drained (wrong content type, malformed JSON, a body on `GET`/`DELETE`,
  * a handler that threw) answers on the same connection normally, because there is nothing left unread
@@ -112,9 +113,22 @@ function declaredContentLength(header: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/**
+ * `JSON.stringify(body)`, refusing a body that serializes to nothing (`undefined`, a function): a
+ * response labelled `application/json` must carry a JSON text, so such a handler result is the
+ * handler's fault and lands in the 500 path like a throw.
+ */
+function serializeBody(body: unknown): string {
+  const payload: string | undefined = JSON.stringify(body);
+  if (payload === undefined) {
+    throw new TypeError("response body does not serialize to JSON");
+  }
+  return payload;
+}
+
 /** Writes a JSON response and returns; the connection stays open for the next request. */
 function respondJson(res: ServerResponse, status: number, body: unknown): void {
-  const payload = JSON.stringify(body); // serialized before the head, so a throw leaves no response half-written
+  const payload = serializeBody(body); // before the head, so a throw leaves no response half-written
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(payload);
 }
@@ -125,8 +139,9 @@ function respondJson(res: ServerResponse, status: number, body: unknown): void {
  * paragraph).
  */
 function respondJsonAndClose(res: ServerResponse, req: IncomingMessage, status: number, body: unknown): void {
+  const payload = serializeBody(body);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", Connection: "close" });
-  res.end(JSON.stringify(body), () => {
+  res.end(payload, () => {
     req.socket?.destroy();
   });
 }

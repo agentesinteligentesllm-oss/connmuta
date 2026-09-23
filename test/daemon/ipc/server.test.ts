@@ -556,7 +556,7 @@ test("a refusal raised before the body is read announces Connection: close", asy
   });
 });
 
-test("a body streamed far past the cap never grows the server and the server keeps serving", async () => {
+test("a body streamed far past the cap is refused (413 or reset) and the server keeps serving", async () => {
   // A client still writing when the refusal lands may read the 413 or meet a reset (unread bytes at
   // close): both are acceptable; the server must stop accumulating and stay up for the next request.
   await withServer({ "POST /tools/status": echoHandler() }, async (port) => {
@@ -582,4 +582,121 @@ test("a body streamed far past the cap never grows the server and the server kee
     const next = await sendRequest({ port, method: "POST", path: "/tools/status", contentType: "application/json", body: "{}" });
     assert.equal(next.status, HTTP_OK);
   });
+});
+
+test("close() before listen() resolves", async () => {
+  const server = createIpcServer({ handlers: {} });
+  await server.close();
+});
+
+test("close() ends a kept-alive connection that is still open", async () => {
+  const server = createIpcServer({ handlers: { "POST /tools/status": echoHandler() } });
+  const { port } = await server.listen();
+  const agent = new http.Agent({ keepAlive: true });
+  const socketClosed = await new Promise<boolean>((resolve, reject) => {
+    const req = http.request(
+      {
+        host: IPC_LOOPBACK_HOST,
+        port,
+        method: "POST",
+        path: "/tools/status",
+        agent,
+        headers: { Host: `${IPC_LOOPBACK_HOST}:${port}`, "Content-Type": "application/json", "Content-Length": "2" },
+      },
+      (res) => {
+        res.resume();
+        res.on("end", () => {
+          assert.ok(openSocket, "the request must have been given a socket");
+          openSocket.once("close", () => resolve(true));
+          void server.close();
+        });
+      },
+    );
+    let openSocket: net.Socket | undefined;
+    req.on("socket", (socket) => {
+      openSocket = socket;
+    });
+    req.on("error", reject);
+    req.end("{}");
+  });
+  agent.destroy();
+  assert.equal(socketClosed, true);
+});
+
+test("an early refusal closes the socket even while the client still owes the body", async () => {
+  await withServer({ "POST /tools/status": echoHandler() }, async (port) => {
+    const closed = await new Promise<boolean>((resolve) => {
+      const socket = net.connect({ host: IPC_LOOPBACK_HOST, port }, () => {
+        socket.write(`POST /tools/status HTTP/1.1
+Host: localhost:${port}
+Content-Type: application/json
+Content-Length: 10
+
+`);
+      });
+      socket.resume();
+      socket.on("close", () => resolve(true));
+      socket.on("error", () => {});
+    });
+    assert.equal(closed, true);
+  });
+});
+
+test("DELETE /session without a body reaches its handler, with a body is refused with 400", async () => {
+  let called = 0;
+  await withServer({ "DELETE /session": () => (called += 1, { status: HTTP_OK, body: { closed: true } }) }, async (port) => {
+    const ok = await sendRequest({ port, method: "DELETE", path: "/session" });
+    assert.equal(ok.status, HTTP_OK);
+    const withBody = await sendRequest({ port, method: "DELETE", path: "/session", contentType: "application/json", body: "{}" });
+    assert.equal(withBody.status, HTTP_BAD_REQUEST);
+    assert.equal(ipcErrorSchema.parse(JSON.parse(withBody.bodyText)).code, IPC_BAD_REQUEST);
+  });
+  assert.equal(called, 1);
+});
+
+test("a POST with no Content-Type, or a media type that only starts with application/json, is refused with 415", async () => {
+  await withServer({ "POST /tools/status": echoHandler() }, async (port) => {
+    const missing = await sendRequest({ port, method: "POST", path: "/tools/status", body: "{}" });
+    assert.equal(missing.status, HTTP_UNSUPPORTED_MEDIA_TYPE);
+    const prefixed = await sendRequest({ port, method: "POST", path: "/tools/status", contentType: "application/jsonx", body: "{}" });
+    assert.equal(prefixed.status, HTTP_UNSUPPORTED_MEDIA_TYPE);
+  });
+});
+
+test("a wrong media type is reported as 415 even when the body is also empty", async () => {
+  await withServer({ "POST /tools/status": echoHandler() }, async (port) => {
+    const res = await sendRequest({ port, method: "POST", path: "/tools/status", contentType: "text/plain", body: "" });
+    assert.equal(res.status, HTTP_UNSUPPORTED_MEDIA_TYPE);
+  });
+});
+
+test("a handler result with an undefined body answers 500 instead of an empty JSON response", async () => {
+  await withServer({ "POST /tools/status": () => ({ status: HTTP_OK, body: undefined }) }, async (port) => {
+    const res = await sendRequest({ port, method: "POST", path: "/tools/status", contentType: "application/json", body: "{}" });
+    assert.equal(res.status, HTTP_INTERNAL_SERVER_ERROR);
+    assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, IPC_INTERNAL_ERROR);
+  });
+});
+
+test("close() resolves while a handler is still pending, ending its connection", async () => {
+  let entered: () => void = () => {};
+  const handlerEntered = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const server = createIpcServer({
+    handlers: {
+      "POST /tools/status": () => {
+        entered();
+        return new Promise<never>(() => {});
+      },
+    },
+  });
+  const { port } = await server.listen();
+  const clientOutcome = sendRequest({ port, method: "POST", path: "/tools/status", contentType: "application/json", body: "{}" }).then(
+    () => "answered",
+    () => "connection ended",
+  );
+  await handlerEntered;
+  await server.close();
+  assert.equal(await clientOutcome, "connection ended");
 });

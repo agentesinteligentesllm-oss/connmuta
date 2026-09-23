@@ -5506,3 +5506,50 @@ HTTP/1.0 framing, chunked decoding) is most of the test weight.
 
 **Verification at the candidate.** `rm -rf dist && npm test`: **850 tests (849 pass, 1 skip)**; `npm run test:static`:
 **8/8**; `node --test` over the two twins: **49/49**.
+
+**Native review.** `gentle-ai review assess --base-ref 4d5de08 --committed-only --untracked-scope=exclude` over `145e3f1`:
+risk `medium`, `review_due: true`, `review_due_reason: slice_budget_reached`, 1,548 changed lines. Not started: the target
+is a Judgment Day target, and the installed `judgment-day` skill states both must never run on one target (HANDOFF §2.3).
+The independent verifier below ran in its place.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-29-audit-001`; both blind judges over a frozen worktree at `145e3f1`, the
+independent verifier in parallel over its own). Judge A: 2 SUGGESTION. Judge B: 2 WARNING. No row from both judges, no
+defect in the shipped behaviour:
+
+- `JD-A-001` (SUGGESTION): `respondJsonAndClose` serialised after `writeHead`, unlike `respondJson`. **Corrected**: both
+  serialise first through one `serializeBody`.
+- `JD-A-002` (SUGGESTION): the far-past-the-cap test's name claimed "never grows the server", which no assertion measures.
+  **Corrected**: renamed to what it asserts (413 or reset, then the server keeps serving).
+- `JD-B-001` (WARNING): `close()`'s two documented guarantees (safe before `listen()`; ends open connections) had no test
+  that could fail. **Corrected**: close before listen; close while a handler is still pending ends its connection (the
+  mutant swapping `closeAllConnections` for `closeIdleConnections` now dies by timeout).
+- `JD-B-002` (WARNING): the socket destroy after an early refusal had no test that could fail. A test now shows the socket
+  closes while the client still owes its body; the mutant removing the explicit `destroy()` still survives and is
+  **equivalent** — `Connection: close` already makes Node end the socket after the flush (`destroySoon`); the module doc now
+  says so.
+
+Both judges' rows were corrected under the Director's session-29 delegation instead of a per-batch question.
+
+**Independent verifier** (separate agent, its own frozen worktree at `145e3f1`): every figure reproduced exactly (1,468 with
+the per-file split; 850 / 849 / 1; 8/8; 49/49; 23 registry entries; no `Provenance:`); the claimed server mutants reproduced
+verdict for verdict, `S9` and `S23` judged equivalent independently; the contract mutants, whose exact texts lived in the
+untracked sweep files, were reconstructed from their meanings and reproduced. Its probes found no crash, hang, double
+response or cap bypass (duplicate, negative or garbage `Content-Length` and `Transfer-Encoding` with `Content-Length` are
+refused by Node's parser; Host with a trailing dot, upper case or IPv6 form is refused 403; absolute-form targets cannot
+bypass the Host check). Of its six mutants one was killed and five survived — the socket destroy (`JD-B-002`'s row), `DELETE`
+never driven through the server, 415-before-400 precedence, a prefix media-type match, and a missing `Content-Type` — each now
+pinned and killed except the equivalent destroy. `V-006` (WARNING): a handler returning `body: undefined` sent an empty body
+labelled `application/json`; **corrected** — `serializeBody` refuses it and the request takes the 500 path. `V-007`
+(informational: a non-integer handler status is coerced by Node) and `V-008` (informational: `//identity` lands on 404
+because WHATWG `URL` reads it as protocol-relative) are recorded, not actioned: handlers are daemon code (PR-30/31) and both
+fail closed.
+
+**Round 1** (parent, inline). Source: `serializeBody` for both response helpers; the doc on the socket close. Tests: seven —
+close before listen, close with a pending handler, the early-refusal socket close, `DELETE` with and without a body, a
+missing or prefix-only media type, 415 before 400, and an undefined handler body — plus the rename. Sweeps at the round-1
+tip (`S12` re-anchored; the round's `R` mutants added): **`server.ts` 32 mutants, 27 killed (four by timeout) / 4 survived
+(`S0` control; `S9`, `S23`, `R1` equivalent) / 1 build failure (`S14`)**; **`ipc-contract.ts` 19 mutants, 18 killed / 1
+survived (`C0` control)**.
+
+**At the round-1 tip:** **1,600 authored lines (642 src + 958 test), a disclosed 1,200-line PR-scoped exception**; `rm -rf
+dist && npm test` **858 tests (857 pass, 1 skip)**; `test:static` **8/8**; the two twins **57/57**.

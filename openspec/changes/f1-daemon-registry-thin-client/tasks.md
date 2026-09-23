@@ -743,7 +743,7 @@ Runtime harness: fake Telegram client returning a 429 with `retry_after_s`.
 
 #### PR-29 — IPC contract + HTTP server scaffolding
 Branch `f1/29-ipc-contract-server` → `main`. Depends: PR-28. Size: ≈310 lines, no exception.
-*Size reconciliation (session 29).* Estimated ≈310; **measured 1,468 authored lines (627 src + 841 test) at the candidate, a disclosed 1,068-line PR-scoped exception** — see `apply-progress.md` §PR-29. The estimate line above is the gate's text and is left as written.
+*Size reconciliation (session 29).* Estimated ≈310; **measured 1,468 authored lines (627 src + 841 test) at the candidate, a disclosed 1,068-line PR-scoped exception** (1,600 lines and a 1,200-line exception after Judgment Day round 1) — see `apply-progress.md` §PR-29. The estimate line above is the gate's text and is left as written.
 Scope: `src/shared/ipc-contract.ts`, `src/daemon/ipc/server.ts`, `test/shared/ipc-contract.test.ts`, `test/daemon/ipc/server.test.ts`.
 Requirements: transport scaffolding underlying every `ipc-handshake` requirement (`Host` DNS-rebinding check, body cap `IPC_MAX_BODY_BYTES`).
 Runtime harness: real `node:http` listener on port 0 (design §15 "IPC" layer).
