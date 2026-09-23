@@ -4795,10 +4795,17 @@ being `M0`, the comment-only control**; 0 build failures. Listed inline, since t
 | `M19` | rows never re-read after the wait | KILLED |
 | `M20` | aborted call still persists (added in round 1, JD-A-005) | KILLED |
 | `M21` | `max_batch` floor removed (added in round 1, JD-B-002) | KILLED |
+| `M22` | compact ignores an active gap warning (round 2, verifier E2) | KILLED |
+| `M23` | `force_full` ignored (round 2, verifier E3) | KILLED |
+| `M24` | unannounced closures never listed (round 2, verifier E4) | KILLED |
+| `M25` | `waiting_on_peer` direction inverted (round 2, verifier E5) | KILLED |
+| `M26` | `waiting_on_peer` ignores participation (round 2, verifier E5) | KILLED |
 
 At the round-1 fix tip the three anchors the corrections moved (`M6`, `M7`, `M18`) were re-pointed at the
 equivalent new code with the same mutation intent, and `M20`/`M21` were added: **22 mutants, 21 killed / 1
-survived (`M0`)**, 0 build failures.
+survived (`M0`)**, 0 build failures. At the round-2 tip, after `M22`–`M26` were added and first observed
+**SURVIVING** against the round-1 tip (the RED for round 2's tests): **27 mutants, 26 killed / 1 survived (`M0`)**,
+0 build failures.
 
 **Disclosed limits (not defects of this slice).** `unanchored` counts only the refused half — admission never
 persists the ADR-13 "authorized despite a null anchor" flag; `skipped` windows on `audit_log.ts`, which is the
@@ -4809,8 +4816,9 @@ fixture)** against a ≈350 estimate — a disclosed **1,001-line PR-scoped exce
 lines; the module also rebuilds from the ledger the `log`/`rejected`/`unapplied`/`skipped`/checkpoint half v1
 computed in the same pass (`v1:fetch.ts:500-663`, now admission's), and carries the module doc the SEAM changes
 need. At the round-1 fix tip: **1,609 authored lines (752 src + 851 test + 6 fixture)**, a disclosed **1,209-line
-PR-scoped exception** — round 1 added +21 src and +187 test, almost all of it the seven pinning tests the judges
-asked for.
+PR-scoped exception** — round 1 added +21 src and +187 test, almost all of it the six pinning tests the judges
+asked for (668 − 662 = 6; the round-1 record first said "seven", which Judge A's scoped re-judgment caught as
+a NEW suggestion and round 2 corrected).
 
 **Verification at the candidate `e276bde`.** `rm -rf dist && npm test`: **662 tests (661 pass, 1 skip)**; `npm run
 test:static`: **8/8**; `node --test dist/test/daemon/serve/fetch.test.js`: **20/20**. **At the round-1 fix tip:**
@@ -4838,3 +4846,24 @@ The native review was **not started** for this candidate: the installed `judgmen
 replaces ordinary 4R as the adversarial method for a target and that both must never run on the same one, and a
 native START would open a consent envelope only the Director may answer, in a session the Director asked to run without
 interruptions. The RDD fallback's separate independent verifier ran instead (below).
+
+**Scoped re-judgment of round 1** (both judges, over the frozen ledger plus `e276bde..44234a0` only): **all eight
+rows `verified` by both judges, 0 regressions**; Judge A added one NEW SUGGESTION — the record's "seven pinning
+tests" where the delta holds six — corrected in round 2.
+
+**Independent verifier** (separate agent, its own frozen worktree at `44234a0`, mandate to reproduce figures and
+re-run the sweep): every figure reproduced exactly — 1,401 (731 + 664 + 6) at `e276bde`, 1,609 (752 + 851 + 6) at
+`44234a0`, 668 / 667 / 1, `test:static` 8/8, focused 26/26, 19 registry entries, the `077561ae…` hash from the
+frozen v1 checkout, the 22-mutant sweep, and the SQLite `LIMIT -5` behaviour. It then wrote five mutants of its own
+against guarantees the sweep did not cover: one was killed (a BROADCAST is never `misaddressed`) and **four
+survived — four ported v1 behaviours no test reached**: the compact tick blocked by an active `gap_warning`,
+`force_full`, `unannounced_closures`, and the population of `waiting_on_peer` (every fixture awaited this agent,
+so the filter always excluded them). No incorrect runtime behaviour was found. It also found that design §8.4
+(`design.md:343`) still credits "ADR-0025 semantics" to `mark_seen: false`, the citation `JD-A-001` corrected in
+the module — recorded as an apply-time note in `tasks.md`'s PR-23 block, since a gated design's text is not
+rewritten.
+
+**Round 2** (parent, inline — four tests and two record lines): the four gaps are pinned by four new tests, each
+proven by a mutant that survived before it and dies after it (`M22`–`M26`), and the "seven" is corrected. At the
+round-2 tip: **1,682 authored lines (752 src + 924 test + 6 fixture), a disclosed 1,282-line PR-scoped exception**;
+`rm -rf dist && npm test` **672 tests (671 pass, 1 skip)**; `test:static` **8/8**; focused **30/30**.

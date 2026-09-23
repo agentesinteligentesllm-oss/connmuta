@@ -849,3 +849,76 @@ test("an aborted caller writes nothing, even with mark_seen true and rows that a
 		);
 	});
 });
+
+test("waiting_on_peer lists the threads this agent is party to and the peer owes, with the peer's text fenced and ours raw", async () => {
+	await withLedger(async (db) => {
+		writeThread(db, "thread-out", { from: AGENT_ID, to: PEER_AGENT_ID, to_user_id: PEER_USER_ID, awaiting: PEER_AGENT_ID, body: "my ask", opened_at: NOW });
+		writeThread(db, "thread-in", { from: PEER_AGENT_ID, to: AGENT_ID, awaiting: PEER_AGENT_ID, body: "their ask", opened_at: LATER });
+		writeThread(db, "thread-other", { from: PEER_AGENT_ID, to: "@carol-agent", to_user_id: null, awaiting: "@carol-agent", body: "not ours" });
+
+		const result = await serveFetch({}, { db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(LATER2) });
+
+		assert.deepEqual(
+			result.waiting_on_peer.map((entry) => [entry.thread, entry.direction, entry.peer]),
+			[
+				["thread-out", "outbound", PEER_AGENT_ID],
+				["thread-in", "inbound", PEER_AGENT_ID],
+			],
+			"oldest first, and a thread this agent is not party to never appears",
+		);
+		assert.equal(result.waiting_on_peer[0].body, "my ask", "our own text is not fenced");
+		const inbound = result.waiting_on_peer[1].body ?? "";
+		assert.ok(inbound.startsWith("<UNTRUSTED-PEER-INPUT "), "the peer's text is fenced");
+		assert.ok(inbound.includes(`agent_id="${PEER_AGENT_ID}" user_id="${PEER_USER_ID}"`), "with the peer's verified origin");
+		assert.deepEqual(result.needs_action, [], "none of these await this agent");
+	});
+});
+
+test("unannounced_closures lists resolved threads whose closure was never delivered, oldest resolution first", async () => {
+	await withLedger(async (db) => {
+		const resolved = { status: "resolved" as const, awaiting: null, resolved_by: AGENT_ID };
+		writeThread(db, "thread-closed-late", { ...resolved, closure_delivered: false, resolved_at: LATER2, basis: "done later" });
+		writeThread(db, "thread-closed-early", { ...resolved, closure_delivered: false, resolved_at: LATER, basis: "done" });
+		writeThread(db, "thread-closed-delivered", { ...resolved, closure_delivered: true, resolved_at: LATER });
+		writeThread(db, "thread-still-open", { closure_delivered: false });
+
+		const result = await serveFetch({}, { db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(LATER2) });
+
+		assert.deepEqual(result.unannounced_closures, [
+			{ thread: "thread-closed-early", to: AGENT_ID, resolved_at: LATER, basis: "done" },
+			{ thread: "thread-closed-late", to: AGENT_ID, resolved_at: LATER2, basis: "done later" },
+		]);
+	});
+});
+
+test("force_full re-emits bodies a client already saw and never answers with the compact tick", async () => {
+	await withLedger(async (db) => {
+		writeThread(db, "thread-full", { awaiting: AGENT_ID, opened_at: NOW });
+		const binding = sampleBinding();
+		const session = sampleSession("client-a");
+		await serveFetch({}, { db, binding, session, now: () => new Date(NOW) });
+
+		const quiet = await serveFetch({}, { db, binding, session, now: () => new Date(NOW) });
+		assert.equal(quiet.unchanged, true);
+		assert.equal(quiet.needs_action[0].body_omitted, true);
+
+		const full = await serveFetch({ force_full: true }, { db, binding, session, now: () => new Date(NOW) });
+		assert.equal(full.unchanged, false, "force_full never compacts");
+		assert.equal(full.needs_action[0].body_omitted, undefined);
+		assert.ok(full.needs_action[0].body?.includes("opening body"), "force_full re-emits the body");
+	});
+});
+
+test("an active gap_warning always breaks the compact tick, even when the digest did not move", async () => {
+	await withLedger(async (db) => {
+		writeThread(db, "thread-gap", { awaiting: AGENT_ID, opened_at: NOW });
+		const binding = sampleBinding();
+		const session = sampleSession("client-a");
+		await serveFetch({}, { db, binding, session, now: () => new Date(NOW) });
+
+		db.prepare("INSERT INTO offsets (bot_id, next_update_id, last_poll_ok_at) VALUES (?, 0, ?)").run(BOT_ID, "2026-01-01T00:00:00.000Z");
+		const result = await serveFetch({}, { db, binding, session, now: () => new Date(NOW) });
+		assert.ok(result.gap_warning !== undefined);
+		assert.equal(result.unchanged, false, "a possible gap is news, so the full form is mandatory");
+	});
+});
