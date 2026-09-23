@@ -787,6 +787,21 @@ visible.
 | Native review | `assess` (`--base-ref fc1c09f --committed-only`, untracked ODD tree excluded): risk `medium`, `review_due: true` (`slice_budget_reached`). **Not started**: the `judgment-day` skill forbids running ordinary 4R and Judgment Day on one target, and START would open a consent envelope only the Director may answer. The RDD fallback's independent verifier ran instead. |
 | Left open, carried to the Director | None new from PR-23. B-40 (session 27) stands. |
 | Consequence | **DN-05 is not satisfied for PR-23 either.** Row PR-23 complete: **29 PR blocks / 24 row ids merged (125 of the 210 task checkboxes), 16 blocks / 18 row ids remain (`PR-24…PR-42`)**. |
+
+### `bus-v2-f1-pr-24-audit-001` — PR-24 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-22 (session 27) |
+| Subject | PR-24 (`src/daemon/serve/status.ts`, `test/daemon/serve/status.test.ts`, `test/fixtures/v1-provenance.json`, backlog row B-41), branch `f1/24-serve-status` from `main` `53903fe`; the `status` half of `thin-client-tools › status and thread are local, no-network reads` and the status half of the `daemon-lifecycle` 409 scenario. |
+| Authority | **The Director**, who owns DN-05; session-27 delegation, so the batches are disclosed here and in `apply-progress.md` §PR-24. |
+| Decision | **ODD + Judgment Day**, both blind judges run in parallel over a frozen worktree at `5a28378`; the RDD fallback's independent verifier run in parallel with them over its own worktree. |
+| Round 1 | Judge A: 1 WARNING (`tasks.md` "no exception" against a disclosed exception — also on PR-23's block), 1 SUGGESTION (two `offsets` reads). Judge B: 1 WARNING, inferential (`open_threads` has no participation filter), 1 SUGGESTION (`status` cited to design §8.4 instead of §12). The verifier reproduced every figure and found **six output guarantees no test read** (`acked`, `age_hours`, the `reminder_window_hours` echo, the reminder floor and its omitted count, the retention hours). Corrected by the parent in `d221098`; the inferential WARNING kept as info (v1's identical predicate; listing a misaddressed thread is intended). |
+| Scoped re-judgments | Round 1 (`5a28378..d221098`): every row verified by both judges except a **split** on the inferential WARNING's written disposition — Judge A proved the record overstated `isOurBusiness` (a REQUEST to a name the roster cannot resolve is stored), which the parent had found independently; round 2 (`443609d`) restated it. Final (`d221098..443609d`): Judge B no findings; Judge A both rows verified plus one NEW WARNING — a self-contradictory sentence in the record — corrected after the budget in `694cc3d`, measurement-checked, not re-judged. Budget used: two of two. |
+| Outcome | **JUDGMENT: APPROVED** for `5a28378..443609d`. Sweep at the fix tip: **27 mutants (21 parent + 6 verifier), 26 killed / 1 survived (`M0`, the control)**, 0 build failures. 690 tests (689 pass, 1 skip), `test:static` 8/8. Authored diff **857 lines (332 src + 519 test + 6 fixture)**, a disclosed **457-line PR-scoped exception**. |
+| Native review | Not started, for the reason PR-23's record gives (`judgment-day` forbids both methods on one target; START's consent belongs to the Director). |
+| Left open, carried to the Director | **B-41** (new): design §6's `secret_store_fallback` condition has no contract and is dropped by `bootstrap.ts`; `status.secret_store.kind` carries the fact. B-40 stands. |
+| Consequence | **DN-05 is not satisfied for PR-24 either.** Row PR-24 complete: **30 PR blocks / 25 row ids merged (128 of the 210 task checkboxes), 15 blocks / 17 row ids remain (`PR-25…PR-42`)**. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)
