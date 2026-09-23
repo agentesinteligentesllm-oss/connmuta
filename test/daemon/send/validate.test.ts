@@ -201,6 +201,18 @@ test("SendToolError carries the expected name, is an instanceof Error and preser
 	assert.equal(error.code, "VALIDATION_ERROR");
 });
 
+test("SendToolError carries retry_after_s when RATE_LIMITED supplies it (change (11)), and it is absent by default", () => {
+	const rateLimited = new SendToolError("RATE_LIMITED", "rate limited", { retry_after_s: 30 });
+	assert.equal(rateLimited.code, "RATE_LIMITED");
+	assert.equal(rateLimited.retry_after_s, 30);
+
+	const withoutOption = new SendToolError("VALIDATION_ERROR", "test message");
+	assert.equal(withoutOption.retry_after_s, undefined);
+
+	const withCauseOnly = new SendToolError("TRANSPORT_ERROR", "transport failed", { cause: new Error("boom") });
+	assert.equal(withCauseOnly.retry_after_s, undefined);
+});
+
 // --- defaultGenerateId ---
 
 test("defaultGenerateId returns a 12-character lowercase-hex id matching the wire id patterns", () => {

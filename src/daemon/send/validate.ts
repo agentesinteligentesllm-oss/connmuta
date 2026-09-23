@@ -24,7 +24,10 @@
  * direct the closing message to any other roster member and the originator never received it
  * (Judgment Day `JD-A-001`, spec "addressee correct"); (9) the `UNKNOWN_THREAD` remedy names this
  * product's tool, `${TOOL_PREFIX}fetch`, not v1's `agentbus_fetch`; (10) `WRONG_ROOM` added for PR-27's
- * send-path room pre-check, so both modules report through one error class.
+ * send-path room pre-check, so both modules report through one error class; (11) `RATE_LIMITED` added
+ * for PR-28's rate discipline (`send/rate.ts`), and `SendToolError` gains an optional `retry_after_s`
+ * so a locally-refused or reclassified 429 carries the same field a caller would get from Telegram
+ * directly, instead of it being reduced to English inside a message.
  *
  * ---
  *
@@ -120,6 +123,7 @@ export type SendErrorCode =
 	| "ALREADY_RESOLVED"
 	| "UNKNOWN_RECIPIENT"
 	| "WRONG_ROOM"
+	| "RATE_LIMITED"
 	| "TRANSPORT_ERROR";
 
 /**
@@ -131,11 +135,14 @@ export type SendErrorCode =
  */
 export class SendToolError extends Error {
 	readonly code: SendErrorCode;
+	/** Seconds until a rate-limited send may be retried — set only for `RATE_LIMITED` (change (11)). */
+	readonly retry_after_s?: number;
 
-	constructor(code: SendErrorCode, message: string, options?: { cause?: unknown }) {
+	constructor(code: SendErrorCode, message: string, options?: { cause?: unknown; retry_after_s?: number }) {
 		super(message, options);
 		this.name = "SendToolError";
 		this.code = code;
+		this.retry_after_s = options?.retry_after_s;
 	}
 }
 

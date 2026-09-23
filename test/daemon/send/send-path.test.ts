@@ -21,6 +21,7 @@ import { DirectTransport } from "../../../src/daemon/transport/direct.js";
 import { DualWriteTransport } from "../../../src/daemon/transport/dual.js";
 import { SendToolError, guardEncodedLength } from "../../../src/daemon/send/validate.js";
 import { BindingMutex, sendPath, type SendPathDeps } from "../../../src/daemon/send/send-path.js";
+import { SendRateBudget } from "../../../src/daemon/send/rate.js";
 import { FakeTelegramClient } from "../../fakes/telegram.js";
 import { deliveredText } from "../../fakes/delivered-text.js";
 
@@ -132,11 +133,25 @@ function sequentialIdGenerator(startAt = 1): () => string {
 	return () => hexId(n++);
 }
 
-/** A deterministic, strictly-increasing clock — one millisecond per call, so `since` ordering is testable. */
-function sequentialClock(startIso: string): () => Date {
+/**
+ * A deterministic, strictly-increasing clock — `stepMs` per call (default 1, so `since` ordering is
+ * testable at millisecond granularity). `buildDeps` below uses a much larger default step: PR-28's
+ * `SendRateBudget` enforces `CHAT_MESSAGES_PER_SECOND` per `(bot_id, chat)` — including the group
+ * chat itself — so two sends sharing one `deps` object less than a second apart on the clock would
+ * otherwise be refused by a window that exists to model real elapsed time, not this suite's synthetic
+ * one.
+ */
+function sequentialClock(startIso: string, stepMs = 1): () => Date {
 	let epochMs = Date.parse(startIso);
-	return () => new Date(epochMs++);
+	return () => {
+		const current = new Date(epochMs);
+		epochMs += stepMs;
+		return current;
+	};
 }
+
+/** Comfortably over `RATE_WINDOW_SECOND_MS` (1000 ms, `send/rate.ts`) — see {@link sequentialClock}'s doc. */
+const CLOCK_STEP_MS = 1_100;
 
 interface BindingFixture {
 	readonly projectId: string;
@@ -218,7 +233,8 @@ function buildDeps(db: DatabaseSync, binding: BindingFixture, overrides: Partial
 		transport: binding.transport,
 		roomGuard: binding.roomGuard,
 		mutex: new BindingMutex(),
-		now: sequentialClock(NOW),
+		rateBudget: new SendRateBudget(),
+		now: sequentialClock(NOW, CLOCK_STEP_MS),
 		generateId: sequentialIdGenerator(1),
 		...overrides,
 	};
@@ -886,6 +902,8 @@ describe("BindingMutex", () => {
 
 	it("sendPath on two different bindings sharing one mutex runs concurrently — the lock is per project_id", async () => {
 		await withLedger(async (db) => {
+			// MAIN and ISO each get their own buildDeps (different bot_id), so PR-28's SendRateBudget
+			// windows — keyed by bot_id — never collide between them regardless of clock step.
 			const main = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
 			const iso = buildBinding({ projectId: PROJECT_ISO_A, botId: BOT_ID_ISO_A, groupId: GROUP_ISO_A_ID, agentId: ISO_A_AGENT, entries: ENTRIES_ISO_A });
 			const mutex = new BindingMutex();
@@ -924,6 +942,12 @@ describe("BindingMutex", () => {
 	it("BindingMutex: two concurrent sendPath ACK calls on the same thread both land — ack_count ends at 2", async () => {
 		await withLedger(async (db) => {
 			const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
+			// Both ACKs share one deps/rateBudget and target the same group + @alice chat. BindingMutex
+			// still serialises them onto one project_id even though they are launched concurrently below,
+			// and buildDeps's CLOCK_STEP_MS-per-call clock (>= RATE_WINDOW_SECOND_MS) keeps the second
+			// ACK's rate check outside the first's CHAT_MESSAGES_PER_SECOND window, so no extra override
+			// is needed here — this is the "concurrent-ACK test" PR-28's rate budget could otherwise
+			// refuse (see sequentialClock's doc).
 			const deps = buildDeps(db, binding);
 			const threadId = hexId(800);
 			writeThread(db, PROJECT_MAIN, threadId, { from: ALICE, to: BOB, to_user_id: BOB_USER_ID, opened_eid: "open-800" });

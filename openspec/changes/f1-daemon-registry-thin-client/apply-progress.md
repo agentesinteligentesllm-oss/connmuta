@@ -5330,3 +5330,63 @@ in the budget was used.
 12 blocks / 14 row ids remaining (`PR-28…PR-42`). Unit 8 `send-path` closes with PR-28 (`daemon/send/rate.ts`), which
 adds the `offsets.retry_after_until` check and the per-binding message budget to the send path, immediately before
 `transport.send`, and settles the `RATE_LIMITED` naming.
+
+## PR-28 — `daemon/send/rate.ts` (new code; PT-33 429 half; closes unit 8 `send-path`)
+
+**Route.** ODD with the SDD contract preserved, session 28: one delegated read-only mapper, one delegated writer
+(`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent readback and
+sweeps. No `sdd-apply` phase envelope exists. `rate.ts` is new code (no v1 range): no provenance header, registry
+unchanged at 23 entries.
+
+**Decisions (orchestrator, session 28), stated in the module docs.** (1) **`RATE_LIMITED`** is the tool-facing code, with
+`retry_after_s` carried on `SendToolError` (spec, DATA-MODEL, THREAT-MODEL T22 and tasks agree; `TELEGRAM_RATE_LIMITED`
+stays `daemon/telegram.ts`'s internal classification). (2) **The ledger is the channel.** The mapper traced that a
+`sendMessage` 429 cannot reach the send path through the AS-IS transports with its `retry_after_s`: `GroupSendOutcome` has
+no field for it, `DualWriteTransport` keeps only a DM failure's message and, when nothing landed, throws a new
+`TransportError` without a cause — `classifyErrorChain` finds nothing (inherited byte-for-byte from v1). `RateLimitRecorder`,
+a `TelegramClient` decorator placed beneath the room guard by `bindings.ts`'s `buildTransport`, records
+`offsets.retry_after_until` (touching no other column) and rethrows the same error; the send path reads the column before
+the call (local refusal) and after a failed call (reclassification when it changed during the call). (3) **Two gates**
+before `transport.send`: the ledger backoff, then `SendRateBudget`'s in-memory windows — `GROUP_MESSAGES_PER_MINUTE` per
+`(bot, group)` and `CHAT_MESSAGES_PER_SECOND` per `(bot, chat)` over the group and every DM target — with the slower of two
+violated windows deciding the wait. A refusal makes no call, writes one bodyless `rejected`/`RATE_LIMITED` audit row and
+spends no budget; a pass spends budget before the call. (4) **`RATE_LIMITED` only when nothing landed**; a partial delivery
+is a `degraded` success and the recorded backoff gates the next send. Local abandonment under a full 429 still closes the
+thread (`closure_delivered = 0`) and reports `RATE_LIMITED`. (5) **"Cursor unmoved"** — DATA-MODEL defines no send-side
+cursor; read as "a rate-limited send advances nothing", `offsets.next_update_id` included, and pinned that way. (6)
+Attribution is by change of a per-`bot_id` column; a concurrent 429 on another binding of the same bot would be attributed
+too (the bot is throttled either way), and the poller's success path can clear a send-side backoff early — **B-45**, with
+the poller's `TELEGRAM_RATE_LIMITED` in `last_error_code` and its missing 429 audit row.
+
+**Out-of-Scope edits, disclosed.** `src/daemon/send/send-path.ts` (+114/−8, the wiring and its doc), `src/daemon/send/validate.ts`
+(+9/−2: `RATE_LIMITED`, `retry_after_s`, change (11)), `src/daemon/bindings.ts` (+9/−1: the recorder in `buildTransport`,
+skipped without a ledger), with tests in `send-path.test.ts` (setup only: `rateBudget` and a default clock step of 1.1 s so
+consecutive sends clear the per-chat second window — no assertion changed), `validate.test.ts` (+1) and `bindings.test.ts`
+(+2).
+
+**TDD evidence, stated as it happened.** The writer reports it wrote tests and implementation **together**, not RED first,
+because the wiring's types and the tests depended on each other; the one failure it met was a fixture error (a non-hex
+thread id). There is therefore **no writer RED** for this slice. The behavioural RED is the parent's sweep: **`R11`** (the
+faster of two violated windows reported), **`R12`** (bots sharing a group budget), **`R14`** (a timestamp exactly one
+window old kept), **`W4`** (DM targets left out of the budget) and **`W5`** (the local refusal unaudited) **survived** the
+writer's suite; five tests now pin them and each dies.
+
+**Parent readback corrections.** `rate.ts`'s module doc stood after the imports (moved to the leading block, the repo's
+convention); its "cursor" paragraph contradicted itself (a "send-side cursor" that "belongs to the receive side"); the
+attribution limit and the B-45 interaction were unstated.
+
+**Mutant sweeps** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close). `rate.ts`: **16 mutants, 14 killed / 2
+survived — `R0` (control) and `R4`, equivalent** (`retryAfterSeconds` only answers for a strictly future instant, so
+`ceil` of a positive quotient is already ≥ 1 and the `MIN_RETRY_AFTER_S` floor never acts). Wiring in `send-path.ts`: **11
+mutants, 9 killed / 2 survived — `W0` (control) and `W8`, equivalent** (a backoff already in the future before the call is
+refused by the pre-check, so the value read before a call is null or past and "unchanged" can never be misattributed).
+`bindings.ts`: **2 mutants, 1 killed / 1 survived (`B0`, control)**. PR-27's `send-path.ts` sweep re-run at this tip (`M15`
+re-anchored — the new audit row repeats its old anchor): **41 mutants, 40 killed / 1 survived (`M0`)**. 0 build failures.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **1,182 authored lines (401 src + 781 test)** —
+`rate.ts` 258, `send-path.ts` 122, `validate.ts` 11, `bindings.ts` 10; `rate.test.ts` 668, `bindings.test.ts` 69,
+`send-path.test.ts` 32, `validate.test.ts` 12 — against a ≈220 estimate, a disclosed **782-line PR-scoped exception**;
+plus 1/1 line in THREAT-MODEL §4 (task 28.4, PT-33).
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **797 tests (796 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test` over `rate`, `send-path`, `validate` and `bindings`: **101/101**.

@@ -10,6 +10,7 @@ import { DirectTransport } from "./transport/direct.js";
 import { DualWriteTransport } from "./transport/dual.js";
 import type { Transport } from "./transport/types.js";
 import { materializeBindingConfig, type BindingConfig } from "./binding-config.js";
+import { RateLimitRecorder } from "./send/rate.js";
 
 export interface PollerHandle {
   stop(): Promise<void> | void;
@@ -151,7 +152,14 @@ export class BindingsReconciler {
       return await this.createTransport(binding, config);
     }
     if (this.createTelegramClient && bot) {
-      const client = this.createTelegramClient(bot);
+      const rawClient = this.createTelegramClient(bot);
+      // Rate discipline (PR-28, `send/rate.ts`): inserted BELOW the room guard so it sees every
+      // outbound `sendMessage` — group or direct — before the AS-IS transports can flatten a 429's
+      // `retry_after_s`. Skipped when this reconciler holds no ledger connection, since there is
+      // nowhere to record `offsets.retry_after_until` against.
+      const client: TelegramClient = this.db
+        ? new RateLimitRecorder(rawClient, { db: this.db, bot_id: binding.bot_id })
+        : rawClient;
       const roomGuard = new RoomGuardClient(client, {
         groupId: binding.group_id,
         roster: binding.roster_snapshot,

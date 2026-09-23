@@ -727,14 +727,17 @@ Runtime harness: `FakeTelegramClient` per token driving a real `send-path.ts` in
 
 #### PR-28 — send rate discipline
 Branch `f1/28-send-rate` → `main`. Depends: PR-27. Size: ≈220 lines, no exception.
+*Size reconciliation (session 28).* Estimated ≈220; **measured 1,182 authored lines (401 src + 781 test) at the candidate, a disclosed 782-line PR-scoped exception** — see `apply-progress.md` §PR-28. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/send/rate.ts`, `test/daemon/send/rate.test.ts`.
 Requirements: `send-path › Rate discipline without auto-retry` (PT-33 429 half).
 Runtime harness: fake Telegram client returning a 429 with `retry_after_s`.
 
-- [ ] 28.1 RED: write `test/daemon/send/rate.test.ts` ("429 surfaced, cursor unmoved, no retry": returns `RATE_LIMITED{retry_after_s: 30}`, no automatic retry, cursor unmoved).
-- [ ] 28.2 GREEN: implement `src/daemon/send/rate.ts` (`offsets.retry_after_until` local check, `GROUP_MESSAGES_PER_MINUTE`/`CHAT_MESSAGES_PER_SECOND` timestamp-window budget).
-- [ ] 28.3 Verify: `npm run build && node --test "dist/test/daemon/send/rate.test.js"`.
-- [ ] 28.4 Docs: update the file-name cell(s) of PT-33 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 28.1 RED: write `test/daemon/send/rate.test.ts` ("429 surfaced, cursor unmoved, no retry": returns `RATE_LIMITED{retry_after_s: 30}`, no automatic retry, cursor unmoved).
+- [x] 28.2 GREEN: implement `src/daemon/send/rate.ts` (`offsets.retry_after_until` local check, `GROUP_MESSAGES_PER_MINUTE`/`CHAT_MESSAGES_PER_SECOND` timestamp-window budget).
+- [x] 28.3 Verify: `npm run build && node --test "dist/test/daemon/send/rate.test.js"`.
+- [x] 28.4 Docs: update the file-name cell(s) of PT-33 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Apply-time note (session 28).* Decided by the orchestrator under the Director's session-28 delegation, recorded in `apply-progress.md` §PR-28: (1) **the tool-facing code is `RATE_LIMITED`** — the spec, DATA-MODEL's enums, THREAT-MODEL T22 and this block agree; design §9's `TELEGRAM_RATE_LIMITED` remains the internal classification code of `daemon/telegram.ts`, and the design's text is left as gated. (2) Through the AS-IS transports a `sendMessage` 429 never reaches the send path with its `retry_after_s` (the group outcome has no field for it; `DualWriteTransport` drops the DM error's cause and throws a cause-less error when nothing landed), so `rate.ts`'s `RateLimitRecorder` records `offsets.retry_after_until` beneath the room guard and the send path reads the column before and after the call. This required edits outside the Scope line, disclosed: `send-path.ts` (the wiring), `validate.ts` (`RATE_LIMITED` and `SendToolError.retry_after_s`) and `bindings.ts` (the recorder in `buildTransport`), each with tests. (3) The spec's "cursor unmoved" has no send-side referent in DATA-MODEL; it is read as "a rate-limited send advances nothing", `offsets.next_update_id` included. (4) The poller's own 429 handling disagrees with DATA-MODEL and can clear a send-side backoff early — filed as B-45, not edited here (closed unit 7).
 
 ### Unit 9 — `ipc-handshake`
 
