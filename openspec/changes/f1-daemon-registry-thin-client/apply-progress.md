@@ -5067,3 +5067,11 @@ opening and two history entries; the import scan now refuses `ledger/cursors`; t
 the parent's 20, the verifier's six and two more on `via`: **28 mutants, 27 killed / 1 survived (`M0`)**, 0 build
 failures. At the round-1 tip: **622 authored lines (226 src + 390 test + 6 fixture), a disclosed 222-line PR-scoped
 exception**; `npm test` **701 (700 pass, 1 skip)**; `test:static` **8/8**; focused **11/11**. No source byte changed.
+
+**Scoped re-judgment of round 1** (both judges, `9984ff5..3e314a0`): **all three rows verified by both judges, 0
+regressions, 0 new defects**. **JUDGMENT: APPROVED** for `9984ff5..3e314a0`; one of the two re-judgments in the budget
+was used.
+
+**Board after this slice.** Row PR-25 complete: **31 PR blocks / 26 row ids merged, 132 of the 210 task checkboxes**,
+14 blocks / 16 row ids remaining (`PR-26…PR-42`). **Unit 7 `durable-inbox` is closed**; unit 8 `send-path` opens with
+PR-26 (`daemon/send/validate.ts`).
