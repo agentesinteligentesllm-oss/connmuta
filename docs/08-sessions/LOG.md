@@ -4,6 +4,18 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 29 — PR-29 (opens unit 9 `ipc-handshake`); B-47
+
+- **Date**: 2026-09-23
+- **Authority**: the Director delegated the whole session with no questions ("tienes mi autorización para que tomes las riendas"). Route: ODD with the SDD contract preserved; one delegated mapper and one delegated writer, the parent reading back the candidate and running the mutant sweep before freezing it; Judgment Day with both blind judges plus a separate independent verifier.
+- **PR-29** `src/shared/ipc-contract.ts` + `src/daemon/ipc/server.ts` — PR #33 (`f765b43`, code tip `2a08e84`). The IPC wire contract (HTTP status names, the seven D-13 routes with request and response schemas, a closed non-retryable transport-refusal vocabulary; `DELETE /session` provisional) and the loopback `node:http` transport (`Host` check, route lookup, body cap, JSON checks, handler dispatch; no body validation, no bearer check, no timers). The parent's readback found three defects before freezing (a `close()` that rejected on a second call, an unserialisable handler body that crashed the process through an unhandled rejection, the `host` field described against the wrong DATA-MODEL table). Judgment Day: round 1 with no defect in the shipped behaviour but four test-coverage rows and the verifier's `V-006` (an undefined handler body sent as empty JSON); the first re-judgment raised a row from **both judges** (the doc overstated a surviving mutant's equivalence) and a test that would hang on regression; the second re-judgment verified everything. **APPROVED after both re-judgments of the budget.** 1,609 authored lines (1,209-line exception).
+- **Board**: 147/210 checkboxes; 35 PR blocks / 30 row ids merged; 858 tests (857 pass, 1 skip); `test:static` 8/8; provenance registry 23 entries. Green on both CI legs at the first run.
+- **Native review**: `assess` returned risk `medium`, `review_due: true` (`slice_budget_reached`); not started (a Judgment Day target).
+- **Backlog**: B-47 (THREAT-MODEL traces the IPC `Host` check and the body cap only to the F3 panel). `state.yaml`'s `next_recommended`, stale since session 28 (it still named PR-26), was corrected.
+- **Incident**: the first mutant sweep hung on a mutant that broke the `Host` check (test clients waiting on sockets forever, no per-test or per-process timeout); stopped, the file restored and checked by sha256, and the harness given `--test-timeout` plus a shell-less `spawnSync` timeout (HANDOFF §4).
+- **Lessons**: a real-listener harness is most of a test file's weight (estimates price only sources); a mutant the suite cannot observe must be recorded as such, not called equivalent; every socket-waiting test needs its own timeout.
+- **Next**: PR-30 (identity handshake and per-session bearer, D-14, D-04; PT-24, PT-26).
+
 ## Session 28 — PR-26, PR-27, PR-28 (closes unit 8 `send-path`); B-42…B-46
 
 - **Date**: 2026-09-22 → 2026-09-23
