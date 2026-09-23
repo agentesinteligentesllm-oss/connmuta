@@ -4729,3 +4729,141 @@ documentation commit ran green on both legs.
 
 **Board after this slice.** Row PR-22b is complete: **28 PR blocks / 23 row ids merged, 122 of the 210 task
 checkboxes**, 17 blocks / 19 row ids remaining (`PR-23…PR-42`). PR-23 (`src/daemon/serve/fetch.ts`) opens next.
+
+## PR-23 — `daemon/serve/fetch.ts` (design §8.4; D-02, D-06, D-15, D-19; SEAM from `v1:src/tools/fetch.ts:664-927`)
+
+**Route.** ODD with the SDD contract preserved (HANDOFF §2.1). Session 27 ran it as the parent orchestrator: one
+delegated read-only mapper (API signatures, v1 range, DDL), one delegated writer (`general-purpose`, sonnet) for
+`src/daemon/serve/fetch.ts`, `test/daemon/serve/fetch.test.ts` and the provenance fixture entry, then a parent
+readback that corrected the candidate before it was frozen (below). No `sdd-apply` phase envelope exists.
+
+**TDD evidence, stated as it happened.** The writer's RED was a compile-level RED — the implementation file moved
+aside, `tsc -b` failing with `TS2307` on the missing module — observed before GREEN, not a behavioural RED per
+case. The parent's three corrections below each came with a test that fails without them (the sweep's `M5`,
+`M12`, `M3`/`M4` kill them), which is the behavioural evidence for those clauses.
+
+**What the module does.** `serveFetch(input, deps)` serves one client over the ledger: `ensureClientCursor` (D-19
+catch-up), rows past `inbox_seq` bounded by `min(max_batch, MAX_BATCH)`, the D-02 wait on `inbox:<project_id>`
+bounded by `effectiveWaitSeconds` (`[0, FETCH_LONGPOLL_MAX_SECONDS]`), `log` fenced with the verified origin
+(`updates.from_user_id`, D-15), `rejected` with its audit reason, `unapplied` from `ignored` rows, `misaddressed`,
+the rejected half of `unanchored`, `skipped` from `audit_log` inside the client's `(last_seen_at, now]` window,
+checkpoint windowing, and v1's needs-action tiering, waiting-on-peer, unannounced closures, A4 digest and ADR-22
+per-entry trimming over the per-client `client_surfaced` set; `mark_seen: false` writes nothing but the first-call
+cursor bootstrap. Provenance: SEAM, `v1 body sha256 077561ae…` over lines 664-927 LF-normalized with the
+terminating newline; the method was validated first by reproducing `admission.ts`'s `3bd09d0d…`. Registry: **19
+entries**.
+
+**Parent readback corrections (before the candidate was frozen).** (1) The clock was read once, BEFORE the D-02
+wait (up to 50 s), so `last_seen_at`, the surfaced stamps, ages, the gap check and the `skipped` upper bound
+described when the call arrived, not when the response was built; it is now read again after the wait. (2)
+Checkpoint windowing chose the last checkpoint by `seq` position under a written claim that `seq` order is time
+order, which nothing guarantees; it now uses v1's `received_at >=` comparison. (3) The test named "fetch blocks
+against new ledger rows" could not fail for its name: with the real 20-second `setTimeout`, a wait the event never
+woke would still re-read and find the row; the delay is now injected and never elapses on its own. The first
+20-mutant sweep then left four survivors besides the control: `M4` (listener leak on a timed-out wait), `M6`
+(peek reporting the cursor it would have taken), `M18` (`max_batch` ignored) — three test gaps, each now pinned —
+and `M19`, an **equivalent** mutant: the "subscribe, then re-check" read could never observe a row, because no
+`await` separates the empty read from the subscription and the poller emits on the same thread. The dead re-read
+and the module-doc sentence crediting it with race-freedom were removed and replaced by the real reason.
+
+**Mutant sweep** (`odd/sweep-fetch.mjs`, explicit `[from, to]` pairs, BUILD-FAIL reported separately from KILLED,
+sha256 restore check; the script lives outside the repository, in the untracked ODD tree, and is deleted at
+session close — the same disclosure the PR-12 entry uses). **At the candidate `e276bde`: 20 mutants, 19 killed / 1 survived, the survivor
+being `M0`, the comment-only control**; 0 build failures. Listed inline, since the script is not committed:
+
+| # | Mutant | Outcome |
+|---|---|---|
+| `M0` | control: comment only (MUST SURVIVE) | SURVIVED |
+| `M1` | clamp removed | KILLED |
+| `M2` | negative wait allowed | KILLED |
+| `M3` | event does not wake the wait | KILLED |
+| `M4` | listener never removed | KILLED |
+| `M5` | clock not re-read after the wait | KILLED |
+| `M6` | peek advances the cursor | KILLED |
+| `M7` | peek writes | KILLED |
+| `M8` | log fence uses envelope-independent wrong user id | KILLED |
+| `M9` | ignored rows leak into log | KILLED |
+| `M10` | unanchored not counted | KILLED |
+| `M11` | misaddressed ignores roster | KILLED |
+| `M12` | checkpoint by position, not time | KILLED |
+| `M13` | per-entry trim disabled | KILLED |
+| `M14` | compact ignores news | KILLED |
+| `M15` | skipped window unbounded below | KILLED |
+| `M16` | gap warning never raised | KILLED |
+| `M17` | unresolved origin uses a real id | KILLED |
+| `M18` | max_batch not honoured | KILLED |
+| `M19` | rows never re-read after the wait | KILLED |
+| `M20` | aborted call still persists (added in round 1, JD-A-005) | KILLED |
+| `M21` | `max_batch` floor removed (added in round 1, JD-B-002) | KILLED |
+| `M22` | compact ignores an active gap warning (round 2, verifier E2) | KILLED |
+| `M23` | `force_full` ignored (round 2, verifier E3) | KILLED |
+| `M24` | unannounced closures never listed (round 2, verifier E4) | KILLED |
+| `M25` | `waiting_on_peer` direction inverted (round 2, verifier E5) | KILLED |
+| `M26` | `waiting_on_peer` ignores participation (round 2, verifier E5) | KILLED |
+
+At the round-1 fix tip the three anchors the corrections moved (`M6`, `M7`, `M18`) were re-pointed at the
+equivalent new code with the same mutation intent, and `M20`/`M21` were added: **22 mutants, 21 killed / 1
+survived (`M0`)**, 0 build failures. At the round-2 tip, after `M22`–`M26` were added and first observed
+**SURVIVING** against the round-1 tip (the RED for round 2's tests): **27 mutants, 26 killed / 1 survived (`M0`)**,
+0 build failures.
+
+**Disclosed limits (not defects of this slice).** `unanchored` counts only the refused half — admission never
+persists the ADR-13 "authorized despite a null anchor" flag; `skipped` windows on `audit_log.ts`, which is the
+message date, so a drop delivered late can fall before a client's window; a first peek creates the cursor row.
+
+**Budget.** `git diff --numstat -- src test` at the candidate `e276bde`: **1,401 authored lines (731 src + 664 test + 6
+fixture)** against a ≈350 estimate — a disclosed **1,001-line PR-scoped exception**. The estimate priced the 264 v1
+lines; the module also rebuilds from the ledger the `log`/`rejected`/`unapplied`/`skipped`/checkpoint half v1
+computed in the same pass (`v1:fetch.ts:500-663`, now admission's), and carries the module doc the SEAM changes
+need. At the round-1 fix tip: **1,609 authored lines (752 src + 851 test + 6 fixture)**, a disclosed **1,209-line
+PR-scoped exception** — round 1 added +21 src and +187 test, almost all of it the six pinning tests the judges
+asked for (668 − 662 = 6; the round-1 record first said "seven", which Judge A's scoped re-judgment caught as
+a NEW suggestion and round 2 corrected).
+
+**Verification at the candidate `e276bde`.** `rm -rf dist && npm test`: **662 tests (661 pass, 1 skip)**; `npm run
+test:static`: **8/8**; `node --test dist/test/daemon/serve/fetch.test.js`: **20/20**. **At the round-1 fix tip:**
+**668 tests (667 pass, 1 skip)**, `test:static` **8/8**, focused **26/26**.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-23-audit-001`; both blind judges ran this time, over a frozen worktree at
+`e276bde`, in parallel, graph shape `{findings, evidence}`). Judge A: 0 CRITICAL, 4 WARNING, 2 SUGGESTION. Judge B:
+1 CRITICAL, 2 WARNING. Merged into eight ledger rows, **every single-judge row reproduced deterministically by the
+parent before any correction**: `JD-B-001` (CRITICAL, single judge) — `FETCH_MISSING_REJECTION_AUDIT_MESSAGE` was a
+documented refusal no test reached (ADR-12); `JD-B-002` — a negative `max_batch` bound a negative SQLite `LIMIT`,
+which SQLite reads as no limit (reproduced: `LIMIT -5` over three rows returns three), now clamped to `[1, MAX_BATCH]`
+by `MIN_FETCH_BATCH`; `JD-A-001` — the peek rule was cited to ADR-0025, which never mentions `mark_seen`; the rule is
+ADR-0016's; `JD-A-002` — D-26's import-graph claim had no test (a source-scan test now pins it; the closure scan stays
+PR-40's task 40.3); `JD-A-003` — two unpinned claims (a first-call peek bootstraps the cursor and writes nothing
+else; `misaddressed`/`unanchored` count before the checkpoint slice); `JD-A-004` — the thread listing is N+1, not
+"one indexed lookup"; `JD-A-005` (SUGGESTION, inferential) — a call whose caller aborted still advanced and stamped
+a response that may never be delivered; it now persists nothing; `JD-AB-006` (both judges) — the sweep script is
+not in the repository, now disclosed with the table above. The batch was applied by the bounded fix actor
+(`jd-fix-agent`); its size and cost are disclosed here under the Director's session-27 delegation instead of a
+per-batch question.
+
+**Native review.** `gentle-ai review assess --base-ref fc1c09f --committed-only --untracked-scope=exclude` over
+`e276bde`: risk `medium`, `review_due: true`, `review_due_reason: slice_budget_reached`, 5 paths / 1,460 changed lines.
+The native review was **not started** for this candidate: the installed `judgment-day` skill states that Judgment Day
+replaces ordinary 4R as the adversarial method for a target and that both must never run on the same one, and a
+native START would open a consent envelope only the Director may answer, in a session the Director asked to run without
+interruptions. The RDD fallback's separate independent verifier ran instead (below).
+
+**Scoped re-judgment of round 1** (both judges, over the frozen ledger plus `e276bde..44234a0` only): **all eight
+rows `verified` by both judges, 0 regressions**; Judge A added one NEW SUGGESTION — the record's "seven pinning
+tests" where the delta holds six — corrected in round 2.
+
+**Independent verifier** (separate agent, its own frozen worktree at `44234a0`, mandate to reproduce figures and
+re-run the sweep): every figure reproduced exactly — 1,401 (731 + 664 + 6) at `e276bde`, 1,609 (752 + 851 + 6) at
+`44234a0`, 668 / 667 / 1, `test:static` 8/8, focused 26/26, 19 registry entries, the `077561ae…` hash from the
+frozen v1 checkout, the 22-mutant sweep, and the SQLite `LIMIT -5` behaviour. It then wrote five mutants of its own
+against guarantees the sweep did not cover: one was killed (a BROADCAST is never `misaddressed`) and **four
+survived — four ported v1 behaviours no test reached**: the compact tick blocked by an active `gap_warning`,
+`force_full`, `unannounced_closures`, and the population of `waiting_on_peer` (every fixture awaited this agent,
+so the filter always excluded them). No incorrect runtime behaviour was found. It also found that design §8.4
+(`design.md:343`) still credits "ADR-0025 semantics" to `mark_seen: false`, the citation `JD-A-001` corrected in
+the module — recorded as an apply-time note in `tasks.md`'s PR-23 block, since a gated design's text is not
+rewritten.
+
+**Round 2** (parent, inline — four tests and two record lines): the four gaps are pinned by four new tests, each
+proven by a mutant that survived before it and dies after it (`M22`–`M26`), and the "seven" is corrected. At the
+round-2 tip: **1,682 authored lines (752 src + 924 test + 6 fixture), a disclosed 1,282-line PR-scoped exception**;
+`rm -rf dist && npm test` **672 tests (671 pass, 1 skip)**; `test:static` **8/8**; focused **30/30**.

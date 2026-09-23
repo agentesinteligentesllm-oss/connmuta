@@ -770,6 +770,23 @@ visible.
 | Left open, carried to the Director | **B-40** (new). B-22 to B-39 stand as PR-22a left them. |
 | Consequence | **DN-05 is not satisfied for PR-22b either**, and row PR-22b is complete: **28 PR blocks / 23 row ids are merged (122 of the 210 task checkboxes), 17 blocks / 19 row ids remain (`PR-23…PR-42`)**. |
 | Independence from ordinary review | No native review or RDD fallback outcome was recorded by the session that merged PR-22b; none is claimed here. |
+
+### `bus-v2-f1-pr-23-audit-001` — PR-23 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-22 (session 27) |
+| Subject | PR-23 (`src/daemon/serve/fetch.ts`, `test/daemon/serve/fetch.test.ts`, `test/fixtures/v1-provenance.json`), branch `f1/23-serve-fetch` from `main` `fc1c09f`; D-02 long-poll against the ledger, D-15 fence site, per-client cursors. |
+| Authority | **The Director**, who owns DN-05; session-27 delegation ("take the reins, do not ask"), so the correction batches are disclosed here and in `apply-progress.md` §PR-23 instead of per-batch questions. |
+| Decision | **ODD + Judgment Day.** Unlike PR-22a/PR-22b, **both blind judges ran** (`jd-judge-a`, `jd-judge-b`, in parallel over a frozen worktree at `e276bde`), with the skill's current result shape `{findings, evidence}`. |
+| Round 1 | Judge A: 4 WARNING, 2 SUGGESTION. Judge B: 1 CRITICAL, 2 WARNING. Eight ledger rows, each single-judge row reproduced by the parent before correction: an untested documented refusal (`JD-B-001`, CRITICAL, ADR-12); a negative `max_batch` binding an unbounded SQLite `LIMIT` (`JD-B-002`); the peek rule cited to the wrong ADR (`JD-A-001`, ADR-0025 → ADR-0016); D-26's import claim unpinned (`JD-A-002`); two unpinned claims (`JD-A-003`); an N+1 described as one lookup (`JD-A-004`); an aborted caller still persisting (`JD-A-005`); the sweep script not in the repository (`JD-AB-006`, both judges). Fixed by `jd-fix-agent` in `44234a0`. |
+| Scoped re-judgments | Round 1 (`e276bde..44234a0`): **8/8 verified by both judges, 0 regressions**, one NEW SUGGESTION (a "seven" that was six). Round 2 (`44234a0..ab2b072`): **6/6 verified by both judges, 0 regressions, 0 new defects**. Budget used: two of two. |
+| Independent verifier | Separate agent, own frozen worktree at `44234a0`: every figure reproduced (line counts at both tips, 668/667/1, `test:static` 8/8, 19 registry entries, the `077561ae…` provenance hash, the 22-mutant sweep). Its five extra mutants found **four ported v1 behaviours no test reached** (`force_full`, `unannounced_closures`, `waiting_on_peer` population, compact broken by a gap warning) — pinned in round 2 (`ab2b072`), each proven by a mutant that survived before and dies after — and design §8.4's stale ADR-0025 citation (apply-time note in `tasks.md`). |
+| Parent readback (before freeze) | Three defects the writer's candidate carried: the clock read before a wait of up to 50 s; checkpoint windowing by `seq` under an unverified "seq is time order" claim; a D-02 test that could not fail for its name. Plus an equivalent mutant exposing a dead re-read credited with race-freedom. |
+| Outcome | **JUDGMENT: APPROVED** for `e276bde..ab2b072`. Mutant sweep at the tip: **27 mutants, 26 killed / 1 survived (`M0`, the control)**, 0 build failures. 672 tests (671 pass, 1 skip), `test:static` 8/8. Authored diff **1,682 lines (752 src + 924 test + 6 fixture)**, a disclosed **1,282-line PR-scoped exception**. |
+| Native review | `assess` (`--base-ref fc1c09f --committed-only`, untracked ODD tree excluded): risk `medium`, `review_due: true` (`slice_budget_reached`). **Not started**: the `judgment-day` skill forbids running ordinary 4R and Judgment Day on one target, and START would open a consent envelope only the Director may answer. The RDD fallback's independent verifier ran instead. |
+| Left open, carried to the Director | None new from PR-23. B-40 (session 27) stands. |
+| Consequence | **DN-05 is not satisfied for PR-23 either.** Row PR-23 complete: **29 PR blocks / 24 row ids merged (125 of the 210 task checkboxes), 16 blocks / 18 row ids remain (`PR-24…PR-42`)**. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)

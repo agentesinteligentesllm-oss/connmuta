@@ -106,5 +106,11 @@
     "v1Path": "src/transport/dual.ts",
     "commit": "bf8f365",
     "verdict": "AS-IS"
+  },
+  {
+    "v2Path": "src/daemon/serve/fetch.ts",
+    "v1Path": "src/tools/fetch.ts:664-927",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
