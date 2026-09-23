@@ -4944,9 +4944,12 @@ Judge A: 1 WARNING (`tasks.md` still says "no exception" for a slice this record
 same gap PR-23's block carries on `main`), 1 SUGGESTION (two `offsets` reads per call). Judge B: 1 WARNING,
 **inferential** (`open_threads` lists every open REQUEST thread without a participation filter), 1 SUGGESTION (three
 "design §8.4" citations for `status`, whose design row is §12). The inferential WARNING is recorded as **info,
-not actioned**, because Judge A's own sweep refuted it with evidence — admission writes a thread only for traffic
-that is this agent's business (`isOurBusiness` in `shared/protocol-apply.ts`), so the `threads` table of a binding
-holds no thread between two other agents — and v1's predicate is the same. The other three were corrected: a
+not actioned** — a disposition the round-1 text first justified with an overstatement (see "Round 2" below): admission
+stores a thread only for a REQUEST that is this agent's business (`isOurBusiness` in `shared/protocol-apply.ts`),
+which is from or to this agent, **or addressed to a name this binding's roster does not hold** (`return !(envelope.to
+in context.roster)`, deliberately failing toward storing, since an unknown name may be this agent under a drifted
+roster — the `misaddressed` case). `status` lists that thread exactly as v1's identical predicate did, which is the
+intent: it is precisely the thread an operator needs to see. The other three were corrected: a
 reconciling size note in `tasks.md` for PR-23 and PR-24, one `offsets` read feeding both `poller` and
 `retention_warning`, and the citations re-pointed at design §12.
 
@@ -4962,3 +4965,18 @@ removed and passes with exactly `FLOOR_REMINDER` overdue threads listed.
 26 killed / 1 survived (`M0`)**, 0 build failures. `git diff --numstat -- src test`: **857 authored lines (332 src +
 519 test + 6 fixture)**, a disclosed **457-line PR-scoped exception**. `npm test` **690 (689 pass, 1 skip)**;
 `test:static` **8/8**; focused **18/18**.
+
+**Scoped re-judgment of round 1** (both judges, `5a28378..d221098`). `JD-A-001`, `JD-A-002` and `VER-X1..X6`:
+**verified by both judges**. `JD-B-001`: **split** — Judge B verified the disposition; Judge A found, with a
+deterministic proof (`protocol-apply.ts:82` plus `admission.ts`'s `translateAddressee` falling back to the wire
+`to`), that the round-1 text claimed "the `threads` table holds no thread between two other agents", which is false
+for an addressee this roster cannot resolve. The parent had reached the same finding independently while the judges
+ran. `JD-B-002`: both judges noted that the ledger handed to them said "one remaining §8.4 mention" while `status.ts`
+keeps two (lines 18 and 201) and its twin one — all three about `fetch`'s `gap_warning`, which §8.4 does define.
+
+**Round 2** (parent, inline; record text and one test-file doc line). The `JD-B-001` paragraph above now states the
+real predicate, including the `misaddressed` case, and why listing that thread is intended. The twin's module doc
+cited "design §8.4/§12" for `status` itself and now cites §12; after that edit `status.ts` keeps **two** §8.4
+mentions (lines 18 and 201), both about `fetch`'s `gap_warning`, and the twin **none**. No source byte changed, so the
+round-1 sweep (27 mutants, 26 killed, `M0` survives) and the figures at the round-1 tip stand; the twin's line count
+is unchanged (one line edited in place).

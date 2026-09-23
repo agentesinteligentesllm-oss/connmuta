@@ -21,7 +21,7 @@ import { serveStatus, type StatusDaemonFacts, type StatusServeBinding } from "..
 const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
- * `daemon/serve/status.ts` (PR-24, design §8.4/§12, `thin-client-tools › status and thread are local,
+ * `daemon/serve/status.ts` (PR-24, design §12's `status` row, `thin-client-tools › status and thread are local,
  * no-network reads`).
  *
  * A real `node:sqlite` ledger per test, seeded directly through `writeThreadRecord`/raw SQL/the cursor
