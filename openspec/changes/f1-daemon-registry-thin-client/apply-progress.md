@@ -5204,3 +5204,12 @@ restructured branch) and two for the corrections (`M31` change (8) removed, `M32
 
 **At the round-1 tip:** **1,104 authored lines (397 src + 701 test + 6 fixture), a disclosed 704-line PR-scoped exception**;
 `rm -rf dist && npm test` **746 tests (745 pass, 1 skip)**; `test:static` **8/8**; focused **45/45**.
+
+**Scoped re-judgment of round 1** (both judges, `1c92aec..c213ef6`): **all five ledger rows and the three verifier
+dispositions verified by both judges, 0 regressions, 0 new defects**. **JUDGMENT: APPROVED** for `1c92aec..c213ef6`; one
+of the two re-judgments in the budget was used.
+
+**Board after this slice.** Row PR-26 complete: **32 PR blocks / 27 row ids merged, 136 of the 210 task checkboxes**,
+13 blocks / 15 row ids remaining (`PR-27…PR-42`). Unit 8 `send-path` continues with PR-27 (`daemon/send/send-path.ts`),
+which builds the envelope, stamps `from`/`to_user_id` from the binding, calls `validateSend` under the binding's mutex
+and `guardEncodedLength` on the envelope it builds.

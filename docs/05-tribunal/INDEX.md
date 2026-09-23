@@ -817,6 +817,21 @@ visible.
 | Native review | Not started, for the reason PR-23's record gives. |
 | Left open, carried to the Director | None new. B-40 and B-41 stand. |
 | Consequence | **DN-05 is not satisfied for PR-25 either.** Row PR-25 complete: **31 PR blocks / 26 row ids merged (132 of the 210 task checkboxes), 14 blocks / 16 row ids remain (`PR-26…PR-42`)**. Unit 7 `durable-inbox` closed. |
+
+### `bus-v2-f1-pr-26-audit-001` — PR-26 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-22 (session 28) |
+| Subject | PR-26 (`src/daemon/send/validate.ts`, `test/daemon/send/validate.test.ts`, `test/fixtures/v1-provenance.json`, the PT-02 and PT-15 cells of THREAT-MODEL §4), branch `f1/26-send-validate` from `main` `a82ae27`; `send-path › Validation pipeline and secret backstop run before any network call` (PT-15) and PR-26's half of `send-path › Send input carries no destination` (PT-02). Opens unit 8. |
+| Authority | **The Director**, who owns DN-05; session-28 delegation ("tienes toda mi autorización"). |
+| Decision | **ODD + Judgment Day**, both blind judges in parallel over a frozen worktree at `1c92aec`; the independent verifier in parallel over its own. |
+| Round 1 | Judge A: 2 WARNING, 1 SUGGESTION. Judge B: 1 CRITICAL, 1 SUGGESTION. No row from both judges; every row reproduced by the parent. `JD-B-001` (CRITICAL) — SEAM `v1 body sha256` pins are not machine-checked — is **pre-existing** (the registry's ratified SEAM assertion, all 14 SEAM headers) and filed as **B-42**. `JD-A-001` — an ACK or non-abandon RESOLVED by the correct addressee could be sent to any rostered agent, inherited byte-for-byte from v1 — was **corroborated independently by the verifier's direct probe** and corrected as SEAM change (8). `JD-A-002` (the "no ledger write" claim unpinned), `JD-A-003` (v1's `agentbus_fetch` in the remedy) and `JD-B-002` (a header pointer to a fixture that carries no hash) corrected; the same v1 text in merged `serve/thread.ts` and `admission.ts` filed as **B-43**. The verifier reproduced every figure and the `771f968e…` pin and found three test gaps (`E5`, `E6` pinned; `E2` an equivalent mutant under the public API). Corrected by the parent in `c213ef6`. |
+| Scoped re-judgment | `1c92aec..c213ef6`: all rows verified by both judges, 0 regressions, 0 new defects. One of two used. |
+| Outcome | **JUDGMENT: APPROVED** for `1c92aec..c213ef6`. Sweep: **39 mutants (31 parent + 6 verifier + 2 on the corrections), 37 killed / 2 survived (`M0`, the control; `E2`, equivalent)**, 0 build failures. 746 tests (745 pass, 1 skip), `test:static` 8/8. Authored diff **1,104 lines (397 src + 701 test + 6 fixture)**, a disclosed **704-line PR-scoped exception**. |
+| Native review | `assess`: risk `high` (`process_boundary`), `review_due: true`. Not started, for the reason PR-23's record gives. |
+| Left open, carried to the Director | **B-42**, **B-43**. B-40 and B-41 stand. |
+| Consequence | **DN-05 is not satisfied for PR-26 either.** Row PR-26 complete: **32 PR blocks / 27 row ids merged (136 of the 210 task checkboxes), 13 blocks / 15 row ids remain (`PR-27…PR-42`)**. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)
