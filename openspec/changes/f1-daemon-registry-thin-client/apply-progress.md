@@ -5729,3 +5729,24 @@ Re-swept at the round-2 tip (`M5` re-anchored after the O(N) rewrite): **`sessio
 `sessions.ts` 115, `constants.ts` +12, `ipc-contract.ts` +16, `handshake.test.ts` 200, `sessions.test.ts` 119) — a
 disclosed **219-line PR-scoped exception**; `rm -rf dist && npm test` **869 tests (868 pass, 1 skip)**; `test:static`
 **8/8**; the two twins **11/11**. No new tests this round (implementation and doc-comment changes only).
+
+**Second scoped re-judgment** (both judges, `4662654..33fd30c`; frozen worktree moved to the round-2 tip; last round in
+the two-re-judgment budget). Both judges traced JavaScript's `||` evaluation order precisely (the left operand,
+`hexDigestsEqual(stored, bearer)`, is always evaluated; only the bare `found` read can be skipped) and independently
+confirmed `hexDigestsEqual` now runs exactly `this.bearers.size` times on every `validate()` call, regardless of match
+position — **`JD-B-001` and `JD-A-R2-003`/`JD-B-R2-001` fully RESOLVED**, no remaining timing leak, no doc
+over/underclaim. `JD-A-001` confirmed **NOT RESOLVED** by both, as expected — the correct disposition is disclosed and
+deferred to PR-31 (`DELETE /session`), not fixed here; both judges independently confirmed the disclosure itself is
+now accurate. **Both judges independently found one new, trivial defect**: `MAX_ACTIVE_SESSIONS`'s reasoning comment
+cited a finding id, `` `JD-A-R2-001` ``, that was never actually minted anywhere in this PR's audit trail (Judge B:
+SUGGESTION; Judge A: WARNING, citing this project's own "every statement traces to a source" rule) — the disclosed
+*substance* was correct throughout, only the citation was a dangling reference. **Corrected**: the citation now points
+to `JD-A-001`'s round-1 re-judgment in `apply-progress.md` §PR-30 instead of a nonexistent id. No further correction
+needed; re-verified `rm -rf dist && npm test` **869/868/1**, `test:static` **8/8** after the fix.
+
+**JUDGMENT: APPROVED** for `3f289c2..<final>`. Both re-judgments in the two-round budget were used. Every CRITICAL/WARNING
+finding from either judge across all three rounds is either resolved (`JD-A-002`, `JD-B-001`, `JD-B-002`/`JD-A-001`'s
+bound half, `JD-B-003`, `JD-B-004`, `JD-A-R2-003`/`JD-B-R2-001`) or disclosed-and-intentionally-deferred to PR-31 with
+an accurate rationale (`JD-A-001`'s revocation half). The independent verifier's `N5` (default clock never exercised)
+and the duplicate-query-parameter behaviour are likewise disclosed, not actioned — no production call site exists for
+either until PR-31 lands.

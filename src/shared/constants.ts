@@ -265,8 +265,8 @@ export const MAX_PENDING_HANDSHAKES = 64;
  * {@link MAX_PENDING_HANDSHAKES} as the same conservative ceiling needs no separately-argued number —
  * but unlike that TTL-swept map, nothing here expires: once the bound is hit it stays hit for the rest
  * of the boot until a bearer is revoked (`DELETE /session`, still `daemon/ipc/routes.ts`'s job, PR-31)
- * or the daemon restarts. This is a coarse memory-growth ceiling, not a self-healing one (round-2
- * re-judgment, `JD-A-R2-001`).
+ * or the daemon restarts. This is a coarse memory-growth ceiling, not a self-healing one — sharpened in
+ * `JD-A-001`'s round-1 re-judgment (`apply-progress.md` §PR-30).
  */
 export const MAX_ACTIVE_SESSIONS = MAX_PENDING_HANDSHAKES;
 
