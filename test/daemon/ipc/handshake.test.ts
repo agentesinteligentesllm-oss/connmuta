@@ -128,6 +128,23 @@ test("a consumed server_nonce cannot be consumed again (single-use)", () => {
   assert.equal(store.consume(nonce), false, "a second consume of the same nonce must fail — single-use");
 });
 
+test("issue() sweeps its own expired entries even when nothing is ever consumed", () => {
+  // Isolates issue()'s own sweepExpired() call from consume()'s: a sustained flood of GET /identity
+  // with zero completed handshakes must still self-heal as old nonces age out, per
+  // IPC_HANDSHAKE_FLOOD's own "retryable: true" doc (the condition clears itself via TTL).
+  let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
+  const store = new PendingHandshakeStore(() => nowMs);
+
+  for (let i = 0; i < MAX_PENDING_HANDSHAKES; i += 1) {
+    assert.ok(store.issue(), `fill ${i} of ${MAX_PENDING_HANDSHAKES} should succeed`);
+  }
+  assert.equal(store.size, MAX_PENDING_HANDSHAKES);
+
+  nowMs += HANDSHAKE_NONCE_TTL_SECONDS * 1000;
+  assert.ok(store.issue(), "issue() must sweep its own expired entries and find room, without any consume() call");
+  assert.equal(store.size, 1, "every stale entry aged out by the sweep, leaving only the fresh one");
+});
+
 test("a pending nonce is consumable just under its TTL and expired at/after the boundary", () => {
   let nowMs = Date.parse("2026-01-01T00:00:00.000Z");
   const store = new PendingHandshakeStore(() => nowMs);

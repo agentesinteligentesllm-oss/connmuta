@@ -259,6 +259,14 @@ export const HANDSHAKE_NONCE_TTL_SECONDS = REQUEST_OVERHEAD_SECONDS;
 export const MAX_PENDING_HANDSHAKES = 64;
 
 /**
+ * Maximum live session bearers the daemon holds at once (new, PR-30 Judgment Day correction — both
+ * judges independently flagged the session store as the only per-boot map in this PR with no bound).
+ * A session can only be minted after consuming a pending handshake nonce, so reusing
+ * {@link MAX_PENDING_HANDSHAKES} as the same conservative ceiling needs no separately-argued number.
+ */
+export const MAX_ACTIVE_SESSIONS = MAX_PENDING_HANDSHAKES;
+
+/**
  * Maximum bytes accepted in one IPC request body.
  *
  * The largest legitimate request — a send body of {@link MAX_BODY_CHARS} in worst-case UTF-8 plus

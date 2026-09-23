@@ -103,6 +103,16 @@ export class PendingHandshakeStore {
     this.pending.delete(nonce);
     return true;
   }
+
+  /**
+   * Number of currently pending (unexpired as of this call) handshakes — a testability accessor, not
+   * part of the wire contract. Sweeps first, so it never reports an entry that a real `issue()` call
+   * would already have dropped.
+   */
+  get size(): number {
+    this.sweepExpired();
+    return this.pending.size;
+  }
 }
 
 export interface IdentityHandlerDeps {

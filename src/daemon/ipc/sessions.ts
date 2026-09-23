@@ -22,11 +22,17 @@
  * holds its bearers in a plain in-memory set; a daemon restart constructs a brand-new store (and a
  * brand-new secret, `lifecycle/run-file.ts`'s `writeRunFile`), so every bearer minted before that
  * restart simply has nowhere left to be found (design §10 "Per-boot rotation" row).
+ *
+ * **{@link MAX_ACTIVE_SESSIONS} bounds the store; there is still no early revoke.** Judgment Day
+ * flagged that this was the one per-boot map in this PR with no ceiling at all, unlike
+ * `handshake.ts`'s `PendingHandshakeStore` — fixed here. Removing a single bearer before a full
+ * restart (`DELETE /session`) is still `daemon/ipc/routes.ts`'s job (PR-31): design §10 lists it as a
+ * fixed route, but no spec scenario names its daemon-side behaviour yet.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-import { SESSION_TOKEN_BYTES } from "../../shared/constants.js";
+import { MAX_ACTIVE_SESSIONS, SESSION_TOKEN_BYTES } from "../../shared/constants.js";
 
 /**
  * D-14's domain-separation label for the session proof — distinct from `handshake.ts`'s `"identity:"`
@@ -68,12 +74,16 @@ export class SessionStore {
 
   /**
    * Verifies `claimedHmac` against `computeSessionProof(secret, serverNonce)` (constant-time) and,
-   * only on a match, mints and stores a fresh random bearer. Returns the new bearer, or `undefined`
-   * when `claimedHmac` does not verify — nothing is stored in that case.
+   * only on a match and only below {@link MAX_ACTIVE_SESSIONS}, mints and stores a fresh random
+   * bearer. Returns `undefined` for either an unverified claim or a store already at capacity —
+   * deliberately not distinguished, so a caller learns nothing about which one it was.
    */
   mint(serverNonce: string, claimedHmac: string): string | undefined {
     const expected = computeSessionProof(this.secret, serverNonce);
     if (!hexDigestsEqual(expected, claimedHmac)) {
+      return undefined;
+    }
+    if (this.bearers.size >= MAX_ACTIVE_SESSIONS) {
       return undefined;
     }
     const bearer = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
@@ -81,9 +91,19 @@ export class SessionStore {
     return bearer;
   }
 
-  /** Whether `bearer` was minted by this exact store instance and not since invalidated. */
+  /**
+   * Whether `bearer` was minted by this exact store instance. Compares against every stored bearer
+   * with {@link hexDigestsEqual} rather than `Set.has`, so a lookup on a 256-bit bearer credential
+   * costs the same regardless of which stored value (if any) matches — this PR's Judgment Day found
+   * that every other secret-derived comparison here was already constant-time except this one.
+   */
   validate(bearer: string): boolean {
-    return this.bearers.has(bearer);
+    for (const stored of this.bearers) {
+      if (hexDigestsEqual(stored, bearer)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Number of live bearers this store holds — a testability accessor, not part of the wire contract. */

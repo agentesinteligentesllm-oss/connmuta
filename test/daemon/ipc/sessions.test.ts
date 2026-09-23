@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac, randomBytes } from "node:crypto";
 
-import { RUN_SECRET_BYTES, SESSION_TOKEN_BYTES } from "../../../src/shared/constants.js";
+import { IPC_NONCE_BYTES, MAX_ACTIVE_SESSIONS, RUN_SECRET_BYTES, SESSION_TOKEN_BYTES } from "../../../src/shared/constants.js";
 import { computeSessionProof, SessionStore } from "../../../src/daemon/ipc/sessions.js";
 import { PendingHandshakeStore } from "../../../src/daemon/ipc/handshake.js";
 
@@ -55,6 +55,7 @@ test("session token issued at POST /session: a verified claimed HMAC mints a bea
   assert.match(bearer, sessionTokenShape);
   assert.notEqual(bearer, secret, "the bearer must be a freshly minted token, never the raw secret");
   assert.equal(store.validate(bearer), true);
+  assert.equal(store.size, 1, "a successful mint must be reflected as a concrete count, not just a before/after delta");
 
   // An unverified claim mints nothing and leaves the store unchanged.
   const sizeBefore = store.size;
@@ -66,7 +67,7 @@ test("session token issued at POST /session: a verified claimed HMAC mints a bea
 test("a wrong-length claimed HMAC is rejected without throwing (constant-time length guard)", () => {
   const secret = freshSecret();
   const store = new SessionStore(secret);
-  const serverNonce = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
+  const serverNonce = randomBytes(IPC_NONCE_BYTES).toString("hex");
   const sizeBefore = store.size;
 
   const result = store.mint(serverNonce, "ab");
@@ -77,7 +78,7 @@ test("a wrong-length claimed HMAC is rejected without throwing (constant-time le
 test("raw per-boot secret is rejected as a bearer", () => {
   const secret = freshSecret();
   const store = new SessionStore(secret);
-  const serverNonce = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
+  const serverNonce = randomBytes(IPC_NONCE_BYTES).toString("hex");
   const bearer = store.mint(serverNonce, computeSessionProof(secret, serverNonce));
   assert.ok(bearer, "setup: a correctly verified claim must mint a bearer");
 
@@ -91,11 +92,28 @@ test("stale-boot bearer rejected: a bearer minted by one boot's store does not v
   const storeBoot1 = new SessionStore(secretBoot1);
   const storeBoot2 = new SessionStore(secretBoot2);
 
-  const nonce = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
+  const nonce = randomBytes(IPC_NONCE_BYTES).toString("hex");
   const bearerFromBoot1 = storeBoot1.mint(nonce, computeSessionProof(secretBoot1, nonce));
   assert.ok(bearerFromBoot1, "setup: a correctly verified claim must mint a bearer");
 
   const sizeBefore = storeBoot2.size;
   assert.equal(storeBoot2.validate(bearerFromBoot1), false);
   assert.equal(storeBoot2.size, sizeBefore, "a failed validate() must not mutate the store");
+});
+
+test("mint refuses once MAX_ACTIVE_SESSIONS live bearers are held, without distinguishing why", () => {
+  const secret = freshSecret();
+  const store = new SessionStore(secret);
+
+  for (let i = 0; i < MAX_ACTIVE_SESSIONS; i += 1) {
+    const serverNonce = randomBytes(IPC_NONCE_BYTES).toString("hex");
+    const bearer = store.mint(serverNonce, computeSessionProof(secret, serverNonce));
+    assert.ok(bearer, `mint ${i} of ${MAX_ACTIVE_SESSIONS} should succeed`);
+  }
+  assert.equal(store.size, MAX_ACTIVE_SESSIONS);
+
+  const overflowNonce = randomBytes(IPC_NONCE_BYTES).toString("hex");
+  const overflow = store.mint(overflowNonce, computeSessionProof(secret, overflowNonce));
+  assert.equal(overflow, undefined, "a correctly verified claim must still be refused once the store is full");
+  assert.equal(store.size, MAX_ACTIVE_SESSIONS, "a refused mint at capacity must not grow the store");
 });

@@ -768,11 +768,14 @@ Runtime harness: in-process daemon on port 0; a fake `http` client for the exces
 - [x] 30.5 Verify: `npm run build && node --test "dist/test/daemon/ipc/handshake.test.js" "dist/test/daemon/ipc/sessions.test.js"`.
 - [x] 30.6 Docs: update the file-name cell(s) of PT-24, PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
-*Size reconciliation.* `git diff --numstat main -- src test`: `handshake.ts` 147, `sessions.ts` 93,
-`ipc-contract.ts` +16 (disclosed extension, see apply-time note), `handshake.test.ts` 183,
-`sessions.test.ts` 101 — **540 authored lines** against the ≈370 estimate and the 400-line budget.
-Disclosed PR-scoped `size:exception` (140 lines over), consistent with every slice since PR-26; no
-chained-PR split (delivery strategy `stacked-to-main`, one PR per slice, per HANDOFF §2/DN-06).
+*Size reconciliation.* Candidate (`3f289c2`): `git diff --numstat main -- src test`: `handshake.ts` 147,
+`sessions.ts` 93, `ipc-contract.ts` +16 (disclosed extension, see apply-time note), `handshake.test.ts`
+183, `sessions.test.ts` 101 — **540 authored lines**. Round-1 tip (Judgment Day corrections, see below):
+`handshake.ts` 157, `sessions.ts` 113, `constants.ts` +8 (`MAX_ACTIVE_SESSIONS`, disclosed), `ipc-contract.ts`
++16, `handshake.test.ts` 200, `sessions.test.ts` 119 — **613 authored lines** against the ≈370 estimate
+and the 400-line budget. Disclosed PR-scoped `size:exception` (213 lines over at the round-1 tip),
+consistent with every slice since PR-26; no chained-PR split (delivery strategy `stacked-to-main`, one PR
+per slice, per HANDOFF §2/DN-06).
 
 *Apply-time note (session 30).* Decisions made by the orchestrator under the Director's session-30
 delegation (full autonomy, recorded in `apply-progress.md` §PR-30):
@@ -819,6 +822,10 @@ delegation (full autonomy, recorded in `apply-progress.md` §PR-30):
    logic per its own module doc) looks stale against the later `ipc/{handshake,sessions,routes}` split —
    filed as **B-48** (Director-owned, text-only), not fixed here (design is gated; apply-time notes
    append, never rewrite gate text).
+8. **Judgment Day round 1** (`bus-v2-f1-pr-30-audit-001`) added `MAX_ACTIVE_SESSIONS` to
+   `shared/constants.ts` (both judges independently flagged `SessionStore` as unbounded) and rewrote
+   `SessionStore.validate` to a constant-time linear scan (Judge B alone). Full detail, both judges' and
+   the independent verifier's findings, and the corrections in `apply-progress.md` §PR-30.
 
 #### PR-31 — session routes, freeze, roster drift, error taxonomy
 Branch `f1/31-ipc-routes` → `main`. Depends: PR-30. Size: ≈390 lines, no exception.
