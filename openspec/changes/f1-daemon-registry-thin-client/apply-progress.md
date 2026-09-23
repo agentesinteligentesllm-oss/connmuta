@@ -5438,3 +5438,71 @@ poller-written value, and that the abandonment branch writes exactly one row). *
 **Board after this slice.** Row PR-28 complete: **34 PR blocks / 29 row ids merged, 144 of the 210 task checkboxes**,
 11 blocks / 13 row ids remaining (`PR-29…PR-42`). **Unit 8 `send-path` is closed.** Unit 9 `ipc-handshake` opens with PR-29
 (IPC contract and HTTP server scaffolding).
+
+## PR-29 — `shared/ipc-contract.ts` + `daemon/ipc/server.ts` (new code; IPC contract and HTTP transport; opens unit 9 `ipc-handshake`)
+
+**Route.** ODD with the SDD contract preserved, session 29: one delegated read-only mapper, one delegated writer
+(`general-purpose`, sonnet) against a brief with the decisions below fixed by the orchestrator, then a parent readback and
+sweeps. No `sdd-apply` phase envelope exists. Both modules are new code (design §12 has no v1 row for them): no
+provenance header, registry unchanged at 23 entries.
+
+**Decisions (orchestrator, session 29), stated in the module docs.** (1) **HTTP numbers live in `ipc-contract.ts`**
+(design §3: "named once in `ipc-contract.ts`"; task 1b.2 deferred them here): the five design names plus five disclosed
+transport statuses — `HTTP_OK` 200, `HTTP_BAD_REQUEST` 400, `HTTP_FORBIDDEN` 403 (the `Host` refusal),
+`HTTP_UNSUPPORTED_MEDIA_TYPE` 415, `HTTP_INTERNAL_SERVER_ERROR` 500. (2) **A closed transport-refusal vocabulary** —
+`IPC_HOST_REJECTED`, `IPC_PAYLOAD_TOO_LARGE`, `IPC_UNSUPPORTED_MEDIA_TYPE`, `IPC_BAD_REQUEST`, `IPC_ROUTE_NOT_FOUND`,
+`IPC_INTERNAL_ERROR`, all `retryable: false`, carried in an `ipcErrorSchema` that mirrors `ToolErrorPayload` exactly; these
+are the daemon's refusals, not client codes (the client surfaces any non-contract failure as `IPC_ERROR`, PR-33/34).
+(3) **Schemas for all seven routes** (design §10 / D-13) in `IPC_REQUEST_SCHEMAS`/`IPC_RESPONSE_SCHEMAS`; the four tool
+routes reference `shared/tool-schemas.ts`'s schema objects (identity, not copies); a tool success body is an opaque JSON
+object (shapes owned by `shared/tool-output.ts` and `daemon/serve/*`). (4) **`DELETE /session` is provisional** — no spec
+scenario names it — as `{ closed: true }` with no request body; PR-31 owns the behaviour. (5) **The server is pure
+transport**: it validates no route body and checks no `Authorization` (PR-30/31), starts no timer and emits nothing.
+Pipeline per request: `Host` must equal `127.0.0.1:<bound port>` (403, before any body byte is read); route lookup (404
+for an unknown route or one with no registered handler); body cap (a declared `Content-Length` over `IPC_MAX_BODY_BYTES`
+refused unread, a streamed count refused the moment it crosses the cap, exactly the cap accepted); `POST` needs
+`application/json` (415) and valid JSON (400); `GET`/`DELETE` must carry no body (400); a handler throw answers 500 with a
+generic message and hands only the thrown message to the injected logger (`writeDaemonLog` redacts token shapes).
+(6) **`host` in `POST /session`** is DATA-MODEL's informational MCP-host label (`client_cursors.host`), bounded by
+`IPC_SESSION_HOST_MAX_CHARS` = 64.
+
+**Known limits, disclosed.** Node's HTTP/1.1 parser refuses a request with no `Host` line itself (a bare 400) before the
+daemon's check runs; the daemon's own 403 for an absent header is reachable only over HTTP/1.0, which the suite uses. A
+client still writing far past the cap may meet a connection reset instead of reading the 413 (unread bytes at close);
+the cap bounds the daemon's memory, the server stays up, and the thin client never sends a body near it. The
+threat-model traceability of the `Host` check (THREAT-MODEL cites DNS rebinding only for the F3 panel) is filed as
+**B-47**.
+
+**TDD evidence.** Writer RED is compile-level: `npm run build` with both tests written and no sources gave `TS2307`
+for `../../../src/shared/ipc-contract.js`, `../../../src/daemon/ipc/server.js` and `../../src/shared/ipc-contract.js`; the
+first implementation left 2 of 41 failing (a Host-less HTTP/1.1 request answered by Node, not the daemon; a race on the
+declared-oversized case), both corrected by the writer. The behavioural RED is the parent's: the readback fixes and the
+sweep survivors below each got a test that fails without them.
+
+**Parent readback corrections.** `close()` rejected when called twice (`ERR_SERVER_NOT_RUNNING`) although its doc
+promised it was safe; a handler result that `JSON.stringify` cannot serialise threw after `writeHead`, and the second
+response attempt rejected the fire-and-forget request promise — an unhandled rejection that would end the daemon
+(fixed: serialise before the head; a last-resort `.catch` destroys the socket); `host` was described as `os.hostname()`
+stored in `client_surfaced` (it is the MCP-host label in `client_cursors`) and bounded at 253 on a DNS argument; the
+`Host` check was attributed to D-13 (the route table) instead of design §10's transport line; an invented
+`schema_invalid` wording; a literal `64` in the roster-hash pattern (now `SHA256_HEX_LENGTH`). Two tests pin the two
+code defects.
+
+**Mutant sweeps** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close; `--test-timeout=5000` and a 150 s
+process bound per mutant, because a mutant that breaks the `Host` check leaves test clients waiting). `server.ts`:
+**24 mutants, 18 killed (three by timeout: `S2`, `S5`, `S13`) / 5 survived / 1 build failure (`S14`)**. Survivors: `S0`
+(control); `S9`, **equivalent** (an empty `POST` body fails `JSON.parse` with the same 400 and message); `S7` (media type
+compared case-sensitively) and `S17` (`Connection: close` dropped on an early refusal), each now pinned and killed;
+`S23` (`cleanup()` removed after a streamed refusal) was unobservable — the code now also returns at the top of `onData`
+once settled, so the mutant is equivalent by construction. `ipc-contract.ts`: **19 mutants, 14 killed / 4 survived / 1
+build failure (`C2`)**; survivors `C8` (non-hex roster digest), `C10` (bearer longer than `SESSION_TOKEN_BYTES`), `C18`
+(`project_id` unchecked) pinned and killed, and `C2` re-anchored and killed; `C0` (control) survives. Every restore
+checked by sha256.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **1,468 authored lines (627 src + 841 test)** —
+`server.ts` 309, `ipc-contract.ts` 318; `server.test.ts` 585, `ipc-contract.test.ts` 256 — against a ≈310 estimate, a
+disclosed **1,068-line PR-scoped exception**. The estimate priced the two sources; the runtime harness (raw sockets,
+HTTP/1.0 framing, chunked decoding) is most of the test weight.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **850 tests (849 pass, 1 skip)**; `npm run test:static`:
+**8/8**; `node --test` over the two twins: **49/49**.
