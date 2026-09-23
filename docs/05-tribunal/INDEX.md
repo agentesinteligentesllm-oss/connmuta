@@ -754,6 +754,22 @@ visible.
 | Consequence | **DN-05 is not satisfied for PR-22a either**, and row PR-22a is complete: **27 PR blocks / 22 row ids are merged (118 of the 210 task checkboxes), 18 blocks / 20 row ids remain (`PR-22b…PR-42`)**. Unit 7's receive path is closed; PR-22b opens next (the poller loop). |
 | Independence from ordinary review | The ordinary native review was **declined by the host** before any lineage existed: START returned `consent-declined-this-candidate` with `lineage_created: false`, no mutation, `correction_budget: 0`, risk `medium`, target `sha256:a11264061ecdd7578353d451ed075e6bb1b3b9db14877bce2a4a4f8a29895263`, two files and 1,131 changed lines. `assess` then returned `risk: unassessable` with `nativeReviewOutcome: declined` and `outcome_source: explicit`, so the risk-gated high path ran: writer self-verification plus a **separate** independent verifier. **With subagents unavailable that second pass is this session's second inline adversarial pass, and it is disclosed as such rather than presented as an independent agent run.** Verification at the tip: 1,243 authored lines (668 `src` + 569 `test` + 6 fixture) with a disclosed 843-line PR-scoped exception; 18 new cases in `test/daemon/admission.test.ts`; 637 tests (636 pass, 1 skip); `test:static` 8/8; provenance registry 18 entries with the pinned multi-range hash `3bd09d0d…` re-derived from the frozen v1 checkout; 14-mutant sweep 13 killed / 1 survived (the survivor being the `M0` control); the mutated file restored byte-identically (sha256 checked). |
 
+
+### `bus-v2-f1-pr-22b-audit-001` — PR-22b audit substitute (inline adversarial audit; record written retroactively)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-20 (audit) · 2026-09-22 (this record, session 27) |
+| Subject | PR-22b (`src/daemon/poller.ts`, `test/daemon/poller.test.ts`, PT-33's cell in THREAT-MODEL §4), branch `f1/22b-poller` from `main`; the loop that consumes `admission.ts`. |
+| Authority | **The Director**, who owns DN-05 |
+| Decision | **ODD + the Judgment Day substitute**, run as PR-22a ran it: the blind judges were not run and the writer performed two inline adversarial passes (specification conformance; defect hunting and test value). |
+| What was used instead | Two inline passes by the writer plus an 11-mutant sweep with explicit `[from, to]` pairs and a sha256 restore check. **Not an independent-agent audit**, and no claim of one is made. |
+| Outcome | 0 CRITICAL, 0 WARNING, 1 SUGGESTION (A7: the loop-top `retry_after_until` re-read after a restart is untested), 3 INFO. Sweep **10 killed / 1 survived, the survivor being the `M0` control**; re-run in session 27 at `27f4b06` with the same result, and the one statement-deleting mutant (`M3`) confirmed to build, so its kill is behavioural. 642 tests (641 pass, 1 skip), `test:static` 8/8. Merged as PR #26 (`3966d39`). |
+| Defects it missed | **Session 27 found one the audit passed.** Pass 1's check 10 declared design §8.1's `poller_conflict`/`poller_rate_limited` conditions out of scope; the design names them. They also have no contract anywhere in the tree (four-name `conditions-store`, hash-pinned `Conditions` output shape, DATA-MODEL silent), so session 27 filed the contradiction as **B-40** rather than inventing one; the gated `daemon-lifecycle` 409 requirement is met through `offsets.last_error_code` and PR-24's `status`. |
+| Close-out defects | **The session that merged PR-22b wrote only `AGENTS.md` and `HANDOFF.md`**: the four `tasks.md` checkboxes, `state.yaml`, `apply-progress.md`, this record and the session-log entry were missing; the handoff claimed 120/210 where the tree held 118; the authored-line figure was 494 where `git diff --numstat d062493 b3fad1f -- src test` measures **492 (212 src + 280 test; a 92-line PR-scoped exception)**; and PR #26 was merged with its Node 26 leg red on the B-39 flake without a recorded re-run (run `35548868133`; the merge commit's own `main` run was green). All repaired or disclosed in session 27. |
+| Left open, carried to the Director | **B-40** (new). B-22 to B-39 stand as PR-22a left them. |
+| Consequence | **DN-05 is not satisfied for PR-22b either**, and row PR-22b is complete: **28 PR blocks / 23 row ids are merged (122 of the 210 task checkboxes), 17 blocks / 19 row ids remain (`PR-23…PR-42`)**. |
+| Independence from ordinary review | No native review or RDD fallback outcome was recorded by the session that merged PR-22b; none is claimed here. |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)

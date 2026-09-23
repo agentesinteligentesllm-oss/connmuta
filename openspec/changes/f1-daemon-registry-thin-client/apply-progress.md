@@ -4679,3 +4679,53 @@ Three of the first sweep's mutants (`M1`–`M3` as originally written, each a ba
 **RDD fallback and independent verification.** START returned `consent-declined-this-candidate` from the host — `lineage_created: false`, no mutation, `correction_budget: 0`, risk `medium`, target `sha256:a11264061ecdd7578353d451ed075e6bb1b3b9db14877bce2a4a4f8a29895263`, two files and 1,131 changed lines — so no consent envelope ever reached the session and nothing was answered. `assess` returned `risk: unassessable` with `nativeReviewOutcome: declined` and `outcome_source: explicit` (the native assessment command returned empty output), which its own rule treats as high risk: writer self-verification plus a separate independent verifier. **Because subagents were unavailable, that second pass is this session's second inline adversarial pass, disclosed as such rather than presented as an independent agent run.** The figures it reproduced by re-measurement rather than by memory: 1,243 authored lines (668 src + 569 test + 6 fixture); 18 new cases; 637 tests (636 pass, 1 skip); `test:static` 8/8; provenance registry 18 entries, with `3bd09d0d…` re-derived from the frozen v1 checkout and the method validated against `20ec5756…` first; the 14-mutant sweep re-run at the tip with the mutated file restored byte-identically.
 
 **Board after this slice.** Row PR-22a is complete: **27 PR blocks / 22 row ids merged, 118 of the 210 task checkboxes**, 18 blocks / 20 row ids remaining (`PR-22b…PR-42`). Unit 7 `durable-inbox`'s receive path is closed; PR-22b (the poller loop, PT-33 poller half) opens next.
+
+## PR-22b — the poller loop (design §8.1; PT-33 poller half; `daemon-lifecycle` Telegram 409 scenario)
+
+> **Written retroactively in session 27.** The session that merged PR-22b (PR #26, `3966d39`) updated `AGENTS.md`
+> and `HANDOFF.md` only; this section, the four `tasks.md` checkboxes, `state.yaml`, the tribunal record
+> `bus-v2-f1-pr-22b-audit-001` and the session-log entry were missing. Every figure below was re-measured in
+> session 27 rather than copied from the writer's working notes.
+
+**What shipped.** `src/daemon/poller.ts` (`startPoller`) and its twin `test/daemon/poller.test.ts` (five cases:
+409 stops the loop, 429 sleeps `retry_after_s`, write-ahead offset advance, transient backoff, clean stop), plus
+PT-33's file-name cell in `THREAT-MODEL.md` §4 marked as the poller half. `poller.ts` is new code, not vendored,
+so the provenance registry stays at 18 entries.
+
+**Behaviour.** One loop per binding: read `offsets.next_update_id` and honour a future `retry_after_until`; stamp
+`last_poll_started_at`/`poller_pid`; `getUpdates(offset, MAX_BATCH, MAX_LONGPOLL_SECONDS)`; hand the batch to
+`admitTelegramUpdates` (the offset advances inside its write-ahead transaction, never in the poller); on success
+clear `last_error_code`/`retry_after_until` and emit `inbox:<project_id>` when `inserted > 0`. A 409
+(`TelegramConflictError`) writes `TELEGRAM_CONFLICT` plus a `system` audit row and **stops** the loop; a 429 writes
+`TELEGRAM_RATE_LIMITED` and `retry_after_until` and sleeps `retry_after_s`; anything else writes the classified
+code and sleeps `POLL_ERROR_BACKOFF_SECONDS`.
+
+**Not done, and why — a contradiction, filed as B-40.** Design §8.1 says the 409 branch raises condition
+`poller_conflict` and the 429 branch `poller_rate_limited`; the loop raises neither. The writer's audit (pass 1,
+check 10) called them out of scope, which is not what the design says. But neither name has a contract anywhere
+else: `src/ledger/conditions-store.ts` accepts exactly four names, `shared/tool-output.ts`'s `Conditions` output
+shape (a hash-pinned SEAM) has no member for them, and DATA-MODEL.md never lists them. Raising them would mean
+inventing a scope, a detail contract and an output member that no gated document defines. The gated requirement
+itself (`daemon-lifecycle` › "Telegram 409 surfaced, never retried blindly") is met through
+`offsets.last_error_code`, which PR-24's `status` reads per bot. Session 27 therefore files the contradiction as
+**B-40** instead of resolving it silently in code.
+
+**Audit.** Judgment Day substitute `bus-v2-f1-pr-22b-audit-001`: two inline adversarial passes by the writer (the
+blind judges were not run, following PR-22a). 0 CRITICAL, 0 WARNING, 1 SUGGESTION (A7: the loop-top
+`retry_after_until` re-read after a restart has no test), 3 INFO (abort-listener lifetime, the second `now()` read
+for the 429 deadline, the 409 audit row written outside a transaction).
+
+**Mutant sweep.** 11 mutants with explicit `[from, to]` pairs and a sha256 restore check: **10 killed / 1 survived,
+the survivor being `M0`, the comment-only control.** Re-run in session 27 from a clean `dist/` at `27f4b06`: same
+result. The harness counts a build failure as a kill; the one statement-deleting mutant (`M3`, the 409 audit row)
+was built separately and compiles, so every kill is behavioural.
+
+**Budget.** `git diff --numstat d062493 b3fad1f -- src test`: **492 authored lines (212 src + 280 test)**, a
+disclosed **92-line PR-scoped exception** against a ≈145 estimate. (The writer's notes said 494 / 94.)
+
+**CI.** PR #26 was merged with leg `build-and-test (26)` **red** on the B-39 flake (`heartbeat: ticks at
+periodMs`, run `35548868133`) and no recorded re-run. The merge commit's own `main` run and the following
+documentation commit ran green on both legs.
+
+**Board after this slice.** Row PR-22b is complete: **28 PR blocks / 23 row ids merged, 122 of the 210 task
+checkboxes**, 17 blocks / 19 row ids remaining (`PR-23…PR-42`). PR-23 (`src/daemon/serve/fetch.ts`) opens next.

@@ -4,6 +4,21 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 27 — PR-22b close-out repair, B-40 filed
+
+- **Date**: 2026-09-22
+- **What**: repaired the records the PR-22b session left unwritten — the four `tasks.md` checkboxes, `state.yaml` (122/210), `apply-progress.md` §PR-22b, the tribunal record `bus-v2-f1-pr-22b-audit-001` and the session-26 entry below. The handoff's "120/210" was wrong (the tree held 118 before this repair).
+- **How it knows**: `gentle-ai sdd-status` printed `completed: 118`; `git diff --numstat d062493 b3fad1f -- src test` = 212 + 280; PR #26's check rollup shows `build-and-test (26)` FAILURE on `heartbeat: ticks at periodMs` (run `35548868133`); `odd/sweep-poller.mjs` re-run at `27f4b06` = 10 killed / 1 survived (`M0`).
+- **Found**: design §8.1's `poller_conflict`/`poller_rate_limited` conditions are not raised by the poller and have no contract anywhere in the tree → **B-40**.
+
+## Session 26 — PR-22b: the poller loop (PT-33 poller half) — entry written retroactively in session 27
+
+- **Date**: 2026-09-20
+- **Slice**: PR-22b (`src/daemon/poller.ts`, `test/daemon/poller.test.ts`), merged as PR #26 (`3966d39`).
+- **Outcome**: 642 tests (641 pass, 1 skip), `test:static` 8/8; 492 authored lines (212 src + 280 test), a 92-line PR-scoped exception.
+- **Audit**: `bus-v2-f1-pr-22b-audit-001` — two inline adversarial passes by the writer; 0 CRITICAL / 0 WARNING / 1 SUGGESTION; 11-mutant sweep 10 killed, `M0` control survived.
+- **CI**: merged with the Node 26 leg red on the B-39 flake and no recorded re-run.
+
 ## Session 25 — PR-22a: seven-step admission pipeline (PT-03, PT-04, PT-16, PT-17, PT-31; invariants 1, 4, 5)
 
 - **Date**: 2026-09-20

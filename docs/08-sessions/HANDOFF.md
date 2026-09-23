@@ -37,7 +37,7 @@ gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 
 The working tree must be **clean** at the start of this session except for an untracked `odd/` directory if
 a previous session left one. The status command must print
-`nextRecommended: apply`, `completed: 120` of `210`, `blockedReasons: []`. Anything else: stop and report.
+`nextRecommended: apply`, `completed: 122` of `210`, `blockedReasons: []`. Anything else: stop and report.
 (`verifyReport: missing` is **expected and correct** while `apply` runs.)
 
 ---
@@ -47,8 +47,8 @@ a previous session left one. The status command must print
 | Item | State | Pointer |
 |---|---|---|
 | Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-22b** (PR-22b merged as PR #26). **Next slice: PR-23** — `src/daemon/serve/fetch.ts` (D-02 `fetch` long-poll against the ledger, D-15 fence application site). | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **28 blocks / 23 row ids** (`PR-01…PR-22b`). Remaining: **17 blocks / 19 row ids** (`PR-23…PR-42`). Checkboxes: **120 of 210**. | `tasks.md` |
-| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **120/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
+| Board, exactly | **45 PR blocks / 42 row ids** in `tasks.md` (`PR-01…PR-42`; PR-06, PR-08 and PR-09 were each re-sliced in place into two blocks). Complete: **28 blocks / 23 row ids** (`PR-01…PR-22b`). Remaining: **17 blocks / 19 row ids** (`PR-23…PR-42`). Checkboxes: **122 of 210**. | `tasks.md` |
+| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **122/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
 | Unit 7 `durable-inbox` — **open** | `src/daemon/telegram.ts` completed and merged (PR-18, PR-19). Transport modules AS-IS merged (PR-20). Room guard, binding config and reconciliation merged (PR-21). PR-22a (`src/daemon/admission.ts`) and PR-22b (`src/daemon/poller.ts`) are both merged; PR-23 (`src/daemon/serve/fetch.ts`) follows. | `INDEX.md` `bus-v2-f1-pr-22b-audit-001` |
 | Code on `main` / current | `src/shared/*` (16 modules), `src/cli/{main,validate,daemon-stop}.ts`, `src/registry/{schema,invariants,loader}.ts`, `src/ledger/{schema,transaction,open,migrations,inbox,threads,cursors,audit,unknown-senders,conditions-store,retention}.ts`, `src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`, `src/daemon/{node-floor,home,log,bootstrap,main,telegram,binding-config,bindings,admission,poller}.ts` and `src/daemon/lifecycle/{lock,run-file,heartbeat,idle}.ts`, and `src/daemon/transport/{types,group,direct,dual,room-guard}.ts`, all with twins — **642 tests** (641 pass, 1 skip), `test:static` **8/8** | PRs `#1`–`#26` |
 | Provenance registry | `test/security/provenance.test.ts` scans tracked `src/**`/`test/**`; the scanned set must **equal** `test/fixtures/v1-provenance.json` — **18 entries** (13 SEAM splits + 4 AS-IS transport modules + 1 SEAM `admission.ts` added by PR-22a). `poller.ts` is new code (not vendored from v1) and needs no provenance entry. | `test/security/provenance.test.ts` |
