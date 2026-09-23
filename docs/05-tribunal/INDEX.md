@@ -847,6 +847,21 @@ visible.
 | Native review | `assess`: risk `medium`, `review_due: true` (`slice_budget_reached`). Not started, for the reason PR-23's record gives. |
 | Left open, carried to the Director | **B-44**. The design/spec naming conflict `TELEGRAM_RATE_LIMITED` / `RATE_LIMITED` is PR-28's to settle. |
 | Consequence | **DN-05 is not satisfied for PR-27 either.** Row PR-27 complete: **33 PR blocks / 28 row ids merged (140 of the 210 task checkboxes), 12 blocks / 14 row ids remain (`PR-28…PR-42`)**. |
+
+### `bus-v2-f1-pr-28-audit-001` — PR-28 audit substitute (Judgment Day, both judges ran; RDD fallback verifier)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-23 (session 28) |
+| Subject | PR-28 (`src/daemon/send/rate.ts`, `test/daemon/send/rate.test.ts`, plus the disclosed wiring in `send-path.ts`, `validate.ts` (`RATE_LIMITED`, `retry_after_s`) and `bindings.ts` (`RateLimitRecorder` in `buildTransport`) with their tests; the PT-33 cell of THREAT-MODEL §4; backlog B-45), branch `f1/28-send-rate` from `main` `da862e7`; `send-path › Rate discipline without auto-retry` (PT-33 429 half). Closes unit 8. |
+| Authority | **The Director**, who owns DN-05; session-28 delegation. |
+| Decision | **ODD + Judgment Day**, both blind judges in parallel over a frozen worktree at `b2c73cc`; the independent verifier in parallel over its own. |
+| Round 1 | Judge A: 2 WARNING. Judge B: 1 CRITICAL, 1 WARNING, 1 SUGGESTION. **Two rows from both judges** — `JD-AB-001`, a rate-limited abandonment written without its audit row, and `JD-AB-002`, a last-write-wins `retry_after_until` that let a short DM wait erase a longer group wait in the same call — both corrected under the Director's delegation. `JD-B-003` (design §9's `TELEGRAM_RATE_LIMITED` against the shipped `RATE_LIMITED`) filed as **B-46**. The verifier reproduced every figure and all four sweeps, concurred that `R4` and `W8` are equivalent mutants, reproduced **B-45** live, and found four coverage gaps, no defect in the shipped bytes. Corrected by the parent in `b4772a4`. |
+| Scoped re-judgment | `b2c73cc..b4772a4`: all rows verified by both judges, 0 regressions, 0 new defects. One of two used. |
+| Outcome | **JUDGMENT: APPROVED** for `b2c73cc..b4772a4`. Sweeps: `rate.ts` **19 mutants, 17 killed / 2 survived (`R0` control, `R4` equivalent)**; wiring **14, 12 / 2 (`W0` control, `W8` equivalent)**; `bindings.ts` **3, 2 / 1 (`B0`)**; `validate.ts` **2, 1 / 1 (`V0`)**; PR-27's `send-path.ts` sweep **41, 40 / 1 (`M0`)**; 0 build failures. 801 tests (800 pass, 1 skip), `test:static` 8/8. Authored diff **1,285 lines (425 src + 860 test)**, a disclosed **885-line PR-scoped exception**. TDD: **no writer RED** (tests and code written together, disclosed); the behavioural RED is five sweep survivors pinned by the parent. |
+| Native review | `assess`: risk `high` (`process_boundary`), `review_due: true`. Not started, for the reason PR-23's record gives. |
+| Left open, carried to the Director | **B-45**, **B-46**. |
+| Consequence | **DN-05 is not satisfied for PR-28 either.** Row PR-28 complete: **34 PR blocks / 29 row ids merged (144 of the 210 task checkboxes), 11 blocks / 13 row ids remain (`PR-29…PR-42`)**. **Unit 8 `send-path` closed.** |
 ---
 
 ## Inherited v1 debates (historical record, not re-audited)

@@ -5429,3 +5429,12 @@ corrections, `R1` re-anchored): **`rate.ts` 19 mutants, 17 killed / 2 survived (
 
 **At the round-1 tip:** **1,285 authored lines (425 src + 860 test), a disclosed 885-line PR-scoped exception**; `rm -rf
 dist && npm test` **801 tests (800 pass, 1 skip)**; `test:static` **8/8**; focused **105/105**.
+
+**Scoped re-judgment of round 1** (both judges, `b2c73cc..b4772a4`): **all three ledger rows and the verifier's gaps
+verified by both judges, 0 regressions, 0 new defects** (both checked the upsert against a NULL, a past, an earlier and a
+poller-written value, and that the abandonment branch writes exactly one row). **JUDGMENT: APPROVED** for
+`b2c73cc..b4772a4`; one of the two re-judgments in the budget was used.
+
+**Board after this slice.** Row PR-28 complete: **34 PR blocks / 29 row ids merged, 144 of the 210 task checkboxes**,
+11 blocks / 13 row ids remaining (`PR-29…PR-42`). **Unit 8 `send-path` is closed.** Unit 9 `ipc-handshake` opens with PR-29
+(IPC contract and HTTP server scaffolding).
