@@ -699,7 +699,7 @@ Runtime harness: in-process daemon over a real ledger temp file.
 
 #### PR-26 — send validation pipeline + secret backstop
 Branch `f1/26-send-validate` → `main`. Depends: PR-25. Size: ≈330 lines, no exception.
-*Size reconciliation (session 28).* Estimated ≈330; **measured 999 authored lines (383 src + 610 test + 6 fixture) at the candidate, a disclosed 599-line PR-scoped exception** — see `apply-progress.md` §PR-26. The estimate line above is the gate's text and is left as written.
+*Size reconciliation (session 28).* Estimated ≈330; **measured 999 authored lines (383 src + 610 test + 6 fixture) at the candidate, a disclosed 599-line PR-scoped exception** (1,104 lines and a 704-line exception after Judgment Day round 1) — see `apply-progress.md` §PR-26. The estimate line above is the gate's text and is left as written.
 Scope: `src/daemon/send/validate.ts`, `test/daemon/send/validate.test.ts`.
 Requirements: `send-path › Validation pipeline and secret backstop run before any network call` (PT-15); `send-path › Send input carries no destination` (PT-02 half, consumes PR-07a's schema).
 Runtime harness: N/A — pure pipeline unit test.

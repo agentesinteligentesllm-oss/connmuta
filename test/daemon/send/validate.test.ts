@@ -10,7 +10,7 @@ import { openLedger } from "../../../src/ledger/open.js";
 import { writeThreadRecord } from "../../../src/ledger/threads.js";
 import type { ThreadRecord } from "../../../src/shared/thread-record.js";
 import { ABANDON_BASIS_VALUE, normalizeBody, type Envelope } from "../../../src/shared/envelope.js";
-import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS } from "../../../src/shared/constants.js";
+import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../../src/shared/constants.js";
 import type { SecretRule } from "../../../src/shared/secrets.js";
 import type { SendToolInput } from "../../../src/shared/tool-schemas.js";
 import type { BindingConfig } from "../../../src/daemon/binding-config.js";
@@ -64,6 +64,18 @@ const FIXTURE_BOT_TOKEN = `1234567:${"A".repeat(35)}`;
 const NEAR_CEILING_BODY_CHARS = 1900;
 /** A body under the raw `MAX_BODY_CHARS` cap that nonetheless encodes past `TELEGRAM_MAX_TEXT_CHARS`. */
 const OVER_ENCODED_BODY_CHARS = 2500;
+/**
+ * The body length whose {@link boundaryEnvelope} encodes to exactly `TELEGRAM_MAX_TEXT_CHARS`. Every body
+ * character is carried twice (ADR-05b), so the encoded length moves in steps of two; the one-character
+ * `approval_ref` is what makes an even total reachable. The test asserts the exact length before relying on it.
+ */
+const EXACT_CEILING_BODY_CHARS = 1905;
+
+/** The ledger's running write counter — any INSERT/UPDATE/DELETE on the connection moves it. */
+function totalChanges(db: DatabaseSync): number {
+	const row = db.prepare("SELECT total_changes() AS n").get() as { n: number | bigint };
+	return Number(row.n);
+}
 
 function withLedger(run: (db: DatabaseSync) => Promise<void> | void): Promise<void> {
 	const home = mkdtempSync(join(tmpdir(), "conmuta-send-validate-"));
@@ -169,6 +181,10 @@ function sampleEnvelope(body: string, overrides: Partial<Envelope> = {}): Envelo
 		body,
 		...overrides,
 	};
+}
+
+function boundaryEnvelope(body: string): Envelope {
+	return sampleEnvelope(body, { type: "RESOLVED", basis: "human-approved", approval_ref: "a" });
 }
 
 function isSendToolError(code: string): (error: unknown) => boolean {
@@ -341,6 +357,14 @@ test("Spec scenario: a body under MAX_BODY_CHARS that encodes past TELEGRAM_MAX_
 	const envelope = sampleEnvelope(body);
 
 	assert.throws(() => guardEncodedLength(envelope), isSendToolError("BODY_TOO_LONG"));
+});
+
+test("the encoded-length guard is inclusive: exactly TELEGRAM_MAX_TEXT_CHARS is accepted with zero headroom, two more characters are not", () => {
+	const atCeiling = guardEncodedLength(boundaryEnvelope("x".repeat(EXACT_CEILING_BODY_CHARS)));
+	assert.equal(atCeiling.text.length, TELEGRAM_MAX_TEXT_CHARS, "sanity: the fixture must encode to exactly the ceiling");
+	assert.equal(atCeiling.wire.headroom_chars, 0);
+
+	assert.throws(() => guardEncodedLength(boundaryEnvelope("x".repeat(EXACT_CEILING_BODY_CHARS + 1))), isSendToolError("BODY_TOO_LONG"));
 });
 
 test("validateSend accepts the same over-encoded body the guard rejects — the raw cap and the encoded guard are different stages", async () => {
@@ -523,6 +547,15 @@ test("stage 2: a REPLY on an already-resolved thread is ALREADY_RESOLVED", async
 	});
 });
 
+test("stage 2: an ACK by a third party, even one addressed to the originator, is NOT_ADDRESSEE", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(119);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: CAROL_AGENT_ID }) });
+		assert.throws(() => validateSend(ackInput({ thread: threadId, to: ALICE_AGENT_ID }), deps), isSendToolError("NOT_ADDRESSEE"));
+	});
+});
+
 test("stage 2: an ACK by a non-addressee is NOT_ADDRESSEE", async () => {
 	await withLedger(async (db) => {
 		const threadId = hexId(107);
@@ -572,6 +605,64 @@ test("stage 2: RESOLVED on an already-resolved thread is ALREADY_RESOLVED", asyn
 		const input = resolvedInput({ thread: threadId, to: ALICE_AGENT_ID, basis: "work-confirmed" });
 		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: BOB_AGENT_ID }) }); // addressee
 		assert.throws(() => validateSend(input, deps), isSendToolError("ALREADY_RESOLVED"));
+	});
+});
+
+test("stage 2: an ACK by the addressee back to the originator succeeds and returns the thread", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(113);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID, opened_eid: "open-113" });
+		const result = validateSend(ackInput({ thread: threadId, to: ALICE_AGENT_ID }), sampleDeps(db));
+		assert.equal(result.existingThread?.opened_eid, "open-113");
+		assert.deepEqual(result.recipients, [ALICE_AGENT_ID]);
+	});
+});
+
+test("stage 2: a non-abandon RESOLVED by the addressee back to the originator succeeds", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(114);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID, opened_eid: "open-114" });
+		const result = validateSend(resolvedInput({ thread: threadId, to: ALICE_AGENT_ID, basis: "work-confirmed" }), sampleDeps(db));
+		assert.equal(result.existingThread?.opened_eid, "open-114");
+	});
+});
+
+test("stage 2: an ACK or non-abandon RESOLVED by the addressee to anyone but the originator is NOT_ADDRESSEE (JD-A-001)", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(115);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		assert.throws(() => validateSend(ackInput({ thread: threadId, to: CAROL_AGENT_ID }), sampleDeps(db)), isSendToolError("NOT_ADDRESSEE"));
+		assert.throws(
+			() => validateSend(resolvedInput({ thread: threadId, to: CAROL_AGENT_ID, basis: "work-confirmed" }), sampleDeps(db)),
+			isSendToolError("NOT_ADDRESSEE"),
+		);
+	});
+});
+
+test("stage 2: the UNKNOWN_THREAD remedy names this product's fetch tool, not v1's", async () => {
+	await withLedger(async (db) => {
+		assert.throws(
+			() => validateSend(replyInput({ thread: hexId(116) }), sampleDeps(db)),
+			(error: unknown) =>
+				error instanceof SendToolError &&
+				error.code === "UNKNOWN_THREAD" &&
+				error.message.includes(`${TOOL_PREFIX}fetch`) &&
+				!error.message.includes("agentbus_"),
+		);
+	});
+});
+
+test("validateSend writes nothing to the ledger — on success and on refusal", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(117);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		const before = totalChanges(db);
+
+		validateSend(ackInput({ thread: threadId, to: ALICE_AGENT_ID }), sampleDeps(db));
+		validateSend(broadcastInput(), sampleDeps(db));
+		assert.throws(() => validateSend(ackInput({ thread: hexId(118) }), sampleDeps(db)), isSendToolError("UNKNOWN_THREAD"));
+
+		assert.equal(totalChanges(db), before);
 	});
 });
 

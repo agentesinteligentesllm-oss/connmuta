@@ -3,8 +3,8 @@
  * v1 body sha256: 771f968e37a1897e7ecb3e277bacb294c30375b1018f30be8e9ce6cb4e1ca423
  *   (SHA-256 of lines 113-192 then 205-378 of the frozen v1 file, each LF-normalized with its
  *    terminating newline, concatenated in that order — the two-range rule `daemon/admission.ts`
- *    established. Reproduce with `node -e "…"` over the frozen checkout, or see
- *    `test/fixtures/v1-provenance.json`.)
+ *    established. Reproduce with `node -e "…"` over the frozen checkout; the registry
+ *    `test/fixtures/v1-provenance.json` lists the entry but carries no hash.)
  * Changes: (1) `BRIDGE_BUSY` removed from `SendErrorCode` — the ledger replaces v1's bridge lock, and
  * PR-27's `BindingMutex` serialises sends instead (design §9); (2) thread lookups against the ledger:
  * `checkLoopPrevention` reads ONE row with `readThreadRecord(db, project_id, thread)` instead of
@@ -18,7 +18,12 @@
  * last stage and PT-15/task 26.1 pin it here — PR-27 calls it with the envelope it builds; (6)
  * `obligations` removed from `SendToolOutput` (design §12 row for send-path, change (4)); (7)
  * `IN_THREAD_TYPES` is re-declared locally because `shared/tool-schemas.ts` keeps its own copy
- * module-private and PR-26 does not reopen that hash-pinned module.
+ * module-private and PR-26 does not reopen that hash-pinned module; (8) an ACK or a non-abandon
+ * RESOLVED must be addressed back to the thread's originator (`input.to === thread.from`, else
+ * `NOT_ADDRESSEE`) — v1 checked only that the caller was the addressee, so a correct addressee could
+ * direct the closing message to any other roster member and the originator never received it
+ * (Judgment Day `JD-A-001`, spec "addressee correct"); (9) the `UNKNOWN_THREAD` remedy names this
+ * product's tool, `${TOOL_PREFIX}fetch`, not v1's `agentbus_fetch`.
  *
  * ---
  *
@@ -50,7 +55,7 @@ import { randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import { readThreadRecord } from "../../ledger/threads.js";
-import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS } from "../../shared/constants.js";
+import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../shared/constants.js";
 import {
 	ABANDON_BASIS_VALUE,
 	encodeEnvelope,
@@ -205,7 +210,7 @@ function checkLoopPrevention(
 	if (!thread) {
 		throw new SendToolError(
 			"UNKNOWN_THREAD",
-			`Thread "${input.thread}" is not known locally — run agentbus_fetch first to receive it before acknowledging or resolving it.`,
+			`Thread "${input.thread}" is not known locally — run ${TOOL_PREFIX}fetch first to receive it before acknowledging or resolving it.`,
 		);
 	}
 	if (thread.opened_type !== "REQUEST") {
@@ -262,11 +267,20 @@ function checkLoopPrevention(
 				`Thread "${input.thread}" was addressed to "${thread.to}", so its abandonment must go to the same peer, not "${input.to}".`,
 			);
 		}
-	} else if (thread.to !== callerAgentId) {
-		throw new SendToolError(
-			"NOT_ADDRESSEE",
-			`Thread "${input.thread}" is addressed to "${thread.to}", not "${callerAgentId}" — only the addressee may acknowledge or resolve it.`,
-		);
+	} else {
+		if (thread.to !== callerAgentId) {
+			throw new SendToolError(
+				"NOT_ADDRESSEE",
+				`Thread "${input.thread}" is addressed to "${thread.to}", not "${callerAgentId}" — only the addressee may acknowledge or resolve it.`,
+			);
+		}
+		// Change (8): the acknowledgement or resolution goes back to the one agent waiting for it.
+		if (input.to !== thread.from) {
+			throw new SendToolError(
+				"NOT_ADDRESSEE",
+				`Thread "${input.thread}" was opened by "${thread.from}", so its acknowledgement or resolution must go back there, not to "${input.to}".`,
+			);
+		}
 	}
 	if (input.type === "RESOLVED" && thread.status === "resolved") {
 		throw new SendToolError("ALREADY_RESOLVED", `Thread "${input.thread}" is already resolved.`);

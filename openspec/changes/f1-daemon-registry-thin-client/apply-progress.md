@@ -5155,3 +5155,52 @@ order and the guard.
 
 **Verification at the candidate.** `rm -rf dist && npm test`: **739 tests (738 pass, 1 skip)**; `npm run test:static`:
 **8/8**; `node --test dist/test/daemon/send/validate.test.js`: **38/38**.
+
+**Native review.** `gentle-ai review assess --base-ref a82ae27 --committed-only --untracked-scope=exclude` over `1c92aec`:
+risk `high` (`process_boundary`, signal `shell_process` — the test's own assertion that the module never names
+`child_process`), `review_due: true`, `review_due_reason: high_risk`, 6 paths / 1,094 changed lines. The native review was
+**not started** for this candidate, as for PR-23..PR-25: the installed `judgment-day` skill replaces ordinary 4R as the
+adversarial method for a target and both must never run on one target, and START's consent envelope belongs to the
+Director. The RDD fallback's high-risk path ran instead: writer self-verification plus the separate independent verifier
+below.
+
+**Judgment Day round 1** (`bus-v2-f1-pr-26-audit-001`; both blind judges over a frozen worktree at `1c92aec`, the
+independent verifier in parallel over its own). Judge A: 2 WARNING, 1 SUGGESTION. Judge B: 1 CRITICAL, 1 SUGGESTION. No row
+was reported by both judges; every row was reproduced by the parent before any correction.
+
+- `JD-B-001` (CRITICAL, single judge, **pre-existing**): the `v1 body sha256` pin of a SEAM header is not machine-checked —
+  `provenance.test.ts` asserts only inequality for SEAM, so any 64-hex value passes. True, and true of all 14 SEAM
+  headers since the convention was ratified (`bus-v2-f1-pr-04-001`); the v1 checkout is not in CI, so pins are verified by
+  audit-time reproduction, which this slice's verifier did. Not candidate-caused: filed as **B-42** with three dispositions.
+- `JD-A-001` (WARNING, single judge, **pre-existing in v1, corroborated independently by the verifier's direct probe**): an
+  ACK or non-abandon RESOLVED by the correct addressee could carry any rostered `to`, and `resolveRecipients` trusted it —
+  the closing message could go to a third agent while the originator waited. Byte-identical to v1 `:320-325`. **Corrected**
+  as SEAM change (8): the message must go back to `thread.from`, else `NOT_ADDRESSEE` — the spec's "addressee correct".
+- `JD-A-002` (WARNING, introduced): "no ledger write" had no test that could fail (the import scan cannot see a
+  `writeThreadRecord` call, since `ledger/threads.js` is an allowed import). **Pinned**: `total_changes()` is unchanged
+  across two successful sends and one refusal.
+- `JD-A-003` (SUGGESTION, introduced): the `UNKNOWN_THREAD` remedy named v1's `agentbus_fetch`; this product ships
+  `${TOOL_PREFIX}fetch`. **Corrected** as change (9) and pinned. `serve/thread.ts:204` carries the same v1 string — filed
+  as **B-43**, not edited drive-by in a closed unit.
+- `JD-B-002` (SUGGESTION, introduced): the header pointed at `test/fixtures/v1-provenance.json` to reproduce a hash the
+  fixture does not carry. **Corrected** in this module; `admission.ts` carries the same pointer (B-43).
+
+**Independent verifier** (separate agent, its own frozen worktree at `1c92aec`): every figure reproduced exactly — 999
+(383 + 610 + 6), 739 / 738 / 1, `test:static` 8/8, focused 38/38, 22 registry entries, `771f968e…` from the frozen v1
+checkout after first reproducing `3bd09d0d…`, and the 31-mutant sweep (30 / 1 / 0). Of its six extra mutants three were
+killed and **three survived**: `E5` (no test reached a successful ACK or non-abandon RESOLVED), `E6` (the guard's inclusive
+boundary at exactly `TELEGRAM_MAX_TEXT_CHARS` was unpinned) and `E2` (the roster check validated only the first
+recipient). Its direct probe reproduced `JD-A-001` on the compiled module. No figure in the records was wrong.
+
+**Round 1** (parent, inline). Source: changes (8) and (9) and the header pointer. Tests: ACK and non-abandon RESOLVED
+success paths; ACK/RESOLVED to a third party refused; a third party's ACK addressed to the originator refused (added
+because `M16` **survived** once change (8) masked the older non-addressee case — the new check refused it for the other
+reason); the remedy's tool name; the no-write snapshot; the guard at exactly 4,096 characters accepted with zero headroom
+and two characters more refused. **`E2` is an equivalent mutant under the public API**: BROADCAST draws its recipients from
+the roster itself and every other type carries exactly one, so no reachable input has an unknown recipient after the
+first; it is recorded, not pinned. The sweep now runs the parent's 31, the verifier's six (with `E4` re-anchored onto the
+restructured branch) and two for the corrections (`M31` change (8) removed, `M32` v1's tool name): **39 mutants, 37 killed
+/ 2 survived (`M0`, the control, and `E2`, equivalent)**, 0 build failures.
+
+**At the round-1 tip:** **1,104 authored lines (397 src + 701 test + 6 fixture), a disclosed 704-line PR-scoped exception**;
+`rm -rf dist && npm test` **746 tests (745 pass, 1 skip)**; `test:static` **8/8**; focused **45/45**.
