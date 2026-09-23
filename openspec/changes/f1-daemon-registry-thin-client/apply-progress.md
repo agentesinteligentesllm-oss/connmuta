@@ -5321,3 +5321,12 @@ rewritten; `G5` the invalid type accepted): **`send-path.ts` 41 mutants, 40 kill
 
 **At the round-1 tip:** **1,493 authored lines (461 src + 1,026 test + 6 fixture), a disclosed 1,093-line PR-scoped
 exception**; `rm -rf dist && npm test` **778 tests (777 pass, 1 skip)**; `test:static` **8/8**; focused **84/84**.
+
+**Scoped re-judgment of round 1** (both judges, `73cfdae..696e6c6`): **all four ledger rows and the verifier's gaps verified
+by both judges, 0 regressions, 0 new defects**. **JUDGMENT: APPROVED** for `73cfdae..696e6c6`; one of the two re-judgments
+in the budget was used.
+
+**Board after this slice.** Row PR-27 complete: **33 PR blocks / 28 row ids merged, 140 of the 210 task checkboxes**,
+12 blocks / 14 row ids remaining (`PR-28…PR-42`). Unit 8 `send-path` closes with PR-28 (`daemon/send/rate.ts`), which
+adds the `offsets.retry_after_until` check and the per-binding message budget to the send path, immediately before
+`transport.send`, and settles the `RATE_LIMITED` naming.
