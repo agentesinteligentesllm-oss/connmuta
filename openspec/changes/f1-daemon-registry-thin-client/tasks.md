@@ -1003,9 +1003,60 @@ Scope: `src/client/main.ts`, `src/cli/main.ts` (add `mcp` subcommand), `test/cli
 Requirements: completes the client bundle entry point (`ADR-0029` "starts within the MCP timeout").
 Runtime harness: MCP host simulated by `StdioServerTransport` in-process.
 
-- [ ] 35.1 RED: write `test/client/main.test.ts` ("handshake is lazy, on the first tool call, cached for the session": MCP initialization completes within the host timeout even with no daemon running).
-- [ ] 35.2 GREEN: implement `src/client/main.ts` (node-floor gate → parse `--project` → `client/binding.ts` walk-up → `server.connect(new StdioServerTransport())` immediately) and wire `conmuta mcp --project <id>` as a dynamic-`import()` subcommand in `src/cli/main.ts` so the IDE-facing process loads only the client closure.
-- [ ] 35.3 Verify: `npm run build && node --test "dist/test/client/main.test.js"`.
+- [x] 35.1 RED: write `test/client/main.test.ts` ("handshake is lazy, on the first tool call, cached for the session": MCP initialization completes within the host timeout even with no daemon running).
+- [x] 35.2 GREEN: implement `src/client/main.ts` (node-floor gate → parse `--project` → `client/binding.ts` walk-up → `server.connect(new StdioServerTransport())` immediately) and wire `conmuta mcp --project <id>` as a dynamic-`import()` subcommand in `src/cli/main.ts` so the IDE-facing process loads only the client closure.
+- [x] 35.3 Verify: `npm run build && node --test "dist/test/client/main.test.js"`.
+
+**Apply-time note (session 35).** Decisions made by the orchestrator under the Director's full-autonomy
+delegation for this session (recorded in `apply-progress.md` §PR-35):
+1. **`src/client/main.ts` exports one testable `runMcpClient(options)` async function, not a top-level
+   side-effecting script** (unlike `daemon/main.ts`). `cli/main.ts` owns the process entry and all argv
+   parsing for `mcp`, mirroring its existing `daemon stop` dynamic-`import()` dispatch exactly.
+2. **No `Provenance:` header on `main.ts`.** `v1:src/index.ts:250-292 main` is verdict REPLACED
+   (design.md:471), and REPLACED code carries no SEAM/AS-IS header.
+3. **The node-floor gate is locally reimplemented inside `main.ts`, never importing
+   `daemon/node-floor.ts`.** `client/tsconfig.json`'s `references` is `[{"path":"../shared"}]` only (a
+   `tsc -b` compile error otherwise) — same disclosed boundary `run-state.ts`/`handshake.ts` already
+   document. Only the small pure semver-floor comparison is duplicated, not the full
+   `enforceNodeFloor`/`process.exit` ceremony, since this function only ever returns an exit code.
+4. **design.md:43's "gate then dynamic import" is read as the OUTER `cli/main.ts` → `client/main.js`
+   dynamic import**, not a second inner one inside `main.ts` itself — every collaborator `main.ts` needs
+   is a static top-of-file import. Documented as a deliberate reading in the module doc.
+5. **`host: os.hostname()`** for the `SessionIdentity.host` field `handshake.ts`'s own module doc
+   explicitly left to "a later PR's CLI entry point" — `client_cursors.host` is an operator-facing label
+   identifying which machine a session came from; no existing helper produces it.
+6. **`test/cli/main.test.ts` was edited outside the block's declared Scope line** (only
+   `test/client/main.test.ts` is named) — necessary because `cli/main.ts` itself is in scope and this
+   project runs Strict TDD: an untested new dispatch branch would violate it. The new dispatch test
+   controls `process.cwd()` via `chdir` (no prior precedent in this repo) rather than an injected `--cwd`
+   flag, since `runMcpClient` has none by design (its walk-up reads `process.cwd()`); verified `node
+   --test` runs one file's top-level tests sequentially in their own child process, so this is race-free.
+7. **Parent mutant sweep found three real test gaps beyond the writer's own 5 RED tests**, closed before
+   freezing the candidate: (a) the patch-level `>=`-vs-`>` node-floor boundary was unpinned — added an
+   exact-`NODE_FLOOR` boundary test; (b) `await server.connect(transport)` was not distinguishable from a
+   fire-and-forget `void server.connect(transport)` by any existing test — added a delayed-`start()` fake
+   transport proving `runMcpClient` does not resolve until the transport is actually connected; (c) no
+   test asserted `createIpcSessionImpl`/`createServerImpl` receive the exact identity/`projectId` derived
+   from the resolved binding — added one test capturing and asserting both. One mutant (disabling
+   `main.ts`'s own `options.project === undefined` check) is an **equivalent mutant, argued not pinned**:
+   `binding.ts`'s `resolveProjectBinding` already refuses an undefined `project` with the identical
+   `EXIT_USAGE` via its own `missing_project_flag` refusal (confirmed by reading `binding.ts:124-126`), so
+   removing `main.ts`'s own early check changes no observable behavior — the check is intentionally
+   defensive duplication for any caller other than `cli/main.ts` (which already validates presence
+   itself), not dead code.
+8. `test/cli/main.test.ts`'s pre-existing test iterating `["daemon", "mcp", "migrate-v1"]` under the title
+   "a subcommand reserved for a later slice..." still passes unmodified (a bare `mcp` is still
+   `EXIT_USAGE`, just for a different reason now — missing `--project`, not "unknown command") — its title
+   is now slightly stale for `mcp` specifically. Left untouched (surgical-change discipline); flagged here
+   per this project's disclosure convention rather than fixed as a drive-by edit.
+
+**Size reconciliation (session 35).** Estimated ≈250; **measured 519 authored lines (187 src + 332 test)
+at the candidate** (`cli/main.ts` 35+2=37, `client/main.ts` 152+0=152, `cli/main.test.ts` 65+1=66,
+`client/main.test.ts` 264+0=264) — a disclosed **269-line PR-scoped exception**, driven mainly by the
+`test/cli/main.test.ts` edit outside the primary Scope line (item 6 above) and the three parent-added
+mutant-sweep tests (item 7 above). See `apply-progress.md` §PR-35 for the full breakdown. The estimate
+line above is the gate's text and is left as written. (Re-check after any Judgment Day correction round —
+the tip above is the pre-audit candidate, not necessarily final.)
 
 ### Unit 11 — `v1-migration`
 

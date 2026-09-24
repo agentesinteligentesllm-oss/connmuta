@@ -7,7 +7,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { runCli, type CliIo } from "../../src/cli/main.js";
-import { EXIT_USAGE, EXIT_VALIDATION_FAILED, PRODUCT_NAME } from "../../src/shared/constants.js";
+import { EXIT_UNBOUND_PROJECT, EXIT_USAGE, EXIT_VALIDATION_FAILED, PRODUCT_NAME } from "../../src/shared/constants.js";
 
 // dist/test/cli/main.test.js -> repo root is three levels up.
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -167,6 +167,7 @@ test("the usage line names the one command this build wires, and only the forms 
   // advertising an optional target would promise a form that exits 2 (JD-A-002, disclosed).
   assert.match(text, /validate <path> \| --stdin/);
   assert.match(text, /daemon stop \[--home <dir>\]/);
+  assert.match(text, /mcp --project <id>/);
   assert.equal(text.includes("[<path>"), false, "the usage text must not advertise an optional target");
 });
 
@@ -208,6 +209,69 @@ test("`daemon stop` invokes stopDaemon and returns its exit code", async () => {
     assert.equal(result, 1);
     assert.match(captured.err.join("\n"), /not running/i);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- mcp subcommand dispatch ---
+
+test("`mcp` without --project is a usage error naming the missing flag", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["mcp"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /mcp requires --project <id>/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`mcp --project` with no value is a usage error", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["mcp", "--project"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /--project requires a value/);
+});
+
+test("`mcp --project=` with an empty value is a usage error", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["mcp", "--project="], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /--project requires a value/);
+});
+
+test("`mcp` with an unknown option is a usage error", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["mcp", "--verbose"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown option '--verbose'/);
+});
+
+test("`mcp` with an unexpected positional argument is a usage error", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["mcp", "extra-arg"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unexpected argument 'extra-arg'/);
+});
+
+// `daemon stop`'s own dispatch test above (`invokes stopDaemon and returns its exit code`) lets the
+// real `stopDaemon` run for real against an isolated --home directory with no daemon running:
+// `stopDaemon` takes `homeDir` as one of its own options, so the CLI can inject a fully isolated temp
+// directory with no chdir needed. `runMcpClient` has no such CLI-level --cwd flag (its binding walk-up
+// reads `process.cwd()` by design — see `src/client/main.ts`), so the only way to exercise this
+// dispatch branch end to end, without mocking the dynamic import and without ever touching real stdin,
+// is to control `process.cwd()` itself. `node --test` runs each matched file in its own child process
+// and runs a file's top-level tests sequentially (verified locally), so a chdir here cannot leak into
+// another test file or race a concurrent test in this one. Both --project forms are proven through the
+// real module chain, landing on the binding walk-up's own fast, real refusal (no conmuta.json) rather
+// than ever reaching `server.connect(new StdioServerTransport())`.
+test("`mcp --project <id>` and `mcp --project=<id>` both reach the real client module through the dynamic import and return its own refusal exit code", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-cli-mcp-"));
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(dir);
+
+    const first = makeIo();
+    assert.equal(await runCli(["mcp", "--project", "prj-example"], first.io), EXIT_UNBOUND_PROJECT);
+    assert.match(first.err.join("\n"), /no conmuta\.json found/);
+
+    const second = makeIo();
+    assert.equal(await runCli(["mcp", "--project=prj-example"], second.io), EXIT_UNBOUND_PROJECT);
+    assert.match(second.err.join("\n"), /no conmuta\.json found/);
+  } finally {
+    process.chdir(originalCwd);
     rmSync(dir, { recursive: true, force: true });
   }
 });

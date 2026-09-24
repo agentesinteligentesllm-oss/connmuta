@@ -6786,3 +6786,106 @@ call this project's own PR-32/33 established for a narrow, single-judge, cleanly
 here to a residual two judges had already both independently reasoned about (one flagging it, one
 clearing it) rather than one judge alone. No native review ran for this candidate — a Judgment Day
 target, per HANDOFF §2.3.
+
+## PR-35 — `client/main.ts` + `cli/main.ts` `mcp` subcommand (thin MCP client process entry point; unit 10 `thin-client-tools` continues)
+
+**Route.** ODD with the SDD contract preserved, session 35 (Director full-autonomy delegation, Arena
+still down, `sdd-apply` preflight gate still closed). One delegated read-only mapper (32 tool uses,
+covering the spec's launcher-refusal requirement, design.md's Startup/Handshake-timing rows and its
+REPLACED verdict for `main.ts`, ADR-0029/ADR-0031's actual "MCP timeout" text, `cli/main.ts`'s full
+`daemon stop` dispatch pattern, every `client/*` module's exact exported signature, the client/daemon
+tsconfig boundary and its two existing precedents for handling it, and the Provenance-header style for
+AS-IS/SEAM/new-code), then the orchestrator decided eight open design points directly from that
+evidence (below) plus two follow-up reads of its own (`daemon/node-floor.ts` in full, `daemon/main.ts`
+in full, `shared/project-file.ts`/`shared/roster-hash.ts` in full, `client/handshake.ts`'s
+`SessionIdentity`/`requestSession` in full) to pin the exact startup sequence and the
+`host`/`rosterHash` derivation before writing the brief, then one delegated writer (`general-purpose`,
+sonnet), then a parent readback that found no functional defect, then a parent mutant sweep that found
+three real test gaps (closed by the parent directly) and one equivalent mutant (argued, not pinned).
+
+**Decisions (orchestrator, session 35), disclosed here and in `tasks.md`'s apply-time note and
+`main.ts`'s own module doc.**
+1. `main.ts` exports one testable `runMcpClient(options)` async function — not a top-level
+   side-effecting script like `daemon/main.ts`. `cli/main.ts` owns the process entry and all argv
+   parsing for `mcp`, mirroring its existing `daemon stop` dispatch exactly (parse, then
+   `await import("../client/main.js")`, then call the exported function).
+2. No `Provenance:` header — `v1:src/index.ts:250-292 main` is verdict REPLACED (design.md:471), and
+   REPLACED code carries no SEAM/AS-IS header by construction.
+3. The node-floor gate is locally reimplemented inside `main.ts` (just the pure semver-floor
+   comparison, not the full `enforceNodeFloor`/`process.exit` ceremony — this function only ever
+   returns an exit code) rather than importing `daemon/node-floor.ts`, since `client/tsconfig.json`'s
+   `references` is `[{"path":"../shared"}]` only — the same disclosed boundary `run-state.ts` and
+   `handshake.ts` already document for the same reason.
+4. design.md:43's "gate then dynamic import" is read as the OUTER `cli/main.ts` -> `client/main.js`
+   dynamic import, not a second inner one inside `main.ts` — every collaborator `main.ts` needs is a
+   static top-of-file import, disclosed as a deliberate reading since design.md's own gloss is terser.
+5. `host: os.hostname()` for `SessionIdentity.host` — `handshake.ts`'s own module doc explicitly left
+   host-label derivation to "a later PR's CLI entry point"; `client_cursors.host` (design.md:209) is an
+   operator-facing label with no existing helper, `os.hostname()` is the natural value.
+6. `rosterHash` computed via `computeRosterHash(binding.file.roster)` (`shared/roster-hash.ts`,
+   already-merged, PR-08b) — `ProjectRosterEntry`'s extra `username` field is structurally compatible
+   with `RosterHashInput`'s narrower `{agent_id, user_id}` shape.
+7. Binding refusals get one plain, value-safe stderr line per `BindingRefusal` variant (`path`,
+   `searchedFrom`, `foundProjectId`, `expectedProjectId` are filesystem/identifier data, not document
+   content — echoing them does not violate the `ProjectFileProblem` "never echo forbidden content" rule,
+   which is a different, unrelated type; `invalid_project_file`'s message reports only a problem count).
+8. `test/cli/main.test.ts` was edited outside the block's declared Scope line (only
+   `test/client/main.test.ts` is named) — necessary because `cli/main.ts` itself is in scope and this
+   project runs Strict TDD. Its new dispatch-through-the-dynamic-import test controls `process.cwd()`
+   via `chdir` (no prior repo precedent) rather than an injected `--cwd` flag, since `runMcpClient` has
+   none by design; verified `node --test` runs one file's top-level tests sequentially in their own
+   child process before relying on this, so it is race-free.
+
+**Writer's own disclosed design choices, beyond the eight decisions above.** `RunMcpClientOptions`
+carries `resolveProjectBindingImpl`/`createIpcSessionImpl`/`createServerImpl` overrides (house DI
+style, matching `ipc-stub.ts`'s/`server.ts`'s own shape) even though `cli/main.ts` never sets them —
+injection points exist purely for `test/client/main.test.ts`. `--project`'s two-form parsing
+(`--project <id>` / `--project=<id>`) in `cli/main.ts` mirrors `daemon stop`'s existing `--home` loop
+verbatim, including its exact error-message shapes.
+
+**Parent readback.** Read `src/client/main.ts`, the `cli/main.ts` diff, and both test files in full.
+No functional defect found — signatures, startup ordering, and refusal-exit-code mapping all matched
+the brief exactly; `computeRosterHash`'s `RosterHashInput` parameter accepts `ProjectRosterEntry`'s
+extra `username` field structurally, confirmed by the passing build. One pre-existing test whose title
+("a subcommand reserved for a later slice...") is now slightly stale for `mcp` specifically (still
+correctly asserts `EXIT_USAGE`, just for a different underlying reason) — left untouched, disclosed in
+`tasks.md`'s apply-time note rather than fixed as a drive-by edit.
+
+**TDD evidence (writer).** RED (verbatim): `test/client/main.test.ts(10,30): error TS2307: Cannot find
+module '../../src/client/main.js'`, plus a downstream `TS7006` implicit-any (a consequence of the
+missing module, not a separate gap). GREEN: `test/client/main.test.ts` 5/5, `test/cli/main.test.ts`
+25/25 (19 pre-existing + 6 new); full suite from clean `dist/`: **970 tests (969 pass, 1 skip)**, up
+from the 959/958+1 baseline by the 11 tests added; `npm run test:static` 8/8, confirming `main.ts`
+carries no Provenance header and stays invisible to that gate.
+
+**Parent mutant sweep** (`odd/sweep.mjs`, recreated this session — 11 explicit mutants against
+`src/client/main.ts`, M0 comment-only control). First pass: **M0 survived** (correct); **M2 killed, M4
+BUILD-FAIL** (via the `BindingResult` discriminated union — the same "discriminated union turns a
+mutant into a compile-time BUILD-FAIL" pattern PR-32/33/34 already established), **M10 killed**; **M1,
+M3, M5, M6, M7, M8, M9 survived** — six real test gaps plus one equivalent mutant. Investigated each:
+- **M3 (disabling `main.ts`'s own `options.project === undefined` check) is an EQUIVALENT mutant,
+  argued not pinned**: `binding.ts:124-126`'s `resolveProjectBinding` already refuses an `undefined`
+  project with the identical `EXIT_USAGE` via its own `missing_project_flag` refusal, so removing
+  `main.ts`'s early check changes no observable behavior — intentional defensive duplication for any
+  caller other than `cli/main.ts` (which validates presence itself first), not dead code.
+- **M1, M5, M6, M7, M8, M9 were real gaps**, closed by three new parent-written tests: (a) an
+  exact-`NODE_FLOOR`-boundary test pins the patch-level `>=` comparison (M1); (b) a delayed-`start()`
+  fake `Transport` proves `runMcpClient` does not resolve until `server.connect()` actually completes,
+  not a fire-and-forget `void` call (M5); (c) one test captures and asserts the exact arguments passed
+  to both `createIpcSessionImpl` (`projectId`/`groupId`/`rosterHash`/`host`, all four) and
+  `createServerImpl` (`projectId`, `ipc` identity) (M6, M7, M8, M9 — all four wiring mutants share this
+  one test as their pin, since they all corrupt the same call's arguments).
+
+Re-ran the sweep after adding the three tests: **all real mutants KILLED (M1, M2, M5, M6, M7, M8, M9,
+M10), M0 still survives (control), M4 still BUILD-FAIL, M3 remains the argued equivalent** — zero
+unexplained survivors.
+
+Parent re-verification, independent of the writer's own report: `rm -rf dist && npm test` → **973 tests
+(972 pass, 1 skip)**, up from 970 (+3, the parent's own gap-closing tests); `npm run test:static` → 8/8.
+
+**At the candidate tip:** `git diff --numstat main -- src test`: **519 authored lines** (`cli/main.ts`
+35/2, `client/main.ts` 152/0, `cli/main.test.ts` 65/1, `client/main.test.ts` 264/0) — against the ≈250
+estimate, a disclosed **269-line PR-scoped exception**, driven mainly by the `test/cli/main.test.ts`
+edit outside the primary Scope line (decision 8 above) and the three parent-added mutant-sweep tests.
+
+_(Judgment Day section appended below once the audit runs.)_
