@@ -6592,7 +6592,7 @@ established, holding a third time); the remaining 3 real mutants (IpcTransportEr
 check swap, a mismatched tool name, a wrong client-local code mapping) **all KILLED**. **Zero real
 survivors across all 15 mutants.**
 
-**At the pre-Judgment-Day tip:** `git diff --numstat main -- src test`: **587 authored lines**
+**At the pre-Judgment-Day tip (`32a0c16`):** `git diff --numstat main -- src test`: **587 authored lines**
 (`errors.ts` 45/0, `ipc-stub.ts` 119/0, `server.ts` 147/0 — includes the readback fix, `errors.test.ts`
 44/0, `ipc-stub.test.ts` 129/0, `server.test.ts` 103/0) — against a ≈360 estimate, a disclosed
 **227-line PR-scoped exception**, smaller than every slice since PR-30 — the writer's own 16 new tests
@@ -6600,3 +6600,143 @@ covering every branch of a brand-new `IpcSession` abstraction account for most o
 three small `src` files. `docs/02-architecture/THREAT-MODEL.md`'s PT-07 row (1/1) and
 `test/fixtures/v1-provenance.json`'s new 24th entry (6/0) stay outside this count, disclosed
 separately. `rm -rf dist && npm test`: **950 tests (949 pass, 1 skip)**; `npm run test:static`: **8/8**.
+
+**Judgment Day** (both judges + independent verifier, frozen worktrees `pr34-judges`/`pr34-verify` at
+`32a0c16`, all three in parallel). **Judge A found the audit's headline CRITICAL**: `IpcSession.callTool`
+re-ran the FULL handshake — including `POST /session`, which mints a brand-new bearer every time — on
+EVERY tool call, with zero caching, directly contradicting design.md §11's ratified "Handshake timing"
+requirement ("Lazy, on the first tool call, cached for the session"). Traced the full consequence
+end-to-end: `daemon/ipc/sessions.ts`'s `SessionStore.mint` enforces a hard, NEVER-SELF-EXPIRING
+`MAX_ACTIVE_SESSIONS` ceiling shared across every project the daemon serves, and no client code anywhere
+calls `DELETE /session` to release a bearer — so the 65th tool call issued anywhere against one daemon
+boot (any project, not just the one that made it) would make `SessionStore.mint` refuse, which
+`performHandshake` reports as `HandshakeError("DAEMON_DOWN", retryable: true)`: a false, PERMANENT
+"daemon is down" for every project on that daemon, recoverable only by a full daemon restart, even
+though the daemon was fully alive. This was the orchestrator's own design decision (session 34's
+decision 5), framed at the time as a performance-only tradeoff ("one extra file read, cheap"); Judge A
+correctly identified that `performHandshake`'s `POST /session` call is not a cheap idempotent read like
+`ensureDaemonRunning`'s — it is a stateful, capacity-bounded daemon-side mutation, making this a
+correctness bug, not a performance one. Judge A also found 3 WARNING (an avoidable retryable-table
+duplication — `HandshakeError` instances already carry their own correct `.retryable`, discarded by
+`server.ts`'s catch branch in favor of re-deriving it through `errors.ts`'s independently-hand-copied
+table; the status/error schema classification has no cross-validation between `toolSuccessSchema` and
+`ipcErrorSchema`, inferential and not currently exploitable; `server.test.ts` behaviorally exercises only
+`conmuta_status`, never `send`/`fetch`/`thread`'s actual handler dispatch) and 1 SUGGESTION (the module
+doc's "three edits" disclosure undercounted a fourth textual change — `agentbus_status`'s TITLE, not
+just its description, also got the bridge→binding rewording). **Judge B** found 1 WARNING corroborating
+Judge A's third WARNING independently (the same `conmuta_status`-only behavioral gap, framed as "no test
+pins which route any of the four tools actually calls"), 1 WARNING that the PT-07/spec "built client
+bundle" guarantee is pinned only for `errors.ts`, not the other client/* files (accurate, but a
+pre-existing condition already tracked and deferred to PR-40 per PT-27, not something this PR
+introduced), 1 WARNING on the untested generic-error fallback path (independently corroborating the
+verifier's own finding below), 1 SUGGESTION that `errors.ts`'s four daemon-passthrough codes are dead
+from a call-graph perspective (accurate, but justified: spec.md's own "Client-local error payload
+constructor" scenario explicitly requires the constructor to demonstrably handle these codes) — and 1
+WARNING that was **empirically REFUTED by the parent**: a claim that `apply-progress.md`'s "6/0" line
+stat for `v1-provenance.json` must be wrong (reasoned abstractly that appending to a JSON array requires
+modifying the previous entry's closing line). Direct `git diff` showed the actual diff IS a pure 6-line
+insertion — git's minimal-diff algorithm matches the file's identical `}\n]` tail before and after the
+edit as unchanged context, making a real, valid 6/0 diff. The **independent verifier** reproduced all 10
+required figures exactly (build, 950/949/1, static 8/8, the sha256, every per-file line count, the
+mutant-sweep verdicts) with one partial exception (a labeling inconsistency between "KILLED" and
+"BUILD-FAIL" for two structurally-identical discriminated-union mutants — cosmetic) — and, independently
+of Judge A, found and REPRODUCED THE SAME ROUTE-WIRING GAP via its own mutant sweep: a "mismatched tool
+name" mutant the candidate's own record had claimed KILLED actually **survives**, confirmed twice (two
+different tool pairs). Wrote 6 further novel mutants/probes: `IPC_REQUEST_TIMEOUT_MS` not verified wired
+to the real fetch call (survived), `retry_after_s`/`new_chat_id` field-dropping on a forwarded daemon
+error undetected (survived), `homeDir` forwarding to `ensureDaemonRunningImpl`/`performHandshakeImpl`
+unasserted (survived), one of the four untested `CLIENT_ERROR_RETRYABLE` codes (killed — the existing
+tests iterate the full closed vocabulary in a loop, so partial mutant coverage understated true test
+coverage), `CreateServerDeps.now`'s dead-code status confirmed genuine (survived, as expected — a
+positive confirmation, not a gap), and a concurrent-calls probe showing no cross-call contamination
+(correct, not a gap). Also confirmed the generic-unrecognized-error fallback path (`runToolCall`'s
+`throw err`) is safely handled by the MCP SDK itself with no crash, but had zero test coverage — the
+same gap Judge B found independently.
+
+**Two judges (Judge A and Judge B) converging independently on the same route-wiring test gap, and the
+independent verifier separately reproducing it empirically as a real surviving mutant, from three
+unrelated methods, is the strongest signal in this project's Judgment Day history to date** — treated as
+effectively pre-confirmed rather than needing further reproduction before fixing.
+
+**Corrected** (parent inline, given the CRITICAL fix's subtlety — session caching plus a stale-bearer
+retry path both need to be exactly right, and a fresh delegated agent redoing this design risked
+introducing a different bug that would then need its own re-judgment round). Six fixes, all confirmed
+findings only:
+1. **`ipc-stub.ts` (the CRITICAL fix)**: `createIpcSession` now caches `{port, bearer}` across calls in
+   a closure variable, running `connect()` (the daemon-liveness check plus the handshake) at most once
+   per `IpcSession` instance. On a `401` (`HTTP_UNAUTHORIZED`) — the daemon's own signal that a cached
+   bearer is stale, most plausibly because the daemon restarted and minted a brand-new `SessionStore`
+   (design's own documented invalidation trigger) — the cache is cleared, `connect()` runs exactly once
+   more, and the same call is retried exactly once against the fresh session; any outcome after that one
+   retry (including a second `401`) falls through to normal response classification, never loops.
+   Mirrors `client/handshake.ts`'s own established "re-read then retry once" shape for a failed `GET
+   /identity`, applied here to the tool-call layer instead. Three new tests pin this: caching (two calls,
+   one handshake), the self-healing retry-once path (a stale-then-fresh bearer pair), and the no-loop
+   guarantee (two consecutive `401`s stop at exactly two attempts, returning the daemon's own error body
+   rather than hanging or looping).
+2. **`server.ts` (WARNING)**: the `HandshakeError` catch branch now builds its error payload directly
+   from `err.code`/`err.message`/`err.retryable` instead of re-deriving `retryable` through
+   `clientErrorPayload`'s independently-maintained table — eliminating the avoidable half of the
+   duplication risk Judge A found (the reachable, real-`HandshakeError`-instance path). `errors.ts`'s
+   `clientErrorPayload` keeps its full 8-code vocabulary for its one remaining reachable call
+   (`IPC_ERROR`, which `IpcTransportError` carries no `.retryable` field to read directly) and for
+   spec-mandated testability of the four daemon-passthrough codes.
+3. **`server.ts` (SUGGESTION)**: module doc corrected to name `agentbus_status`'s TITLE as also rewritten
+   (previously only the description field was named), per Judge A's finding.
+4. **`test/client/server.test.ts` (the route-wiring CRITICAL, both judges + verifier)**: one new test
+   drives all four tools (`conmuta_send`/`fetch`/`status`/`thread`) through a fake `IpcSession` that
+   records which route each call reaches, asserting all four map to their own distinct
+   `POST /tools/{send,fetch,status,thread}` route — closing the gap that let a route-swap mutant survive.
+5. **`test/client/server.test.ts` (WARNING, Judge B + verifier)**: one new test drives an unrecognized
+   thrown error type through `runToolCall`'s fallback `throw err` path, confirming the MCP SDK's own
+   tool-dispatch layer converts it to a safe `isError` result rather than a crash.
+6. **`test/client/ipc-stub.test.ts` (3 WARNING, independent verifier)**: three new tests close the
+   `IPC_REQUEST_TIMEOUT_MS`-wiring gap (asserting the exact timeout value reaches `AbortSignal.timeout`,
+   via a scoped monkey-patch restored in a `finally`), the `retry_after_s`/`new_chat_id` field-dropping
+   gap (a forwarded daemon error fixture now carries both optional fields, asserted preserved verbatim),
+   and the `homeDir`-forwarding gap (asserting the same `homeDir` reaches both
+   `ensureDaemonRunningImpl` and `performHandshakeImpl`).
+
+**Deferred, not fixed this round.** Judge A's schema-cross-validation WARNING (`toolSuccessSchema`'s
+bare-object shape would also accept an `ipcErrorSchema`-shaped body, so a hypothetical future daemon
+change pairing `HTTP_OK` with an error-shaped body would be silently misclassified as success) — not
+exploitable through any code in this repository today (`daemon/ipc/routes.ts`'s `dispatchTool` never
+produces that combination), and fixing it would mean touching `shared/ipc-contract.ts`, an already-merged
+PR-29 file outside this PR's own scope. Filed as **B-52**. Judge B's PT-07/multi-file-bundle-scope
+WARNING — accurate, but a pre-existing condition already tracked and deferred to PR-40 (PT-27), not a new
+gap this PR introduced; no new backlog row needed. Judge B's dead-passthrough-code SUGGESTION — justified
+by spec.md's own explicit requirement, left as documented reasoning rather than removed.
+
+Parent re-verification after the fixes (independent of any subagent's own report): `rm -rf dist && npm
+test` → **958 tests (957 pass, 1 skip)**, up from 950 (+8 new tests, zero regressions); `npm run
+test:static` → **8/8**. Re-ran the full `ipc-stub.ts` mutant sweep plus 2 new mutants targeting the fix
+itself (session-caching removal, 401-retry-once disabled, using a runtime-opaque `Date.now() < 0` guard
+rather than a literal `false` per this project's own established mutant-harness convention) — **both
+new mutants KILLED**, confirming the fix is meaningfully exercised, not merely present; all 5 original
+mutants still KILLED against the restructured code. Re-ran `server.ts`'s mutant sweep — the previously
+`KILLED`-but-actually-`SURVIVED` `SRV-3` (mismatched tool name) is now genuinely **KILLED** by the new
+route-wiring test; all other mutants unchanged (1 BUILD-FAIL via the same discriminated-union mechanism,
+3 KILLED, M0 survived as the control).
+
+**At the final tip:** `git diff --numstat main -- src test`: **802 authored lines** (`errors.ts` 45/0,
+`ipc-stub.ts` 165/0, `server.ts` 162/0, `errors.test.ts` 44/0, `ipc-stub.test.ts` 252/0,
+`server.test.ts` 134/0) — grown from the candidate's 587 entirely by this correction round's fixes, a
+disclosed **442-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.md`'s PT-07 row (1/1) and
+`test/fixtures/v1-provenance.json`'s 24th entry (6/0) stay outside this count, unchanged from the
+candidate.
+
+**Not yet APPROVED at this point — a scoped re-judgment round is mandatory before that verdict, per
+HANDOFF §2.2 step 8, and was not skipped.** Original-audit disposition, pending re-judgment confirmation:
+Judge A's CRITICAL (session caching + self-healing retry) fixed with three new pinning tests; the
+two-judges-plus-verifier route-wiring gap fixed with a fourth; Judge A's avoidable duplication WARNING
+fixed; Judge A's title-disclosure SUGGESTION fixed; Judge B's and the verifier's corroborated
+generic-error-fallback WARNING fixed; the verifier's three further WARNING-tier gaps (timeout wiring,
+optional-field forwarding, homeDir forwarding) all fixed; Judge A's schema cross-validation WARNING
+deliberately deferred to **B-52** (touches an already-merged, out-of-scope file); Judge B's PT-07-scope
+WARNING left as an accurate but pre-existing, already-tracked observation; Judge B's dead-code SUGGESTION
+left as justified, disclosed reasoning; Judge B's line-count WARNING empirically refuted by direct `git
+diff`. Every fix above was parent-verified independent of any subagent's own report (full suite, static
+gates, and a targeted mutant re-sweep including two new mutants against the CRITICAL fix itself). The
+correction is committed next, then sent back to both judges as a scoped re-judgment over the delta only
+(first of the two-round budget) before any APPROVED verdict is recorded. No native review ran for this
+candidate — a Judgment Day target, per HANDOFF §2.3.

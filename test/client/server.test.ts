@@ -101,3 +101,34 @@ test("a HandshakeError thrown by IpcSession.callTool surfaces as isError with th
     assert.equal(payload.retryable, false);
   });
 });
+
+// --- Judgment Day CRITICAL fix: every tool must call its OWN route, not another tool's ---
+// (an independent verifier confirmed a mutant swapping which route any handler calls survived every
+// test in this file before this addition, since every prior behavioral test targeted conmuta_status only)
+
+test("each of the four tools calls its own distinct daemon route", async () => {
+  const seenRoutes: IpcToolRoute[] = [];
+  const ipc = fakeSession(async (route) => {
+    seenRoutes.push(route);
+    return { ok: true, data: {} };
+  });
+  await withConnectedClient(ipc, async (client) => {
+    await client.callTool({ name: "conmuta_send", arguments: { type: "BROADCAST", body: "hi" } });
+    await client.callTool({ name: "conmuta_fetch", arguments: {} });
+    await client.callTool({ name: "conmuta_status", arguments: {} });
+    await client.callTool({ name: "conmuta_thread", arguments: { thread_id: "a1b2c3d4e5f6" } });
+  });
+  assert.deepEqual(seenRoutes, ["POST /tools/send", "POST /tools/fetch", "POST /tools/status", "POST /tools/thread"]);
+});
+
+// --- Corroborated WARNING fix (independent verifier + Judge B): the generic-error fallback path ---
+
+test("an unrecognized thrown error type surfaces safely as isError, not a crash", async () => {
+  const ipc = fakeSession(async () => {
+    throw new Error("something neither IpcTransportError nor HandshakeError");
+  });
+  await withConnectedClient(ipc, async (client) => {
+    const result = await client.callTool({ name: "conmuta_status", arguments: {} });
+    assert.equal(result.isError, true);
+  });
+});

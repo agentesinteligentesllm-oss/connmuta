@@ -5,6 +5,7 @@ import { HandshakeError } from "../../src/client/handshake.js";
 import { createIpcSession, IpcTransportError } from "../../src/client/ipc-stub.js";
 import type { DaemonRunPayload } from "../../src/client/run-state.js";
 import { IPC_LOOPBACK_HOST, type SessionResponse } from "../../src/shared/ipc-contract.js";
+import { IPC_REQUEST_TIMEOUT_MS } from "../../src/shared/constants.js";
 
 const IDENTITY = {
   projectId: "prj-example",
@@ -126,4 +127,126 @@ test("callTool POSTs to the daemon's loopback port with the stripped path, beare
   assert.equal(headers["content-type"], "application/json");
   assert.equal(headers["authorization"], `Bearer ${SESSION_RESPONSE.bearer}`);
   assert.equal(calls[0].init.body, JSON.stringify({ type: "BROADCAST", body: "hi" }));
+});
+
+// --- Judgment Day CRITICAL fix: session caching (design §11 "Handshake timing: cached for the session") ---
+
+test("callTool caches the session: a second call reuses the same handshake result, no second performHandshakeImpl call", async () => {
+  let ensureCalls = 0;
+  let handshakeCalls = 0;
+  const calls: Array<{ init: RequestInit }> = [];
+  const s = session({
+    ensureDaemonRunningImpl: async () => {
+      ensureCalls += 1;
+      return RUN_PAYLOAD;
+    },
+    performHandshakeImpl: async () => {
+      handshakeCalls += 1;
+      return SESSION_RESPONSE;
+    },
+    fetchImpl: (async (_url: string | URL, init?: RequestInit) => {
+      calls.push({ init: init as RequestInit });
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as typeof fetch,
+  });
+
+  await s.callTool("POST /tools/status", {});
+  await s.callTool("POST /tools/status", {});
+
+  assert.equal(ensureCalls, 1, "ensureDaemonRunningImpl must run at most once per session");
+  assert.equal(handshakeCalls, 1, "performHandshakeImpl must run at most once per session");
+  assert.equal(calls.length, 2);
+  const bearer1 = (calls[0].init.headers as Record<string, string>)["authorization"];
+  const bearer2 = (calls[1].init.headers as Record<string, string>)["authorization"];
+  assert.equal(bearer1, bearer2, "both calls must reuse the identical cached bearer");
+});
+
+test("callTool re-handshakes once and retries once on a 401 from a stale cached bearer, without looping", async () => {
+  let handshakeCalls = 0;
+  const staleBearer = "b".repeat(64);
+  const freshBearer = "c".repeat(64);
+  const s = session({
+    performHandshakeImpl: async () => {
+      handshakeCalls += 1;
+      return { ...SESSION_RESPONSE, bearer: handshakeCalls === 1 ? staleBearer : freshBearer };
+    },
+    fetchImpl: (async (_url: string | URL, init?: RequestInit) => {
+      const bearer = (init?.headers as Record<string, string>)["authorization"];
+      if (bearer === `Bearer ${staleBearer}`) {
+        return new Response(JSON.stringify({ code: "SESSION_UNAUTHORIZED", message: "stale bearer", retryable: false }), { status: 401 });
+      }
+      return new Response(JSON.stringify({ served: "fresh" }), { status: 200 });
+    }) as typeof fetch,
+  });
+
+  const result = await s.callTool("POST /tools/status", {});
+
+  assert.equal(handshakeCalls, 2, "exactly one re-handshake after the 401");
+  assert.deepEqual(result, { ok: true, data: { served: "fresh" } });
+});
+
+test("callTool does not loop forever: a second consecutive 401 after the one retry is classified normally", async () => {
+  let handshakeCalls = 0;
+  let fetchCalls = 0;
+  const errorBody = { code: "SESSION_UNAUTHORIZED", message: "still stale", retryable: false };
+  const s = session({
+    performHandshakeImpl: async () => {
+      handshakeCalls += 1;
+      return SESSION_RESPONSE;
+    },
+    fetchImpl: (async () => {
+      fetchCalls += 1;
+      return new Response(JSON.stringify(errorBody), { status: 401 });
+    }) as typeof fetch,
+  });
+
+  const result = await s.callTool("POST /tools/status", {});
+
+  assert.equal(handshakeCalls, 2, "one initial connect plus exactly one re-handshake, never more");
+  assert.equal(fetchCalls, 2, "one initial attempt plus exactly one retry, never more");
+  assert.deepEqual(result, { ok: false, error: errorBody });
+});
+
+// --- Independent-verifier WARNING fixes: previously-unasserted wiring details ---
+
+test("callTool derives its fetch abort timeout from IPC_REQUEST_TIMEOUT_MS", async () => {
+  const originalTimeout = AbortSignal.timeout;
+  let capturedMs: number | undefined;
+  AbortSignal.timeout = ((ms: number) => {
+    capturedMs = ms;
+    return originalTimeout(ms);
+  }) as typeof AbortSignal.timeout;
+  try {
+    const s = session({ fetchImpl: (async () => new Response(JSON.stringify({}), { status: 200 })) as typeof fetch });
+    await s.callTool("POST /tools/status", {});
+  } finally {
+    AbortSignal.timeout = originalTimeout;
+  }
+  assert.equal(capturedMs, IPC_REQUEST_TIMEOUT_MS);
+});
+
+test("callTool forwards a daemon error's optional retry_after_s and new_chat_id fields unchanged", async () => {
+  const errorBody = { code: "RATE_LIMITED", message: "slow down", retryable: true, retry_after_s: 30, new_chat_id: -100999 };
+  const s = session({ fetchImpl: (async () => new Response(JSON.stringify(errorBody), { status: 429 })) as typeof fetch });
+  const result = await s.callTool("POST /tools/send", { type: "BROADCAST", body: "hi" });
+  assert.deepEqual(result, { ok: false, error: errorBody });
+});
+
+test("callTool forwards options.homeDir to both ensureDaemonRunningImpl and performHandshakeImpl", async () => {
+  const seenHomeDirs: Array<string | undefined> = [];
+  const s = createIpcSession({
+    ...IDENTITY,
+    homeDir: "/custom/home",
+    ensureDaemonRunningImpl: async (opts) => {
+      seenHomeDirs.push(opts?.homeDir);
+      return RUN_PAYLOAD;
+    },
+    performHandshakeImpl: async (opts) => {
+      seenHomeDirs.push(opts.homeDir);
+      return SESSION_RESPONSE;
+    },
+    fetchImpl: (async () => new Response(JSON.stringify({}), { status: 200 })) as typeof fetch,
+  });
+  await s.callTool("POST /tools/status", {});
+  assert.deepEqual(seenHomeDirs, ["/custom/home", "/custom/home"]);
 });

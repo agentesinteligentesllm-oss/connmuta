@@ -38,8 +38,11 @@ import { IpcTransportError, type IpcSession, type IpcToolResult } from "./ipc-st
  * underlying guarantee is unchanged: the SEAM's premise is that the input/output CONTRACT a calling
  * agent sees is identical, only its implementation moved behind IPC — and v1's own test suite
  * (`v1:test/index.test.ts`) already paid down real description-accuracy bugs this text reflects. Three
- * edits, all disclosed. (1) `agentbus_status`'s description called itself "this bridge" — a v1-only
- * noun with no v2 counterpart; reworded to "this binding". (2) The `thread` tool's own description is
+ * edits, all disclosed (a Judgment Day SUGGESTION found the first draft of this note named only the
+ * description half of edit (1), silently also carrying the same rewording in the title — corrected here
+ * to name both). (1) `agentbus_status`'s TITLE ("Read-only agent-bus bridge status") and its description
+ * both called themselves "this bridge" — a v1-only noun with no v2 counterpart; both reworded to "this
+ * binding". (2) The `thread` tool's own description is
  * repointed from `agentbus_fetch` to `conmuta_fetch`, since that is a cross-reference to an actual
  * sibling tool name, not descriptive prose. (3) **Parent readback correction**: v1's `status` and
  * `thread` descriptions both claimed "Makes no network call" — true in v1, where these tools read
@@ -51,7 +54,19 @@ import { IpcTransportError, type IpcSession, type IpcToolResult } from "./ipc-st
  * Telegram, unlike `send`/`fetch`) without asserting the one that no longer is.
  */
 
-/** Runs one IPC tool call and turns its result or a caught failure into an MCP `CallToolResult`. */
+/**
+ * Runs one IPC tool call and turns its result or a caught failure into an MCP `CallToolResult`.
+ *
+ * **Judgment Day WARNING, fixed**: the `HandshakeError` branch below reads `err.retryable` directly
+ * rather than re-deriving it through `clientErrorPayload(err.code, ...)`. `HandshakeError`'s own
+ * constructor (`client/handshake.ts`) already sets `retryable` from its closed vocabulary's fixed
+ * table — re-deriving the same value from a second, hand-copied table in `client/errors.ts` was
+ * avoidable duplication for this specific, reachable path (a real `HandshakeError` instance always
+ * carries its own correct value). `errors.ts`'s `clientErrorPayload` keeps its full vocabulary for the
+ * `IPC_ERROR` literal below (an `IpcTransportError` carries no `retryable` field of its own) and for
+ * spec `thin-client-tools`'s own requirement that the constructor demonstrably handle every closed
+ * code, including the four daemon-passthrough ones no production call site here actually reaches.
+ */
 async function runToolCall(call: () => Promise<IpcToolResult>) {
   try {
     const result = await call();
@@ -64,7 +79,7 @@ async function runToolCall(call: () => Promise<IpcToolResult>) {
       return errorResult(clientErrorPayload("IPC_ERROR", err.message));
     }
     if (err instanceof HandshakeError) {
-      return errorResult(clientErrorPayload(err.code, err.message));
+      return errorResult({ code: err.code, message: err.message, retryable: err.retryable });
     }
     throw err;
   }
