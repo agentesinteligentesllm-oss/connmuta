@@ -896,10 +896,32 @@ Scope: `src/client/spawn.ts`, `src/client/run-state.ts`, `test/client/spawn.test
 Requirements: `daemon-lifecycle › Lazy spawn is one allow-listed call site (D-01 Option A)` (PT-27 — full multi-clause bundle scan in PR-40); `daemon-lifecycle › Client-side spawn election uses a separate stale window` (`run/spawn.lock`, `SPAWN_LOCK_STALE_SECONDS`).
 Runtime harness: injected `spawnImpl` in unit tests; the N-clients-race scenario runs concurrent in-process client instances against a shared temp `run/` directory.
 
-- [ ] 32.1 RED: write `test/client/spawn.test.ts` ("argv never carries caller input": spawned argv is unchanged from the compile-time literal regardless of `--project`) and `test/client/run-state.test.ts` ("N clients racing spawn exactly one daemon": exactly one client wins `run/spawn.lock`, calls `spawnDaemon()` once, others wait on the run-file event).
-- [ ] 32.2 GREEN: implement `src/client/spawn.ts` (the one allow-listed `child_process` reference: `spawn(process.execPath, [DAEMON_ENTRY], SPAWN_OPTIONS)`, `shell: false`, `detached: true`, `windowsHide: true`, `child.unref()`) and `src/client/run-state.ts` (`fs.watch` + `AbortSignal.timeout(SPAWN_WAIT_SECONDS * 1000)`, `run/spawn.lock` `wx` election with `SPAWN_LOCK_STALE_SECONDS`).
-- [ ] 32.3 Verify: `npm run build && node --test "dist/test/client/spawn.test.js" "dist/test/client/run-state.test.js"`.
-- [ ] 32.4 Docs: update the file-name cell(s) of PT-27 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 32.1 RED: write `test/client/spawn.test.ts` ("argv never carries caller input": spawned argv is unchanged from the compile-time literal regardless of `--project`) and `test/client/run-state.test.ts` ("N clients racing spawn exactly one daemon": exactly one client wins `run/spawn.lock`, calls `spawnDaemon()` once, others wait on the run-file event).
+- [x] 32.2 GREEN: implement `src/client/spawn.ts` (the one allow-listed `child_process` reference: `spawn(process.execPath, [DAEMON_ENTRY], SPAWN_OPTIONS)`, `shell: false`, `detached: true`, `windowsHide: true`, `child.unref()`) and `src/client/run-state.ts` (`fs.watch` + `AbortSignal.timeout(SPAWN_WAIT_SECONDS * 1000)`, `run/spawn.lock` `wx` election with `SPAWN_LOCK_STALE_SECONDS`).
+- [x] 32.3 Verify: `npm run build && node --test "dist/test/client/spawn.test.js" "dist/test/client/run-state.test.js"`.
+- [x] 32.4 Docs: update the file-name cell(s) of PT-27 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+*Apply-time note (session 32).* Two decisions, both disclosed in `src/client/run-state.ts`'s module doc
+and in `apply-progress.md` §PR-32: (1) `run-state.ts` locally reimplements — never imports — the
+daemon's `lifecycle/lock.ts`/`lifecycle/run-file.ts`/`home.ts` algorithms, since `client/tsconfig.json`'s
+`references` is `[{"path":"../shared"}]` only (a `tsc -b` project-reference wall, not a style choice).
+(2) `spawnDaemon()` gains one optional injectable parameter (`REAL_SPAWN`, defaulting to the real
+`node:child_process` `spawn`) beyond design.md's zero-parameter illustrative snippet, required by this
+PR's own Runtime-harness line ("injected `spawnImpl` in unit tests") and to avoid a unit test launching
+a real daemon against a developer's actual `~/.conmuta`. Task 32.4's PT-27 cell is filled with a scoped,
+disambiguated pointer (matching the PT-24/PT-25 precedent), not a full-coverage claim: this PR's tests
+cover only the "Argv never carries caller input" unit scenario; the "Bundle scan finds exactly one spawn
+site" multi-clause static scan stays open for PR-40, exactly as `tasks.md`'s own Requirements line already
+says. Two edits outside this block's Scope line, both required by `src/client/` gaining its first source
+file: root `tsconfig.json` (+`{"path":"src/client"}`) and `src/cli/tsconfig.json` (+`{"path":"../client"}`,
+plus fixing a stale comment that claimed `../daemon` was still absent — PR-15 had already re-added it).
+Parent readback found and fixed one real gap (a cross-process spawn-lock TOCTOU) and a genuine coverage
+gap (the default `spawnImpl` parameter was never exercised) — see `apply-progress.md` §PR-32 for both.
+
+*Size reconciliation (session 32).* Estimated ≈300; **measured 716 authored lines (409 src + 307 test:
+`run-state.ts` 360, `spawn.ts` 44, `src/cli/tsconfig.json` 5/5, `run-state.test.ts` 226, `spawn.test.ts`
+81) at the candidate, a disclosed 316-line PR-scoped exception** — see `apply-progress.md` §PR-32. The
+estimate line above is the gate's text and is left as written.
 
 #### PR-33 — binding walk-up + client handshake
 Branch `f1/33-client-binding-handshake` → `main`. Depends: PR-32. Size: ≈340 lines, no exception.

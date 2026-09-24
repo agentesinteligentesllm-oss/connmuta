@@ -14,6 +14,7 @@
     { "path": "src/registry" },
     { "path": "src/ledger" },
     { "path": "src/secret-store" },
-    { "path": "src/daemon" }
+    { "path": "src/daemon" },
+    { "path": "src/client" }
   ]
 }

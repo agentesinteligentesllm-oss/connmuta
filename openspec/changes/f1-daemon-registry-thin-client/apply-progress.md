@@ -5989,3 +5989,108 @@ and re-verified; the SUGGESTION-tier round-2 citation ambiguity is fixed; the tw
 (spec.md wording, `dispatchTool` redaction defense-in-depth) are filed as **B-49**/**B-50**, not code changes,
 matching this project's own precedent for out-of-scope or non-demonstrated-risk findings. No native review ran for
 this candidate — a Judgment Day target, per HANDOFF §2.3.
+
+## PR-32 — `client/spawn.ts` + `client/run-state.ts` (lazy spawn D-01 + client-side spawn election; opens unit 10 `thin-client-tools`)
+
+**Route.** ODD with the SDD contract preserved, session 32: one delegated read-only mapper (14 tool uses,
+pulling verbatim `daemon/lifecycle/lock.ts`, `run-file.ts`, `home.ts`, `main.ts`, the relevant
+`constants.ts` block, both tsconfig files, `lock.test.ts`, and the current PT-27 row), then two mechanical
+tsconfig edits made directly by the parent (already fully specified by the mapping, no design judgment
+needed), then one delegated writer (`general-purpose`, sonnet) against a brief carrying three orchestrator
+decisions, then a parent readback that found and fixed a real gap, then a parent mutant sweep. No
+`sdd-apply` phase envelope exists. `spawn.ts`/`run-state.ts` are new code (design §12 has no v1 row — v1
+has no daemon/client split at all, confirmed by session 31's own mapping): no provenance header,
+registry unchanged at 23 entries.
+
+**Decisions (orchestrator, session 32), stated in `run-state.ts`'s module doc and in `tasks.md`'s
+apply-time note.** (1) Local reimplementation, not a shared-module extraction: `client/tsconfig.json`'s
+`references` is `[{"path":"../shared"}]` only (confirmed by direct read) — no `tsc -b` project-reference
+path to `src/daemon/` exists, so `run-state.ts` locally reimplements the wx-create-in-one-call election
+with stale-age reclaim (mirroring `lock.ts`'s `acquireLock`), the dead-pid-invalidates run-file read
+(mirroring `run-file.ts`'s `readRunFile`), and the `~/.conmuta` + `run/` resolution (mirroring `home.ts`,
+using the *shared* `HOME_DIR_NAME` constant, which client/* CAN import). (2) `spawnDaemon()` gains one
+optional injectable parameter (named `REAL_SPAWN` after a parent readback refinement — see below) beyond
+design.md's zero-parameter illustrative snippet, since `tasks.md`'s own Runtime-harness line requires
+"injected `spawnImpl` in unit tests" and a unit test must never launch a real daemon against a developer's
+actual `~/.conmuta`. Production behavior is identical to the design snippet when the parameter is omitted.
+(3) Task 32.4's PT-27 cell is filled with a scoped, disambiguated pointer, matching the established
+PT-24/PT-25 precedent for a PT id whose coverage spans multiple PRs (cite the file(s), then parenthesize
+exactly which clause is covered and where the rest lands) — never silently claiming full coverage of a row
+only partially satisfied. This PR's tests cover only the "Argv never carries caller input" unit scenario;
+the "Bundle scan finds exactly one spawn site" multi-clause static scan (`test/security/client-bundle.test.ts`,
+which does not exist yet) stays open for PR-40, exactly as `tasks.md`'s own Requirements line already says.
+
+**TDD evidence.** Writer RED (verbatim): `run-state.test.ts(15,8): error TS2307: Cannot find module
+'../../src/client/run-state.js'`; `spawn.test.ts(5,74): error TS2307: Cannot find module
+'../../src/client/spawn.js'`; plus three `TS7006` implicit-`any` errors on the fake `spawnImpl`'s
+parameters before its type was declared. Writer GREEN: `npm run build && node --test
+"dist/test/client/spawn.test.js" "dist/test/client/run-state.test.js"` → 11/11 (before the parent's own
+addition below); full suite 911/910/1 skip (baseline 900/899/1, exactly +11).
+
+**Writer-found defect: a real Windows/libuv native crash, root-caused and fixed.** While making task
+32.3's command pass, the "N clients racing spawn exactly one daemon" test crashed the whole Node process
+with a native assertion: `Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\win\fs-event.c,
+line 72`. Root cause, confirmed with isolated standalone repro scripts rather than guessed: `os.tmpdir()`
+on this machine returns an 8.3 short path (`C:\Users\LABORA~1\...`), and Windows `fs.watch()` crashes
+natively the instant it must report a change event for a directory reached via its short-path form. Two
+other theories (multiple concurrent watchers on one directory; a watcher closed re-entrantly from within
+its own event callback) were tested and both ruled out, then reverted to keep the fix minimal. The actual
+fix is one line: resolve with `realpathSync.native(runDir)` before calling `watch()` — confirmed via 5/5
+clean runs afterward. Disclosed in `waitForRunFile`'s doc comment as a reusable gotcha for any future
+`fs.watch` use on this machine/environment.
+
+**Parent readback correction — a real cross-process TOCTOU gap, closed.** `ensureDaemonRunning` read the
+run file once, and — on winning `run/spawn.lock` — called `spawnDaemonImpl()` unconditionally, with no
+re-check in between. Within one process this is unreachable (`readRunFile`/`acquireSpawnLock` are both
+synchronous with no `await` between them, so nothing else in the same process can interleave), but across
+real separate OS processes — the actual deployment shape — another client's daemon could finish booting
+and release `run/spawn.lock` in the gap between this client's first `readRunFile` (null) and its own lock
+acquisition succeeding, causing a redundant `spawnDaemonImpl()` call. Not a safety hole (`run/daemon.lock`
+is the actual singleton backstop — a redundant second daemon would fail to acquire it and self-terminate
+immediately), but a literal gap against the spec's own wording ("calls `spawnDaemon()` exactly once").
+**Fixed**: one re-check of `readRunFile` immediately after winning the lock, before calling
+`spawnDaemonImpl()`; if the recheck finds a valid payload, return it directly (still releasing the lock in
+`finally`, since it was acquired). Not independently pinned by a new test: the interleaving requires true
+OS-level preemption across separate processes, which this PR's own stated test-harness scope deliberately
+keeps in-process only (HANDOFF §4); a mutant targeting this exact line (`RS6`, disabling the recheck) hit
+an unrelated compiler artifact (TypeScript's unreachable-code detection on the resulting `if (false)`,
+reported as `BUILD-FAIL` per this project's own sweep-harness convention) rather than answering the
+behavioral-coverage question either way — the absence of behavioral coverage here is disclosed, not
+fabricated as tested.
+
+**Parent mutant sweep** (`odd/sweep.mjs`, untracked ODD tree, recreated this session, deleted at close;
+restore verified by sha256 after each mutant). `spawn.ts`: **7 mutants — 5 killed by test, 1 control
+(`SP0`, comment-only) correctly survived, 1 real survivor** (`SP6`: the default `spawnImpl` parameter,
+mutated to a throwing stub, was never exercised — every test in the file injects an explicit fake).
+**Pinned**: extracted the default into a named, exported constant `REAL_SPAWN` and added one test
+asserting `REAL_SPAWN === spawn` by reference identity — verifies the production default without ever
+invoking it (invoking it for real would launch an actual daemon against the developer's real
+`~/.conmuta`). Re-swept the equivalent mutant against the new anchor: **killed**. `run-state.ts`: **9
+mutants — 5 killed by test, 3 "killed" by the TypeScript compiler itself** (`RS4`: neutering the
+`readRunFile` secret type-guard leaves `data.secret` typed `string | undefined` where the return type
+requires `string`, `TS2322`; `RS5`: inverting `waitForRunFile`'s resolve condition tries to `resolve(null)`
+against a `Promise<DaemonRunPayload>`, `TS2345`; `RS6`: disabling the TOCTOU recheck via `if (false)` hits
+TypeScript's unreachable-code detection, `TS7027`) — reported apart from ordinary kills per this project's
+own convention, not survivors, though `RS6` specifically does not resolve the behavioral-coverage question
+noted above. **1 control** (`RS0`, comment-only) correctly survived. **0 unexplained survivors** in either
+file.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **716 authored lines** — `run-state.ts`
+360/0, `spawn.ts` 44/0 (both entirely new files), `src/cli/tsconfig.json` 5/5 (net 0, comment rewrite plus
+one reference line); `run-state.test.ts` 226/0, `spawn.test.ts` 81/0 — against a ≈300 estimate, a disclosed
+**316-line PR-scoped exception**. The estimate priced two source files at their design-snippet size; the
+actual scope grew via the mandatory local-reimplementation decision (three daemon modules' worth of
+algorithm mirrored, not merely referenced) plus eleven prescribed and defensive RED scenarios, consistent
+with every slice since PR-06b. Two edits outside the primary Scope line, both required by `src/client/`
+gaining its first source file and disclosed separately, not counted in the 716: root `tsconfig.json`
+(+2/-1, outside the `-- src test` pathspec) and `docs/02-architecture/THREAT-MODEL.md`'s PT-27 row
+(scope column only).
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **912 tests (911 pass, 1 skip)** — clean, no
+flake, no crash (5/5 repeated runs of the task 32.3 command specifically, after the `fs.watch` fix).
+`npm run test:static`: **8/8** (confirmed with the four new files intent-to-added via `git add -N`,
+named explicitly, never `-N .`, so PT-22's repository scan actually covers them).
+
+**Native review.** RDD is on (global). Recorded per HANDOFF §2.3: **not started** for this candidate — a
+Judgment Day target, and the installed `judgment-day` skill states both must never run on one target.
+`gentle-ai review assess` to be run and recorded at close, matching every slice since PR-23.

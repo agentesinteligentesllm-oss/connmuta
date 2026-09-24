@@ -6,9 +6,9 @@
     "tsBuildInfoFile": "../../dist/.tsbuildinfo/cli.tsbuildinfo"
   },
   "include": ["**/*.ts"],
-  // `../client` and `../daemon` are deliberately absent until their first `.ts` lands (PR-32 and
-  // PR-15): a referenced composite project with no inputs is TS18003, and `npm run build` builds
-  // every project this one references. Re-add each `{ "path": ... }` in the slice that writes its
-  // first source file (HANDOFF §4 "src/cli/ must join the root references").
-  "references": [{ "path": "../shared" }, { "path": "../daemon" }]
+  // A referenced composite project with no inputs is TS18003, and `npm run build` builds every
+  // project this one references — so each of `../daemon` and `../client` stayed absent until its
+  // own first `.ts` landed. `../daemon` was re-added when PR-15 shipped its first source file;
+  // `../client` is re-added here in PR-32, its own first source file.
+  "references": [{ "path": "../shared" }, { "path": "../daemon" }, { "path": "../client" }]
 }
