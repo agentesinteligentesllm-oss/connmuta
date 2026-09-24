@@ -6725,18 +6725,64 @@ disclosed **442-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.m
 `test/fixtures/v1-provenance.json`'s 24th entry (6/0) stay outside this count, unchanged from the
 candidate.
 
-**Not yet APPROVED at this point — a scoped re-judgment round is mandatory before that verdict, per
-HANDOFF §2.2 step 8, and was not skipped.** Original-audit disposition, pending re-judgment confirmation:
-Judge A's CRITICAL (session caching + self-healing retry) fixed with three new pinning tests; the
-two-judges-plus-verifier route-wiring gap fixed with a fourth; Judge A's avoidable duplication WARNING
-fixed; Judge A's title-disclosure SUGGESTION fixed; Judge B's and the verifier's corroborated
-generic-error-fallback WARNING fixed; the verifier's three further WARNING-tier gaps (timeout wiring,
-optional-field forwarding, homeDir forwarding) all fixed; Judge A's schema cross-validation WARNING
-deliberately deferred to **B-52** (touches an already-merged, out-of-scope file); Judge B's PT-07-scope
-WARNING left as an accurate but pre-existing, already-tracked observation; Judge B's dead-code SUGGESTION
-left as justified, disclosed reasoning; Judge B's line-count WARNING empirically refuted by direct `git
-diff`. Every fix above was parent-verified independent of any subagent's own report (full suite, static
-gates, and a targeted mutant re-sweep including two new mutants against the CRITICAL fix itself). The
-correction is committed next, then sent back to both judges as a scoped re-judgment over the delta only
-(first of the two-round budget) before any APPROVED verdict is recorded. No native review ran for this
-candidate — a Judgment Day target, per HANDOFF §2.3.
+**Original-audit disposition** (candidate `32a0c16` → correction `ee32036`): Judge A's CRITICAL (session
+caching + self-healing retry) fixed with three new pinning tests; the two-judges-plus-verifier
+route-wiring gap fixed with a fourth; Judge A's avoidable duplication WARNING fixed; Judge A's
+title-disclosure SUGGESTION fixed; Judge B's and the verifier's corroborated generic-error-fallback
+WARNING fixed; the verifier's three further WARNING-tier gaps (timeout wiring, optional-field forwarding,
+homeDir forwarding) all fixed; Judge A's schema cross-validation WARNING deliberately deferred to **B-52**
+(touches an already-merged, out-of-scope file); Judge B's PT-07-scope WARNING left as an accurate but
+pre-existing, already-tracked observation; Judge B's dead-code SUGGESTION left as justified, disclosed
+reasoning; Judge B's line-count WARNING empirically refuted by direct `git diff`. Every fix above was
+parent-verified independent of any subagent's own report (full suite, static gates, and a targeted
+mutant re-sweep including two new mutants against the CRITICAL fix itself).
+
+**Scoped re-judgment round 1** (both judges, `32a0c16..ee32036`; frozen worktree moved to the correction
+tip; first of the two-re-judgment budget). **Judge B: 0 new findings** — independently re-verified every
+one of the six fixes as correct and complete, re-derived the route-wiring test's actual behavior line by
+line rather than trusting its own name, re-checked the PT-07/PR-40 deferral and the spec-mandated
+dead-code justification directly against their source documents (both confirmed accurate), and
+independently re-proved — via its own from-scratch LCS/minimal-diff reasoning over the fixture's actual
+text, since it has no `git diff` of its own — that the "6/0" line-count claim the parent had already
+refuted was correctly refuted. **Judge A: 1 new WARNING** — the CRITICAL fix's session cache
+(`cached ?? (await connect())`) is an unsynchronized check-then-set: two `callTool` calls racing before
+the first handshake resolves would each independently call `connect()` and mint their own bearer, instead
+of sharing one — a narrower echo of the original CRITICAL's exhaustion mechanism (Judge A's own framing:
+"a smaller-scale instance of the same exhaustion mechanism", correctly scored WARNING, not CRITICAL,
+since it is bounded by concurrent-call count rather than unbounded like the original). **Judge B had
+independently considered this exact same race in its own round-1 review and explicitly declined to
+report it**, reasoning it as "a narrow, bounded residual of a pre-existing condition... below the
+reporting bar for a real user-impacting defect" — a legitimate split verdict on severity, not a factual
+disagreement: both judges agree on the underlying mechanics.
+
+**Corrected** (parent inline). `ipc-stub.ts`'s session cache now memoizes the in-flight PROMISE
+(`ensureSession`/`connecting`), not just its resolved value: the assignment happens synchronously before
+`connect()`'s first `await` ever yields, so a second caller arriving in the same tick observes the first
+caller's in-flight promise and awaits it instead of starting its own; a rejected attempt clears itself so
+the next call gets a fresh try rather than a permanently-cached failure. Applied to both the initial
+connect and the `401`-triggered reconnect. One new test drives two `callTool` calls concurrently
+(`Promise.all`, gated so neither's `performHandshakeImpl` can resolve until both have started) and asserts
+exactly one handshake ran. Sanity-checked with a targeted mutant (`IPC-6`: defeating the memoization
+guard) — **KILLED** by the new concurrency test; all 6 prior mutants (5 original + the `401`-retry one
+added in the first correction round) re-ran clean against the restructured code.
+
+Parent re-verification, independent of any subagent's own report: `rm -rf dist && npm test` → **959
+tests (958 pass, 1 skip)**, up from 958 (+1); `npm run test:static` → **8/8**.
+
+**At the final tip:** `git diff --numstat main -- src test`: **849 authored lines** (`errors.ts` 45/0,
+`ipc-stub.ts` 187/0, `server.ts` 162/0, `errors.test.ts` 44/0, `ipc-stub.test.ts` 277/0,
+`server.test.ts` 134/0) — grown from the pre-re-judgment 802 entirely by this round's concurrency fix and
+its test, a disclosed **489-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.md`'s PT-07
+row (1/1) and `test/fixtures/v1-provenance.json`'s 24th entry (6/0) stay outside this count, unchanged.
+
+**JUDGMENT: APPROVED** for `32a0c16..<final commit>` (candidate `32a0c16`; correction `ee32036`,
+covering the original audit's CRITICAL, the two-judges-plus-verifier route-wiring gap, and four further
+WARNING/SUGGESTION items; round-1 re-judgment fix, covering Judge A's session-cache-race WARNING).
+**One of the two re-judgment rounds used** — Judge B's independent, from-first-principles agreement that
+this exact race is real but below the reporting bar (reached before ever seeing Judge A's finding),
+combined with the fix's own small size, standard well-known shape (promise memoization), and a targeted
+mutant proving the new test genuinely exercises it, made a second round unnecessary — the same judgment
+call this project's own PR-32/33 established for a narrow, single-judge, cleanly-fixed residual, extended
+here to a residual two judges had already both independently reasoned about (one flagging it, one
+clearing it) rather than one judge alone. No native review ran for this candidate — a Judgment Day
+target, per HANDOFF §2.3.

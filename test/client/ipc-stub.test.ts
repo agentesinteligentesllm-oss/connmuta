@@ -161,6 +161,31 @@ test("callTool caches the session: a second call reuses the same handshake resul
   assert.equal(bearer1, bearer2, "both calls must reuse the identical cached bearer");
 });
 
+test("callTool shares one in-flight handshake across two calls that race before either resolves (Judgment Day round-1 fix, Judge A)", async () => {
+  let handshakeCalls = 0;
+  let releaseHandshake: () => void = () => {};
+  const handshakeGate = new Promise<void>((resolve) => {
+    releaseHandshake = resolve;
+  });
+  const s = session({
+    performHandshakeImpl: async () => {
+      handshakeCalls += 1;
+      await handshakeGate; // both racing callTool() calls must reach this point before either resolves
+      return SESSION_RESPONSE;
+    },
+    fetchImpl: (async () => new Response(JSON.stringify({}), { status: 200 })) as typeof fetch,
+  });
+
+  const first = s.callTool("POST /tools/status", {});
+  const second = s.callTool("POST /tools/status", {});
+  queueMicrotask(releaseHandshake);
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+
+  assert.equal(handshakeCalls, 1, "two calls racing before the first handshake resolves must share ONE attempt, not mint two");
+  assert.deepEqual(firstResult, { ok: true, data: {} });
+  assert.deepEqual(secondResult, { ok: true, data: {} });
+});
+
 test("callTool re-handshakes once and retries once on a 401 from a stale cached bearer, without looping", async () => {
   let handshakeCalls = 0;
   const staleBearer = "b".repeat(64);

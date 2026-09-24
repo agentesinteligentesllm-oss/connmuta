@@ -19,7 +19,11 @@ import { ensureDaemonRunning, type DaemonRunPayload } from "./run-state.js";
  * a false, permanent "daemon is down" for every project on that daemon, recoverable only by a full
  * daemon restart. Fixed: the handshake now runs at most once per `IpcSession`, its result (`port` +
  * `bearer`) cached for every subsequent `callTool` call on that same session — matching the ratified
- * "cached for the session" requirement exactly.
+ * "cached for the session" requirement exactly. The cache is the PROMISE (`ensureSession`), not just the
+ * resolved value (Judgment Day round-1 WARNING, Judge A): two `callTool` calls racing before the first
+ * handshake resolves both see the same in-flight promise and await it together, rather than each starting
+ * their own — closing a narrower echo of the same exhaustion mechanism that would otherwise still let
+ * concurrent callers each mint an extra, uncoordinated bearer.
  *
  * **Self-healing on a stale cached bearer.** A daemon restart mints a brand-new `SessionStore` (and a
  * brand-new per-boot secret, `lifecycle/run-file.ts`'s `writeRunFile`), invalidating every bearer minted
@@ -88,9 +92,27 @@ export function createIpcSession(options: CreateIpcSessionOptions): IpcSession {
   const performHandshakeImpl = options.performHandshakeImpl ?? performHandshake;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 
-  let cached: CachedSession | undefined;
+  // A cached PROMISE, not a cached VALUE (Judgment Day round-1 WARNING, Judge A). `cached ?? (await
+  // connect())` alone lets two callTool() invocations that both start before either's connect() resolves
+  // each observe no cached value and each independently mint their own session -- a narrower echo of the
+  // original CRITICAL's exhaustion mechanism, since every concurrent racer mints one extra bearer instead
+  // of sharing one. Memoizing the PROMISE itself closes this: the assignment on the line below happens
+  // synchronously, before connect()'s first `await` ever yields, so a second caller arriving in the same
+  // tick already sees the first caller's in-flight promise and awaits it instead of starting its own.
+  let connecting: Promise<CachedSession> | undefined;
 
-  /** Runs the handshake, caching (and overwriting) its result. A thrown `HandshakeError` propagates unchanged. */
+  /** The one shared handshake attempt, in flight or already settled. A rejection clears itself so the next call gets a fresh attempt rather than a permanently-cached failure. */
+  function ensureSession(): Promise<CachedSession> {
+    if (connecting === undefined) {
+      connecting = connect().catch((err: unknown) => {
+        connecting = undefined;
+        throw err;
+      });
+    }
+    return connecting;
+  }
+
+  /** Runs the handshake. A thrown `HandshakeError` propagates unchanged. Never call directly -- go through {@link ensureSession}. */
   async function connect(): Promise<CachedSession> {
     let runPayload: DaemonRunPayload;
     try {
@@ -108,9 +130,7 @@ export function createIpcSession(options: CreateIpcSessionOptions): IpcSession {
       fetchImpl,
     });
 
-    const result: CachedSession = { port: runPayload.port, bearer: session.bearer };
-    cached = result;
-    return result;
+    return { port: runPayload.port, bearer: session.bearer };
   }
 
   /** One `POST` attempt against `session`. Never inspects the response beyond obtaining it. */
@@ -129,15 +149,17 @@ export function createIpcSession(options: CreateIpcSessionOptions): IpcSession {
 
   return {
     async callTool(route, input) {
-      const session = cached ?? (await connect());
+      const session = await ensureSession();
 
       let res = await postOnce(session, route, input);
       if (res.status === HTTP_UNAUTHORIZED) {
         // The cached bearer is no longer recognized -- most likely the daemon restarted since it was
         // minted (a fresh SessionStore invalidates every prior bearer). Re-handshake once and retry
         // once; a second failure of any kind falls through to the classification below, never loops.
-        cached = undefined;
-        const fresh = await connect();
+        // Discarding `connecting` unconditionally (not just when it still resolves to `session`) is
+        // deliberate: any concurrent caller sharing this same stale attempt needs a fresh one too.
+        connecting = undefined;
+        const fresh = await ensureSession();
         res = await postOnce(fresh, route, input);
       }
 
