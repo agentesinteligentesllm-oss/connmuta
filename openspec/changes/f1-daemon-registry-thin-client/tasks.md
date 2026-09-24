@@ -904,8 +904,11 @@ Runtime harness: injected `spawnImpl` in unit tests; the N-clients-race scenario
 *Apply-time note (session 32).* Two decisions, both disclosed in `src/client/run-state.ts`'s module doc
 and in `apply-progress.md` §PR-32: (1) `run-state.ts` locally reimplements — never imports — the
 daemon's `lifecycle/lock.ts`/`lifecycle/run-file.ts`/`home.ts` algorithms, since `client/tsconfig.json`'s
-`references` is `[{"path":"../shared"}]` only (a `tsc -b` project-reference wall, not a style choice).
-(2) `spawnDaemon()` gains one optional injectable parameter (`REAL_SPAWN`, defaulting to the real
+`references` is currently `[{"path":"../shared"}]` only (as configured, a `tsc -b` build error today —
+Judgment Day's independent verifier confirmed this is a chosen isolation, not a structural wall: adding
+`{"path":"../daemon"}` lets the cross-import compile cleanly; the choice keeps the client bundle's
+dependency closure isolated from daemon-only code). (2) `spawnDaemon()` gains one optional injectable
+parameter (`REAL_SPAWN`, defaulting to the real
 `node:child_process` `spawn`) beyond design.md's zero-parameter illustrative snippet, required by this
 PR's own Runtime-harness line ("injected `spawnImpl` in unit tests") and to avoid a unit test launching
 a real daemon against a developer's actual `~/.conmuta`. Task 32.4's PT-27 cell is filled with a scoped,
