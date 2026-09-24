@@ -96,6 +96,12 @@ function isNodeAtOrAboveFloor(version: string): boolean {
  * which touches `client/ipc-stub.ts` and `client/server.ts` — both already-merged, already-audited
  * PR-34 modules, off-limits to a drive-by re-slice (HANDOFF §6). Filed as **B-53** for a future PR.
  * This fixed placeholder is disclosed, not a guess dressed up as the real thing.
+ *
+ * Re-judgment round 1 (session 35, Judge B SUGGESTION): a fixed constant means every session now
+ * looks identical in `client_cursors.host`, where `os.hostname()` at least varied per machine —
+ * confirmed non-exploitable (`daemon/ipc/sessions.ts` never keys or dedupes on `host`, only forwards
+ * it as informational data), but a real, disclosed reduction in per-machine operator debuggability
+ * until B-53 lands.
  */
 const MCP_HOST_LABEL_UNKNOWN = "unknown";
 

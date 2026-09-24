@@ -7010,5 +7010,45 @@ present.
 candidate's 519 entirely by this correction round's fixes and their pinning tests, a disclosed
 **423-line PR-scoped exception**.
 
-**Scoped re-judgment: pending** (both judges, over the delta between the candidate `ee4f91e` and the
-correction commit — first of the two-re-judgment budget). Results appended below once it returns.
+**Scoped re-judgment round 1** (both judges, `ee4f91e..593a72f`; frozen worktree moved to the correction
+tip; first of the two-re-judgment budget). **Judge A: 0 new findings** — independently re-verified all
+three of its own original findings VERIFIED-FIXED (traced the node-floor gate's actual position in the
+source before the `--project` parsing loop; traced the try block's coverage of `await
+server.connect(transport)` and confirmed neither of the two pre-try checks can throw; confirmed the new
+stderr-emptiness assertion pins the M3 divergence), independently re-verified Judge B's `host` CRITICAL
+fixed (no remaining `os.hostname()`/`hostname` import anywhere), and confirmed the double node-floor
+check (cli.ts's outer gate, `main.ts`'s own inner one) cannot double-print a message since cli.ts
+returns immediately on refusal, never reaching the dynamic import. **Judge B: 1 new SUGGESTION** — the
+CRITICAL fix's own fixed placeholder (`MCP_HOST_LABEL_UNKNOWN = "unknown"`) makes every session look
+identical in `client_cursors.host`, a real (confirmed non-exploitable — `daemon/ipc/sessions.ts` never
+keys or dedupes on `host`, grepped directly) reduction in per-machine operator debuggability compared
+to the wrong-but-varied `os.hostname()` value it replaced. Otherwise Judge B independently re-verified
+every one of its own six original findings (the CRITICAL, both WARNINGs, all three SUGGESTIONs)
+resolved — fixed, or, for the two judgment-call items (the `StdioServerTransport`-default gap and the
+`chdir`-test fragility), explicitly endorsed the parent's disclosed-not-fixed disposition as reasonable
+rather than pushing back.
+
+**Corrected** (parent inline — a two-line disclosure addition, no code or behavior change, so no new
+test or targeted mutant is needed). `main.ts`'s own module doc and `docs/06-backlog/CHECKLIST.md`'s
+B-53 row both gained one sentence naming this specific debuggability tradeoff explicitly, rather than
+leaving it only implicit in the broader "can't know the real label yet" disclosure.
+
+Parent re-verification, independent of any subagent's own report: `rm -rf dist && npm test` → **977
+tests (976 pass, 1 skip)**, unchanged (a comment-only, text-only change adds no new test); `npm run
+test:static` → **8/8**.
+
+**At the final tip:** `git diff --numstat main -- src test`: **679 authored lines** (`cli/main.ts`
+50/3, `client/main.ts` 182/0, `cli/main.test.ts` 90/1, `client/main.test.ts` 353/0) — grown from the
+pre-re-judgment 673 by this round's two-line disclosure addition only, a disclosed **429-line
+PR-scoped exception**.
+
+**JUDGMENT: APPROVED** for `ee4f91e..593a72f` (candidate `ee4f91e`; correction `593a72f`, covering both
+judges' CRITICALs — the missing try/catch and the wrong `host` semantics — the node-floor gate ordering
+both judges found independently, the M3-equivalence-claim inaccuracy both judges found independently,
+and four SUGGESTION-tier gaps). **One of the two re-judgment rounds used** — the single new finding
+(Judge B's own fixed-placeholder-reduces-debuggability SUGGESTION) is low-severity, confirmed
+non-exploitable, already substantively covered by the CRITICAL fix's own disclosure and B-53's existing
+backlog row, and closed with a two-line textual addition rather than a behavior change — the same
+judgment call this project's own PR-32/33/34 established for a narrow, well-understood, cleanly-closed
+residual, extended here to a SUGGESTION-tier residual rather than a WARNING-tier one. No native review
+ran for this candidate — a Judgment Day target, per HANDOFF §2.3.

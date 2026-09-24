@@ -1074,11 +1074,12 @@ delegation for this session (recorded in `apply-progress.md` §PR-35):
    `unreadable_project_file` refusal arm stay deliberately untested/disclosed (real stdio and
    cross-platform unreadable-file fixtures are not safely constructible in this test suite's style).
 
-**Size reconciliation (session 35, final tip after Judgment Day's one correction round).** Estimated
-≈250; **measured 673 authored lines (229 src + 444 test)** (`cli/main.ts` 50+3=53, `client/main.ts`
-176+0=176, `cli/main.test.ts` 90+1=91, `client/main.test.ts` 353+0=353) — grown from the pre-audit
-candidate's 519 by this round's fixes and their pinning tests, a disclosed **423-line PR-scoped
-exception**. See `apply-progress.md` §PR-35 for the full breakdown.
+**Size reconciliation (session 35, final tip after Judgment Day's one re-judgment round).** Estimated
+≈250; **measured 679 authored lines (235 src + 444 test)** (`cli/main.ts` 50+3=53, `client/main.ts`
+182+0=182, `cli/main.test.ts` 90+1=91, `client/main.test.ts` 353+0=353) — grown from the correction
+round's 673 by a two-line disclosure addition (Judge B's SUGGESTION in the re-judgment round), a
+disclosed **429-line PR-scoped exception**. See `apply-progress.md` §PR-35 for the full breakdown.
+**JUDGMENT: APPROVED** (`ee4f91e..593a72f`, one of the two re-judgment rounds used).
 
 ### Unit 11 — `v1-migration`
 
