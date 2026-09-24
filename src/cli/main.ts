@@ -8,8 +8,9 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-import { EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
+import { EXIT_NODE_FLOOR, EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
 import { SERVER_VERSION } from "../shared/version.js";
+import { enforceNodeFloor } from "../daemon/node-floor.js";
 import { validateText } from "./validate.js";
 
 /**
@@ -36,8 +37,10 @@ export interface CliIo {
 const USAGE_LINES = [
 	`usage: ${PRODUCT_NAME} validate <path> | --stdin`,
 	`       ${PRODUCT_NAME} daemon stop [--home <dir>]`,
+	`       ${PRODUCT_NAME} mcp --project <id>`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
 	`  daemon stop   stop the running daemon after confirming identity (D-29)`,
+	`  mcp           start the MCP server for an IDE host (ADR-0029)`,
 ];
 
 /** Report a usage failure: a short reason, then the usage block. Always {@link EXIT_USAGE}. */
@@ -105,8 +108,52 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 		})();
 	}
 
-	// Only `validate` and `daemon stop` are wired in this CLI slice. The reserved subcommands are
-	// named so a caller that tries one gets a usage error instead of a stub that pretends to work.
+	if (command === "mcp") {
+		// Judgment Day correction (session 35, both judges independently): the Node-floor gate must run
+		// before anything else the `mcp` branch does, including argument parsing — design.md:418's
+		// Startup row and D-25's "gate then dynamic import" apply to the whole dispatch, not just
+		// `client/main.ts`'s own internal function. Reuses `daemon/node-floor.ts`'s already-tested
+		// `enforceNodeFloor` (cli/main.ts's tsconfig references `daemon`, unlike `client/main.ts`'s own
+		// boundary), injecting `exit` so a below-floor Node reports EXIT_NODE_FLOOR here instead of
+		// `process.exit`ing directly — this dispatcher only ever returns exit codes.
+		let belowNodeFloor = false;
+		enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+		if (belowNodeFloor) {
+			return EXIT_NODE_FLOOR;
+		}
+
+		let project: string | undefined;
+		for (let i = 0; i < rest.length; i++) {
+			const arg = rest[i];
+			if (arg === "--project") {
+				if (i + 1 >= rest.length || rest[i + 1].startsWith("--")) {
+					return usageError(io, "--project requires a value");
+				}
+				project = rest[++i];
+			} else if (arg.startsWith("--project=")) {
+				project = arg.slice("--project=".length);
+				if (project.length === 0) {
+					return usageError(io, "--project requires a value");
+				}
+			} else if (arg.startsWith("--")) {
+				return usageError(io, `unknown option '${arg}'`);
+			} else {
+				return usageError(io, `unexpected argument '${arg}'`);
+			}
+		}
+		if (project === undefined) {
+			return usageError(io, "mcp requires --project <id>");
+		}
+
+		return (async () => {
+			const { runMcpClient } = await import("../client/main.js");
+			return await runMcpClient({ project, stderr: io.err });
+		})();
+	}
+
+	// Only `validate`, `daemon stop` and `mcp` are wired in this CLI slice. The remaining reserved
+	// subcommands are named so a caller that tries one gets a usage error instead of a stub that
+	// pretends to work.
 	if (command !== "validate") {
 		return usageError(io, `unknown command '${command}'`);
 	}

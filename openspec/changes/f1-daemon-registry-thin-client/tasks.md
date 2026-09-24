@@ -1003,9 +1003,83 @@ Scope: `src/client/main.ts`, `src/cli/main.ts` (add `mcp` subcommand), `test/cli
 Requirements: completes the client bundle entry point (`ADR-0029` "starts within the MCP timeout").
 Runtime harness: MCP host simulated by `StdioServerTransport` in-process.
 
-- [ ] 35.1 RED: write `test/client/main.test.ts` ("handshake is lazy, on the first tool call, cached for the session": MCP initialization completes within the host timeout even with no daemon running).
-- [ ] 35.2 GREEN: implement `src/client/main.ts` (node-floor gate → parse `--project` → `client/binding.ts` walk-up → `server.connect(new StdioServerTransport())` immediately) and wire `conmuta mcp --project <id>` as a dynamic-`import()` subcommand in `src/cli/main.ts` so the IDE-facing process loads only the client closure.
-- [ ] 35.3 Verify: `npm run build && node --test "dist/test/client/main.test.js"`.
+- [x] 35.1 RED: write `test/client/main.test.ts` ("handshake is lazy, on the first tool call, cached for the session": MCP initialization completes within the host timeout even with no daemon running).
+- [x] 35.2 GREEN: implement `src/client/main.ts` (node-floor gate → parse `--project` → `client/binding.ts` walk-up → `server.connect(new StdioServerTransport())` immediately) and wire `conmuta mcp --project <id>` as a dynamic-`import()` subcommand in `src/cli/main.ts` so the IDE-facing process loads only the client closure.
+- [x] 35.3 Verify: `npm run build && node --test "dist/test/client/main.test.js"`.
+
+**Apply-time note (session 35).** Decisions made by the orchestrator under the Director's full-autonomy
+delegation for this session (recorded in `apply-progress.md` §PR-35):
+1. **`src/client/main.ts` exports one testable `runMcpClient(options)` async function, not a top-level
+   side-effecting script** (unlike `daemon/main.ts`). `cli/main.ts` owns the process entry and all argv
+   parsing for `mcp`, mirroring its existing `daemon stop` dynamic-`import()` dispatch exactly.
+2. **No `Provenance:` header on `main.ts`.** `v1:src/index.ts:250-292 main` is verdict REPLACED
+   (design.md:471), and REPLACED code carries no SEAM/AS-IS header.
+3. **The node-floor gate is locally reimplemented inside `main.ts`, never importing
+   `daemon/node-floor.ts`.** `client/tsconfig.json`'s `references` is `[{"path":"../shared"}]` only (a
+   `tsc -b` compile error otherwise) — same disclosed boundary `run-state.ts`/`handshake.ts` already
+   document. Only the small pure semver-floor comparison is duplicated, not the full
+   `enforceNodeFloor`/`process.exit` ceremony, since this function only ever returns an exit code.
+4. **design.md:43's "gate then dynamic import" is read as the OUTER `cli/main.ts` → `client/main.js`
+   dynamic import**, not a second inner one inside `main.ts` itself — every collaborator `main.ts` needs
+   is a static top-of-file import. Documented as a deliberate reading in the module doc.
+5. **`host: os.hostname()`** for the `SessionIdentity.host` field `handshake.ts`'s own module doc
+   explicitly left to "a later PR's CLI entry point" — `client_cursors.host` is an operator-facing label
+   identifying which machine a session came from; no existing helper produces it.
+6. **`test/cli/main.test.ts` was edited outside the block's declared Scope line** (only
+   `test/client/main.test.ts` is named) — necessary because `cli/main.ts` itself is in scope and this
+   project runs Strict TDD: an untested new dispatch branch would violate it. The new dispatch test
+   controls `process.cwd()` via `chdir` (no prior precedent in this repo) rather than an injected `--cwd`
+   flag, since `runMcpClient` has none by design (its walk-up reads `process.cwd()`); verified `node
+   --test` runs one file's top-level tests sequentially in their own child process, so this is race-free.
+7. **Parent mutant sweep found three real test gaps beyond the writer's own 5 RED tests**, closed before
+   freezing the candidate: (a) the patch-level `>=`-vs-`>` node-floor boundary was unpinned — added an
+   exact-`NODE_FLOOR` boundary test; (b) `await server.connect(transport)` was not distinguishable from a
+   fire-and-forget `void server.connect(transport)` by any existing test — added a delayed-`start()` fake
+   transport proving `runMcpClient` does not resolve until the transport is actually connected; (c) no
+   test asserted `createIpcSessionImpl`/`createServerImpl` receive the exact identity/`projectId` derived
+   from the resolved binding — added one test capturing and asserting both. One mutant (disabling
+   `main.ts`'s own `options.project === undefined` check) is an **equivalent mutant, argued not pinned**:
+   `binding.ts`'s `resolveProjectBinding` already refuses an undefined `project` with the identical
+   `EXIT_USAGE` via its own `missing_project_flag` refusal (confirmed by reading `binding.ts:124-126`), so
+   removing `main.ts`'s own early check changes no observable behavior — the check is intentionally
+   defensive duplication for any caller other than `cli/main.ts` (which already validates presence
+   itself), not dead code.
+8. `test/cli/main.test.ts`'s pre-existing test iterating `["daemon", "mcp", "migrate-v1"]` under the title
+   "a subcommand reserved for a later slice..." still passes unmodified (a bare `mcp` is still
+   `EXIT_USAGE`, just for a different reason now — missing `--project`, not "unknown command") — its title
+   is now slightly stale for `mcp` specifically. Left untouched (surgical-change discipline); flagged here
+   per this project's disclosure convention rather than fixed as a drive-by edit.
+9. **Judgment Day found and corrected two real CRITICALs plus one convergent-both-judges WARNING**
+   (both judges + the independent verifier; full detail in `apply-progress.md` §PR-35): (a) `host` used
+   `os.hostname()` (a machine name) instead of the MCP host-application label DATA-MODEL.md §3.5 and
+   `shared/ipc-contract.ts` actually document (`claude-code`/`cursor`/`opencode`) — corrected to a
+   disclosed fixed placeholder (`MCP_HOST_LABEL_UNKNOWN = "unknown"`), properly wiring the real label
+   deferred to **B-53** (would touch the already-merged, already-audited `ipc-stub.ts`/`server.ts`);
+   (b) `runMcpClient` had no try/catch, so an unexpected failure (e.g. a `server.connect` rejection)
+   would propagate as an uncaught raw stack trace, violating design.md:424/PT-08's "message only, never
+   `err.stack`" requirement — corrected with a catch-all returning exit code 1 (design.md:126's
+   "reserved for uncaught errors"), message-only, mirroring `daemon/main.ts`'s own established pattern;
+   (c) both judges independently found `cli/main.ts`'s `mcp` dispatch checked `--project` before the
+   Node-floor gate, so a malformed invocation on an old Node reported the wrong error — corrected by
+   moving the gate (reusing `daemon/node-floor.ts`'s own `enforceNodeFloor`, importable since
+   `cli/main.ts`'s tsconfig references `daemon`) to the very first action of the `mcp` branch, before
+   any argument parsing. Also both judges independently found item 7's own "M3 is an equivalent mutant"
+   claim above factually imprecise — the exit code is identical either way, but a real stderr
+   side-effect difference exists (the early-check path writes nothing; the fallback path through
+   `binding.ts` writes a message) — pinned with a new assertion rather than re-argued as equivalent.
+   Four SUGGESTION-tier gaps (three corroborated by the independent verifier's own novel mutants) closed
+   cheaply: the real (non-injected) `createIpcSession` default path, the `invalid_project_file` refusal
+   arm, and this note's own arithmetic (the candidate's "187 src + 332 test" split did not sum to its
+   own per-file figures — corrected below). The `StdioServerTransport` default path and the
+   `unreadable_project_file` refusal arm stay deliberately untested/disclosed (real stdio and
+   cross-platform unreadable-file fixtures are not safely constructible in this test suite's style).
+
+**Size reconciliation (session 35, final tip after Judgment Day's one re-judgment round).** Estimated
+≈250; **measured 679 authored lines (235 src + 444 test)** (`cli/main.ts` 50+3=53, `client/main.ts`
+182+0=182, `cli/main.test.ts` 90+1=91, `client/main.test.ts` 353+0=353) — grown from the correction
+round's 673 by a two-line disclosure addition (Judge B's SUGGESTION in the re-judgment round), a
+disclosed **429-line PR-scoped exception**. See `apply-progress.md` §PR-35 for the full breakdown.
+**JUDGMENT: APPROVED** (`ee4f91e..593a72f`, one of the two re-judgment rounds used).
 
 ### Unit 11 — `v1-migration`
 
