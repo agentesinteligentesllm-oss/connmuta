@@ -136,5 +136,11 @@
     "v1Path": "src/tools/send.ts:380-660",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/client/server.ts",
+    "v1Path": "src/index.ts:112-248",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
