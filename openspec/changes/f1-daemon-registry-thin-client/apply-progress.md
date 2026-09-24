@@ -6455,10 +6455,10 @@ precedent for a narrow, single-judge, low-severity residual): added `assert.equa
 no new test); `npm run test:static`: **8/8**. `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1)
 stays outside this count, unchanged from the candidate.
 
-**JUDGMENT: APPROVED** for `36683bc..7f4c9c1` (candidate `36683bc`; correction `8975d9f`, covering both
+**JUDGMENT: APPROVED** for `36683bc..c91d16c` (candidate `36683bc`; correction `8975d9f`, covering both
 judges' independently-converged `readFileSync`/EISDIR WARNING, the independent verifier's 6/6-survivor
 `POST /session` body gap, the nonce-freshness gap, the missing unreachable-then-retry test, and this
-record's own mutant-tally arithmetic error; round-1 re-judgment fix `7f4c9c1`, a parent-inline one-line
+record's own mutant-tally arithmetic error; round-1 re-judgment fix `c91d16c`, a parent-inline one-line
 assertion addition for round 1's own single new SUGGESTION). Every finding across the original audit and
 the one re-judgment round used is resolved: both judges' independently-converged WARNING fixed and
 re-verified by both on re-judgment; the independent verifier's body-field gap and tally-arithmetic finding
