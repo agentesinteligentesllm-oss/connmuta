@@ -5823,8 +5823,11 @@ two prose "net" descriptors were mistyped. Corrected here, not re-litigated as a
 **Verification at the candidate.** `rm -rf dist && npm test`: **891 tests (890 pass, 1 skip)** — clean on the first
 run, no flake. `npm run test:static`: **8/8**.
 
-**Native review.** RDD is on (global). `gentle-ai review assess` was not run for this candidate: the target is a
-Judgment Day target, and the installed `judgment-day` skill states both must never run on one target (HANDOFF §2.3).
+**Native review.** RDD is on (global). `gentle-ai review assess --base-ref 280e35f --committed-only
+--untracked-scope=exclude --json` (run at close, over the whole branch): `risk: medium`, `review_due: true`
+(`slice_budget_reached`), 11 changed paths, 1,783 changed lines. START was not run for this candidate: the target
+is a Judgment Day target, and the installed `judgment-day` skill states both must never run on one target
+(HANDOFF §2.3).
 
 **Judgment Day** (`bus-v2-f1-pr-31-audit-001`; both blind judges over the frozen worktree
 `../telegram_bus_agent-worktrees/pr31-judges` at `c349d96`, a separate independent verifier in parallel over its own
@@ -5976,10 +5979,11 @@ this document instead of a specific round number. A new mutant (`MR3-1`, droppin
 `error-payload.test.ts` 5/2, `ipc-contract.test.ts` 14/0) — a disclosed **1,095-line PR-scoped exception**;
 `rm -rf dist && npm test`: **900 tests (899 pass, 1 skip)**, clean; `test:static`: **8/8**.
 
-**JUDGMENT: APPROVED** for `c349d96..<final commit>` (three commits: the candidate, the first correction round, the
-second correction round — the third, comment-only fix closing round 2's own findings was verified by the parent via
-full suite + static + a targeted mutant, not sent through a third re-judgment, since the two-round budget was
-already used by the rounds that found it). Every CRITICAL/WARNING finding across the original audit and both
+**JUDGMENT: APPROVED** for `c349d96..5eae0c1` (four commits: the candidate, and one correction commit per round —
+`33701b4` for the original audit's findings, `107b652` for round 1's re-judgment findings, `5eae0c1` for round 2's
+re-judgment finding. `5eae0c1` itself was verified by the parent via full suite + static + a targeted mutant, not
+sent through a third re-judgment, since the two-round budget was already used by the rounds that found what it
+fixes). Every CRITICAL/WARNING finding across the original audit and both
 re-judgment rounds is resolved: the original CRITICAL (`JD-B-001`) and both re-judgment rounds' WARNINGs are fixed
 and re-verified; the SUGGESTION-tier round-2 citation ambiguity is fixed; the two informational disclosures
 (spec.md wording, `dispatchTool` redaction defense-in-depth) are filed as **B-49**/**B-50**, not code changes,
