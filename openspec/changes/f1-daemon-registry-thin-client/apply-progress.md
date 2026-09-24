@@ -6469,4 +6469,6 @@ feedback (traced end-to-end as carrying no behavioral risk, confirmed independen
 both rounds). **One of the two re-judgment rounds used**; the second was not needed, since round 1 returned
 only a single narrow, single-judge, SUGGESTION-tier, explicitly-pre-existing-pattern finding, parent-corrected
 and confirmed by full suite + static gates rather than spending the final round on it. No native review ran
-for this candidate — a Judgment Day target, per HANDOFF §2.3.
+for this candidate — a Judgment Day target, per HANDOFF §2.3 (recorded, not started: `gentle-ai review
+assess` at close read `risk: medium`, `review_due: true`, `review_due_reason: slice_budget_reached`
+against `main` at `2dcd6ae`).
