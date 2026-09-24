@@ -40,7 +40,7 @@ import {
 import { openLedger } from "../../../src/ledger/open.js";
 import { BindingsReconciler } from "../../../src/daemon/bindings.js";
 import { createRegistryLoader } from "../../../src/registry/loader.js";
-import { RateLimitedError } from "../../../src/daemon/telegram.js";
+import { GroupMigratedError, RateLimitedError } from "../../../src/daemon/telegram.js";
 import { RoomGuardClient } from "../../../src/daemon/transport/room-guard.js";
 import { GroupTransport } from "../../../src/daemon/transport/group.js";
 import { DirectTransport } from "../../../src/daemon/transport/direct.js";
@@ -128,6 +128,7 @@ function sendRequest(options: { port: number; method: string; path: string; body
 // ---------------------------------------------------------------------------
 
 const PROJECT_ID = "prj-example";
+const BOT_ID = 100000001; // activeBinding()'s own default (test/registry/fixtures.ts)
 const GROUP_ID = -1001234567890;
 
 const TWO_MEMBER_ROSTER: readonly ProjectRosterEntry[] = [
@@ -278,12 +279,17 @@ async function openValidSession(h: Harness, overrides: Record<string, unknown> =
 // 1. Unbound project refused at session start
 // ---------------------------------------------------------------------------
 
-test("unbound project refused at session start: UNBOUND_PROJECT, 404, no session minted", async () => {
+test("unbound project refused at session start: UNBOUND_PROJECT, 404, no session minted, nonce NOT consumed", async () => {
 	await withHarness(async (h) => {
-		const { status, parsed } = await postSession(h, validSessionRequestBody(h, { project_id: "prj-never-bound" }));
+		const serverNonce = h.handshakeStore.issue();
+		assert.ok(serverNonce);
+		const { status, parsed } = await postSession(h, validSessionRequestBody(h, { project_id: "prj-never-bound", server_nonce: serverNonce }));
 		assert.equal(status, HTTP_NOT_FOUND);
 		assert.equal(ipcErrorSchema.parse(parsed).code, UNBOUND_PROJECT);
 		assert.equal(h.sessionStore.size, 0, "no bearer may be minted for an unbound project");
+		// Proof the registry check runs BEFORE nonce consumption (module doc's "resource hygiene" claim):
+		// the nonce this refused call carried must still be consumable afterward.
+		assert.equal(h.handshakeStore.consume(serverNonce), true, "a registry refusal must not have consumed the nonce");
 	});
 });
 
@@ -314,7 +320,7 @@ test("freeze compares only (bot_id, group_id, agent_id): a roster_snapshot-only 
 
 test("live binding drift is refused per call: BINDING_CHANGED, 409, one audit row, nothing dispatched", async () => {
 	await withHarness(async (h) => {
-		const { bearer } = await openValidSession(h);
+		const { bearer, response } = await openValidSession(h);
 
 		await h.reload(baseRegistryDocument({ group_id: -1009999999 }));
 		const telegram = h.telegramClients.get(PROJECT_ID);
@@ -334,9 +340,50 @@ test("live binding drift is refused per call: BINDING_CHANGED, 409, one audit ro
 
 		const rows = auditRows(h.db, PROJECT_ID);
 		assert.equal(rows.length, before + 1, "exactly one audit row must be written");
-		assert.equal(rows[rows.length - 1]?.reason, "BINDING_CHANGED");
-		assert.equal(rows[rows.length - 1]?.outcome, "ok");
-		assert.equal(rows[rows.length - 1]?.direction, "system");
+		const row = rows[rows.length - 1];
+		assert.equal(row?.reason, "BINDING_CHANGED");
+		assert.equal(row?.outcome, "ok");
+		assert.equal(row?.direction, "system");
+		// The row records the session's FROZEN identity (what the call thought it was talking to), not
+		// the live/new one — a field swap or a dropped client_id would ship silently without these.
+		assert.equal(row?.bot_id, BOT_ID, "must be the frozen bot_id, not swapped with chat_id");
+		assert.equal(row?.chat_id, GROUP_ID, "must be the frozen (pre-drift) group_id, not the new live one");
+		assert.equal(row?.client_id, response.client_id, "must not be silently dropped (client_id is nullable at the DB level)");
+	});
+});
+
+test("live binding drift on bot_id alone (group_id and agent_id unchanged) still trips BINDING_CHANGED", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+
+		const NEW_BOT_ID = 100000099;
+		await h.reload(
+			baseRegistryDocument({
+				bot_id: NEW_BOT_ID,
+				roster_snapshot: [{ ...TWO_MEMBER_ROSTER[0], user_id: NEW_BOT_ID }, TWO_MEMBER_ROSTER[1]],
+			}),
+		);
+
+		const res = await sendRequest({ port: h.port, method: "POST", path: "/tools/status", body: "{}", authorization: `Bearer ${bearer}` });
+		assert.equal(res.status, HTTP_CONFLICT, "a bot_id-only drift must trip the freeze on its own, independent of group_id/agent_id");
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, BINDING_CHANGED);
+	});
+});
+
+test("live binding drift on agent_id alone (bot_id and group_id unchanged) still trips BINDING_CHANGED", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+
+		await h.reload(
+			baseRegistryDocument({
+				agent_id: "@alice-renamed-agent",
+				roster_snapshot: [{ ...TWO_MEMBER_ROSTER[0], agent_id: "@alice-renamed-agent" }, TWO_MEMBER_ROSTER[1]],
+			}),
+		);
+
+		const res = await sendRequest({ port: h.port, method: "POST", path: "/tools/status", body: "{}", authorization: `Bearer ${bearer}` });
+		assert.equal(res.status, HTTP_CONFLICT, "an agent_id-only drift must trip the freeze on its own, independent of bot_id/group_id");
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, BINDING_CHANGED);
 	});
 });
 
@@ -358,15 +405,18 @@ test("roster hash mismatch raises a condition, not a failure: session is minted,
 // 5. Session refused when the project file's group disagrees with the binding (R4)
 // ---------------------------------------------------------------------------
 
-test("session refused when the project file's group disagrees with the binding (R4): BINDING_MISMATCH, 409, no session minted, no audit row", async () => {
+test("session refused when the project file's group disagrees with the binding (R4): BINDING_MISMATCH, 409, no session minted, no audit row, nonce NOT consumed", async () => {
 	await withHarness(async (h) => {
 		const before = auditRows(h.db, PROJECT_ID).length;
-		const body = validSessionRequestBody(h, { group_id: -1009999999 });
+		const serverNonce = h.handshakeStore.issue();
+		assert.ok(serverNonce);
+		const body = validSessionRequestBody(h, { group_id: -1009999999, server_nonce: serverNonce });
 		const { status, parsed } = await postSession(h, body);
 		assert.equal(status, HTTP_CONFLICT);
 		assert.equal(ipcErrorSchema.parse(parsed).code, BINDING_MISMATCH);
 		assert.equal(h.sessionStore.size, 0, "no bearer may be minted on an R4 refusal");
 		assert.equal(auditRows(h.db, PROJECT_ID).length, before, "R4 is a session-start refusal, not a live drift — no audit row");
+		assert.equal(h.handshakeStore.consume(serverNonce), true, "an R4 refusal must not have consumed the nonce either");
 	});
 });
 
@@ -566,6 +616,53 @@ test("route-level schema validation refuses a malformed /tools/* body with IPC_B
 	});
 });
 
+test("route-level schema validation refuses a malformed /tools/fetch body with IPC_BAD_REQUEST", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		const res = await sendRequest({
+			port: h.port,
+			method: "POST",
+			path: "/tools/fetch",
+			body: JSON.stringify({ max_batch: -1 }),
+			authorization: `Bearer ${bearer}`,
+		});
+		assert.equal(res.status, HTTP_BAD_REQUEST);
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, IPC_BAD_REQUEST);
+	});
+});
+
+test("route-level schema validation refuses a malformed /tools/status body with IPC_BAD_REQUEST", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		// statusInputSchema is `z.object({})`: any object (even with extra keys) parses successfully
+		// with them stripped, so only a non-object JSON value can fail this gate.
+		const res = await sendRequest({
+			port: h.port,
+			method: "POST",
+			path: "/tools/status",
+			body: JSON.stringify("not-an-object"),
+			authorization: `Bearer ${bearer}`,
+		});
+		assert.equal(res.status, HTTP_BAD_REQUEST);
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, IPC_BAD_REQUEST);
+	});
+});
+
+test("route-level schema validation refuses a malformed /tools/thread body with IPC_BAD_REQUEST", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		const res = await sendRequest({
+			port: h.port,
+			method: "POST",
+			path: "/tools/thread",
+			body: JSON.stringify({ thread_id: "not-twelve-hex-chars" }),
+			authorization: `Bearer ${bearer}`,
+		});
+		assert.equal(res.status, HTTP_BAD_REQUEST);
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, IPC_BAD_REQUEST);
+	});
+});
+
 // ---------------------------------------------------------------------------
 // 13. toTelegramErrorPayload composition
 // ---------------------------------------------------------------------------
@@ -578,6 +675,15 @@ test("toTelegramErrorPayload: a Telegram-classifiable cause is composed with the
 	assert.equal(payload.retryable, true);
 	assert.equal(payload.retry_after_s, 42);
 	assert.equal(payload.message, "send failed", "the TOP-level error's own message must be used, not the cause's");
+});
+
+test("toTelegramErrorPayload: a GroupMigratedError cause propagates new_chat_id, not just retry_after_s", () => {
+	const cause = new GroupMigratedError(400, "group migrated", -1009999999999);
+	const err = new SendToolError("TRANSPORT_ERROR", "send failed", { cause });
+	const payload = toTelegramErrorPayload(err, "TRANSPORT_ERROR");
+	assert.equal(payload.code, "GROUP_MIGRATED");
+	assert.equal(payload.retryable, false);
+	assert.equal(payload.new_chat_id, -1009999999999, "the classified new_chat_id must reach the caller, not just retry_after_s");
 });
 
 test("toTelegramErrorPayload: no Telegram-classifiable cause falls back to the generic tool error code", () => {
@@ -593,6 +699,7 @@ test("toTelegramErrorPayload: a SendToolError's own retry_after_s survives the f
 	const payload = toTelegramErrorPayload(err, err.code);
 	assert.equal(payload.code, "RATE_LIMITED");
 	assert.equal(payload.retry_after_s, 7, "a locally re-detected 429's retry_after_s must not be dropped just because the cause chain has nothing to classify");
+	assert.equal(payload.retryable, true, "a payload carrying retry_after_s must never also claim retryable: false — that combination told a caller to both wait and never retry");
 });
 
 test("toolErrorHttpStatus: RATE_LIMITED and TELEGRAM_RATE_LIMITED map to 429, an unclassified error maps to 500, everything else maps to 400", () => {

@@ -163,6 +163,12 @@ test("session request refuses a non-64-char hmac", () => {
   assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, hmac: "not-hex" }).success, false);
 });
 
+test("session request refuses a zero, negative, or non-integer pid", () => {
+  assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, pid: 0 }).success, false);
+  assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, pid: -1 }).success, false);
+  assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, pid: 1.5 }).success, false);
+});
+
 const VALID_SESSION_BINDING = {
   project_id: VALID_PROJECT_ID,
   bot_id: 7,
