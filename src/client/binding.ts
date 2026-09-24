@@ -51,6 +51,14 @@ import { parseProjectFile, type ProjectFile, type ProjectFileProblem } from "../
  * walked past in search of a valid ancestor. Walking past a broken-but-present binding file to bind
  * against a different, unrelated ancestor project would be a silent misbinding, not a refusal — the
  * walk-up stops at the NEAREST file regardless of whether that file turns out to be valid.
+ *
+ * Same reasoning covers a found-but-unreadable path: `findNearestProjectFile`'s `existsSync` check
+ * returns `true` for any filesystem entry at that path, including a directory, and a TOCTOU window
+ * exists between that check and the `readFileSync` call below. A `readFileSync` failure (`EISDIR`,
+ * `ENOENT` from a deletion race, `EACCES`) is caught and treated the same as "no valid binding
+ * recorded here" (`EXIT_UNBOUND_PROJECT`, refusal kind `unreadable_project_file`) rather than
+ * propagating as an uncaught exception — this module's whole job is converting every walk-up failure
+ * into a typed {@link BindingResult} refusal, never crashing.
  */
 
 /** Why {@link resolveProjectBinding} refused to bind, paired with the exit code that names it. */
@@ -62,6 +70,13 @@ export type BindingRefusal =
       readonly exitCode: typeof EXIT_UNBOUND_PROJECT;
       readonly path: string;
       readonly problems: readonly ProjectFileProblem[];
+    }
+  | {
+      readonly kind: "unreadable_project_file";
+      readonly exitCode: typeof EXIT_UNBOUND_PROJECT;
+      readonly path: string;
+      /** The caught error from `readFileSync` (e.g. `EISDIR`, `ENOENT`, `EACCES`); useful for future diagnostics/logging even though the exit code is the same as the other "nothing usable found here" cases. */
+      readonly cause: unknown;
     }
   | {
       readonly kind: "project_id_mismatch";
@@ -116,7 +131,12 @@ export function resolveProjectBinding(options: ResolveProjectBindingOptions): Bi
     return { ok: false, refusal: { kind: "no_project_file_found", exitCode: EXIT_UNBOUND_PROJECT, searchedFrom: startDir } };
   }
 
-  const text = readFileSync(found, "utf8");
+  let text: string;
+  try {
+    text = readFileSync(found, "utf8");
+  } catch (cause) {
+    return { ok: false, refusal: { kind: "unreadable_project_file", exitCode: EXIT_UNBOUND_PROJECT, path: found, cause } };
+  }
   const parsed = parseProjectFile(text);
   if (!parsed.ok) {
     return {

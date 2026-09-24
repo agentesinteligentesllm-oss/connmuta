@@ -6344,16 +6344,88 @@ make an incorrect kind↔code mapping a compile error, a stronger guarantee than
 remaining 2 (`project_id` comparison, walk-up termination) **killed**. `handshake.ts` (10 mutants: the
 `DAEMON_VERSION_MISMATCH` retryable flag, both HMAC domain-separation labels, the `hexDigestsEqual` length
 guard, the retry-trigger condition, the no-live-run-file guard, both post-retry kind checks, the
-version-mismatch comparison, plus M0): **M0 survived** (correct); **4 killed** at runtime (retryable flag,
-both labels, the length guard, the version-mismatch comparison — genuine test-pinned security/correctness
-properties); **4 BUILD-FAIL** (the retry-trigger inversion and both post-retry kind-check swaps are
-compile-time impossible against the 3-way discriminated union — the same win seen in `binding.ts`, and a
+version-mismatch comparison, plus M0): **M0 survived** (correct); **5 killed** at runtime (the
+`DAEMON_VERSION_MISMATCH` retryable flag, both HMAC domain-separation labels, the `hexDigestsEqual` length
+guard, and the version-mismatch comparison — genuine test-pinned security/correctness properties); **4
+BUILD-FAIL** (the retry-trigger inversion, the no-live-run-file guard, and both post-retry kind-check swaps
+are compile-time impossible against the 3-way discriminated union — the same win seen in `binding.ts`, and a
 direct result of this session's own readback fix). **Zero real survivors** in either file.
 
-**At the final tip:** `git diff --numstat main -- src test`: **987 authored lines** (`binding.ts` 142/0,
-`handshake.ts` 295/0, `binding.test.ts` 140/0, `handshake.test.ts` 410/0) — against a ≈340 estimate, a
-disclosed **647-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1) stays
-outside this count, disclosed separately. Growth beyond the writer's own reported 886 came entirely from
-the parent's readback fix: the `IdentityAttempt` type, the restructured retry logic and its updated doc
-comments (+26 in `handshake.ts`), and the two new pinning tests (+75 in `handshake.test.ts`). `rm -rf dist
-&& npm test`: **932 tests (931 pass, 1 skip)**; `npm run test:static`: **8/8**.
+The independent verifier separately tested a DIFFERENT mutation on the same `hexDigestsEqual` line — full
+deletion of the length check (not this sweep's inversion mutation) — which survives, since every proof
+reaching that function today is schema-gated to a fixed 64-hex-char length upstream
+(`identityResponseSchema`'s `hmacDigestSchema`), so no existing test ever constructs a mismatched-length
+digest; disclosed as a real but currently-unreachable-via-the-real-call-path coverage gap, not a
+contradiction of this sweep's own (correctly-killed) inversion mutant.
+
+**At the pre-Judgment-Day tip (`36683bc`):** `git diff --numstat main -- src test`: **987 authored lines**
+(`binding.ts` 142/0, `handshake.ts` 295/0, `binding.test.ts` 140/0, `handshake.test.ts` 410/0) — against a
+≈340 estimate, a disclosed **647-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.md`'s
+PT-26 row (1/1) stays outside this count, disclosed separately. Growth beyond the writer's own reported 886
+came entirely from the parent's readback fix: the `IdentityAttempt` type, the restructured retry logic and
+its updated doc comments (+26 in `handshake.ts`), and the two new pinning tests (+75 in
+`handshake.test.ts`). `rm -rf dist && npm test`: **932 tests (931 pass, 1 skip)**; `npm run test:static`:
+**8/8**.
+
+**Judgment Day** (both judges + independent verifier, frozen worktrees `pr33-judges`/`pr33-verify` at
+`36683bc`, all three in parallel). Judge A: 1 WARNING (`resolveProjectBinding`'s unguarded `readFileSync`
+throws uncaught on a found-but-unreadable path — a directory named `conmuta.json`, a TOCTOU deletion, a
+permission error — contradicting the module's own "found-but-broken is treated as no valid binding, never
+a crash" guarantee, and risking design §11's "message only, never `err.stack`" pin once a caller exists),
+1 WARNING (this record's own handshake.ts mutant-tally arithmetic didn't add up as written), 2 SUGGESTIONs
+(the `IPC_REQUEST_TIMEOUT_MS` reuse risking a ~140 s worst-case hang; a missing "unreachable-then-retry"
+test). Judge B: the SAME `readFileSync` WARNING, independently — both judges converged on it without
+seeing each other's work — plus 1 SUGGESTION (a confusing `identity`-identifier reuse between
+`performHandshake`'s local binding and `requestSession`'s parameter name; traced end to end and confirmed
+behaviorally correct, no bug). Independent verifier: reproduced every number exactly (987 lines, 932/931/1,
+8/8); independently reproduced 16 of the candidate's 17 mutants; found the candidate's own tally arithmetic
+error the same way Judge A did; found the `readFileSync`/EISDIR gap via its own standalone probe, a third
+independent route to the same finding; and — beyond anything either judge or this candidate's own sweep
+found — wrote 6 of its own hand-written mutants against `requestSession`'s body construction (swapping or
+hardcoding wrong values for `host`/`group_id`/`project_id`/`pid`/`roster_hash`), **all 6 survived**: the
+`/session` fake-fetch handler asserted only `hmac`, leaving every other field of the request body
+completely unpinned.
+
+**Corrected** (delegated `jd-fix-agent`, sonnet; parent-verified line by line and re-swept before
+accepting). Five fixes, all confirmed findings only, nothing broader:
+1. `binding.ts`: `readFileSync` wrapped in try/catch; new `BindingRefusal` member `unreadable_project_file`
+   (`exitCode: EXIT_UNBOUND_PROJECT`, `path`, `cause`), module doc extended with the same "found-but-broken
+   never crashes" reasoning already given for the malformed-JSON case; one new test (a directory literally
+   named `conmuta.json`).
+2. This record's own handshake.ts mutant tally corrected: 5 killed (not 4, all 5 now named), 4 BUILD-FAIL
+   (not 3 named — the no-live-run-file guard was omitted from the prose despite being counted), plus one
+   disclosed clarifying note: the verifier's `hexDigestsEqual` finding tested a DIFFERENT mutation (full
+   deletion of the length check, not this sweep's inversion) — real, but not reachable via the real call
+   path today, since `identityResponseSchema`'s `hmacDigestSchema` schema-gates every proof to a fixed
+   64-hex-char length upstream; disclosed, not forced into new coverage that would require exporting a
+   currently-private helper.
+3. `handshake.test.ts`'s happy-path `/session` assertion extended from `hmac`-only to the full
+   `SessionRequest` shape (`project_id`, `group_id`, `roster_hash`, `host`, `pid`), closing the verifier's
+   6/6-survivor gap.
+4. The existing retry test now asserts the two `GET /identity` attempts use different nonces
+   (`assert.notEqual(firstNonce, secondNonce)`), closing a nonce-freshness gap the candidate's own sweep
+   never probed for.
+5. One new test: first `GET /identity` attempt unreachable (transport failure), the re-read retry succeeds
+   — the untested mirror of the already-tested proof-mismatch-then-verified case.
+
+**Deferred, not fixed this round**: Judge A's `IPC_REQUEST_TIMEOUT_MS`-reuse SUGGESTION — a latency
+concern on an uncommon transient state (a daemon alive-per-pid but stalled before answering), not a
+correctness bug; the verifier's own probe confirmed the existing `AbortSignal.timeout` mechanism already
+works correctly. Filed as **B-51** (`docs/06-backlog/CHECKLIST.md`) for a dedicated slice rather than
+scope-creeping this correction round. Judge B's `identity`-naming SUGGESTION: no behavioral risk, left as
+prose feedback rather than a rename.
+
+Parent re-verification after the fix (independent of `jd-fix-agent`'s own report): `npm run build && node
+--test "dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"` → **17/17** (8 binding + 9
+handshake, up from 7+8). `rm -rf dist && npm test` → **934 tests (933 pass, 1 skip)**. `npm run
+test:static` → **8/8**. A focused 2-mutant sweep on the new try/catch (`odd/mutants-binding-fix.json`):
+the new refusal's exit code is a compile-time **BUILD-FAIL** (same discriminated-union win as the rest of
+this file); removing the try/catch entirely is **KILLED** by the new directory test — confirming the fix
+is meaningfully exercised, not merely present.
+
+**At the final tip:** `git diff --numstat main -- src test`: **1,106 authored lines** (`binding.ts` 162/0,
+`handshake.ts` 295/0 — unchanged, no source fix needed there — `binding.test.ts` 162/0, `handshake.test.ts`
+487/0) — a disclosed **766-line PR-scoped exception**, grown from the pre-correction 987 entirely by this
+round's fixes (the try/catch + new refusal kind in `binding.ts` and its test, plus the three
+`handshake.test.ts` additions/extensions). `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1) stays
+outside this count, unchanged from the candidate.

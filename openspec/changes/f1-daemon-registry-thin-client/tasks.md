@@ -949,11 +949,22 @@ Parent readback found and fixed a real design/implementation divergence in `hand
 /identity` connection failure was misreported as `DAEMON_IDENTITY_MISMATCH` instead of `DAEMON_DOWN`
 (design §10's own taxonomy table lists "connection refused" under `DAEMON_DOWN`) — fixed by having
 `requestAndVerifyIdentity` distinguish "never got a response" from "got a response, proof failed," with
-two new tests pinning the corrected behavior. **Size reconciliation**: landed at **987 authored lines**
-(`binding.ts` 142, `handshake.ts` 295, `binding.test.ts` 140, `handshake.test.ts` 410) against the ≈340
-estimate above — a disclosed **647-line PR-scoped exception**, driven by the retry/error-taxonomy
-correctness fix and its test coverage. See `apply-progress.md` §PR-33 for the full breakdown. The estimate
-line above is the gate's text and is left as written.
+two new tests pinning the corrected behavior.
+
+**Judgment Day** (both judges + independent verifier, `36683bc`): both judges independently converged on
+the same real gap — `binding.ts`'s unguarded `readFileSync` throws uncaught on a found-but-unreadable path
+(a directory named `conmuta.json`, a TOCTOU deletion, a permission error) instead of a typed refusal; the
+verifier found it a third way via direct probing. The verifier's own 6 hand-written mutants against
+`POST /session`'s body construction all survived (only `hmac` was asserted). Both judges independently
+caught the same arithmetic error in this record's own mutant-sweep tally. **Corrected** (`jd-fix-agent`,
+parent-verified): `unreadable_project_file` refusal kind + try/catch in `binding.ts` with a new test;
+`POST /session` body fully asserted; nonce-freshness assertion added; one new unreachable-then-retry test;
+the tally arithmetic fixed. Deferred to backlog **B-51** (not fixed this round): reusing the 70s long-poll
+timeout for the handshake (latency concern, not a correctness bug — the timeout mechanism itself already
+works correctly). **Size reconciliation**: landed at **1,106 authored lines** at the final tip (`binding.ts`
+162, `handshake.ts` 295, `binding.test.ts` 162, `handshake.test.ts` 487) against the ≈340 estimate above —
+a disclosed **766-line PR-scoped exception**. See `apply-progress.md` §PR-33 for the full breakdown. The
+estimate line above is the gate's text and is left as written.
 
 #### PR-34 — IPC stub, client errors, `createServer(deps)`
 Branch `f1/34-client-server` → `main`. Depends: PR-33. Size: ≈360 lines, no exception.

@@ -138,3 +138,25 @@ test(
     }
   },
 );
+
+test(
+  "resolveProjectBinding refuses with EXIT_UNBOUND_PROJECT (unreadable_project_file) instead of throwing when " +
+    "conmuta.json exists as a directory rather than a file (existsSync returns true for any filesystem entry)",
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "binding-unreadable-"));
+    try {
+      mkdirSync(join(dir, "conmuta.json"));
+
+      const result = resolveProjectBinding({ project: "prj-example", cwd: dir });
+
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.refusal.kind, "unreadable_project_file");
+        assert.equal(result.refusal.exitCode, EXIT_UNBOUND_PROJECT);
+        assert.equal(result.refusal.path, join(dir, "conmuta.json"));
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);

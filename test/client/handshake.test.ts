@@ -125,8 +125,21 @@ test("performHandshake sends no Authorization header on GET /identity, verifies 
         );
       }
       if (url.includes("/session")) {
-        const body = JSON.parse(String(init?.body)) as { server_nonce: string; hmac: string };
+        const body = JSON.parse(String(init?.body)) as {
+          project_id: string;
+          group_id: number;
+          roster_hash: string;
+          host: string;
+          pid: number;
+          hmac: string;
+          server_nonce: string;
+        };
         assert.equal(body.hmac, sessionProof(secret, body.server_nonce), "POST /session must carry the correct session hmac");
+        assert.equal(body.project_id, SESSION_IDENTITY.projectId, "POST /session must carry the identity's project_id");
+        assert.equal(body.group_id, SESSION_IDENTITY.groupId, "POST /session must carry the identity's group_id");
+        assert.equal(body.roster_hash, SESSION_IDENTITY.rosterHash, "POST /session must carry the identity's roster_hash");
+        assert.equal(body.host, SESSION_IDENTITY.host, "POST /session must carry the identity's host");
+        assert.equal(body.pid, process.pid, "POST /session must carry this process's pid");
         return new Response(
           JSON.stringify({
             client_id: "client-1",
@@ -182,11 +195,14 @@ test("performHandshake retries GET /identity once on a proof mismatch, using the
     writeFileSync(join(runDir, "daemon.json"), JSON.stringify({ port, pid: process.pid, secret: staleSecret }), "utf8");
 
     let identityCallCount = 0;
+    let firstNonce: string | undefined;
+    let secondNonce: string | undefined;
     const { fetchImpl, calls } = createFakeFetch((url, init) => {
       if (url.includes("/identity")) {
         identityCallCount += 1;
         const nonce = nonceFromUrl(url);
         if (identityCallCount === 1) {
+          firstNonce = nonce;
           // Simulate a daemon restart landing between our first read and this response: the run
           // file now carries a fresh secret, but this first response is still signed with a secret
           // this client's first read never saw, so local verification fails and a retry is required.
@@ -201,6 +217,7 @@ test("performHandshake retries GET /identity once on a proof mismatch, using the
             { status: 200 },
           );
         }
+        secondNonce = nonce;
         return new Response(
           JSON.stringify({
             proof: identityProof(freshSecret, nonce),
@@ -236,6 +253,66 @@ test("performHandshake retries GET /identity once on a proof mismatch, using the
 
     assert.equal(result.client_id, "client-1");
     assert.equal(identityCallCount, 2, "must retry GET /identity exactly once after a mismatch");
+    assert.notEqual(firstNonce, secondNonce, "each GET /identity attempt must use a fresh nonce");
+    assert.equal(calls.filter((call) => call.url.includes("/session")).length, 1, "must call POST /session exactly once, after the retry succeeds");
+  } finally {
+    rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("performHandshake retries GET /identity once when the first attempt is unreachable (transport failure), and succeeds once the retry returns a verified proof", async () => {
+  const homeDir = mkdtempSync(join(tmpdir(), "handshake-retry-unreachable-"));
+  const runDir = join(homeDir, "run");
+  const port = 6102;
+  const secret = "retry-unreachable-secret";
+
+  try {
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "daemon.json"), JSON.stringify({ port, pid: process.pid, secret }), "utf8");
+
+    let identityCallCount = 0;
+    const { fetchImpl, calls } = createFakeFetch((url, init) => {
+      if (url.includes("/identity")) {
+        identityCallCount += 1;
+        if (identityCallCount === 1) {
+          throw new Error("ECONNREFUSED (simulated)");
+        }
+        const nonce = nonceFromUrl(url);
+        return new Response(
+          JSON.stringify({
+            proof: identityProof(secret, nonce),
+            server_nonce: "b".repeat(64),
+            pid: process.pid,
+            build: SERVER_VERSION,
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/session")) {
+        const body = JSON.parse(String(init?.body)) as { server_nonce: string; hmac: string };
+        assert.equal(body.hmac, sessionProof(secret, body.server_nonce), "POST /session must use the re-read secret");
+        return new Response(
+          JSON.stringify({
+            client_id: "client-1",
+            bearer: "c".repeat(64),
+            binding: { project_id: "prj-example", bot_id: 1, group_id: -100, agent_id: "@claude", roster_hash: ROSTER_HASH },
+            conditions: [],
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const result = await performHandshake({
+      ...SESSION_IDENTITY,
+      homeDir,
+      ensureDaemonRunningImpl: async () => ({ port, pid: process.pid, secret }),
+      fetchImpl,
+    });
+
+    assert.equal(result.client_id, "client-1");
+    assert.equal(identityCallCount, 2, "must retry GET /identity exactly once after an unreachable first attempt");
     assert.equal(calls.filter((call) => call.url.includes("/session")).length, 1, "must call POST /session exactly once, after the retry succeeds");
   } finally {
     rmSync(homeDir, { recursive: true, force: true });
