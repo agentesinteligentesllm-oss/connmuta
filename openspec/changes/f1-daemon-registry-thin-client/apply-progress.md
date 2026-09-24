@@ -6255,3 +6255,220 @@ round 1 returned only a single narrow, independently-verifiable, zero-risk prose
 and confirmed by full suite + static gates rather than spending the final round on it. No native review
 ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (recorded above: `risk: high`,
 `review_due: true`).
+
+## PR-33 — `client/binding.ts` + `client/handshake.ts` (launcher `--project` walk-up/refusal + client handshake; unit 10 `thin-client-tools` continues)
+
+**Route.** ODD with the SDD contract preserved, session 33: one delegated read-only mapper (30 tool uses,
+pulling the PR-33 tasks.md block, `thin-client-tools/spec.md`'s two requirements verbatim, design.md §10's
+sequence diagram and client error-taxonomy table, §11's Startup row, `constants.ts`'s EXIT_* docs,
+`project-file.ts`'s `parseProjectFile` signature, the daemon-side wire schemas, `spawn.ts`/`run-state.ts`
+conventions, and THREAT-MODEL.md's PT-26/PT-27 rows), then the orchestrator decided the exit-code mapping
+directly from that evidence (below), then one delegated writer (`general-purpose`, sonnet), then a parent
+readback that found and fixed a real design/implementation divergence, then a parent mutant sweep. No
+`sdd-apply` phase envelope exists. Both files are new code (design §3 confirms: v1 has no daemon/client
+split at all, no lazy-spawn, no separate binding-walk-up/handshake step to vendor) — no provenance header,
+registry unchanged at 23 entries.
+
+**Decision (orchestrator, session 33), stated in `binding.ts`'s module doc and disclosed here per
+HANDOFF.md §4's explicit flag.** `shared/constants.ts` defines exactly two binding-shaped exit codes
+(`EXIT_UNBOUND_PROJECT = 3`, `EXIT_PROJECT_MISMATCH = 4`) and design.md's §11 Startup row names both
+together for the walk-up's non-usage refusal, without saying which condition maps to which; spec.md's own
+Scenario 39 is titled "project_id mismatch is UNBOUND_PROJECT". Resolved by a process-lifecycle argument:
+exit codes in this design only ever fire during the synchronous startup walk-up, strictly before
+`server.connect()` — the daemon handshake happens lazily on the first tool call, long after the process
+is already running as an MCP server, so the daemon-returned `UNBOUND_PROJECT` (design §10's client
+error-taxonomy table lists it as an IPC-time, `HTTP_NOT_FOUND` tool error — a JSON error payload from a
+tool call, never a process exit) cannot be what these two exit constants describe. That leaves exactly two
+non-missing-flag walk-up failures for exactly two exit constants: no `conmuta.json` anywhere in the
+walk-up → `EXIT_UNBOUND_PROJECT` (nothing bound at this location at all); a `conmuta.json` found but its
+`project_id` disagrees with `--project` → `EXIT_PROJECT_MISMATCH` (matches that constant's own doc comment
+verbatim). Spec.md's Scenario 39 title is read as informal prose describing the situation, not a literal
+pointer to the constant name — the module doc and the test both disclose this reading explicitly.
+
+**Disclosed test-coverage additions beyond tasks.md's literal sub-task wording (writer, confirmed by the
+parent).** (1) `specs/thin-client-tools/spec.md`'s requirement text names three refusal triggers
+(`--project` missing, no `conmuta.json` found, or `project_id` disagrees) but only the first and third have
+a named scenario; the writer added a third `binding.test.ts` case for "no `conmuta.json` found at all"
+(asserting `EXIT_UNBOUND_PROJECT`), closing the gap between the requirement's MUST clause and ADR-12's
+"every guarantee needs a test that can fail." (2) The writer's own further addition: a `conmuta.json` IS
+found but `parseProjectFile` refuses it (malformed JSON) — treated as `EXIT_UNBOUND_PROJECT`, not silently
+walked past to a valid ancestor (a broken-but-present binding file stopping the walk-up, rather than being
+skipped in search of a different, unrelated project, is a deliberate anti-misbinding choice, disclosed in
+`binding.ts`'s module doc and pinned by its own test).
+
+**Writer's disclosed design choices.** `binding.ts`: `resolveProjectBinding(options): BindingResult`, a
+discriminated union mirroring `project-file.ts`'s own style (no `fetch` import at all — the "before any IPC
+call" guarantee is structural, not merely observed). `handshake.ts`: `performHandshake(options):
+Promise<SessionResponse>`, thrown `HandshakeError` (code/retryable from a closed
+`HANDSHAKE_ERROR_CODES as const` vocabulary, none of which existed as string constants before this slice),
+composing `run-state.ts`'s already-merged `ensureDaemonRunning` as its own first step (an injectable
+override parameter, mirroring `spawn.ts`'s `REAL_SPAWN` pattern, so tests never wait through a real
+`SPAWN_WAIT_SECONDS` timeout). HMAC helpers (`computeIdentityProof`/`computeSessionProof`) are reimplemented
+locally rather than imported from the daemon's `ipc/{handshake,sessions}.ts`: `client/tsconfig.json`'s
+`references` is `[{"path":"../shared"}]` only (confirmed by direct read), the identical disclosed boundary
+`run-state.ts` already documents for the same reason.
+
+**TDD evidence.** Writer RED (verbatim): `binding.test.ts(6,39): error TS2307: Cannot find module
+'../../src/client/binding.js'`; `handshake.test.ts(12,8): error TS2307: Cannot find module
+'../../src/client/handshake.js'`. Writer GREEN: `npm run build && node --test
+"dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"` → 13/13; full suite 930/929/1 skip
+(baseline 917/916/1, +13); `npm run test:static` 8/8.
+
+**Parent readback correction — a real design/implementation divergence, closed.** `handshake.ts`'s own
+module doc claimed "a non-OK or schema-invalid response from **either** route currently folds into
+`DAEMON_DOWN`," but the writer's actual code only did this for `POST /session` — for `GET /identity`, every
+failure (transport error, non-OK status, malformed body, *or* a genuine proof mismatch) fed into one
+undifferentiated retry-then-`DAEMON_IDENTITY_MISMATCH` path. design.md §10's client error-taxonomy table
+explicitly lists "connection refused" as a `DAEMON_DOWN` trigger, distinct from `DAEMON_IDENTITY_MISMATCH`
+("HMAC proof failed") — so a genuine connection failure on `GET /identity` (plausible even after
+`ensureDaemonRunning` confirms a live pid: the daemon's HTTP listener may not have bound the port yet) would
+have surfaced as a misleading `DAEMON_IDENTITY_MISMATCH`, contradicting both the design table and the
+module's own doc comment. Verified empirically first, not assumed: a standalone Node script confirmed
+`fetch` silently ignores any explicit `host` header and always derives it from the URL (also cleaned up two
+now-confirmed-dead `headers: { host: ... }` lines in `requestIdentity`/`requestSession` while in the file).
+**Fixed**: `requestAndVerifyIdentity` now returns a three-way `IdentityAttempt`
+(`"unreachable"` / `"proof_mismatch"` / `"verified"`) instead of `IdentityResponse | undefined`;
+`performHandshake` raises `DAEMON_DOWN` when the final attempt never produced a usable response (or the
+re-read found no live run file at all) and only raises `DAEMON_IDENTITY_MISMATCH` when a response WAS
+received and its proof genuinely failed to verify. Two new tests pin this: unreachable on both attempts →
+`DAEMON_DOWN` (2 identity attempts); unreachable with no live run file on re-read → `DAEMON_DOWN` (1
+attempt, no retry). `npm run build` confirmed TypeScript's own discriminated-union narrowing accepts the
+restructure cleanly. Full suite re-run after the fix: **932 tests (931 pass, 1 skip)**, `npm run test:static`
+**8/8**.
+
+**Parent mutant sweep** (`odd/sweep.mjs`, recreated this session). `binding.ts` (7 mutants: exit-code
+mapping ×3, the OR/AND missing-flag guard, the `project_id` comparison, the walk-up termination condition,
+plus the M0 comment control): **M0 survived** (correct — the control); **3 of the exit-code mutants and the
+OR/AND mutant are BUILD-FAIL**, not runtime survivors — the discriminated union's literal `exitCode` types
+make an incorrect kind↔code mapping a compile error, a stronger guarantee than a runtime test; the
+remaining 2 (`project_id` comparison, walk-up termination) **killed**. `handshake.ts` (10 mutants: the
+`DAEMON_VERSION_MISMATCH` retryable flag, both HMAC domain-separation labels, the `hexDigestsEqual` length
+guard, the retry-trigger condition, the no-live-run-file guard, both post-retry kind checks, the
+version-mismatch comparison, plus M0): **M0 survived** (correct); **5 killed** at runtime (the
+`DAEMON_VERSION_MISMATCH` retryable flag, both HMAC domain-separation labels, the `hexDigestsEqual` length
+guard, and the version-mismatch comparison — genuine test-pinned security/correctness properties); **4
+BUILD-FAIL** (the retry-trigger inversion, the no-live-run-file guard, and both post-retry kind-check swaps
+are compile-time impossible against the 3-way discriminated union — the same win seen in `binding.ts`, and a
+direct result of this session's own readback fix). **Zero real survivors** in either file.
+
+The independent verifier separately tested a DIFFERENT mutation on the same `hexDigestsEqual` line — full
+deletion of the length check (not this sweep's inversion mutation) — which survives, since every proof
+reaching that function today is schema-gated to a fixed 64-hex-char length upstream
+(`identityResponseSchema`'s `hmacDigestSchema`), so no existing test ever constructs a mismatched-length
+digest; disclosed as a real but currently-unreachable-via-the-real-call-path coverage gap, not a
+contradiction of this sweep's own (correctly-killed) inversion mutant.
+
+**At the pre-Judgment-Day tip (`36683bc`):** `git diff --numstat main -- src test`: **987 authored lines**
+(`binding.ts` 142/0, `handshake.ts` 295/0, `binding.test.ts` 140/0, `handshake.test.ts` 410/0) — against a
+≈340 estimate, a disclosed **647-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.md`'s
+PT-26 row (1/1) stays outside this count, disclosed separately. Growth beyond the writer's own reported 886
+came entirely from the parent's readback fix: the `IdentityAttempt` type, the restructured retry logic and
+its updated doc comments (+26 in `handshake.ts`), and the two new pinning tests (+75 in
+`handshake.test.ts`). `rm -rf dist && npm test`: **932 tests (931 pass, 1 skip)**; `npm run test:static`:
+**8/8**.
+
+**Judgment Day** (both judges + independent verifier, frozen worktrees `pr33-judges`/`pr33-verify` at
+`36683bc`, all three in parallel). Judge A: 1 WARNING (`resolveProjectBinding`'s unguarded `readFileSync`
+throws uncaught on a found-but-unreadable path — a directory named `conmuta.json`, a TOCTOU deletion, a
+permission error — contradicting the module's own "found-but-broken is treated as no valid binding, never
+a crash" guarantee, and risking design §11's "message only, never `err.stack`" pin once a caller exists),
+1 WARNING (this record's own handshake.ts mutant-tally arithmetic didn't add up as written), 2 SUGGESTIONs
+(the `IPC_REQUEST_TIMEOUT_MS` reuse risking a ~140 s worst-case hang; a missing "unreachable-then-retry"
+test). Judge B: the SAME `readFileSync` WARNING, independently — both judges converged on it without
+seeing each other's work — plus 1 SUGGESTION (a confusing `identity`-identifier reuse between
+`performHandshake`'s local binding and `requestSession`'s parameter name; traced end to end and confirmed
+behaviorally correct, no bug). Independent verifier: reproduced every number exactly (987 lines, 932/931/1,
+8/8); independently reproduced 16 of the candidate's 17 mutants; found the candidate's own tally arithmetic
+error the same way Judge A did; found the `readFileSync`/EISDIR gap via its own standalone probe, a third
+independent route to the same finding; and — beyond anything either judge or this candidate's own sweep
+found — wrote 6 of its own hand-written mutants against `requestSession`'s body construction (swapping or
+hardcoding wrong values for `host`/`group_id`/`project_id`/`pid`/`roster_hash`), **all 6 survived**: the
+`/session` fake-fetch handler asserted only `hmac`, leaving every other field of the request body
+completely unpinned.
+
+**Corrected** (delegated `jd-fix-agent`, sonnet; parent-verified line by line and re-swept before
+accepting). Five fixes, all confirmed findings only, nothing broader:
+1. `binding.ts`: `readFileSync` wrapped in try/catch; new `BindingRefusal` member `unreadable_project_file`
+   (`exitCode: EXIT_UNBOUND_PROJECT`, `path`, `cause`), module doc extended with the same "found-but-broken
+   never crashes" reasoning already given for the malformed-JSON case; one new test (a directory literally
+   named `conmuta.json`).
+2. This record's own handshake.ts mutant tally corrected: 5 killed (not 4, all 5 now named), 4 BUILD-FAIL
+   (not 3 named — the no-live-run-file guard was omitted from the prose despite being counted), plus one
+   disclosed clarifying note: the verifier's `hexDigestsEqual` finding tested a DIFFERENT mutation (full
+   deletion of the length check, not this sweep's inversion) — real, but not reachable via the real call
+   path today, since `identityResponseSchema`'s `hmacDigestSchema` schema-gates every proof to a fixed
+   64-hex-char length upstream; disclosed, not forced into new coverage that would require exporting a
+   currently-private helper.
+3. `handshake.test.ts`'s happy-path `/session` assertion extended from `hmac`-only to the full
+   `SessionRequest` shape (`project_id`, `group_id`, `roster_hash`, `host`, `pid`), closing the verifier's
+   6/6-survivor gap.
+4. The existing retry test now asserts the two `GET /identity` attempts use different nonces
+   (`assert.notEqual(firstNonce, secondNonce)`), closing a nonce-freshness gap the candidate's own sweep
+   never probed for.
+5. One new test: first `GET /identity` attempt unreachable (transport failure), the re-read retry succeeds
+   — the untested mirror of the already-tested proof-mismatch-then-verified case.
+
+**Deferred, not fixed this round**: Judge A's `IPC_REQUEST_TIMEOUT_MS`-reuse SUGGESTION — a latency
+concern on an uncommon transient state (a daemon alive-per-pid but stalled before answering), not a
+correctness bug; the verifier's own probe confirmed the existing `AbortSignal.timeout` mechanism already
+works correctly. Filed as **B-51** (`docs/06-backlog/CHECKLIST.md`) for a dedicated slice rather than
+scope-creeping this correction round. Judge B's `identity`-naming SUGGESTION: no behavioral risk, left as
+prose feedback rather than a rename.
+
+Parent re-verification after the fix (independent of `jd-fix-agent`'s own report): `npm run build && node
+--test "dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"` → **17/17** (8 binding + 9
+handshake, up from 7+8). `rm -rf dist && npm test` → **934 tests (933 pass, 1 skip)**. `npm run
+test:static` → **8/8**. A focused 2-mutant sweep on the new try/catch (`odd/mutants-binding-fix.json`):
+the new refusal's exit code is a compile-time **BUILD-FAIL** (same discriminated-union win as the rest of
+this file); removing the try/catch entirely is **KILLED** by the new directory test — confirming the fix
+is meaningfully exercised, not merely present.
+
+**At the pre-re-judgment tip (`8975d9f`):** `git diff --numstat main -- src test`: **1,106 authored lines**
+(`binding.ts` 162/0, `handshake.ts` 295/0 — unchanged, no source fix needed there — `binding.test.ts`
+162/0, `handshake.test.ts` 487/0) — a disclosed **766-line PR-scoped exception**, grown from the
+pre-correction 987 entirely by this round's fixes (the try/catch + new refusal kind in `binding.ts` and its
+test, plus the three `handshake.test.ts` additions/extensions). `docs/02-architecture/THREAT-MODEL.md`'s
+PT-26 row (1/1) stays outside this count, unchanged from the candidate.
+
+**Scoped re-judgment round 1** (both judges, `36683bc..8975d9f`; frozen worktree moved to the correction
+tip; first of the two-re-judgment budget). Judge A: **0 new findings** — all 5 fixes independently
+re-verified as correctly and completely closing what they claim, no regressions, the new
+`unreadable_project_file` refusal kind's design confirmed sound (mutually exclusive with the other two
+kinds, correctly exit-coded, correctly documented), and explicitly confirmed the B-51 deferral is an
+acceptable non-blocking call rather than something that should have blocked. Judge B: **1 new SUGGESTION**
+— the corrected happy-path test's `/session` body assertion pins 5 of 6 non-`hmac` fields directly but
+covers `server_nonce` only indirectly (through the HMAC-equality check, which is self-referential for that
+one field); explicitly flagged `causal_disposition: "pre-existing"` (the same indirect-only pattern already
+existed, unchanged, in the retry tests) and "consistent with, not a regression from, the file's existing
+test style" — a single-judge, SUGGESTION-tier, pre-existing-pattern finding, not corroborated by Judge A or
+the independent verifier.
+
+**Corrected** (parent inline; one assertion line, zero behavioral change, so verified by full suite +
+static gates rather than spending the second re-judgment round on it, matching this project's own PR-32
+precedent for a narrow, single-judge, low-severity residual): added `assert.equal(body.server_nonce,
+"b".repeat(64), ...)` directly after the existing `hmac` assertion in the happy-path test.
+
+**At the final tip:** `git diff --numstat main -- src test`: **1,107 authored lines** (`binding.ts` 162/0,
+`handshake.ts` 295/0, `binding.test.ts` 162/0, `handshake.test.ts` 488/0 — one line more than the
+766-line-exception tip, the one new assertion) — a disclosed **767-line PR-scoped exception**;
+`rm -rf dist && npm test`: **934 tests (933 pass, 1 skip)**, unchanged (a same-test assertion addition adds
+no new test); `npm run test:static`: **8/8**. `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1)
+stays outside this count, unchanged from the candidate.
+
+**JUDGMENT: APPROVED** for `36683bc..c91d16c` (candidate `36683bc`; correction `8975d9f`, covering both
+judges' independently-converged `readFileSync`/EISDIR WARNING, the independent verifier's 6/6-survivor
+`POST /session` body gap, the nonce-freshness gap, the missing unreachable-then-retry test, and this
+record's own mutant-tally arithmetic error; round-1 re-judgment fix `c91d16c`, a parent-inline one-line
+assertion addition for round 1's own single new SUGGESTION). Every finding across the original audit and
+the one re-judgment round used is resolved: both judges' independently-converged WARNING fixed and
+re-verified by both on re-judgment; the independent verifier's body-field gap and tally-arithmetic finding
+both fixed; the nonce-freshness and missing-retry-combination gaps both closed with new tests; Judge A's
+`IPC_REQUEST_TIMEOUT_MS` SUGGESTION deliberately deferred to **B-51** rather than fixed (explicitly endorsed
+as acceptable by Judge A itself on re-judgment); Judge B's `identity`-naming SUGGESTION left as prose
+feedback (traced end-to-end as carrying no behavioral risk, confirmed independently by both judges across
+both rounds). **One of the two re-judgment rounds used**; the second was not needed, since round 1 returned
+only a single narrow, single-judge, SUGGESTION-tier, explicitly-pre-existing-pattern finding, parent-corrected
+and confirmed by full suite + static gates rather than spending the final round on it. No native review ran
+for this candidate — a Judgment Day target, per HANDOFF §2.3 (recorded, not started: `gentle-ai review
+assess` at close read `risk: medium`, `review_due: true`, `review_due_reason: slice_budget_reached`
+against `main` at `2dcd6ae`).

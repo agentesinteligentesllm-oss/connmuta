@@ -934,10 +934,40 @@ Scope: `src/client/binding.ts`, `src/client/handshake.ts`, `test/client/binding.
 Requirements: `thin-client-tools › Launcher requires --project and refuses when unbound or mismatched`; `thin-client-tools › DAEMON_DOWN makes zero network calls` (PT-26 a/b).
 Runtime harness: fake `fetch` that throws on any call (proves zero network on `DAEMON_DOWN`).
 
-- [ ] 33.1 RED: write `test/client/binding.test.ts` ("missing `--project` exits before any IPC call", "`project_id` mismatch is `UNBOUND_PROJECT`") and `test/client/handshake.test.ts` ("no daemon, zero network calls": a network recorder shows zero outbound calls and no `Authorization` header).
-- [ ] 33.2 GREEN: implement `src/client/binding.ts` (cwd walk-up to the nearest `conmuta.json`, strict-parse via PR-08, `EXIT_UNBOUND_PROJECT`/`EXIT_PROJECT_MISMATCH`) and `src/client/handshake.ts` (identity verify, `POST /session`, `DAEMON_IDENTITY_MISMATCH` re-read-once).
-- [ ] 33.3 Verify: `npm run build && node --test "dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"`.
-- [ ] 33.4 Docs: update the file-name cell(s) of PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 33.1 RED: write `test/client/binding.test.ts` ("missing `--project` exits before any IPC call", "`project_id` mismatch is `UNBOUND_PROJECT`") and `test/client/handshake.test.ts` ("no daemon, zero network calls": a network recorder shows zero outbound calls and no `Authorization` header).
+- [x] 33.2 GREEN: implement `src/client/binding.ts` (cwd walk-up to the nearest `conmuta.json`, strict-parse via PR-08, `EXIT_UNBOUND_PROJECT`/`EXIT_PROJECT_MISMATCH`) and `src/client/handshake.ts` (identity verify, `POST /session`, `DAEMON_IDENTITY_MISMATCH` re-read-once).
+- [x] 33.3 Verify: `npm run build && node --test "dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"`.
+- [x] 33.4 Docs: update the file-name cell(s) of PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+**Apply-time note (session 33).** Exit-code mapping decided and disclosed: `EXIT_UNBOUND_PROJECT` = no
+`conmuta.json` found anywhere in the walk-up; `EXIT_PROJECT_MISMATCH` = found but `project_id` disagrees
+with `--project` (process-lifecycle argument: exit codes only ever fire pre-`server.connect()`, so the
+IPC-time daemon-returned `UNBOUND_PROJECT` cannot be either constant; full reasoning in `binding.ts`'s
+module doc and `apply-progress.md` §PR-33). Two disclosed test-coverage additions beyond this block's
+literal wording (the "no `conmuta.json` found at all" MUST clause and the "found but malformed" case).
+Parent readback found and fixed a real design/implementation divergence in `handshake.ts`: a `GET
+/identity` connection failure was misreported as `DAEMON_IDENTITY_MISMATCH` instead of `DAEMON_DOWN`
+(design §10's own taxonomy table lists "connection refused" under `DAEMON_DOWN`) — fixed by having
+`requestAndVerifyIdentity` distinguish "never got a response" from "got a response, proof failed," with
+two new tests pinning the corrected behavior.
+
+**Judgment Day** (both judges + independent verifier, `36683bc`): both judges independently converged on
+the same real gap — `binding.ts`'s unguarded `readFileSync` throws uncaught on a found-but-unreadable path
+(a directory named `conmuta.json`, a TOCTOU deletion, a permission error) instead of a typed refusal; the
+verifier found it a third way via direct probing. The verifier's own 6 hand-written mutants against
+`POST /session`'s body construction all survived (only `hmac` was asserted). Both judges independently
+caught the same arithmetic error in this record's own mutant-sweep tally. **Corrected** (`jd-fix-agent`,
+parent-verified): `unreadable_project_file` refusal kind + try/catch in `binding.ts` with a new test;
+`POST /session` body fully asserted; nonce-freshness assertion added; one new unreachable-then-retry test;
+the tally arithmetic fixed. Deferred to backlog **B-51** (not fixed this round): reusing the 70s long-poll
+timeout for the handshake (latency concern, not a correctness bug — the timeout mechanism itself already
+works correctly). **Round-1 re-judgment** (both judges again, scoped to the correction delta): Judge A 0
+new findings; Judge B 1 new SUGGESTION (`server_nonce` only indirectly asserted in the happy-path test,
+explicitly flagged pre-existing, not a regression) — parent-corrected inline (one assertion line), second
+round not needed. **Size reconciliation**: landed at **1,107 authored lines** at the final tip
+(`binding.ts` 162, `handshake.ts` 295, `binding.test.ts` 162, `handshake.test.ts` 488) against the ≈340
+estimate above — a disclosed **767-line PR-scoped exception**. See `apply-progress.md` §PR-33 for the full
+breakdown. The estimate line above is the gate's text and is left as written.
 
 #### PR-34 — IPC stub, client errors, `createServer(deps)`
 Branch `f1/34-client-server` → `main`. Depends: PR-33. Size: ≈360 lines, no exception.
