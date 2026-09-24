@@ -8,8 +8,9 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-import { EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
+import { EXIT_NODE_FLOOR, EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
 import { SERVER_VERSION } from "../shared/version.js";
+import { enforceNodeFloor } from "../daemon/node-floor.js";
 import { validateText } from "./validate.js";
 
 /**
@@ -108,6 +109,19 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 	}
 
 	if (command === "mcp") {
+		// Judgment Day correction (session 35, both judges independently): the Node-floor gate must run
+		// before anything else the `mcp` branch does, including argument parsing — design.md:418's
+		// Startup row and D-25's "gate then dynamic import" apply to the whole dispatch, not just
+		// `client/main.ts`'s own internal function. Reuses `daemon/node-floor.ts`'s already-tested
+		// `enforceNodeFloor` (cli/main.ts's tsconfig references `daemon`, unlike `client/main.ts`'s own
+		// boundary), injecting `exit` so a below-floor Node reports EXIT_NODE_FLOOR here instead of
+		// `process.exit`ing directly — this dispatcher only ever returns exit codes.
+		let belowNodeFloor = false;
+		enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+		if (belowNodeFloor) {
+			return EXIT_NODE_FLOOR;
+		}
+
 		let project: string | undefined;
 		for (let i = 0; i < rest.length; i++) {
 			const arg = rest[i];

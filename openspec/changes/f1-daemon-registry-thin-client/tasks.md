@@ -1049,14 +1049,36 @@ delegation for this session (recorded in `apply-progress.md` §PR-35):
    `EXIT_USAGE`, just for a different reason now — missing `--project`, not "unknown command") — its title
    is now slightly stale for `mcp` specifically. Left untouched (surgical-change discipline); flagged here
    per this project's disclosure convention rather than fixed as a drive-by edit.
+9. **Judgment Day found and corrected two real CRITICALs plus one convergent-both-judges WARNING**
+   (both judges + the independent verifier; full detail in `apply-progress.md` §PR-35): (a) `host` used
+   `os.hostname()` (a machine name) instead of the MCP host-application label DATA-MODEL.md §3.5 and
+   `shared/ipc-contract.ts` actually document (`claude-code`/`cursor`/`opencode`) — corrected to a
+   disclosed fixed placeholder (`MCP_HOST_LABEL_UNKNOWN = "unknown"`), properly wiring the real label
+   deferred to **B-53** (would touch the already-merged, already-audited `ipc-stub.ts`/`server.ts`);
+   (b) `runMcpClient` had no try/catch, so an unexpected failure (e.g. a `server.connect` rejection)
+   would propagate as an uncaught raw stack trace, violating design.md:424/PT-08's "message only, never
+   `err.stack`" requirement — corrected with a catch-all returning exit code 1 (design.md:126's
+   "reserved for uncaught errors"), message-only, mirroring `daemon/main.ts`'s own established pattern;
+   (c) both judges independently found `cli/main.ts`'s `mcp` dispatch checked `--project` before the
+   Node-floor gate, so a malformed invocation on an old Node reported the wrong error — corrected by
+   moving the gate (reusing `daemon/node-floor.ts`'s own `enforceNodeFloor`, importable since
+   `cli/main.ts`'s tsconfig references `daemon`) to the very first action of the `mcp` branch, before
+   any argument parsing. Also both judges independently found item 7's own "M3 is an equivalent mutant"
+   claim above factually imprecise — the exit code is identical either way, but a real stderr
+   side-effect difference exists (the early-check path writes nothing; the fallback path through
+   `binding.ts` writes a message) — pinned with a new assertion rather than re-argued as equivalent.
+   Four SUGGESTION-tier gaps (three corroborated by the independent verifier's own novel mutants) closed
+   cheaply: the real (non-injected) `createIpcSession` default path, the `invalid_project_file` refusal
+   arm, and this note's own arithmetic (the candidate's "187 src + 332 test" split did not sum to its
+   own per-file figures — corrected below). The `StdioServerTransport` default path and the
+   `unreadable_project_file` refusal arm stay deliberately untested/disclosed (real stdio and
+   cross-platform unreadable-file fixtures are not safely constructible in this test suite's style).
 
-**Size reconciliation (session 35).** Estimated ≈250; **measured 519 authored lines (187 src + 332 test)
-at the candidate** (`cli/main.ts` 35+2=37, `client/main.ts` 152+0=152, `cli/main.test.ts` 65+1=66,
-`client/main.test.ts` 264+0=264) — a disclosed **269-line PR-scoped exception**, driven mainly by the
-`test/cli/main.test.ts` edit outside the primary Scope line (item 6 above) and the three parent-added
-mutant-sweep tests (item 7 above). See `apply-progress.md` §PR-35 for the full breakdown. The estimate
-line above is the gate's text and is left as written. (Re-check after any Judgment Day correction round —
-the tip above is the pre-audit candidate, not necessarily final.)
+**Size reconciliation (session 35, final tip after Judgment Day's one correction round).** Estimated
+≈250; **measured 673 authored lines (229 src + 444 test)** (`cli/main.ts` 50+3=53, `client/main.ts`
+176+0=176, `cli/main.test.ts` 90+1=91, `client/main.test.ts` 353+0=353) — grown from the pre-audit
+candidate's 519 by this round's fixes and their pinning tests, a disclosed **423-line PR-scoped
+exception**. See `apply-progress.md` §PR-35 for the full breakdown.
 
 ### Unit 11 — `v1-migration`
 

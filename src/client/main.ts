@@ -1,5 +1,3 @@
-import { hostname } from "node:os";
-
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
@@ -82,6 +80,25 @@ function isNodeAtOrAboveFloor(version: string): boolean {
  * (`../shared/project-file.js`), which is value-free by construction: for `invalid_project_file` this
  * only reports the problem count, never stringifying a `ProjectFileProblem` itself.
  */
+/**
+ * Judgment Day correction (session 35, Judge B CRITICAL). `host` (`shared/ipc-contract.ts`'s
+ * `IPC_SESSION_HOST_MAX_CHARS` doc comment; `docs/02-architecture/DATA-MODEL.md` §3.5's
+ * `client_cursors.host` row: "Informational: `claude-code`, `cursor`, `opencode`, …") names the MCP
+ * HOST APPLICATION — which IDE/tool connected — not a machine name. `os.hostname()` (the original
+ * candidate's choice) is the wrong vocabulary entirely and can exceed `IPC_SESSION_HOST_MAX_CHARS`
+ * (64) on a long FQDN-style hostname, failing the handshake outright.
+ *
+ * The real value (the MCP client's negotiated `clientInfo.name`, e.g. `"claude-code"`) is only known
+ * AFTER `server.connect(transport)` completes the `initialize` exchange — but `IpcSession` must be
+ * constructed and passed into `createServer` BEFORE `connect()` runs (design §11 "Startup"; the
+ * established "construct exactly once" invariant this module's own doc already documents). Properly
+ * wiring the real host label would mean deferring `IpcSession` construction until after `initialize`,
+ * which touches `client/ipc-stub.ts` and `client/server.ts` — both already-merged, already-audited
+ * PR-34 modules, off-limits to a drive-by re-slice (HANDOFF §6). Filed as **B-53** for a future PR.
+ * This fixed placeholder is disclosed, not a guess dressed up as the real thing.
+ */
+const MCP_HOST_LABEL_UNKNOWN = "unknown";
+
 function refusalMessage(refusal: BindingRefusal): string {
   switch (refusal.kind) {
     case "missing_project_flag":
@@ -127,26 +144,33 @@ export async function runMcpClient(options: RunMcpClientOptions): Promise<number
     return EXIT_USAGE;
   }
 
-  const resolveBindingImpl = options.resolveProjectBindingImpl ?? resolveProjectBinding;
-  const binding = resolveBindingImpl({ project: options.project, cwd: options.cwd });
-  if (!binding.ok) {
-    writeErr(refusalMessage(binding.refusal));
-    return binding.refusal.exitCode;
+  try {
+    const resolveBindingImpl = options.resolveProjectBindingImpl ?? resolveProjectBinding;
+    const binding = resolveBindingImpl({ project: options.project, cwd: options.cwd });
+    if (!binding.ok) {
+      writeErr(refusalMessage(binding.refusal));
+      return binding.refusal.exitCode;
+    }
+
+    const rosterHash = computeRosterHash(binding.file.roster);
+    const ipc = (options.createIpcSessionImpl ?? createIpcSession)({
+      projectId: binding.file.project_id,
+      groupId: binding.file.group_id,
+      rosterHash,
+      host: MCP_HOST_LABEL_UNKNOWN,
+    });
+
+    const server = (options.createServerImpl ?? createServer)({ ipc, projectId: binding.file.project_id });
+
+    const transport = options.transport ?? new StdioServerTransport();
+    await server.connect(transport);
+    return 0;
+  } catch (err) {
+    // Judgment Day correction (session 35, Judge A CRITICAL). Message only, never `err.stack`
+    // (design.md:424, PT-08/T04) — mirrors `daemon/main.ts`'s own established catch-all pattern.
+    // Exit code 1 is "reserved for uncaught errors" (design.md:126), the same fallback daemon/main.ts
+    // uses for an unrecognized failure.
+    writeErr(err instanceof Error ? err.message : String(err));
+    return 1;
   }
-
-  const rosterHash = computeRosterHash(binding.file.roster);
-  // client_cursors.host is an operator-facing label identifying which machine a session came from; no
-  // existing helper produces it, os.hostname() is the natural value (orchestrator decision).
-  const ipc = (options.createIpcSessionImpl ?? createIpcSession)({
-    projectId: binding.file.project_id,
-    groupId: binding.file.group_id,
-    rosterHash,
-    host: hostname(),
-  });
-
-  const server = (options.createServerImpl ?? createServer)({ ipc, projectId: binding.file.project_id });
-
-  const transport = options.transport ?? new StdioServerTransport();
-  await server.connect(transport);
-  return 0;
 }
