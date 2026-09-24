@@ -5753,3 +5753,239 @@ bound half, `JD-B-003`, `JD-B-004`, `JD-A-R2-003`/`JD-B-R2-001`) or disclosed-an
 an accurate rationale (`JD-A-001`'s revocation half). The independent verifier's `N5` (default clock never exercised)
 and the duplicate-query-parameter behaviour are likewise disclosed, not actioned — no production call site exists for
 either until PR-31 lands.
+
+## PR-31 — `daemon/ipc/routes.ts` (session routing, freeze, roster drift, error taxonomy; closes unit 9 `ipc-handshake`)
+
+**Route.** ODD with the SDD contract preserved, session 31: one delegated read-only mapper (43 tool uses), one
+delegated writer (`general-purpose`, sonnet) against a brief with ten decisions fixed by the orchestrator from the
+mapper's findings, then a parent readback that found and fixed a real gap the writer had worked around, then a parent
+mutant sweep. No `sdd-apply` phase envelope exists. `routes.ts` is new code (design §12 has no v1 row for any `ipc/*`
+module): no provenance header, registry unchanged at 23 entries.
+
+**Decisions (orchestrator, session 31), stated in the module docs and in `tasks.md`'s apply-time note.** (1)
+`DAEMON_VERSION_MISMATCH`/`IPC_ERROR` are exclusively client-side, no daemon-side test (same method as PR-30's
+decision 1). (2) `SessionStore.revoke(bearer): boolean` added (disclosed, outside this block's Scope line) — `mint`/
+`validate` gave no way to invalidate a single bearer before a full restart. (3) `routes.ts` owns its own per-session
+frozen-binding state (`Map<bearer, FrozenSessionRecord>`), narrower than `bindings.ts`'s `areBindingsEquivalent`. (4)
+R4 implemented inline at `POST /session`, per `invariants.ts`'s own doc comment. (5) `roster_drift` surfaced as a bare
+string in `conditions`, not routed through `conditions-store.ts`. (6) Six daemon-raised business codes defined as free
+strings with an HTTP status/retryable table (see `tasks.md`'s apply-time note item 6). (7-10) `toTelegramErrorPayload`
+composition, the two daemon-lifetime singletons (`BindingMutex`, `SendRateBudget`) instantiated for the first time,
+a single `createSessionRoutes` factory, and `client_id` generation — all as specified in the writer's brief.
+
+**TDD evidence.** Writer RED: `sessions.test.ts` failed `TS2339` (`revoke` did not exist on `SessionStore`, ×3);
+`routes.test.ts` failed `TS2307` (`routes.js` did not exist), after first fixing three unrelated type errors in its
+own draft (`ProjectRosterEntry` passed where `JsonObject` was expected). Writer GREEN: `npm run build && node --test
+"dist/test/daemon/ipc/routes.test.js" "dist/test/daemon/ipc/sessions.test.js"` → 25/25; full suite 889/888/1 skip.
+The writer self-corrected an ordering mistake mid-session (wrote GREEN before RED twice, then reverted each
+implementation to capture a truthful RED) — disclosed in its own report, not found by the parent.
+
+**Parent readback correction — a real gap in already-merged code, fixed at its source.** Design's sequence diagram
+(§10, step 7-8) requires the daemon to know which `server_nonce` a `POST /session` request's `hmac` was computed
+against, to sequence `PendingHandshakeStore.consume(server_nonce)` before `SessionStore.mint(server_nonce, hmac)`
+(neither call searches for the nonce itself). `shared/ipc-contract.ts`'s `sessionRequestSchema` (PR-29/30, already
+merged and Judgment-Day-approved) never had a `server_nonce` field — only `project_id, group_id, roster_hash, host,
+pid, hmac`. The writer's candidate worked around this by reading `server_nonce` off the raw, unvalidated
+`request.body: unknown` before validating the remaining six fields through the real schema — functionally correct,
+disclosed, but left the wire contract itself incomplete, and `test/shared/ipc-contract.test.ts:128`
+("session request accepts the full valid shape…") was actively asserting the 6-field shape was complete, which is a
+documented guarantee (ADR-12) the schema could not actually keep. **Corrected**: extended `sessionRequestSchema` with
+`server_nonce: nonceHexSchema` (reusing `identityResponseSchema`'s own field for the same value, byte-for-byte the
+same validation), updated the fixture and added a new shape test (`server_nonce` too-short / uppercase / missing, all
+refused), and simplified `routes.ts` to validate the whole body through the real schema instead of the workaround.
+Verified: every existing test in `ipc-contract.test.ts` that spreads `...VALID_SESSION_REQUEST` needed no other
+change (all pick up the new field automatically); `routes.test.ts`'s bodies already included `server_nonce`
+unconditionally, so the fix was a pure net simplification, not a second round of writer changes.
+
+**Mutant sweep** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close; `--test-timeout=5000`, 150 s process
+bound per mutant, restore verified by sha256 after each). `routes.ts`: **12 mutants — 10 killed by test, 2 "killed" by
+the TypeScript compiler itself** (`M10`: inverting the mint-failure check makes the post-mint code operate on a
+compiler-narrowed `undefined`, `TS2345`; `M11`: removing the `managed === undefined` freeze guard leaves
+`managed.binding` unguarded where the type is still `ManagedBinding | undefined`, same class of error) — reported
+apart from ordinary kills per this project's own convention, not survivors. **1 real survivor**: `M7`
+(`RATE_LIMITED_TOOL_CODES` dropping `TELEGRAM_RATE_LIMITED`) — no test in `routes.test.ts` imported
+`HTTP_TOO_MANY_REQUESTS` at all, so nothing could fail on this mapping. **Pinned**: exported the previously-private
+`toolErrorHttpStatus` (mirroring `toTelegramErrorPayload`'s own precedent for direct unit testing) and added one
+direct test covering all three status buckets (429/500/400); re-swept `M7` alone and confirmed killed. `M0` (control,
+comment-only) correctly survived both sweeps. `sessions.ts`: **1 mutant (`MS1`, `revoke` using `has()` instead of
+`delete()`) — killed** by the new `revoke` test on the first pass.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **1,303 authored lines** — `routes.ts` 618/0
+(net +618), `sessions.ts` 20/5 (net **+15**, `revoke` + doc update), `ipc-contract.ts` 11/1 (net **+10**,
+`server_nonce`); `routes.test.ts` 619/0, `sessions.test.ts` 21/0, `ipc-contract.test.ts` 8/0 (fixture field + one
+new test) — against a ≈390 estimate, a disclosed **903-line PR-scoped exception**. The estimate priced one source
+file; the actual scope grew to six files (two disclosed edits outside the primary Scope line) and fourteen
+prescribed RED scenarios account for the size, consistent with every slice since PR-06b. (The independent verifier's
+report flagged this paragraph's original `sessions.ts`/`ipc-contract.ts` "net" figures as arithmetically wrong —
++25/+12 claimed against +15/+10 actual; the gross numstat and the 1,303/903 totals were always correct, only these
+two prose "net" descriptors were mistyped. Corrected here, not re-litigated as a code finding.)
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **891 tests (890 pass, 1 skip)** — clean on the first
+run, no flake. `npm run test:static`: **8/8**.
+
+**Native review.** RDD is on (global). `gentle-ai review assess --base-ref 280e35f --committed-only
+--untracked-scope=exclude --json` (run at close, over the whole branch): `risk: medium`, `review_due: true`
+(`slice_budget_reached`), 11 changed paths, 1,783 changed lines. START was not run for this candidate: the target
+is a Judgment Day target, and the installed `judgment-day` skill states both must never run on one target
+(HANDOFF §2.3).
+
+**Judgment Day** (`bus-v2-f1-pr-31-audit-001`; both blind judges over the frozen worktree
+`../telegram_bus_agent-worktrees/pr31-judges` at `c349d96`, a separate independent verifier in parallel over its own
+worktree `pr31-verify` with a `node_modules` junction). Judge A: 2 WARNING, 2 SUGGESTION. Judge B: 1 CRITICAL, 3
+WARNING, 1 SUGGESTION. Verifier: every gross figure reproduced exactly (1,303 lines, 891/890/0/1, 8/8 static, the
+one disclosed real survivor confirmed now-killed by exactly the new pin test); found the "net" arithmetic slip above
+(documentation-only); reconstructed 13 mutants independently (all converged with the disclosed set, including both
+compiler-killed ones) and wrote 6 new mutants of its own, 4 of which survived; probed the running server directly
+(concurrent same-nonce races, double `DELETE /session`, malformed JSON on all six routes, `Authorization` scheme
+casing) and found no crash or unsafe behavior.
+
+**Judge B's CRITICAL** (`JD-B-001`): `toTelegramErrorPayload`'s fallback path could compose a payload carrying both
+`retryable: false` and a populated `retry_after_s` for a locally-detected `RATE_LIMITED` send refusal — a
+self-contradictory instruction (told to never retry, but also told how long to wait before retrying). Root cause:
+`shared/error-payload.ts`'s `RETRYABLE_TOOL_CODES` allowlist predates `send/validate.ts`'s `SendErrorCode` gaining
+`RATE_LIMITED` (PR-28) and was never reconciled — its own doc comment's "every other tool-level code is the caller's
+own input being wrong" generalization became false the moment that code was added, unnoticed until this Judgment
+Day. **Corrected**: added `RATE_LIMITED` to `RETRYABLE_TOOL_CODES` (the one caller of `toolErrorPayload` in the
+entire codebase is `routes.ts`, confirmed by grep, so this is not a broad blast-radius change), rewrote the doc
+comment's now-false generalization, added a `Changes:` (4) entry to the SEAM header (this does not affect the
+provenance hash, which pins the cited v1 *source* range, not this v2 file's current bytes), and strengthened both
+the existing `error-payload.test.ts` allow-list test and the existing `routes.test.ts` "retry_after_s survives the
+fallback path" test to assert `retryable: true` — exactly the assertion whose absence let the contradiction ship
+silently the first time. A new mutant (`ME1`, reverting the fix) confirmed killed by the strengthened tests.
+
+**Convergent and independently-found WARNING-class test-coverage gaps — all corrected:**
+- Judge A: the freeze's 3-field guarantee (`bot_id`, `group_id`, `agent_id`) was exercised along only one axis
+  each (a roster-only change tolerated; `group_id` alone tripping `BINDING_CHANGED`) — no test varied `bot_id` or
+  `agent_id` alone, so a regression dropping either field from the comparison (not just inverting it — the parent's
+  own mutant sweep only tried inversion) would have shipped clean. **Corrected**: two new tests, one drifting
+  `bot_id` alone, one drifting `agent_id` alone (with a consistent roster edit to keep R3 satisfied), both keeping
+  the other two fields fixed.
+- Judge B: the module doc's "registry checks run before nonce consumption, for resource hygiene" claim had no test
+  able to falsify it — neither the `UNBOUND_PROJECT` nor the `BINDING_MISMATCH`/R4 refusal test checked whether the
+  nonce survived the refusal. **Corrected**: both tests now independently re-consume the same nonce after the
+  refusal and assert it succeeds (proving it was never touched).
+- Verifier (`N1`/`N2`, its own new mutants, both survived): the `BINDING_CHANGED` audit row's `bot_id`/`chat_id`
+  values and its `client_id` (nullable at the DB level) were never independently asserted — a field swap or a
+  silently-dropped `client_id` would ship clean. **Corrected**: the existing audit-row test now asserts all three
+  against the session's frozen (not live) values and the real minted `client_id`.
+- Verifier (`N3`, survived): `toTelegramErrorPayload`'s `new_chat_id` propagation (`GroupMigratedError`, the only
+  producer) had zero test coverage, unlike `retry_after_s` in the sibling case. **Corrected**: one new unit test.
+- Verifier (`N4`/direct reading, `N6`/direct reading): only `/tools/send`'s `IPC_BAD_REQUEST` schema gate was
+  tested; `/tools/fetch`, `/tools/status`, `/tools/thread` had none, and `sessionRequestSchema`'s `pid` field had no
+  dedicated refusal test among its seven fields. **Corrected**: three new route-level schema-gate tests plus one new
+  `pid` refusal test. (Verifier's `N5` — an apparent "kill" on `/tools/thread`'s gate — was itself flagged as a
+  false signal, incidentally exercised by an unrelated happy-path test rather than a real malformed-body assertion;
+  the new dedicated test replaces that false confidence with a real one.)
+
+**Disclosed, not corrected — informational, matches this project's own precedent for out-of-scope or
+non-load-bearing findings:**
+- Judge A (test-count arithmetic): flagged that `891` didn't reconcile against `tasks.md:818`'s "867/866/1" for
+  PR-30. **Verified, not a PR-31 defect**: `tasks.md:818` is PR-30's own mid-Judgment-Day snapshot (after its
+  parent's four pinning tests, before PR-30's own two correction rounds added more), not PR-30's final close, which
+  was **869/868/1** (`apply-progress.md` §PR-30 "round-2 tip", matching `HANDOFF.md` §1/§8 exactly). Re-verified
+  directly: a clean, isolated worktree at `main` (`280e35f`) measures **869/868/1**; `869 + 20 (routes.test.ts) + 1
+  (sessions.test.ts) + 1 (ipc-contract.test.ts) = 891` — exact. `891` stands as correct and unchanged.
+- Judge A (audit `outcome: "ok"` on a `BINDING_CHANGED` refusal, vs. the ledger's `'rejected'` value): matches
+  `bindings.ts`'s own already-merged precedent for its own `BINDING_CHANGED` row (same reason string, same `"ok"`)
+  — changing it here would diverge from that precedent, not fix an inconsistency. Left as-is.
+- Judge A (spec.md's "keeps its original frozen binding" wording could read as freezing the whole binding, not just
+  three identity fields): spec.md is gated text (`AGENTS.md` §3); a wording-precision fix belongs to the next
+  authorized spec touch, not an apply-time edit. Filed as **B-49** (Director-owned, text-only).
+- Judge B (no construction guard against `createSessionRoutes` being called more than once per daemon boot): no
+  code path anywhere calls it twice (`bootstrap.ts` does not wire it in at all yet — a later PR's job); a guard
+  against a scenario nothing can currently trigger is speculative engineering. Disclosed in the module doc's own
+  assumption, not enforced in code.
+- Judge B (`dispatchTool`'s forwarded error `.message` has no defense-in-depth redaction pass, unlike the egress
+  points design.md's Redaction table names): no concrete leak demonstrated (the known error types in this exact
+  chain — `SendToolError`/`ThreadToolError` static messages, self-redacting `TelegramError` subclasses — don't carry
+  secrets), and no ready-made redaction primitive exists to call (`shared/secrets.ts` only detects, it doesn't
+  redact). Matches this project's own precedent for this exact class of gap (**B-37**/**B-38**: "no receive-side
+  scan in F1"). Filed as **B-50** (Director-owned) rather than building a new, hastily-scoped redaction utility
+  inside an unrelated PR.
+- Judge B (`BINDING_CHANGED` audit rows use the session's frozen identity while `bindings.ts`'s own hot-reload
+  `BINDING_CHANGED` rows use the live one, with no field distinguishing the two writers): both are individually
+  defensible (this PR's row records what the refused call *believed* it was talking to); left as-is, SUGGESTION-tier.
+
+**Re-swept after corrections** (`odd/sweep.mjs`): `routes.ts` 12 mutants — 10 killed by test (was 10, `M7` moved
+from the one disclosed real survivor to killed), 2 killed by the compiler (`M10`, `M11`, unchanged), `M0` control
+correctly survived. `sessions.ts`: `MS1` killed (unchanged). `error-payload.ts`: new mutant `ME1` (reverting the
+`RATE_LIMITED` fix) killed by the strengthened tests. **0 survivors past the control anywhere.**
+
+**At the correction tip:** `git diff --numstat main -- src test`: **1,442 authored lines** (`routes.ts` 618,
+`sessions.ts` net +15, `error-payload.ts` 14/5 net +9, `ipc-contract.ts` net +10, `routes.test.ts` 726,
+`sessions.test.ts` 21, `error-payload.test.ts` 5/2 net +3, `ipc-contract.test.ts` 14) — a disclosed **1,042-line
+PR-scoped exception**; `rm -rf dist && npm test`: **898 tests (897 pass, 1 skip)**, clean; `test:static`: **8/8**.
+Seven new tests this round (the `new_chat_id` test, two freeze-axis tests, three route-level schema-gate tests, one
+`pid` test) plus targeted strengthening of four existing tests (no test count change from strengthening alone).
+
+**Scoped re-judgment round 1** (both judges, `c349d96..33701b4`; frozen worktree moved to the correction tip; first of
+the two-re-judgment budget). Judge A: **0 new findings** — all thirteen claimed corrections (four of its own, five
+of judge B's, four of the verifier's) independently re-verified as `CONFIRMED RESOLVED` against the actual test
+bodies and actual source, including re-checking the two new freeze-axis fixtures still satisfy R3 and re-deriving
+the 869-baseline arithmetic from `HANDOFF.md`'s own citation. Judge B found **2 new WARNINGs**, both real:
+1. **The `RATE_LIMITED` fix closed the reported case, not the general hazard.** `toTelegramErrorPayload`'s
+   carry-over checked only `err instanceof SendToolError && err.retry_after_s !== undefined` — tied to a
+   *specific* code being retryable, not to the payload's `retryable` field itself. Nothing in `SendToolError`'s
+   constructor enforces `retry_after_s` being set only for `RATE_LIMITED` (a doc comment, not a type constraint);
+   a future `SendToolError` construction under a different code with `retry_after_s` set would silently reproduce
+   the exact contradiction JD-B-001 described, unreachable today (exhaustively verified: the only three call sites
+   that set it all use `RATE_LIMITED`) but not structurally prevented.
+2. **`apply-progress.md` itself claimed "Filed as B-49"/"Filed as B-50" before those rows existed anywhere** —
+   `docs/06-backlog/CHECKLIST.md` ended at B-48 at the commit being reviewed. A disclosure text that describes an
+   action not yet taken is itself a defect in the record, caught by the same adversarial reading applied to code.
+
+**Both corrected:**
+1. `toTelegramErrorPayload`'s carry-over condition now additionally requires `payload.retryable` (derived from the
+   already-corrected `RETRYABLE_TOOL_CODES`), so the carry-over is gated on the SAME fact that decided
+   `retryable` — no code, current or future, can produce the contradiction, not just `RATE_LIMITED`. One new
+   defensive test proves the general property directly: a `SendToolError` with a non-retryable code
+   (`BODY_TOO_LONG`) and an (unrealistic, type-permitted) `retry_after_s` set must NOT carry it onto the payload.
+   A new mutant (`MR2-1`, reverting the `&& payload.retryable` clause) confirmed killed.
+2. `docs/06-backlog/CHECKLIST.md` gained the actual **B-49** and **B-50** rows the disclosure paragraphs above
+   already named, closing the gap between the claim and the record.
+
+**At the round-1-correction tip:** `git diff --numstat main -- src test`: **1,457 authored lines** (`routes.ts`
+622/0, `sessions.ts` 20/5, `error-payload.ts` 14/5, `ipc-contract.ts` 11/1, `routes.test.ts` 737/0, `sessions.test.ts`
+21/0, `error-payload.test.ts` 5/2, `ipc-contract.test.ts` 14/0 — 15 more than the prior tip: `routes.ts` net +4,
+`routes.test.ts` net +11) — a disclosed **1,057-line PR-scoped exception**; `rm -rf dist && npm test`: **899 tests
+(898 pass, 1 skip)**, clean; `test:static`: **8/8**. `docs/06-backlog/CHECKLIST.md` also changed (+2 rows, not part
+of the authored src+test budget).
+
+**Scoped re-judgment round 2** (both judges, `33701b4..107b652`; second and final round of the budget). Judge A
+found **1 new WARNING**: the round-1 correction's own new comment claimed `withRetryAfterIfRetryable`-equivalent
+safety ("no code, current or future, can produce the contradiction") but the fix had only gated the fallback
+branch — the `classified !== null` branch above it still copied `classified.retry_after_s` unconditionally, safe
+today only because `classifyTelegramError`'s seven hand-written branches happen to never pair `retry_after_s` with
+`retryable: false`, not because anything enforced it. Judge B independently re-verified both round-1 findings as
+**CONFIRMED RESOLVED** (re-deriving the `classifyTelegramError` trace by hand to the same conclusion judge A
+reached, and additionally tracing the real runtime cause chain for `send-path.ts`'s two 429-raising call sites to
+confirm `classified` is always `null` there in practice — `DualWriteTransport.send` throws a causeless
+`TransportError`, so the fallback branch this Judgment Day fixed is the one genuinely exercised for a real 429, not
+just the branch that happened to get the test) and found **1 new SUGGESTION**: a new code comment's round-number
+citation was ambiguous against this document's own section numbering — no functional effect.
+
+**Corrected** (parent, inline; the budget for further JUDGE re-verification is exhausted after this round, so this
+correction is measurement-checked — full suite, static gates, and a targeted mutant — not judge-re-verified, matching
+this project's own PR-11/12/13 precedent for a residual finding after the two-round budget): extracted
+`withRetryAfterIfRetryable(payload, retryAfterS)`, one small shared helper both the `classified` branch and the
+`SendToolError` fallback branch now call, so the "never `retryable: false` with a populated `retry_after_s`"
+property is enforced once, structurally, rather than by each branch's logic happening to agree. One new direct unit
+test (`withRetryAfterIfRetryable`'s own contract, independent of any real error class) plus the existing
+`toTelegramErrorPayload` tests cover both branches. The ambiguous round-number citation was rewritten to reference
+this document instead of a specific round number. A new mutant (`MR3-1`, dropping the shared gate) confirmed killed.
+
+**At the final tip:** `git diff --numstat main -- src test`: **1,495 authored lines** (`routes.ts` 644/0,
+`sessions.ts` 20/5, `error-payload.ts` 14/5, `ipc-contract.ts` 11/1, `routes.test.ts` 753/0, `sessions.test.ts` 21/0,
+`error-payload.test.ts` 5/2, `ipc-contract.test.ts` 14/0) — a disclosed **1,095-line PR-scoped exception**;
+`rm -rf dist && npm test`: **900 tests (899 pass, 1 skip)**, clean; `test:static`: **8/8**.
+
+**JUDGMENT: APPROVED** for `c349d96..5eae0c1` (four commits: the candidate, and one correction commit per round —
+`33701b4` for the original audit's findings, `107b652` for round 1's re-judgment findings, `5eae0c1` for round 2's
+re-judgment finding. `5eae0c1` itself was verified by the parent via full suite + static + a targeted mutant, not
+sent through a third re-judgment, since the two-round budget was already used by the rounds that found what it
+fixes). Every CRITICAL/WARNING finding across the original audit and both
+re-judgment rounds is resolved: the original CRITICAL (`JD-B-001`) and both re-judgment rounds' WARNINGs are fixed
+and re-verified; the SUGGESTION-tier round-2 citation ambiguity is fixed; the two informational disclosures
+(spec.md wording, `dispatchTool` redaction defense-in-depth) are filed as **B-49**/**B-50**, not code changes,
+matching this project's own precedent for out-of-scope or non-demonstrated-risk findings. No native review ran for
+this candidate — a Judgment Day target, per HANDOFF §2.3.

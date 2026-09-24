@@ -12,7 +12,12 @@
  * paragraph recording that `RETRYABLE_TOOL_CODES` lost `BRIDGE_BUSY` and why, the new
  * `toolErrorPayload` (v1 kept that branch inline inside `toToolErrorPayload`; lifted out, the allowlist
  * stays the only place `retryable` is decided for a TOOL-LEVEL code — the client-local family keeps the
- * separate classification design §10 gives it), and a first JSDoc for `errorResult`.
+ * separate classification design §10 gives it), and a first JSDoc for `errorResult`; (4) `RATE_LIMITED`
+ * added to `RETRYABLE_TOOL_CODES` (PR-31 Judgment Day, `bus-v2-f1-pr-31-audit-001`, judge B's CRITICAL
+ * finding) — this file predates `send/validate.ts`'s `SendErrorCode` gaining `RATE_LIMITED` (PR-28) and
+ * was never updated when that code was added, so `toTelegramErrorPayload`'s fallback path
+ * (`daemon/ipc/routes.ts`) could compose a payload carrying both `retryable: false` and a
+ * `retry_after_s`, a self-contradictory instruction to the calling agent.
  */
 
 /**
@@ -37,15 +42,19 @@ export type ToolErrorPayload = {
  * Deliberately a closed allowlist rather than a denylist: an unrecognised code is NOT retryable, so
  * a future error type cannot become a hot loop just because nobody remembered to classify it.
  *
- * `TRANSPORT_ERROR` is the only genuinely transient one here — a socket or protocol failure on an
- * otherwise well-formed request. Every other tool-level code is the caller's own input being wrong,
- * and repeating an identical wrong request produces an identical rejection.
+ * Two codes here are genuinely transient rather than the caller's own input being wrong (every other
+ * tool-level code IS the caller's input being wrong, and repeating an identical wrong request produces
+ * an identical rejection): `TRANSPORT_ERROR` (a socket or protocol failure on an otherwise well-formed
+ * request), and `RATE_LIMITED` (`send/validate.ts`'s `SendErrorCode`, added by PR-28 after this
+ * allowlist was written and never reconciled with it until PR-31's Judgment Day — `retry_after_s` is
+ * set only for `RATE_LIMITED` among `SendToolError`'s codes, which is meaningless advice to a caller
+ * told `retryable: false`).
  *
  * v1 also listed `BRIDGE_BUSY`: another call held the v1 bridge lock and would release it. That code
  * is deleted in v2 (design §10), because the daemon owns the ledger inside one process and there is no
  * cross-process lock left to be busy.
  */
-export const RETRYABLE_TOOL_CODES: ReadonlySet<string> = new Set(["TRANSPORT_ERROR"]);
+export const RETRYABLE_TOOL_CODES: ReadonlySet<string> = new Set(["TRANSPORT_ERROR", "RATE_LIMITED"]);
 
 /**
  * The payload for a TOOL-LEVEL rejection — v1's `toToolErrorPayload` fallback branch, lifted into its

@@ -44,14 +44,17 @@ test("the tool-level constructor sets exactly `code`, `message` and `retryable`"
 // --- `RETRYABLE_TOOL_CODES` is a closed ALLOW-list, not a deny-list: an unrecognised code is NOT
 // retryable, so a future error type cannot become a hot loop just because nobody classified it.
 // v1 also listed `BRIDGE_BUSY`; v2 deletes that code with the v1 bridge lock (design §10, §12).
+// `RATE_LIMITED` added by PR-31's Judgment Day (judge B's CRITICAL finding, `bus-v2-f1-pr-31-audit-001`):
+// this allowlist predates `RATE_LIMITED` existing as a `SendErrorCode` (PR-28) and was never reconciled.
 
-test("the retryable allow-list is exactly TRANSPORT_ERROR — BRIDGE_BUSY is gone with the v1 lock", () => {
-  assert.deepEqual([...RETRYABLE_TOOL_CODES], ["TRANSPORT_ERROR"]);
+test("the retryable allow-list is exactly TRANSPORT_ERROR and RATE_LIMITED — BRIDGE_BUSY is gone with the v1 lock", () => {
+  assert.deepEqual([...RETRYABLE_TOOL_CODES].sort(), ["RATE_LIMITED", "TRANSPORT_ERROR"]);
   assert.equal(RETRYABLE_TOOL_CODES.has("BRIDGE_BUSY"), false);
 });
 
 test("an unrecognised code is not retryable, while a listed one is", () => {
   assert.equal(toolErrorPayload("TRANSPORT_ERROR", "socket closed").retryable, true);
+  assert.equal(toolErrorPayload("RATE_LIMITED", "slow down").retryable, true, "retry_after_s is meaningless advice without this");
   assert.equal(toolErrorPayload("NO_SUCH_CODE", "invented").retryable, false);
   assert.equal(toolErrorPayload("BODY_TOO_LONG", "too long").retryable, false);
 });
