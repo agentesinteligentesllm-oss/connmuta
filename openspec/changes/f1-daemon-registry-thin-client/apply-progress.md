@@ -6255,3 +6255,105 @@ round 1 returned only a single narrow, independently-verifiable, zero-risk prose
 and confirmed by full suite + static gates rather than spending the final round on it. No native review
 ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (recorded above: `risk: high`,
 `review_due: true`).
+
+## PR-33 — `client/binding.ts` + `client/handshake.ts` (launcher `--project` walk-up/refusal + client handshake; unit 10 `thin-client-tools` continues)
+
+**Route.** ODD with the SDD contract preserved, session 33: one delegated read-only mapper (30 tool uses,
+pulling the PR-33 tasks.md block, `thin-client-tools/spec.md`'s two requirements verbatim, design.md §10's
+sequence diagram and client error-taxonomy table, §11's Startup row, `constants.ts`'s EXIT_* docs,
+`project-file.ts`'s `parseProjectFile` signature, the daemon-side wire schemas, `spawn.ts`/`run-state.ts`
+conventions, and THREAT-MODEL.md's PT-26/PT-27 rows), then the orchestrator decided the exit-code mapping
+directly from that evidence (below), then one delegated writer (`general-purpose`, sonnet), then a parent
+readback that found and fixed a real design/implementation divergence, then a parent mutant sweep. No
+`sdd-apply` phase envelope exists. Both files are new code (design §3 confirms: v1 has no daemon/client
+split at all, no lazy-spawn, no separate binding-walk-up/handshake step to vendor) — no provenance header,
+registry unchanged at 23 entries.
+
+**Decision (orchestrator, session 33), stated in `binding.ts`'s module doc and disclosed here per
+HANDOFF.md §4's explicit flag.** `shared/constants.ts` defines exactly two binding-shaped exit codes
+(`EXIT_UNBOUND_PROJECT = 3`, `EXIT_PROJECT_MISMATCH = 4`) and design.md's §11 Startup row names both
+together for the walk-up's non-usage refusal, without saying which condition maps to which; spec.md's own
+Scenario 39 is titled "project_id mismatch is UNBOUND_PROJECT". Resolved by a process-lifecycle argument:
+exit codes in this design only ever fire during the synchronous startup walk-up, strictly before
+`server.connect()` — the daemon handshake happens lazily on the first tool call, long after the process
+is already running as an MCP server, so the daemon-returned `UNBOUND_PROJECT` (design §10's client
+error-taxonomy table lists it as an IPC-time, `HTTP_NOT_FOUND` tool error — a JSON error payload from a
+tool call, never a process exit) cannot be what these two exit constants describe. That leaves exactly two
+non-missing-flag walk-up failures for exactly two exit constants: no `conmuta.json` anywhere in the
+walk-up → `EXIT_UNBOUND_PROJECT` (nothing bound at this location at all); a `conmuta.json` found but its
+`project_id` disagrees with `--project` → `EXIT_PROJECT_MISMATCH` (matches that constant's own doc comment
+verbatim). Spec.md's Scenario 39 title is read as informal prose describing the situation, not a literal
+pointer to the constant name — the module doc and the test both disclose this reading explicitly.
+
+**Disclosed test-coverage additions beyond tasks.md's literal sub-task wording (writer, confirmed by the
+parent).** (1) `specs/thin-client-tools/spec.md`'s requirement text names three refusal triggers
+(`--project` missing, no `conmuta.json` found, or `project_id` disagrees) but only the first and third have
+a named scenario; the writer added a third `binding.test.ts` case for "no `conmuta.json` found at all"
+(asserting `EXIT_UNBOUND_PROJECT`), closing the gap between the requirement's MUST clause and ADR-12's
+"every guarantee needs a test that can fail." (2) The writer's own further addition: a `conmuta.json` IS
+found but `parseProjectFile` refuses it (malformed JSON) — treated as `EXIT_UNBOUND_PROJECT`, not silently
+walked past to a valid ancestor (a broken-but-present binding file stopping the walk-up, rather than being
+skipped in search of a different, unrelated project, is a deliberate anti-misbinding choice, disclosed in
+`binding.ts`'s module doc and pinned by its own test).
+
+**Writer's disclosed design choices.** `binding.ts`: `resolveProjectBinding(options): BindingResult`, a
+discriminated union mirroring `project-file.ts`'s own style (no `fetch` import at all — the "before any IPC
+call" guarantee is structural, not merely observed). `handshake.ts`: `performHandshake(options):
+Promise<SessionResponse>`, thrown `HandshakeError` (code/retryable from a closed
+`HANDSHAKE_ERROR_CODES as const` vocabulary, none of which existed as string constants before this slice),
+composing `run-state.ts`'s already-merged `ensureDaemonRunning` as its own first step (an injectable
+override parameter, mirroring `spawn.ts`'s `REAL_SPAWN` pattern, so tests never wait through a real
+`SPAWN_WAIT_SECONDS` timeout). HMAC helpers (`computeIdentityProof`/`computeSessionProof`) are reimplemented
+locally rather than imported from the daemon's `ipc/{handshake,sessions}.ts`: `client/tsconfig.json`'s
+`references` is `[{"path":"../shared"}]` only (confirmed by direct read), the identical disclosed boundary
+`run-state.ts` already documents for the same reason.
+
+**TDD evidence.** Writer RED (verbatim): `binding.test.ts(6,39): error TS2307: Cannot find module
+'../../src/client/binding.js'`; `handshake.test.ts(12,8): error TS2307: Cannot find module
+'../../src/client/handshake.js'`. Writer GREEN: `npm run build && node --test
+"dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"` → 13/13; full suite 930/929/1 skip
+(baseline 917/916/1, +13); `npm run test:static` 8/8.
+
+**Parent readback correction — a real design/implementation divergence, closed.** `handshake.ts`'s own
+module doc claimed "a non-OK or schema-invalid response from **either** route currently folds into
+`DAEMON_DOWN`," but the writer's actual code only did this for `POST /session` — for `GET /identity`, every
+failure (transport error, non-OK status, malformed body, *or* a genuine proof mismatch) fed into one
+undifferentiated retry-then-`DAEMON_IDENTITY_MISMATCH` path. design.md §10's client error-taxonomy table
+explicitly lists "connection refused" as a `DAEMON_DOWN` trigger, distinct from `DAEMON_IDENTITY_MISMATCH`
+("HMAC proof failed") — so a genuine connection failure on `GET /identity` (plausible even after
+`ensureDaemonRunning` confirms a live pid: the daemon's HTTP listener may not have bound the port yet) would
+have surfaced as a misleading `DAEMON_IDENTITY_MISMATCH`, contradicting both the design table and the
+module's own doc comment. Verified empirically first, not assumed: a standalone Node script confirmed
+`fetch` silently ignores any explicit `host` header and always derives it from the URL (also cleaned up two
+now-confirmed-dead `headers: { host: ... }` lines in `requestIdentity`/`requestSession` while in the file).
+**Fixed**: `requestAndVerifyIdentity` now returns a three-way `IdentityAttempt`
+(`"unreachable"` / `"proof_mismatch"` / `"verified"`) instead of `IdentityResponse | undefined`;
+`performHandshake` raises `DAEMON_DOWN` when the final attempt never produced a usable response (or the
+re-read found no live run file at all) and only raises `DAEMON_IDENTITY_MISMATCH` when a response WAS
+received and its proof genuinely failed to verify. Two new tests pin this: unreachable on both attempts →
+`DAEMON_DOWN` (2 identity attempts); unreachable with no live run file on re-read → `DAEMON_DOWN` (1
+attempt, no retry). `npm run build` confirmed TypeScript's own discriminated-union narrowing accepts the
+restructure cleanly. Full suite re-run after the fix: **932 tests (931 pass, 1 skip)**, `npm run test:static`
+**8/8**.
+
+**Parent mutant sweep** (`odd/sweep.mjs`, recreated this session). `binding.ts` (7 mutants: exit-code
+mapping ×3, the OR/AND missing-flag guard, the `project_id` comparison, the walk-up termination condition,
+plus the M0 comment control): **M0 survived** (correct — the control); **3 of the exit-code mutants and the
+OR/AND mutant are BUILD-FAIL**, not runtime survivors — the discriminated union's literal `exitCode` types
+make an incorrect kind↔code mapping a compile error, a stronger guarantee than a runtime test; the
+remaining 2 (`project_id` comparison, walk-up termination) **killed**. `handshake.ts` (10 mutants: the
+`DAEMON_VERSION_MISMATCH` retryable flag, both HMAC domain-separation labels, the `hexDigestsEqual` length
+guard, the retry-trigger condition, the no-live-run-file guard, both post-retry kind checks, the
+version-mismatch comparison, plus M0): **M0 survived** (correct); **4 killed** at runtime (retryable flag,
+both labels, the length guard, the version-mismatch comparison — genuine test-pinned security/correctness
+properties); **4 BUILD-FAIL** (the retry-trigger inversion and both post-retry kind-check swaps are
+compile-time impossible against the 3-way discriminated union — the same win seen in `binding.ts`, and a
+direct result of this session's own readback fix). **Zero real survivors** in either file.
+
+**At the final tip:** `git diff --numstat main -- src test`: **987 authored lines** (`binding.ts` 142/0,
+`handshake.ts` 295/0, `binding.test.ts` 140/0, `handshake.test.ts` 410/0) — against a ≈340 estimate, a
+disclosed **647-line PR-scoped exception**. `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1) stays
+outside this count, disclosed separately. Growth beyond the writer's own reported 886 came entirely from
+the parent's readback fix: the `IdentityAttempt` type, the restructured retry logic and its updated doc
+comments (+26 in `handshake.ts`), and the two new pinning tests (+75 in `handshake.test.ts`). `rm -rf dist
+&& npm test`: **932 tests (931 pass, 1 skip)**; `npm run test:static`: **8/8**.

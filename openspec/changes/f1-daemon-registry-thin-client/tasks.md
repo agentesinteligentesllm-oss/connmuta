@@ -934,10 +934,26 @@ Scope: `src/client/binding.ts`, `src/client/handshake.ts`, `test/client/binding.
 Requirements: `thin-client-tools › Launcher requires --project and refuses when unbound or mismatched`; `thin-client-tools › DAEMON_DOWN makes zero network calls` (PT-26 a/b).
 Runtime harness: fake `fetch` that throws on any call (proves zero network on `DAEMON_DOWN`).
 
-- [ ] 33.1 RED: write `test/client/binding.test.ts` ("missing `--project` exits before any IPC call", "`project_id` mismatch is `UNBOUND_PROJECT`") and `test/client/handshake.test.ts` ("no daemon, zero network calls": a network recorder shows zero outbound calls and no `Authorization` header).
-- [ ] 33.2 GREEN: implement `src/client/binding.ts` (cwd walk-up to the nearest `conmuta.json`, strict-parse via PR-08, `EXIT_UNBOUND_PROJECT`/`EXIT_PROJECT_MISMATCH`) and `src/client/handshake.ts` (identity verify, `POST /session`, `DAEMON_IDENTITY_MISMATCH` re-read-once).
-- [ ] 33.3 Verify: `npm run build && node --test "dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"`.
-- [ ] 33.4 Docs: update the file-name cell(s) of PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 33.1 RED: write `test/client/binding.test.ts` ("missing `--project` exits before any IPC call", "`project_id` mismatch is `UNBOUND_PROJECT`") and `test/client/handshake.test.ts` ("no daemon, zero network calls": a network recorder shows zero outbound calls and no `Authorization` header).
+- [x] 33.2 GREEN: implement `src/client/binding.ts` (cwd walk-up to the nearest `conmuta.json`, strict-parse via PR-08, `EXIT_UNBOUND_PROJECT`/`EXIT_PROJECT_MISMATCH`) and `src/client/handshake.ts` (identity verify, `POST /session`, `DAEMON_IDENTITY_MISMATCH` re-read-once).
+- [x] 33.3 Verify: `npm run build && node --test "dist/test/client/binding.test.js" "dist/test/client/handshake.test.js"`.
+- [x] 33.4 Docs: update the file-name cell(s) of PT-26 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+**Apply-time note (session 33).** Exit-code mapping decided and disclosed: `EXIT_UNBOUND_PROJECT` = no
+`conmuta.json` found anywhere in the walk-up; `EXIT_PROJECT_MISMATCH` = found but `project_id` disagrees
+with `--project` (process-lifecycle argument: exit codes only ever fire pre-`server.connect()`, so the
+IPC-time daemon-returned `UNBOUND_PROJECT` cannot be either constant; full reasoning in `binding.ts`'s
+module doc and `apply-progress.md` §PR-33). Two disclosed test-coverage additions beyond this block's
+literal wording (the "no `conmuta.json` found at all" MUST clause and the "found but malformed" case).
+Parent readback found and fixed a real design/implementation divergence in `handshake.ts`: a `GET
+/identity` connection failure was misreported as `DAEMON_IDENTITY_MISMATCH` instead of `DAEMON_DOWN`
+(design §10's own taxonomy table lists "connection refused" under `DAEMON_DOWN`) — fixed by having
+`requestAndVerifyIdentity` distinguish "never got a response" from "got a response, proof failed," with
+two new tests pinning the corrected behavior. **Size reconciliation**: landed at **987 authored lines**
+(`binding.ts` 142, `handshake.ts` 295, `binding.test.ts` 140, `handshake.test.ts` 410) against the ≈340
+estimate above — a disclosed **647-line PR-scoped exception**, driven by the retry/error-taxonomy
+correctness fix and its test coverage. See `apply-progress.md` §PR-33 for the full breakdown. The estimate
+line above is the gate's text and is left as written.
 
 #### PR-34 — IPC stub, client errors, `createServer(deps)`
 Branch `f1/34-client-server` → `main`. Depends: PR-33. Size: ≈360 lines, no exception.
