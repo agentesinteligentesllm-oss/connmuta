@@ -920,10 +920,10 @@ gap (the default `spawnImpl` parameter was never exercised) — see `apply-progr
 
 *Size reconciliation (session 32).* Estimated ≈300; measured 721 authored lines at the candidate (the
 additions+deletions convention, corrected from an additions-only 716 mis-sum caught by the independent
-verifier), grown to **871 authored lines at the corrected tip after Judgment Day round 1** (`run-state.ts`
-387, `spawn.ts` 56, `src/cli/tsconfig.json` 5/5, `run-state.test.ts` 313, `spawn.test.ts` 105) — a
-disclosed **471-line PR-scoped exception**. See `apply-progress.md` §PR-32 for the full breakdown. The
-estimate line above is the gate's text and is left as written.
+verifier), grown to **873 authored lines at the final tip after Judgment Day's one scoped re-judgment
+round** (`run-state.ts` 387, `spawn.ts` 56, `src/cli/tsconfig.json` 5/5, `run-state.test.ts` 315,
+`spawn.test.ts` 105) — a disclosed **473-line PR-scoped exception**. See `apply-progress.md` §PR-32 for
+the full breakdown. The estimate line above is the gate's text and is left as written.
 
 #### PR-33 — binding walk-up + client handshake
 Branch `f1/33-client-binding-handshake` → `main`. Depends: PR-32. Size: ≈340 lines, no exception.

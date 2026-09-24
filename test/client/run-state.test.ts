@@ -238,8 +238,10 @@ test(
     // prove: the wx exclusivity flag genuinely excludes every later racer (losers correctly hit the
     // EEXIST -> SpawnLockHeldError path and wait on the run-file event instead of spawning), which is
     // the spec's actual "N-1 wait instead of spawning a second daemon" guarantee. A truly simultaneous
-    // multi-process race is not constructible in a single-process test — the same limitation applies
-    // to the daemon's own already-merged lock.test.ts for run/daemon.lock's equivalent election.
+    // multi-process race is not constructible in a single-process test (JavaScript's single-threaded,
+    // run-to-completion execution model makes every unit-level "race" of this shape sequential by
+    // construction) — this is a general limitation of testing OS-level file-creation atomicity
+    // in-process, not something specific to this module.
     const homeDir = mkdtempSync(join(tmpdir(), "run-state-race-"));
 
     try {

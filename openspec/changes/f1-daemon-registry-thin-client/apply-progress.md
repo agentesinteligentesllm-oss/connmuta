@@ -6213,6 +6213,44 @@ its two tests, the clock-skew test, the `stdio` assertion, the `daemon.lock` non
 disclosure comments. Root `tsconfig.json` (+2/-1) and `docs/02-architecture/THREAT-MODEL.md`'s PT-27 row
 remain outside this count, disclosed separately, unchanged from the candidate.
 
-**JUDGMENT: pending scoped re-judgment round 1** (both judges, over the correction delta only, per the
-two-round budget). Not yet run as of this record's writing — see the tribunal record for the terminal
-verdict.
+**Scoped re-judgment round 1** (both judges, `ed882b9..c6b2046`; frozen worktree moved to the correction
+tip; first of the two-re-judgment budget). Judge B: **0 new findings** — every one of the twelve ledger
+items (the CRITICAL, both WARNINGs, the SUGGESTION, and the eight verifier items) independently
+re-verified as fixed or accurately disclosed exactly as claimed, including re-deriving the 917-test and
+871-line arithmetic from the actual files and independently confirming the staleness-boundary and
+port-range-check comparison claims against `lock.ts`/`lock.test.ts`/`run-file.ts`. Judge A found **1 new
+WARNING**: the correction's own new disclosure comment on the "N clients racing" test claimed "the same
+limitation applies to the daemon's own already-merged `lock.test.ts` for `run/daemon.lock`'s equivalent
+election" — but `lock.test.ts` (5 tests) has no multi-caller racing test at all, only single-caller
+coverage; broadening the check, `singleton.test.ts` and `main.test.ts` also only exercise sequential
+two-party contention, never an N-way race. The comparison the disclosure leaned on to justify leaving the
+test as-is was not verifiable as stated — independently confirmed against this session's own earlier
+verbatim read of `lock.test.ts` (5 tests: create, release-owner-check, heartbeat-owner-check,
+age-fallback, `isProcessAlive` — none racing).
+
+**Corrected** (parent inline; prose-only, zero behavioral change, so verified by full suite + static
+gates rather than sent through a second re-judgment round, matching this project's own PR-31 precedent
+for a narrow, independently-confirmed final residual): removed the false comparison from the test's
+disclosure comment, replacing it with the general (and accurate) reasoning alone — JavaScript's
+single-threaded, run-to-completion execution model makes any unit-level "race" of this shape sequential
+by construction, a general limitation of testing OS-level file-creation atomicity in-process, not a
+claim about what any other specific file's test suite does or doesn't cover.
+
+**At the final tip:** `git diff --numstat main -- src test`: **873 authored lines** (`run-state.ts`
+387/0, `spawn.ts` 56/0, `src/cli/tsconfig.json` 5/5, `run-state.test.ts` 315/0 — two lines more than the
+471-line-exception tip, the comment fix's net growth, `spawn.test.ts` 105/0) — a disclosed **473-line
+PR-scoped exception**; `rm -rf dist && npm test`: **917 tests (916 pass, 1 skip)**, unchanged (a
+comment-only fix adds no test); `npm run test:static`: **8/8**.
+
+**JUDGMENT: APPROVED** for `ed882b9..<final commit>` (candidate plus one correction commit covering the
+original audit's CRITICAL/WARNING/SUGGESTION findings and the independent verifier's own mutant/probing
+findings, plus one parent-inline prose fix for round 1's own single new WARNING). Every finding across
+the original audit and the one re-judgment round used is resolved: Judge A's CRITICAL (error-listener
+crash) fixed and re-verified; both of Judge B's WARNINGs closed (one fixed via extraction, one honestly
+disclosed with corrected reasoning after round 1 caught a false comparison in the first disclosure
+attempt); Judge B's SUGGESTION fixed; every verifier-found gap fixed or disclosed with a
+verified-accurate reason. **One of the two re-judgment rounds used**; the second was not needed, since
+round 1 returned only a single narrow, independently-verifiable, zero-risk prose finding, parent-corrected
+and confirmed by full suite + static gates rather than spending the final round on it. No native review
+ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (recorded above: `risk: high`,
+`review_due: true`).
