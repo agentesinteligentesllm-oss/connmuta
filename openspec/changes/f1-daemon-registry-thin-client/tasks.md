@@ -918,9 +918,11 @@ plus fixing a stale comment that claimed `../daemon` was still absent — PR-15 
 Parent readback found and fixed one real gap (a cross-process spawn-lock TOCTOU) and a genuine coverage
 gap (the default `spawnImpl` parameter was never exercised) — see `apply-progress.md` §PR-32 for both.
 
-*Size reconciliation (session 32).* Estimated ≈300; **measured 716 authored lines (409 src + 307 test:
-`run-state.ts` 360, `spawn.ts` 44, `src/cli/tsconfig.json` 5/5, `run-state.test.ts` 226, `spawn.test.ts`
-81) at the candidate, a disclosed 316-line PR-scoped exception** — see `apply-progress.md` §PR-32. The
+*Size reconciliation (session 32).* Estimated ≈300; measured 721 authored lines at the candidate (the
+additions+deletions convention, corrected from an additions-only 716 mis-sum caught by the independent
+verifier), grown to **871 authored lines at the corrected tip after Judgment Day round 1** (`run-state.ts`
+387, `spawn.ts` 56, `src/cli/tsconfig.json` 5/5, `run-state.test.ts` 313, `spawn.test.ts` 105) — a
+disclosed **471-line PR-scoped exception**. See `apply-progress.md` §PR-32 for the full breakdown. The
 estimate line above is the gate's text and is left as written.
 
 #### PR-33 — binding walk-up + client handshake

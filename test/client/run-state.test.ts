@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import {
   acquireSpawnLock,
   releaseSpawnLock,
   spawnLockAgeSeconds,
   readRunFile,
   ensureDaemonRunning,
+  spawnIfStillNeeded,
   SpawnLockHeldError,
   DaemonSpawnTimeoutError,
   type SpawnLockPayload,
@@ -59,6 +61,23 @@ test("spawnLockAgeSeconds computes age from acquired_at, falls back to mtime, el
 
     rmSync(lockPath);
     assert.equal(spawnLockAgeSeconds(lockPath, null), Infinity, "a vanished file with no payload is treated as free");
+  } finally {
+    rmSync(runDir, { recursive: true, force: true });
+  }
+});
+
+test("spawnLockAgeSeconds clamps a future acquired_at (clock skew) to 0, never negative", () => {
+  const runDir = mkdtempSync(join(tmpdir(), "spawn-lock-skew-"));
+  const lockPath = join(runDir, "spawn.lock");
+
+  try {
+    const now = 100000;
+    const fromTheFuture: SpawnLockPayload = { pid: 1234, acquired_at: now + 5000 };
+    assert.equal(
+      spawnLockAgeSeconds(lockPath, fromTheFuture, now),
+      0,
+      "a payload whose acquired_at is after now must clamp to 0, not go negative",
+    );
   } finally {
     rmSync(runDir, { recursive: true, force: true });
   }
@@ -123,6 +142,59 @@ test("releaseSpawnLock only deletes the lock when the owner matches", () => {
   }
 });
 
+test("run-state.ts never uses \"daemon.lock\" as a code value — a client must never touch the daemon's own singleton lock", () => {
+  // Structural pin for the spec's "a client MUST NOT release or reclaim run/daemon.lock" clause
+  // (daemon-lifecycle spec.md). Checks for the double-quoted string-literal form specifically — the
+  // form real code would use as a filename constant — not a blind substring match, since the module's
+  // own doc comments legitimately mention `run/daemon.lock` (backtick-quoted prose) to explain this
+  // exact guarantee; a naive substring check would false-positive on that documentation.
+  const compiledSource = readFileSync(
+    new URL("../../src/client/run-state.js", import.meta.url),
+    "utf8",
+  );
+  assert.ok(
+    !compiledSource.includes('"daemon.lock"'),
+    "run-state.ts must never use \"daemon.lock\" as a string-literal value",
+  );
+});
+
+test("spawnIfStillNeeded returns the existing payload and never spawns when the run file is already valid", () => {
+  const runDir = mkdtempSync(join(tmpdir(), "spawn-if-needed-hit-"));
+
+  try {
+    const live = { port: 7001, pid: process.pid, secret: "toctou-secret" };
+    writeFileSync(join(runDir, "daemon.json"), JSON.stringify(live), "utf8");
+
+    let called = false;
+    const result = spawnIfStillNeeded(runDir, () => {
+      called = true;
+      return undefined;
+    });
+
+    assert.equal(called, false, "must not spawn when the run file is already valid");
+    assert.deepEqual(result, live);
+  } finally {
+    rmSync(runDir, { recursive: true, force: true });
+  }
+});
+
+test("spawnIfStillNeeded spawns when no valid run file is present", () => {
+  const runDir = mkdtempSync(join(tmpdir(), "spawn-if-needed-miss-"));
+
+  try {
+    let called = false;
+    const result = spawnIfStillNeeded(runDir, () => {
+      called = true;
+      return undefined;
+    });
+
+    assert.equal(called, true, "must spawn when no valid run file exists");
+    assert.equal(result, undefined);
+  } finally {
+    rmSync(runDir, { recursive: true, force: true });
+  }
+});
+
 test("ensureDaemonRunning returns the existing payload immediately when a live run file already exists", async () => {
   const homeDir = mkdtempSync(join(tmpdir(), "run-state-fastpath-"));
 
@@ -142,8 +214,13 @@ test("ensureDaemonRunning returns the existing payload immediately when a live r
 
     assert.equal(result.port, 6001);
     assert.equal(result.secret, "fastpath-secret");
+    // Disclosed (Judgment Day finding): these two assertions prove ensureDaemonRunning resolves
+    // correctly without spawning — they do NOT distinguish whether the initial fast-path check (line
+    // ~328) or spawnIfStillNeeded's own recheck served this result, since both leave no spawn call and
+    // no leftover lock file behind. spawnIfStillNeeded's own dedicated tests above cover its half
+    // directly; this test's job is only the end-to-end outcome.
     assert.equal(spawnCallCount, 0, "spawnDaemonImpl must not be called when a live run file exists");
-    assert.equal(existsSync(join(runDir, "spawn.lock")), false, "no spawn lock should be created on the fast path");
+    assert.equal(existsSync(join(runDir, "spawn.lock")), false, "no spawn lock file must remain after resolving");
   } finally {
     rmSync(homeDir, { recursive: true, force: true });
   }
@@ -153,6 +230,16 @@ test(
   "N clients racing spawn exactly one daemon",
   { timeout: 5000 },
   async () => {
+    // Disclosed (Judgment Day finding): this is sequential exclusivity, not genuine OS-level
+    // simultaneous contention. ensureDaemonRunning runs fully synchronously from entry through
+    // acquireSpawnLock, with no `await` until it starts waiting for the run file — so
+    // Array.from(...).map(() => ensureDaemonRunning(...)) invokes each racer one after another, and
+    // racer #1 deterministically wins the wx-create simply by executing first. What this test DOES
+    // prove: the wx exclusivity flag genuinely excludes every later racer (losers correctly hit the
+    // EEXIST -> SpawnLockHeldError path and wait on the run-file event instead of spawning), which is
+    // the spec's actual "N-1 wait instead of spawning a second daemon" guarantee. A truly simultaneous
+    // multi-process race is not constructible in a single-process test — the same limitation applies
+    // to the daemon's own already-merged lock.test.ts for run/daemon.lock's equivalent election.
     const homeDir = mkdtempSync(join(tmpdir(), "run-state-race-"));
 
     try {

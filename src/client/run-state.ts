@@ -23,15 +23,19 @@ import { spawnDaemon } from "./spawn.js";
  * Client-side spawn election over `run/spawn.lock` (D-16), and the client's own read of the daemon's
  * run file (`run/daemon.json`).
  *
- * Disclosed apply-time decision: `src/client/tsconfig.json`'s `references` is `[{"path":"../shared"}]`
- * only — there is no TypeScript project-reference path from `client/*` to `src/daemon/*`, so importing
- * the daemon's own `lifecycle/lock.ts`, `lifecycle/run-file.ts` or `home.ts` is a `tsc -b` build error,
- * not a style choice. This module therefore locally reimplements the pieces of those three daemon
- * modules the client needs: the `wx`-create-in-one-call election with stale-age check and
- * reclaim-once semantics, the dead-pid-invalidates run-file read, and the `~/.conmuta` + `run/` path
- * resolution — scoped to `run/spawn.lock` and keyed by {@link SPAWN_LOCK_STALE_SECONDS} instead of the
- * daemon's own `DAEMON_LOCK_STALE_SECONDS`. A client MUST NEVER touch `run/daemon.lock` — the daemon's
- * own singleton lock — only `run/spawn.lock`.
+ * Disclosed apply-time decision: `src/client/tsconfig.json`'s `references` is currently
+ * `[{"path":"../shared"}]` only, so as configured there is no TypeScript project-reference path from
+ * `client/*` to `src/daemon/*` — importing the daemon's own `lifecycle/lock.ts`, `lifecycle/run-file.ts`
+ * or `home.ts` is a `tsc -b` build error today. That is a chosen configuration, not a structural
+ * impossibility (verified during review: adding `{"path":"../daemon"}` to the references array does
+ * let such an import compile) — the choice keeps the client bundle's dependency closure isolated from
+ * daemon-only code, consistent with the thin client's own design (the IDE-facing process should load
+ * only the client closure, not the daemon's). Given that choice, this module locally reimplements the
+ * pieces of those three daemon modules the client needs: the `wx`-create-in-one-call election with
+ * stale-age check and reclaim-once semantics, the dead-pid-invalidates run-file read, and the
+ * `~/.conmuta` + `run/` path resolution — scoped to `run/spawn.lock` and keyed by
+ * {@link SPAWN_LOCK_STALE_SECONDS} instead of the daemon's own `DAEMON_LOCK_STALE_SECONDS`. A client
+ * MUST NEVER touch `run/daemon.lock` — the daemon's own singleton lock — only `run/spawn.lock`.
  */
 
 /** Name of the client's own spawn-election lock file, distinct from the daemon's `daemon.lock`. */
@@ -229,6 +233,12 @@ export function acquireSpawnLock(
     // Someone else removed it already.
   }
 
+  // Disclosed (Judgment Day finding): the retry's own EEXIST branch below — a third party winning the
+  // create in the instant between our unlinkSync and this writeSpawnLockFile — is, like the TOCTOU
+  // window spawnIfStillNeeded closes, only reachable via genuine cross-process preemption. No
+  // in-process test can construct it (both calls are synchronous, so nothing else in this process can
+  // run between them); the behavior is still correct (the loser throws SpawnLockHeldError, exactly as
+  // the ordinary contention path above does), just not independently pinned by a test.
   try {
     const own = writeSpawnLockFile(lockPath);
     return { release: () => releaseSpawnLock(lockPath, own), payload: own };
@@ -294,6 +304,29 @@ function waitForRunFile(runDir: string, waitMs: number): Promise<DaemonRunPayloa
   });
 }
 
+/**
+ * Winner-path body, extracted so this property is directly unit-testable: two separate deterministic
+ * cases (a valid run file already present; none present), rather than trying to construct a genuine
+ * cross-process race in a single-process test (not possible — see {@link ensureDaemonRunning}'s doc).
+ *
+ * Re-checks the run file before calling `spawnDaemonImpl`: between the caller's earlier read and
+ * winning `run/spawn.lock`, another process's spawn may have already landed. Skipping a redundant
+ * `spawnDaemonImpl()` call here is strictly safe either way — `run/daemon.lock` is the actual
+ * singleton backstop, so a redundant spawn would self-terminate, not corrupt state — this just keeps
+ * the call count matching the spec's "calls `spawnDaemon()` exactly once".
+ */
+export function spawnIfStillNeeded(
+  runDir: string,
+  spawnDaemonImpl: () => number | undefined,
+): DaemonRunPayload | undefined {
+  const recheck = readRunFile(runDir);
+  if (recheck !== null) {
+    return recheck;
+  }
+  spawnDaemonImpl();
+  return undefined;
+}
+
 /** What {@link ensureDaemonRunning} needs beyond the constants it already imports. */
 export interface EnsureDaemonRunningOptions {
   /** Defaults to `~/.conmuta` via {@link resolveClientHomeDir}. */
@@ -309,9 +342,10 @@ export interface EnsureDaemonRunningOptions {
  *
  * 1. Reads `run/daemon.json` first; a parsed payload with a live pid resolves immediately — no lock,
  *    no spawn.
- * 2. Otherwise races for `run/spawn.lock`. The winner calls the injected spawn implementation exactly
- *    once, then waits for the run file; a loser (an immediate {@link SpawnLockHeldError}) skips
- *    straight to the same wait with no spawn call.
+ * 2. Otherwise races for `run/spawn.lock`. The winner runs {@link spawnIfStillNeeded} (its own
+ *    TOCTOU re-check, then the injected spawn implementation at most once), then waits for the run
+ *    file; a loser (an immediate {@link SpawnLockHeldError}) skips straight to the same wait with no
+ *    spawn call.
  * 3. The winner releases `run/spawn.lock` only AFTER the wait resolves or times out — releasing
  *    earlier would let a client arriving mid-boot spawn a second daemon, which is exactly why
  *    {@link SPAWN_LOCK_STALE_SECONDS} outlasts the whole spawn-and-boot wait (spec
@@ -341,17 +375,10 @@ export async function ensureDaemonRunning(options: EnsureDaemonRunningOptions = 
 
   try {
     if (handle !== undefined) {
-      // Re-check: between the read above and winning the lock, another process's spawn may have
-      // already landed (real cross-process races only — impossible to observe within one process,
-      // since readRunFile/acquireSpawnLock are synchronous with no await between them). Skipping a
-      // redundant spawnDaemonImpl() call here is strictly safe either way: run/daemon.lock is the
-      // actual singleton backstop, so a redundant spawn would self-terminate, not corrupt state —
-      // this just keeps the call count matching the spec's "calls spawnDaemon() exactly once".
-      const recheck = readRunFile(runDir);
-      if (recheck !== null) {
+      const recheck = spawnIfStillNeeded(runDir, spawnDaemonImpl);
+      if (recheck !== undefined) {
         return recheck;
       }
-      spawnDaemonImpl();
     }
     return await waitForRunFile(runDir, waitMs);
   } finally {

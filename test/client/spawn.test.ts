@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { spawn, type ChildProcess } from "node:child_process";
 import { spawnDaemon, DAEMON_ENTRY, SPAWN_OPTIONS, REAL_SPAWN, type SpawnImpl } from "../../src/client/spawn.js";
 
@@ -24,9 +25,18 @@ function createFakeSpawn(): {
       unref: () => {
         unrefCallCount += 1;
       },
+      on: () => {},
     } as unknown as ChildProcess;
   };
   return { spawnImpl, calls, getUnrefCallCount: () => unrefCallCount };
+}
+
+/** A minimal real EventEmitter standing in for a ChildProcess, so a test can `.emit("error", …)`. */
+function createEmittingFakeSpawn(): { spawnImpl: SpawnImpl; child: EventEmitter } {
+  const child = new EventEmitter();
+  Object.assign(child, { pid: 4242, unref: () => {} });
+  const spawnImpl: SpawnImpl = () => child as unknown as ChildProcess;
+  return { spawnImpl, child };
 }
 
 test("spawnDaemon calls the injected spawn implementation once with the literal argv and options", () => {
@@ -41,8 +51,22 @@ test("spawnDaemon calls the injected spawn implementation once with the literal 
   assert.equal(SPAWN_OPTIONS.shell, false);
   assert.equal(SPAWN_OPTIONS.detached, true);
   assert.equal(SPAWN_OPTIONS.windowsHide, true);
+  assert.equal(SPAWN_OPTIONS.stdio, "ignore");
   assert.equal(fake.getUnrefCallCount(), 1, "the returned child must be unref'd exactly once");
   assert.equal(pid, 4242);
+});
+
+test("spawnDaemon does not crash when the spawned child emits an 'error' event", () => {
+  // An EventEmitter with zero 'error' listeners throws synchronously from emit() itself — this is
+  // Node's documented behavior, and the exact crash Judgment Day flagged. If spawnDaemon's `.on`
+  // handler were ever removed, this assertion would fail with that thrown error instead of passing.
+  const { spawnImpl, child } = createEmittingFakeSpawn();
+
+  spawnDaemon(spawnImpl);
+
+  assert.doesNotThrow(() => {
+    child.emit("error", new Error("simulated ENOENT: spawn failed"));
+  });
 });
 
 test("argv never carries caller input regardless of --project", () => {
