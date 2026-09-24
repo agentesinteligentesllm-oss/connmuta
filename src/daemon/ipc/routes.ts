@@ -54,7 +54,17 @@
  * `SendToolError`'s own `retry_after_s` (set for a LOCALLY re-detected 429 — `send/rate.ts`'s own module
  * doc states the AS-IS transports deliberately sever the cause chain for that exact case, so
  * `classifyErrorChain` finds nothing to walk) is carried onto the fallback payload rather than silently
- * dropped, since `toolErrorPayload` itself carries no `retry_after_s` parameter.
+ * dropped, since `toolErrorPayload` itself carries no `retry_after_s` parameter. Both this fallback and
+ * the `classified !== null` branch above it attach `retry_after_s` only through
+ * {@link withRetryAfterIfRetryable}: a payload can never carry `retry_after_s` while also claiming
+ * `retryable: false` — enforced by that one shared gate, not by each branch happening to agree. PR-31
+ * Judgment Day found this the hard way in two passes: judge B's CRITICAL first found the fallback
+ * branch could produce that exact contradiction for `RATE_LIMITED` specifically, before
+ * `shared/error-payload.ts`'s `RETRYABLE_TOOL_CODES` was corrected to include it; a later re-judgment's
+ * judge A then found the `classified` branch was safe only because `classifyTelegramError`'s seven
+ * hand-written branches happened to never combine the two, not because anything enforced it —
+ * `withRetryAfterIfRetryable` closes both branches at once, so neither one's safety depends on the
+ * other file's content staying correct (`apply-progress.md`'s PR-31 section has the full narrative).
  *
  * **HTTP status for a tool-level rejection.** Neither spec nor design pins one per `SendErrorCode`/
  * `ThreadErrorCode` (design's own client taxonomy table calls these "daemon, passed through unchanged",
@@ -205,6 +215,20 @@ function ipcError(code: string, message: string, retryable = false): ToolErrorPa
 	return { code, message, retryable };
 }
 
+/**
+ * Attaches `retry_after_s` only when `payload.retryable` is already `true` — the one place both of
+ * {@link toTelegramErrorPayload}'s branches enforce that a payload can never tell a caller both "wait
+ * this long" and "never retry" (PR-31 Judgment Day: an earlier correction had gated only the fallback
+ * branch, leaving the classified branch's safety an accident of `classifyTelegramError`'s seven
+ * hand-written branches happening to agree, not a guarantee this function itself enforces).
+ */
+export function withRetryAfterIfRetryable(payload: ToolErrorPayload, retryAfterS: number | undefined): ToolErrorPayload {
+	if (retryAfterS === undefined || !payload.retryable) {
+		return payload;
+	}
+	return { ...payload, retry_after_s: retryAfterS };
+}
+
 /** `Authorization: Bearer <token>` — `undefined` for anything else (missing header, wrong scheme, empty token). */
 function extractBearer(headers: IpcRequest["headers"]): string | undefined {
 	const raw = headers.authorization;
@@ -224,20 +248,18 @@ export function toTelegramErrorPayload(err: unknown, fallbackCode: string): Tool
 	const message = err instanceof Error ? err.message : String(err);
 	const classified = classifyErrorChain(err);
 	if (classified !== null) {
-		const payload: ToolErrorPayload = { code: classified.code, message, retryable: classified.retryable };
-		if (classified.retry_after_s !== undefined) payload.retry_after_s = classified.retry_after_s;
+		let payload: ToolErrorPayload = { code: classified.code, message, retryable: classified.retryable };
+		payload = withRetryAfterIfRetryable(payload, classified.retry_after_s);
 		if (classified.new_chat_id !== undefined) payload.new_chat_id = classified.new_chat_id;
 		return payload;
 	}
 	const payload = toolErrorPayload(fallbackCode, message);
 	// SendToolError's own retry_after_s (a LOCALLY re-detected 429 — see the module doc) is not part of
-	// toolErrorPayload's shape; carried over here rather than dropped. Gated on `payload.retryable`
-	// (not just "is this a SendToolError with retry_after_s set"), tying the carry-over to the SAME
-	// fact that decided retryable, so no code could ever produce `retryable: false` alongside a
-	// populated `retry_after_s` — the structural version of JD-B-001's fix, not just the one code it
-	// was reported against (PR-31 Judgment Day round 2, judge B).
-	if (err instanceof SendToolError && err.retry_after_s !== undefined && payload.retryable) {
-		return { ...payload, retry_after_s: err.retry_after_s };
+	// toolErrorPayload's shape; carried over here rather than dropped, through the same
+	// withRetryAfterIfRetryable gate the classified branch above uses (PR-31 Judgment Day, judges A
+	// and B).
+	if (err instanceof SendToolError) {
+		return withRetryAfterIfRetryable(payload, err.retry_after_s);
 	}
 	return payload;
 }

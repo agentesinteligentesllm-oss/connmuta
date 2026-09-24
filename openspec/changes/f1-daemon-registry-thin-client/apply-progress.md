@@ -5948,4 +5948,40 @@ the 869-baseline arithmetic from `HANDOFF.md`'s own citation. Judge B found **2 
 (898 pass, 1 skip)**, clean; `test:static`: **8/8**. `docs/06-backlog/CHECKLIST.md` also changed (+2 rows, not part
 of the authored src+test budget).
 
-**Scoped re-judgment round 2** (both judges, second and final of the two-re-judgment budget) — see below.
+**Scoped re-judgment round 2** (both judges, `33701b4..107b652`; second and final round of the budget). Judge A
+found **1 new WARNING**: the round-1 correction's own new comment claimed `withRetryAfterIfRetryable`-equivalent
+safety ("no code, current or future, can produce the contradiction") but the fix had only gated the fallback
+branch — the `classified !== null` branch above it still copied `classified.retry_after_s` unconditionally, safe
+today only because `classifyTelegramError`'s seven hand-written branches happen to never pair `retry_after_s` with
+`retryable: false`, not because anything enforced it. Judge B independently re-verified both round-1 findings as
+**CONFIRMED RESOLVED** (re-deriving the `classifyTelegramError` trace by hand to the same conclusion judge A
+reached, and additionally tracing the real runtime cause chain for `send-path.ts`'s two 429-raising call sites to
+confirm `classified` is always `null` there in practice — `DualWriteTransport.send` throws a causeless
+`TransportError`, so the fallback branch this Judgment Day fixed is the one genuinely exercised for a real 429, not
+just the branch that happened to get the test) and found **1 new SUGGESTION**: a new code comment's round-number
+citation was ambiguous against this document's own section numbering — no functional effect.
+
+**Corrected** (parent, inline; the budget for further JUDGE re-verification is exhausted after this round, so this
+correction is measurement-checked — full suite, static gates, and a targeted mutant — not judge-re-verified, matching
+this project's own PR-11/12/13 precedent for a residual finding after the two-round budget): extracted
+`withRetryAfterIfRetryable(payload, retryAfterS)`, one small shared helper both the `classified` branch and the
+`SendToolError` fallback branch now call, so the "never `retryable: false` with a populated `retry_after_s`"
+property is enforced once, structurally, rather than by each branch's logic happening to agree. One new direct unit
+test (`withRetryAfterIfRetryable`'s own contract, independent of any real error class) plus the existing
+`toTelegramErrorPayload` tests cover both branches. The ambiguous round-number citation was rewritten to reference
+this document instead of a specific round number. A new mutant (`MR3-1`, dropping the shared gate) confirmed killed.
+
+**At the final tip:** `git diff --numstat main -- src test`: **1,495 authored lines** (`routes.ts` 644/0,
+`sessions.ts` 20/5, `error-payload.ts` 14/5, `ipc-contract.ts` 11/1, `routes.test.ts` 753/0, `sessions.test.ts` 21/0,
+`error-payload.test.ts` 5/2, `ipc-contract.test.ts` 14/0) — a disclosed **1,095-line PR-scoped exception**;
+`rm -rf dist && npm test`: **900 tests (899 pass, 1 skip)**, clean; `test:static`: **8/8**.
+
+**JUDGMENT: APPROVED** for `c349d96..<final commit>` (three commits: the candidate, the first correction round, the
+second correction round — the third, comment-only fix closing round 2's own findings was verified by the parent via
+full suite + static + a targeted mutant, not sent through a third re-judgment, since the two-round budget was
+already used by the rounds that found it). Every CRITICAL/WARNING finding across the original audit and both
+re-judgment rounds is resolved: the original CRITICAL (`JD-B-001`) and both re-judgment rounds' WARNINGs are fixed
+and re-verified; the SUGGESTION-tier round-2 citation ambiguity is fixed; the two informational disclosures
+(spec.md wording, `dispatchTool` redaction defense-in-depth) are filed as **B-49**/**B-50**, not code changes,
+matching this project's own precedent for out-of-scope or non-demonstrated-risk findings. No native review ran for
+this candidate — a Judgment Day target, per HANDOFF §2.3.

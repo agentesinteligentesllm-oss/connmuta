@@ -35,6 +35,7 @@ import {
 	createSessionRoutes,
 	toTelegramErrorPayload,
 	toolErrorHttpStatus,
+	withRetryAfterIfRetryable,
 	type RoutesDeps,
 } from "../../../src/daemon/ipc/routes.js";
 import { openLedger } from "../../../src/ledger/open.js";
@@ -711,6 +712,21 @@ test("toTelegramErrorPayload: retry_after_s is never carried onto a payload whos
 	const payload = toTelegramErrorPayload(err, err.code);
 	assert.equal(payload.retryable, false);
 	assert.equal(payload.retry_after_s, undefined, "retry_after_s must never survive onto a non-retryable payload, regardless of which code carried it");
+});
+
+test("withRetryAfterIfRetryable: the shared gate both toTelegramErrorPayload branches use", () => {
+	// Direct unit coverage of the helper itself (PR-31 Judgment Day round 2, judge A): the
+	// `classified !== null` branch in toTelegramErrorPayload was, before this helper existed, safe only
+	// because classifyTelegramError's seven hand-written branches happened to never pair retry_after_s
+	// with retryable:false -- an accident of that file's current content, not something this function
+	// enforced. This test proves the property directly, with no dependency on which real error classes
+	// exist today in either classifyTelegramError or SendErrorCode.
+	const retryablePayload = { code: "X", message: "m", retryable: true };
+	assert.deepEqual(withRetryAfterIfRetryable(retryablePayload, 5), { code: "X", message: "m", retryable: true, retry_after_s: 5 });
+	assert.deepEqual(withRetryAfterIfRetryable(retryablePayload, undefined), retryablePayload, "undefined retryAfterS must not add the key at all");
+
+	const nonRetryablePayload = { code: "Y", message: "m", retryable: false };
+	assert.deepEqual(withRetryAfterIfRetryable(nonRetryablePayload, 5), nonRetryablePayload, "retryable: false must refuse retry_after_s even when a caller supplies one");
 });
 
 test("toolErrorHttpStatus: RATE_LIMITED and TELEGRAM_RATE_LIMITED map to 429, an unclassified error maps to 500, everything else maps to 400", () => {
