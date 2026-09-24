@@ -6242,9 +6242,10 @@ claim about what any other specific file's test suite does or doesn't cover.
 PR-scoped exception**; `rm -rf dist && npm test`: **917 tests (916 pass, 1 skip)**, unchanged (a
 comment-only fix adds no test); `npm run test:static`: **8/8**.
 
-**JUDGMENT: APPROVED** for `ed882b9..<final commit>` (candidate plus one correction commit covering the
-original audit's CRITICAL/WARNING/SUGGESTION findings and the independent verifier's own mutant/probing
-findings, plus one parent-inline prose fix for round 1's own single new WARNING). Every finding across
+**JUDGMENT: APPROVED** for `ed882b9..f433e6e` (three commits: the candidate `ed882b9`; the correction
+`c6b2046`, covering the original audit's CRITICAL/WARNING/SUGGESTION findings and the independent
+verifier's own mutant/probing findings; and the round-1 re-judgment fix `f433e6e`, a parent-inline prose
+correction for round 1's own single new WARNING). Every finding across
 the original audit and the one re-judgment round used is resolved: Judge A's CRITICAL (error-listener
 crash) fixed and re-verified; both of Judge B's WARNINGs closed (one fixed via extraction, one honestly
 disclosed with corrected reasoning after round 1 caught a false comparison in the first disclosure
