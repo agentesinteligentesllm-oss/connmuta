@@ -985,10 +985,17 @@ Runtime harness: N/A — unit tests over the handler wiring; the client bundle s
 `client/ipc-stub.ts` shipped as **new code, no Provenance header** (no v1 byte range exists for
 either — see `apply-progress.md`'s PR-34 entry for the full disclosed-decisions list, including the
 `IpcSession` shape, the discriminated `IpcToolResult`, and the parent readback's "Makes no network
-call" → "Makes no call to the Telegram API" correction on `status`/`thread`). **Size reconciliation**:
-587 authored lines (src+test) against the ≈360 estimate — a disclosed **227-line PR-scoped exception**.
-`docs/02-architecture/THREAT-MODEL.md`'s PT-07 row (1/1) and `test/fixtures/v1-provenance.json`'s new
-24th entry (6/0, `client/server.ts`'s SEAM row) stay outside this count, disclosed separately.
+call" → "Makes no call to the Telegram API" correction on `status`/`thread`). Judgment Day found a
+CRITICAL (no session caching, contradicting design §11's "cached for the session"; fixed with
+promise-memoized caching + a self-healing retry-once on 401) and a route-wiring test gap two judges
+plus the independent verifier converged on independently; one re-judgment round found and fixed a
+residual session-cache concurrency race. **Size reconciliation (final tip, after both correction
+rounds)**: 849 authored lines (src+test) against the ≈360 estimate — a disclosed **489-line PR-scoped
+exception** (587 at the pre-Judgment-Day candidate, grown by the CRITICAL fix and its tests, the
+route-wiring test, and the round-1 concurrency fix). `docs/02-architecture/THREAT-MODEL.md`'s PT-07 row
+(1/1) and `test/fixtures/v1-provenance.json`'s new 24th entry (6/0, `client/server.ts`'s SEAM row) stay
+outside this count, disclosed separately. Full record: `apply-progress.md`'s `## PR-34` section,
+tribunal `bus-v2-f1-pr-34-audit-001`.
 
 #### PR-35 — client entry point + `conmuta mcp` subcommand
 Branch `f1/35-client-main-cli-mcp` → `main`. Depends: PR-34. Size: ≈250 lines, no exception.
