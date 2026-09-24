@@ -6423,9 +6423,50 @@ the new refusal's exit code is a compile-time **BUILD-FAIL** (same discriminated
 this file); removing the try/catch entirely is **KILLED** by the new directory test — confirming the fix
 is meaningfully exercised, not merely present.
 
-**At the final tip:** `git diff --numstat main -- src test`: **1,106 authored lines** (`binding.ts` 162/0,
-`handshake.ts` 295/0 — unchanged, no source fix needed there — `binding.test.ts` 162/0, `handshake.test.ts`
-487/0) — a disclosed **766-line PR-scoped exception**, grown from the pre-correction 987 entirely by this
-round's fixes (the try/catch + new refusal kind in `binding.ts` and its test, plus the three
-`handshake.test.ts` additions/extensions). `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1) stays
-outside this count, unchanged from the candidate.
+**At the pre-re-judgment tip (`8975d9f`):** `git diff --numstat main -- src test`: **1,106 authored lines**
+(`binding.ts` 162/0, `handshake.ts` 295/0 — unchanged, no source fix needed there — `binding.test.ts`
+162/0, `handshake.test.ts` 487/0) — a disclosed **766-line PR-scoped exception**, grown from the
+pre-correction 987 entirely by this round's fixes (the try/catch + new refusal kind in `binding.ts` and its
+test, plus the three `handshake.test.ts` additions/extensions). `docs/02-architecture/THREAT-MODEL.md`'s
+PT-26 row (1/1) stays outside this count, unchanged from the candidate.
+
+**Scoped re-judgment round 1** (both judges, `36683bc..8975d9f`; frozen worktree moved to the correction
+tip; first of the two-re-judgment budget). Judge A: **0 new findings** — all 5 fixes independently
+re-verified as correctly and completely closing what they claim, no regressions, the new
+`unreadable_project_file` refusal kind's design confirmed sound (mutually exclusive with the other two
+kinds, correctly exit-coded, correctly documented), and explicitly confirmed the B-51 deferral is an
+acceptable non-blocking call rather than something that should have blocked. Judge B: **1 new SUGGESTION**
+— the corrected happy-path test's `/session` body assertion pins 5 of 6 non-`hmac` fields directly but
+covers `server_nonce` only indirectly (through the HMAC-equality check, which is self-referential for that
+one field); explicitly flagged `causal_disposition: "pre-existing"` (the same indirect-only pattern already
+existed, unchanged, in the retry tests) and "consistent with, not a regression from, the file's existing
+test style" — a single-judge, SUGGESTION-tier, pre-existing-pattern finding, not corroborated by Judge A or
+the independent verifier.
+
+**Corrected** (parent inline; one assertion line, zero behavioral change, so verified by full suite +
+static gates rather than spending the second re-judgment round on it, matching this project's own PR-32
+precedent for a narrow, single-judge, low-severity residual): added `assert.equal(body.server_nonce,
+"b".repeat(64), ...)` directly after the existing `hmac` assertion in the happy-path test.
+
+**At the final tip:** `git diff --numstat main -- src test`: **1,107 authored lines** (`binding.ts` 162/0,
+`handshake.ts` 295/0, `binding.test.ts` 162/0, `handshake.test.ts` 488/0 — one line more than the
+766-line-exception tip, the one new assertion) — a disclosed **767-line PR-scoped exception**;
+`rm -rf dist && npm test`: **934 tests (933 pass, 1 skip)**, unchanged (a same-test assertion addition adds
+no new test); `npm run test:static`: **8/8**. `docs/02-architecture/THREAT-MODEL.md`'s PT-26 row (1/1)
+stays outside this count, unchanged from the candidate.
+
+**JUDGMENT: APPROVED** for `36683bc..7f4c9c1` (candidate `36683bc`; correction `8975d9f`, covering both
+judges' independently-converged `readFileSync`/EISDIR WARNING, the independent verifier's 6/6-survivor
+`POST /session` body gap, the nonce-freshness gap, the missing unreachable-then-retry test, and this
+record's own mutant-tally arithmetic error; round-1 re-judgment fix `7f4c9c1`, a parent-inline one-line
+assertion addition for round 1's own single new SUGGESTION). Every finding across the original audit and
+the one re-judgment round used is resolved: both judges' independently-converged WARNING fixed and
+re-verified by both on re-judgment; the independent verifier's body-field gap and tally-arithmetic finding
+both fixed; the nonce-freshness and missing-retry-combination gaps both closed with new tests; Judge A's
+`IPC_REQUEST_TIMEOUT_MS` SUGGESTION deliberately deferred to **B-51** rather than fixed (explicitly endorsed
+as acceptable by Judge A itself on re-judgment); Judge B's `identity`-naming SUGGESTION left as prose
+feedback (traced end-to-end as carrying no behavioral risk, confirmed independently by both judges across
+both rounds). **One of the two re-judgment rounds used**; the second was not needed, since round 1 returned
+only a single narrow, single-judge, SUGGESTION-tier, explicitly-pre-existing-pattern finding, parent-corrected
+and confirmed by full suite + static gates rather than spending the final round on it. No native review ran
+for this candidate — a Judgment Day target, per HANDOFF §2.3.

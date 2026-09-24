@@ -135,6 +135,7 @@ test("performHandshake sends no Authorization header on GET /identity, verifies 
           server_nonce: string;
         };
         assert.equal(body.hmac, sessionProof(secret, body.server_nonce), "POST /session must carry the correct session hmac");
+        assert.equal(body.server_nonce, "b".repeat(64), "POST /session must carry the identity response's own server_nonce");
         assert.equal(body.project_id, SESSION_IDENTITY.projectId, "POST /session must carry the identity's project_id");
         assert.equal(body.group_id, SESSION_IDENTITY.groupId, "POST /session must carry the identity's group_id");
         assert.equal(body.roster_hash, SESSION_IDENTITY.rosterHash, "POST /session must carry the identity's roster_hash");

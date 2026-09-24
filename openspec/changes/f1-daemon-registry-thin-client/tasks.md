@@ -961,10 +961,13 @@ parent-verified): `unreadable_project_file` refusal kind + try/catch in `binding
 `POST /session` body fully asserted; nonce-freshness assertion added; one new unreachable-then-retry test;
 the tally arithmetic fixed. Deferred to backlog **B-51** (not fixed this round): reusing the 70s long-poll
 timeout for the handshake (latency concern, not a correctness bug — the timeout mechanism itself already
-works correctly). **Size reconciliation**: landed at **1,106 authored lines** at the final tip (`binding.ts`
-162, `handshake.ts` 295, `binding.test.ts` 162, `handshake.test.ts` 487) against the ≈340 estimate above —
-a disclosed **766-line PR-scoped exception**. See `apply-progress.md` §PR-33 for the full breakdown. The
-estimate line above is the gate's text and is left as written.
+works correctly). **Round-1 re-judgment** (both judges again, scoped to the correction delta): Judge A 0
+new findings; Judge B 1 new SUGGESTION (`server_nonce` only indirectly asserted in the happy-path test,
+explicitly flagged pre-existing, not a regression) — parent-corrected inline (one assertion line), second
+round not needed. **Size reconciliation**: landed at **1,107 authored lines** at the final tip
+(`binding.ts` 162, `handshake.ts` 295, `binding.test.ts` 162, `handshake.test.ts` 488) against the ≈340
+estimate above — a disclosed **767-line PR-scoped exception**. See `apply-progress.md` §PR-33 for the full
+breakdown. The estimate line above is the gate's text and is left as written.
 
 #### PR-34 — IPC stub, client errors, `createServer(deps)`
 Branch `f1/34-client-server` → `main`. Depends: PR-33. Size: ≈360 lines, no exception.
