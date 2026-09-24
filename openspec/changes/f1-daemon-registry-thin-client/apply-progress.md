@@ -5915,4 +5915,37 @@ PR-scoped exception**; `rm -rf dist && npm test`: **898 tests (897 pass, 1 skip)
 Seven new tests this round (the `new_chat_id` test, two freeze-axis tests, three route-level schema-gate tests, one
 `pid` test) plus targeted strengthening of four existing tests (no test count change from strengthening alone).
 
-**Scoped re-judgment** — see below, appended after both judges re-reviewed the correction delta.
+**Scoped re-judgment round 1** (both judges, `c349d96..33701b4`; frozen worktree moved to the correction tip; first of
+the two-re-judgment budget). Judge A: **0 new findings** — all thirteen claimed corrections (four of its own, five
+of judge B's, four of the verifier's) independently re-verified as `CONFIRMED RESOLVED` against the actual test
+bodies and actual source, including re-checking the two new freeze-axis fixtures still satisfy R3 and re-deriving
+the 869-baseline arithmetic from `HANDOFF.md`'s own citation. Judge B found **2 new WARNINGs**, both real:
+1. **The `RATE_LIMITED` fix closed the reported case, not the general hazard.** `toTelegramErrorPayload`'s
+   carry-over checked only `err instanceof SendToolError && err.retry_after_s !== undefined` — tied to a
+   *specific* code being retryable, not to the payload's `retryable` field itself. Nothing in `SendToolError`'s
+   constructor enforces `retry_after_s` being set only for `RATE_LIMITED` (a doc comment, not a type constraint);
+   a future `SendToolError` construction under a different code with `retry_after_s` set would silently reproduce
+   the exact contradiction JD-B-001 described, unreachable today (exhaustively verified: the only three call sites
+   that set it all use `RATE_LIMITED`) but not structurally prevented.
+2. **`apply-progress.md` itself claimed "Filed as B-49"/"Filed as B-50" before those rows existed anywhere** —
+   `docs/06-backlog/CHECKLIST.md` ended at B-48 at the commit being reviewed. A disclosure text that describes an
+   action not yet taken is itself a defect in the record, caught by the same adversarial reading applied to code.
+
+**Both corrected:**
+1. `toTelegramErrorPayload`'s carry-over condition now additionally requires `payload.retryable` (derived from the
+   already-corrected `RETRYABLE_TOOL_CODES`), so the carry-over is gated on the SAME fact that decided
+   `retryable` — no code, current or future, can produce the contradiction, not just `RATE_LIMITED`. One new
+   defensive test proves the general property directly: a `SendToolError` with a non-retryable code
+   (`BODY_TOO_LONG`) and an (unrealistic, type-permitted) `retry_after_s` set must NOT carry it onto the payload.
+   A new mutant (`MR2-1`, reverting the `&& payload.retryable` clause) confirmed killed.
+2. `docs/06-backlog/CHECKLIST.md` gained the actual **B-49** and **B-50** rows the disclosure paragraphs above
+   already named, closing the gap between the claim and the record.
+
+**At the round-1-correction tip:** `git diff --numstat main -- src test`: **1,457 authored lines** (`routes.ts`
+622/0, `sessions.ts` 20/5, `error-payload.ts` 14/5, `ipc-contract.ts` 11/1, `routes.test.ts` 737/0, `sessions.test.ts`
+21/0, `error-payload.test.ts` 5/2, `ipc-contract.test.ts` 14/0 — 15 more than the prior tip: `routes.ts` net +4,
+`routes.test.ts` net +11) — a disclosed **1,057-line PR-scoped exception**; `rm -rf dist && npm test`: **899 tests
+(898 pass, 1 skip)**, clean; `test:static`: **8/8**. `docs/06-backlog/CHECKLIST.md` also changed (+2 rows, not part
+of the authored src+test budget).
+
+**Scoped re-judgment round 2** (both judges, second and final of the two-re-judgment budget) — see below.

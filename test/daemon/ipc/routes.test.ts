@@ -702,6 +702,17 @@ test("toTelegramErrorPayload: a SendToolError's own retry_after_s survives the f
 	assert.equal(payload.retryable, true, "a payload carrying retry_after_s must never also claim retryable: false — that combination told a caller to both wait and never retry");
 });
 
+test("toTelegramErrorPayload: retry_after_s is never carried onto a payload whose code is not retryable (structural, not just the RATE_LIMITED case)", () => {
+	// A defensive property test, not a production-reachable scenario: SendToolError's own doc comment
+	// says retry_after_s is "set only for RATE_LIMITED", but nothing in its constructor's TYPE enforces
+	// that. If it ever were violated, the carry-over must still refuse to produce a self-contradictory
+	// payload — proven here directly, independent of whether any real call site currently does this.
+	const err = new SendToolError("BODY_TOO_LONG", "not actually rate-limited", { retry_after_s: 99 });
+	const payload = toTelegramErrorPayload(err, err.code);
+	assert.equal(payload.retryable, false);
+	assert.equal(payload.retry_after_s, undefined, "retry_after_s must never survive onto a non-retryable payload, regardless of which code carried it");
+});
+
 test("toolErrorHttpStatus: RATE_LIMITED and TELEGRAM_RATE_LIMITED map to 429, an unclassified error maps to 500, everything else maps to 400", () => {
 	assert.equal(toolErrorHttpStatus("RATE_LIMITED"), HTTP_TOO_MANY_REQUESTS);
 	assert.equal(toolErrorHttpStatus("TELEGRAM_RATE_LIMITED"), HTTP_TOO_MANY_REQUESTS);
