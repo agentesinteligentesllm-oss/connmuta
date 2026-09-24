@@ -6472,3 +6472,131 @@ and confirmed by full suite + static gates rather than spending the final round 
 for this candidate — a Judgment Day target, per HANDOFF §2.3 (recorded, not started: `gentle-ai review
 assess` at close read `risk: medium`, `review_due: true`, `review_due_reason: slice_budget_reached`
 against `main` at `2dcd6ae`).
+
+## PR-34 — `client/ipc-stub.ts` + `client/errors.ts` + `client/server.ts` (IPC-calling stub, client-local error taxonomy, `createServer(deps)`; unit 10 `thin-client-tools` continues)
+
+**Route.** ODD with the SDD contract preserved, session 34: one delegated read-only mapper (43 tool
+uses, pulling `shared/error-payload.ts`, `shared/tool-schemas.ts` and v1's own four schemas/`index.ts`
+side by side, all four merged `client/*` files' doc-placement and cross-import conventions,
+`design.md` §10/§11/§12 verbatim, `test/fixtures/v1-provenance.json`'s exact schema and
+`test/security/provenance.test.ts`'s opt-in-per-file behavior), then the orchestrator decided nine
+open design points directly from that evidence (below) plus two follow-up reads of its own
+(`shared/ipc-contract.ts` in full, `client/handshake.ts` in full) to pin the daemon's exact wire
+contract and bearer-header convention before writing the brief, then one delegated writer
+(`general-purpose`, sonnet), then a parent readback that found and fixed a real description-accuracy
+divergence, then a parent mutant sweep.
+
+**Decisions (orchestrator, session 34), disclosed here and in each module's own doc comment.**
+1. **Provenance**: `client/server.ts` is **SEAM** from `v1:src/index.ts:112-248` — design.md §12's own
+   ratified table names this row explicitly, and the tribunal already settled "a line-range extract is
+   SEAM by construction" (`bus-v2-f1-tasks-001`). New 24th entry in `v1-provenance.json`. `client/errors.ts`
+   and `client/ipc-stub.ts` ship as **new code, no Provenance header** — neither has a v1 byte range: v1
+   has no daemon/client IPC concept at all, and `errors.ts`'s SHAPE (not its code vocabulary) mirrors
+   `shared/error-payload.ts`'s already-vendored `ToolErrorPayload` type.
+2. **`IpcSession` is authored fresh in `ipc-stub.ts`** — confirmed via full-codebase grep before writing
+   the brief: it existed nowhere (not in `shared/ipc-contract.ts`, not in `daemon/ipc/*`).
+3. **`client/errors.ts` reuses `handshake.ts`'s `HandshakeErrorCode` type** for the four client-raised
+   codes (DRY within the compile unit) and adds four daemon-pass-through code names locally
+   (`UNBOUND_PROJECT`, `BINDING_CHANGED`, `WRONG_ROOM`, `BINDING_MISMATCH`, always `retryable: false` per
+   design §10's table). Its own retryable table for the four handshake codes is a **disclosed manual
+   copy** of `handshake.ts`'s own unexported `HANDSHAKE_ERROR_RETRYABLE` (that file is closed,
+   already-merged, already-audited — not edited to export it) — a real, disclosed drift risk if
+   `handshake.ts`'s table ever changes without this copy being updated in lockstep. "v1 tool and
+   Telegram codes … as classified by the daemon" are explicitly OUT of scope for this constructor:
+   those arrive already `ipcErrorSchema`-shaped from the daemon and are forwarded via
+   `shared/error-payload.ts`'s `errorResult` without reconstruction.
+4. **Daemon bearer header confirmed** (`daemon/ipc/routes.ts:147-148`): `Authorization: Bearer <token>`.
+5. **Disclosed simplification — `client/handshake.ts` (PR-33, merged, audited) is not touched.**
+   `performHandshake` returns a `SessionResponse` but never the daemon's port (internal to
+   `DaemonRunPayload`, never surfaced). Rather than widening PR-33's already-audited return contract
+   (a re-slice, forbidden by HANDOFF §6), `ipc-stub.ts`'s `createIpcSession` calls BOTH
+   `ensureDaemonRunning` (for the port) and `performHandshake` (for the bearer) on every `callTool` —
+   one redundant, cheap `ensureDaemonRunning` fast-path read, no caching across calls (a later PR may
+   add session-lifetime caching).
+6. **`IpcSession.callTool` returns a discriminated `IpcToolResult`, never throws for a well-formed
+   daemon refusal** — mirrors `client/handshake.ts`'s own `IdentityAttempt` pattern: `{ok:true, data}`
+   on a 200 matching `toolSuccessSchema`, `{ok:false, error}` on a non-200 matching `ipcErrorSchema`.
+   Throws `IpcTransportError` only when no well-formed response was obtained at all (design §10's
+   `IPC_ERROR` case) — caught by `server.ts` and turned into `clientErrorPayload("IPC_ERROR", …)`. A
+   `HandshakeError` from the handshake step propagates unchanged, uncaught by `ipc-stub.ts`, and is
+   turned into `clientErrorPayload(err.code, err.message)` by `server.ts` instead — `HandshakeError`
+   already carries the exact code/retryable this layer would otherwise have to reconstruct.
+7. **Tool names**: `${TOOL_PREFIX}send`/`fetch`/`status`/`thread` → `conmuta_*` (design.md §11 +
+   `TOOL_PREFIX`'s actual value govern; spec.md's own literal `agentbus_*` tool-name strings are stale
+   prose, not gate text being rewritten).
+8. **Handlers cast `args` without re-validating** — matches v1's own `createServer` exactly (confirmed:
+   the writer found `IpcSession.callTool(route, input: unknown)` needs no cast at all, since `unknown`
+   accepts anything — a cleaner outcome than the anticipated `as <ToolInput>` cast, verified by a clean
+   `tsc -b`).
+9. **Docs (34.4)**: PT-07's THREAT-MODEL.md row (previously a bare `static (client bundle)` scope cell
+   with no file names, unlike PT-14/24/25/26/27's already-scoped cells) gets `test/client/errors.test.ts`
+   for the narrow "no Telegram-classification import" clause only; the full bundle scan stays
+   `test/security/client-bundle.test.ts`, deferred to PR-40 per PT-27 — same scoped-pointer convention.
+
+**Writer's own disclosed design choices, beyond the nine decisions above.** Tool titles/descriptions
+ported from v1 verbatim except three edits: `agentbus_status`'s "this bridge" → "this binding" (a
+v1-only noun); `thread`'s cross-reference `agentbus_fetch` → `conmuta_fetch` (an actual sibling tool
+name); a shared `runToolCall` helper factors the four handlers' identical try/catch instead of
+repeating it four times (DRY, not requested but consistent with project conventions). `new
+McpServer({...})` uses `MCP_SERVER_NAME` (`shared/constants.ts`, = `"conmuta"`) and `SERVER_VERSION`,
+mirroring v1's own `{name: "agentbus", version: SERVER_VERSION}` pattern. `server.test.ts` uses the
+real MCP SDK `Client` + `InMemoryTransport` pair (mirroring v1's own `test/index.test.ts` pattern) to
+introspect `createServer`'s registered tools via `client.listTools()`, rather than reaching into SDK
+internals — a sound, idiomatic choice. Schema-shape assertions derive expected property names
+dynamically from `sendInputBaseSchema.shape`/etc. rather than hardcoding a second copy of each field
+list (the base, pre-`.refine()` schema is used for shape introspection since `.refine()` does not
+change an object schema's own keys). The writer flagged `send`'s description claim
+"`wire.headroom_chars`" as unverified against the already-merged `send-path.ts`/`validate.ts` output
+shape (outside its own 6-file scope) — **parent-verified**: `src/daemon/send/validate.ts:99-105`'s
+`SendToolOutput.wire: WireCost` and `WireCost.headroom_chars` (line 95) confirm the claim is accurate;
+no fix needed.
+
+**Parent readback correction — a real description-accuracy divergence, closed.** v1's `status` and
+`thread` tool descriptions both claimed "Makes no network call" — true in v1, where these tools
+synchronously read local files with zero socket I/O. In v2's thin-client architecture EVERY tool,
+including these two, now reaches the daemon over loopback HTTP (`ipc-stub.ts`'s `callTool`) — a real
+network call, subject to `ECONNREFUSED`/timeouts if the daemon is down, even though it never leaves
+the loopback interface. The literal claim was therefore false for v2 (an agent reading this
+description could wrongly assume zero failure modes) and was never flagged in the writer's own
+Changes disclosure. **Fixed**: reworded both to "Makes no call to the Telegram API" — preserving the
+guarantee that remains true (neither tool ever reaches Telegram, unlike `send`/`fetch`) without
+asserting the one that no longer holds; disclosed inline in `server.ts`'s own module doc as a named
+parent-readback correction, matching the project's established disclosure convention (PR-33's
+`DAEMON_DOWN`/`DAEMON_IDENTITY_MISMATCH` fix, PR-32's TOCTOU fix).
+
+**TDD evidence.** Writer RED (verbatim): `errors.test.ts(5,69)`, `ipc-stub.test.ts(5,53)`,
+`server.test.ts(8,91)`, `server.test.ts(9,30)` — all `TS2307: Cannot find module`, naming the three
+not-yet-created source files. Writer GREEN: `npm run build && node --test` the three compiled test
+files → 16/16; full suite 950/949/1 skip (baseline 934/933/1, +16, no regressions); `npm run
+test:static` 8/8 (the provenance check passes only because it iterates the EXISTING registry at that
+point — the writer correctly left `v1-provenance.json` untouched, out of its own 6-file scope).
+
+**Parent verification, independent of the writer's own report.** Re-ran `rm -rf dist && npm run build`
+(clean) after applying the readback fix above: **950 tests (949 pass, 1 skip)**, unchanged (a
+same-behavior text-only fix adds no new test); `npm run test:static` **8/8** — but only after adding
+`client/server.ts`'s new Provenance row to `test/fixtures/v1-provenance.json` (the writer's own
+scope correctly excluded this file; the parent owns it). Independently recomputed the v1 body sha256
+for `server.ts`'s Provenance header from scratch (`git -C "../telegram-agent-bus" show
+bf8f365:src/index.ts | tr -d '\r' | sed -n '112,248p' | sha256sum`) — matches the writer's own
+`1d07e12d170ddd4466e738f92ec31a27abef6fc91fd6e89a80c962e646e12651` exactly.
+
+**Parent mutant sweep** (`odd/sweep.mjs`, recreated this session). Three files, 5 mutants each (4 real
++ M0 comment-only control): `ipc-stub.ts` — **M0 survived** (correct); 4 real mutants **all KILLED**
+(path-stripping removal, success/error branch inversion, Bearer-prefix removal, success/error schema
+swap). `errors.ts` — **M0 survived** (correct); 4 real mutants (one retryable flip per code family
+member) **all KILLED**. `server.ts` — **M0 survived** (correct); the success/error branch inversion in
+`runToolCall` is a **BUILD-FAIL** (`IpcToolResult`'s discriminated union makes narrowing `result.data`
+in the `ok:false` arm and `result.error` in the `ok:true` arm a compile error, `TS2339` — the same
+"discriminated union turns a mutant into a stronger-than-runtime BUILD-FAIL" pattern PR-32/33 already
+established, holding a third time); the remaining 3 real mutants (IpcTransportError/HandshakeError
+check swap, a mismatched tool name, a wrong client-local code mapping) **all KILLED**. **Zero real
+survivors across all 15 mutants.**
+
+**At the pre-Judgment-Day tip:** `git diff --numstat main -- src test`: **587 authored lines**
+(`errors.ts` 45/0, `ipc-stub.ts` 119/0, `server.ts` 147/0 — includes the readback fix, `errors.test.ts`
+44/0, `ipc-stub.test.ts` 129/0, `server.test.ts` 103/0) — against a ≈360 estimate, a disclosed
+**227-line PR-scoped exception**, smaller than every slice since PR-30 — the writer's own 16 new tests
+covering every branch of a brand-new `IpcSession` abstraction account for most of the growth beyond
+three small `src` files. `docs/02-architecture/THREAT-MODEL.md`'s PT-07 row (1/1) and
+`test/fixtures/v1-provenance.json`'s new 24th entry (6/0) stay outside this count, disclosed
+separately. `rm -rf dist && npm test`: **950 tests (949 pass, 1 skip)**; `npm run test:static`: **8/8**.

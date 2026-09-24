@@ -975,10 +975,20 @@ Scope: `src/client/ipc-stub.ts`, `src/client/errors.ts`, `src/client/server.ts`,
 Requirements: `thin-client-tools › Client-local error payload constructor` (PT-07); `thin-client-tools › Four tool input schemas port unchanged`.
 Runtime harness: N/A — unit tests over the handler wiring; the client bundle scan runs in PR-40.
 
-- [ ] 34.1 RED: write `test/client/errors.test.ts` ("client-local codes need no Telegram import": the built client bundle has no reference to the Telegram-classification module) and `test/client/server.test.ts` ("tool count and shapes are unchanged" against v1's four schemas from PR-07a).
-- [ ] 34.2 GREEN: implement `src/client/ipc-stub.ts` (`deps = {ipc: IpcSession, projectId, now?}`), `src/client/errors.ts` (client-local `{code, message, retryable}` constructor mirroring PR-07a's shape), `src/client/server.ts` (`createServer(deps)` keeps v1's shape; tool names from `TOOL_PREFIX`).
-- [ ] 34.3 Verify: `npm run build && node --test "dist/test/client/ipc-stub.test.js" "dist/test/client/errors.test.js" "dist/test/client/server.test.js"`.
-- [ ] 34.4 Docs: update the file-name cell(s) of PT-07 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 34.1 RED: write `test/client/errors.test.ts` ("client-local codes need no Telegram import": the built client bundle has no reference to the Telegram-classification module) and `test/client/server.test.ts` ("tool count and shapes are unchanged" against v1's four schemas from PR-07a).
+- [x] 34.2 GREEN: implement `src/client/ipc-stub.ts` (`deps = {ipc: IpcSession, projectId, now?}`), `src/client/errors.ts` (client-local `{code, message, retryable}` constructor mirroring PR-07a's shape), `src/client/server.ts` (`createServer(deps)` keeps v1's shape; tool names from `TOOL_PREFIX`).
+- [x] 34.3 Verify: `npm run build && node --test "dist/test/client/ipc-stub.test.js" "dist/test/client/errors.test.js" "dist/test/client/server.test.js"`.
+- [x] 34.4 Docs: update the file-name cell(s) of PT-07 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+**Apply-time note (session 34).** `client/server.ts` decided as **SEAM** from `v1:src/index.ts:112-248`
+(design.md §12's own ratified table names this row explicitly); `client/errors.ts` and
+`client/ipc-stub.ts` shipped as **new code, no Provenance header** (no v1 byte range exists for
+either — see `apply-progress.md`'s PR-34 entry for the full disclosed-decisions list, including the
+`IpcSession` shape, the discriminated `IpcToolResult`, and the parent readback's "Makes no network
+call" → "Makes no call to the Telegram API" correction on `status`/`thread`). **Size reconciliation**:
+587 authored lines (src+test) against the ≈360 estimate — a disclosed **227-line PR-scoped exception**.
+`docs/02-architecture/THREAT-MODEL.md`'s PT-07 row (1/1) and `test/fixtures/v1-provenance.json`'s new
+24th entry (6/0, `client/server.ts`'s SEAM row) stay outside this count, disclosed separately.
 
 #### PR-35 — client entry point + `conmuta mcp` subcommand
 Branch `f1/35-client-main-cli-mcp` → `main`. Depends: PR-34. Size: ≈250 lines, no exception.
