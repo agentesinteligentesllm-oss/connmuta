@@ -101,6 +101,27 @@ test("stale-boot bearer rejected: a bearer minted by one boot's store does not v
   assert.equal(storeBoot2.size, sizeBefore, "a failed validate() must not mutate the store");
 });
 
+test("revoke: a minted bearer stops validating after revoke; revoking an unknown or already-revoked bearer is a no-op", () => {
+  const secret = freshSecret();
+  const store = new SessionStore(secret);
+  const serverNonce = randomBytes(IPC_NONCE_BYTES).toString("hex");
+  const bearer = store.mint(serverNonce, computeSessionProof(secret, serverNonce));
+  assert.ok(bearer, "setup: a correctly verified claim must mint a bearer");
+  assert.equal(store.validate(bearer), true, "setup: the freshly minted bearer must validate");
+
+  assert.equal(store.revoke(bearer), true, "revoking a bearer that was minted must report it was removed");
+  assert.equal(store.validate(bearer), false, "a revoked bearer must no longer validate");
+  assert.equal(store.size, 0, "revoke must actually shrink the store, not just hide the bearer from validate");
+
+  assert.equal(store.revoke(bearer), false, "revoking an already-revoked bearer must report nothing was removed");
+  assert.equal(
+    store.revoke("0".repeat(SESSION_TOKEN_HEX_LENGTH)),
+    false,
+    "revoking a bearer this store never minted must report nothing was removed",
+  );
+  assert.equal(store.size, 0, "a no-op revoke must not change the store's size");
+});
+
 test("mint refuses once MAX_ACTIVE_SESSIONS live bearers are held, without distinguishing why", () => {
   const secret = freshSecret();
   const store = new SessionStore(secret);

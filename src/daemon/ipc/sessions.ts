@@ -23,11 +23,11 @@
  * brand-new secret, `lifecycle/run-file.ts`'s `writeRunFile`), so every bearer minted before that
  * restart simply has nowhere left to be found (design §10 "Per-boot rotation" row).
  *
- * **{@link MAX_ACTIVE_SESSIONS} bounds the store; there is still no early revoke.** Judgment Day
- * flagged that this was the one per-boot map in this PR with no ceiling at all, unlike
- * `handshake.ts`'s `PendingHandshakeStore` — fixed here. Removing a single bearer before a full
- * restart (`DELETE /session`) is still `daemon/ipc/routes.ts`'s job (PR-31): design §10 lists it as a
- * fixed route, but no spec scenario names its daemon-side behaviour yet.
+ * **{@link MAX_ACTIVE_SESSIONS} bounds the store.** Judgment Day flagged that this was the one
+ * per-boot map in this PR with no ceiling at all, unlike `handshake.ts`'s `PendingHandshakeStore` —
+ * fixed here. {@link SessionStore.revoke} (PR-31) lets `daemon/ipc/routes.ts`'s `DELETE /session`
+ * free a single bearer's slot before a full restart, so a long-lived daemon does not march every
+ * client toward {@link MAX_ACTIVE_SESSIONS} merely because none of them crashed.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -106,6 +106,21 @@ export class SessionStore {
       found = hexDigestsEqual(stored, bearer) || found;
     }
     return found;
+  }
+
+  /**
+   * Removes `bearer` from the store, if present (design §10 "DELETE /session"; `daemon/ipc/routes.ts`,
+   * PR-31). Returns `true` when a bearer was present and removed, `false` otherwise —
+   * {@link Set.prototype.delete}'s own semantics, deliberately kept rather than re-shaped, so a caller
+   * that already knows `Set.delete`'s contract needs no new one here.
+   *
+   * Unlike {@link validate}, this performs no constant-time comparison: the caller must already have
+   * proven possession of `bearer` through a prior {@link validate} call — every route's 401 gate,
+   * `daemon/ipc/routes.ts` — before a revoke is ever attempted, so there is no secret-comparison timing
+   * left to protect here, only membership removal of a value the caller already holds.
+   */
+  revoke(bearer: string): boolean {
+    return this.bearers.delete(bearer);
   }
 
   /** Number of live bearers this store holds — a testability accessor, not part of the wire contract. */

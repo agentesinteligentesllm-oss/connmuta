@@ -123,11 +123,19 @@ const VALID_SESSION_REQUEST = {
   host: "dev-machine",
   pid: 4242,
   hmac: VALID_DIGEST,
+  server_nonce: VALID_NONCE,
 };
 
 test("session request accepts the full valid shape and is strict about extra keys", () => {
   assert.equal(sessionRequestSchema.safeParse(VALID_SESSION_REQUEST).success, true);
   assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, extra: "nope" }).success, false);
+});
+
+test("session request requires a nonce-shaped server_nonce, matching GET /identity's own shape", () => {
+  assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, server_nonce: VALID_NONCE.slice(1) }).success, false, "too short");
+  assert.equal(sessionRequestSchema.safeParse({ ...VALID_SESSION_REQUEST, server_nonce: VALID_NONCE.toUpperCase() }).success, false, "uppercase hex refused");
+  const { server_nonce: _omitted, ...withoutNonce } = VALID_SESSION_REQUEST;
+  assert.equal(sessionRequestSchema.safeParse(withoutNonce).success, false, "server_nonce is required, not optional");
 });
 
 test("session request refuses a positive group_id (Telegram groups are negative)", () => {

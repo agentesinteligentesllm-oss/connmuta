@@ -164,7 +164,16 @@ export type IdentityResponse = z.infer<typeof identityResponseSchema>;
 // POST /session, DELETE /session
 // ---------------------------------------------------------------------------
 
-/** `POST /session`'s request body (design §10 sequence step 7). */
+/**
+ * `POST /session`'s request body (design §10 sequence step 7). `server_nonce` identifies which
+ * `GET /identity` handshake `hmac` was computed against (`HMAC-SHA256(secret, "session:" +
+ * server_nonce)`) — the daemon needs it explicitly to single-use-consume the matching pending
+ * handshake (`PendingHandshakeStore.consume`) and to verify the hmac (`SessionStore.mint`), neither
+ * of which searches for it. Found missing here during PR-31 (`daemon/ipc/routes.ts`), which is the
+ * first PR to actually implement `POST /session`; added rather than worked around, since a
+ * `z.strictObject` that silently omits a field the daemon requires on every real request is a
+ * documented guarantee this schema cannot actually keep (ADR-12).
+ */
 export const sessionRequestSchema = z.strictObject({
   project_id: z.string().regex(PROJECT_ID_PATTERN),
   group_id: z.number().int().negative(),
@@ -172,6 +181,7 @@ export const sessionRequestSchema = z.strictObject({
   host: z.string().min(1).max(IPC_SESSION_HOST_MAX_CHARS),
   pid: z.number().int().positive(),
   hmac: hmacDigestSchema,
+  server_nonce: nonceHexSchema,
 });
 
 export type SessionRequest = z.infer<typeof sessionRequestSchema>;

@@ -5753,3 +5753,73 @@ bound half, `JD-B-003`, `JD-B-004`, `JD-A-R2-003`/`JD-B-R2-001`) or disclosed-an
 an accurate rationale (`JD-A-001`'s revocation half). The independent verifier's `N5` (default clock never exercised)
 and the duplicate-query-parameter behaviour are likewise disclosed, not actioned — no production call site exists for
 either until PR-31 lands.
+
+## PR-31 — `daemon/ipc/routes.ts` (session routing, freeze, roster drift, error taxonomy; closes unit 9 `ipc-handshake`)
+
+**Route.** ODD with the SDD contract preserved, session 31: one delegated read-only mapper (43 tool uses), one
+delegated writer (`general-purpose`, sonnet) against a brief with ten decisions fixed by the orchestrator from the
+mapper's findings, then a parent readback that found and fixed a real gap the writer had worked around, then a parent
+mutant sweep. No `sdd-apply` phase envelope exists. `routes.ts` is new code (design §12 has no v1 row for any `ipc/*`
+module): no provenance header, registry unchanged at 23 entries.
+
+**Decisions (orchestrator, session 31), stated in the module docs and in `tasks.md`'s apply-time note.** (1)
+`DAEMON_VERSION_MISMATCH`/`IPC_ERROR` are exclusively client-side, no daemon-side test (same method as PR-30's
+decision 1). (2) `SessionStore.revoke(bearer): boolean` added (disclosed, outside this block's Scope line) — `mint`/
+`validate` gave no way to invalidate a single bearer before a full restart. (3) `routes.ts` owns its own per-session
+frozen-binding state (`Map<bearer, FrozenSessionRecord>`), narrower than `bindings.ts`'s `areBindingsEquivalent`. (4)
+R4 implemented inline at `POST /session`, per `invariants.ts`'s own doc comment. (5) `roster_drift` surfaced as a bare
+string in `conditions`, not routed through `conditions-store.ts`. (6) Six daemon-raised business codes defined as free
+strings with an HTTP status/retryable table (see `tasks.md`'s apply-time note item 6). (7-10) `toTelegramErrorPayload`
+composition, the two daemon-lifetime singletons (`BindingMutex`, `SendRateBudget`) instantiated for the first time,
+a single `createSessionRoutes` factory, and `client_id` generation — all as specified in the writer's brief.
+
+**TDD evidence.** Writer RED: `sessions.test.ts` failed `TS2339` (`revoke` did not exist on `SessionStore`, ×3);
+`routes.test.ts` failed `TS2307` (`routes.js` did not exist), after first fixing three unrelated type errors in its
+own draft (`ProjectRosterEntry` passed where `JsonObject` was expected). Writer GREEN: `npm run build && node --test
+"dist/test/daemon/ipc/routes.test.js" "dist/test/daemon/ipc/sessions.test.js"` → 25/25; full suite 889/888/1 skip.
+The writer self-corrected an ordering mistake mid-session (wrote GREEN before RED twice, then reverted each
+implementation to capture a truthful RED) — disclosed in its own report, not found by the parent.
+
+**Parent readback correction — a real gap in already-merged code, fixed at its source.** Design's sequence diagram
+(§10, step 7-8) requires the daemon to know which `server_nonce` a `POST /session` request's `hmac` was computed
+against, to sequence `PendingHandshakeStore.consume(server_nonce)` before `SessionStore.mint(server_nonce, hmac)`
+(neither call searches for the nonce itself). `shared/ipc-contract.ts`'s `sessionRequestSchema` (PR-29/30, already
+merged and Judgment-Day-approved) never had a `server_nonce` field — only `project_id, group_id, roster_hash, host,
+pid, hmac`. The writer's candidate worked around this by reading `server_nonce` off the raw, unvalidated
+`request.body: unknown` before validating the remaining six fields through the real schema — functionally correct,
+disclosed, but left the wire contract itself incomplete, and `test/shared/ipc-contract.test.ts:128`
+("session request accepts the full valid shape…") was actively asserting the 6-field shape was complete, which is a
+documented guarantee (ADR-12) the schema could not actually keep. **Corrected**: extended `sessionRequestSchema` with
+`server_nonce: nonceHexSchema` (reusing `identityResponseSchema`'s own field for the same value, byte-for-byte the
+same validation), updated the fixture and added a new shape test (`server_nonce` too-short / uppercase / missing, all
+refused), and simplified `routes.ts` to validate the whole body through the real schema instead of the workaround.
+Verified: every existing test in `ipc-contract.test.ts` that spreads `...VALID_SESSION_REQUEST` needed no other
+change (all pick up the new field automatically); `routes.test.ts`'s bodies already included `server_nonce`
+unconditionally, so the fix was a pure net simplification, not a second round of writer changes.
+
+**Mutant sweep** (`odd/sweep.mjs`, untracked ODD tree, deleted at session close; `--test-timeout=5000`, 150 s process
+bound per mutant, restore verified by sha256 after each). `routes.ts`: **12 mutants — 10 killed by test, 2 "killed" by
+the TypeScript compiler itself** (`M10`: inverting the mint-failure check makes the post-mint code operate on a
+compiler-narrowed `undefined`, `TS2345`; `M11`: removing the `managed === undefined` freeze guard leaves
+`managed.binding` unguarded where the type is still `ManagedBinding | undefined`, same class of error) — reported
+apart from ordinary kills per this project's own convention, not survivors. **1 real survivor**: `M7`
+(`RATE_LIMITED_TOOL_CODES` dropping `TELEGRAM_RATE_LIMITED`) — no test in `routes.test.ts` imported
+`HTTP_TOO_MANY_REQUESTS` at all, so nothing could fail on this mapping. **Pinned**: exported the previously-private
+`toolErrorHttpStatus` (mirroring `toTelegramErrorPayload`'s own precedent for direct unit testing) and added one
+direct test covering all three status buckets (429/500/400); re-swept `M7` alone and confirmed killed. `M0` (control,
+comment-only) correctly survived both sweeps. `sessions.ts`: **1 mutant (`MS1`, `revoke` using `has()` instead of
+`delete()`) — killed** by the new `revoke` test on the first pass.
+
+**Budget.** `git diff --numstat main -- src test` at the candidate: **1,303 authored lines** — `routes.ts` 618,
+`sessions.ts` +25 (net, `revoke` + doc update), `ipc-contract.ts` +12 (net, `server_nonce`); `routes.test.ts` 619
+(618 from the writer + 1 net from the `toolErrorHttpStatus` pin, offset by a `-1` doc-comment simplification),
+`sessions.test.ts` 21, `ipc-contract.test.ts` 8 (fixture field + one new test) — against a ≈390 estimate, a disclosed
+**903-line PR-scoped exception**. The estimate priced one source file; the actual scope grew to six files (two
+disclosed edits outside the primary Scope line) and fourteen prescribed RED scenarios plus the parent's own two
+corrections (schema fix, mutant-sweep pin) account for the size, consistent with every slice since PR-06b.
+
+**Verification at the candidate.** `rm -rf dist && npm test`: **891 tests (890 pass, 1 skip)** — clean on the first
+run, no flake. `npm run test:static`: **8/8**.
+
+**Native review.** RDD is on (global). `gentle-ai review assess` was not run for this candidate: the target is a
+Judgment Day target, and the installed `judgment-day` skill states both must never run on one target (HANDOFF §2.3).

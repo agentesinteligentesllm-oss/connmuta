@@ -836,9 +836,57 @@ Scope: `src/daemon/ipc/routes.ts`, `test/daemon/ipc/routes.test.ts`.
 Requirements: `ipc-handshake › Session binds one project and freezes for its lifetime`; `ipc-handshake › Roster hash detects drift without auto-resolving it` (D-07); `ipc-handshake › Client error taxonomy for handshake and session failures`.
 Runtime harness: in-process daemon over a real registry temp file (PR-09).
 
-- [ ] 31.1 RED: write `test/daemon/ipc/routes.test.ts` covering "unbound project refused at session start", "binding never changes mid-session", "roster hash mismatch raises a condition, not a failure", "live binding drift is refused per call" (`BINDING_CHANGED`, `HTTP_CONFLICT`), "session refused when the project file's group disagrees with the binding" (`BINDING_MISMATCH`, R4), and version-skew/transport-failure scenarios (`DAEMON_VERSION_MISMATCH`, `IPC_ERROR`).
-- [ ] 31.2 GREEN: implement `src/daemon/ipc/routes.ts` (`POST`/`DELETE /session`, `/tools/*` routing, binding snapshot freeze-and-compare, `toTelegramErrorPayload` consuming `daemon/telegram.ts` from PR-19).
-- [ ] 31.3 Verify: `npm run build && node --test "dist/test/daemon/ipc/routes.test.js"`.
+*Size reconciliation (session 31).* Estimated ≈390; **measured 1,303 authored lines (655 src + 648
+test) at the candidate, a disclosed 903-line PR-scoped exception** — see `apply-progress.md` §PR-31.
+The estimate line above is the gate's text and is left as written.
+
+- [x] 31.1 RED: write `test/daemon/ipc/routes.test.ts` covering "unbound project refused at session start", "binding never changes mid-session", "roster hash mismatch raises a condition, not a failure", "live binding drift is refused per call" (`BINDING_CHANGED`, `HTTP_CONFLICT`), "session refused when the project file's group disagrees with the binding" (`BINDING_MISMATCH`, R4), and version-skew/transport-failure scenarios (`DAEMON_VERSION_MISMATCH`, `IPC_ERROR`) — resolved as client-only vocabulary with no daemon-side test, see the apply-time note below.
+- [x] 31.2 GREEN: implement `src/daemon/ipc/routes.ts` (`POST`/`DELETE /session`, `/tools/*` routing, binding snapshot freeze-and-compare, `toTelegramErrorPayload` consuming `daemon/telegram.ts` from PR-19).
+- [x] 31.3 Verify: `npm run build && node --test "dist/test/daemon/ipc/routes.test.js"`.
+
+*Apply-time note (session 31).* Decisions made by the orchestrator under the Director's session-31
+delegation (full autonomy, recorded in `apply-progress.md` §PR-31):
+1. **`DAEMON_VERSION_MISMATCH`/`IPC_ERROR` are exclusively client-side vocabulary — no daemon-side
+   test.** Same method as PR-30's decision 1: spec's own scenario wording ("WHEN the client
+   compares…"/"THEN the client surfaces…"), corroborated independently by `ipc-contract.ts`'s and
+   `error-payload.ts`'s doc comments. `DAEMON_VERSION_MISMATCH` depends only on `GET /identity`'s
+   `build` field (PR-30, already tested); `IPC_ERROR` is the client's own transport-failure
+   classification. Neither has a daemon-side implementation surface in `routes.ts`.
+2. **`SessionStore` gains `revoke(bearer): boolean`** (`daemon/ipc/sessions.ts` + its twin — a
+   disclosed edit outside this block's Scope line). `sessions.ts` had zero revocation capability
+   since PR-30; `DELETE /session`'s response (`sessionCloseResponseSchema`) was explicitly
+   provisional pending this decision. A `{closed: true}` that did not actually invalidate the bearer
+   would be a false guarantee (ADR-12).
+3. **A real gap found in the already-merged `shared/ipc-contract.ts` (PR-29/30), fixed at its source
+   — a second disclosed edit outside this block's Scope line.** `sessionRequestSchema` had no
+   `server_nonce` field, even though design's sequence diagram requires the daemon to know which
+   `server_nonce` an `hmac` was computed against (`PendingHandshakeStore.consume` and
+   `SessionStore.mint` both take it explicitly; neither searches for it). The writer's candidate
+   worked around this by reading the field off the raw unvalidated body; parent readback judged that
+   an insufficient fix, since the merged `ipc-contract.test.ts` was actively asserting the 6-field
+   shape was "the full valid shape" — a documented guarantee the schema could not keep (ADR-12).
+   Extended `sessionRequestSchema` with `server_nonce: nonceHexSchema` (reusing
+   `identityResponseSchema`'s own pattern for the same value) and simplified `routes.ts` to validate
+   the whole body through the real schema. `test/shared/ipc-contract.test.ts` carries the updated
+   fixture and a new shape test.
+4. **R4 (`group_id` cross-check) is implemented inline in `routes.ts`'s `POST /session` handler**,
+   per `registry/invariants.ts`'s own doc comment, which always placed R4 at the call site rather
+   than in the invariants module.
+5. **`roster_drift` is a bare string in `SessionResponse.conditions`**, not routed through
+   `ledger/conditions-store.ts`'s `ConditionName` union (which does not include it, and extending it
+   is out of this block's file scope) — matches `sessionResponseSchema.conditions`'s own doc comment
+   and the `registry_invalid` precedent (also outside that same union).
+6. **Daemon-raised business codes** (`UNBOUND_PROJECT` 404, `HANDSHAKE_NONCE_INVALID` 401,
+   `SESSION_MINT_REFUSED` 401, `BINDING_MISMATCH` 409, `BINDING_CHANGED` 409, `SESSION_UNAUTHORIZED`
+   401) are free strings in `ipcErrorSchema.code` — no closed enum to extend, consistent with the
+   existing `IPC_*` transport vocabulary's own pattern.
+7. **Parent mutant sweep** (12 mutants over `routes.ts` + 1 over `sessions.ts`'s `revoke`, generic
+   harness, explicit `[from,to]` pairs, `M0` comment-only control): **10 killed by test, 2 killed by
+   the TypeScript compiler itself** (removing the `managed === undefined` freeze guard, and inverting
+   the mint-failure check, both fail to build under control-flow narrowing — reported apart from
+   ordinary kills, not survivors), **1 real survivor** (`RATE_LIMITED`/`TELEGRAM_RATE_LIMITED` →
+   `HTTP_TOO_MANY_REQUESTS` had no test able to fail it) — pinned with a new direct unit test on the
+   now-exported `toolErrorHttpStatus`, then re-swept and confirmed killed. `M0` correctly survived.
 
 ### Unit 10 — `thin-client-tools`
 
