@@ -1085,13 +1085,57 @@ disclosed **429-line PR-scoped exception**. See `apply-progress.md` §PR-35 for 
 
 #### PR-36 — read-only v1 config/state loaders (SEAM)
 Branch `f1/36-migration-v1-readers` → `main`. Depends: PR-35. Size: ≈360 lines, no exception.
+*Size reconciliation (session 36).* Estimated ≈360; **measured 829 authored lines (407 src + 410 test + 12 fixture) at the candidate, a disclosed 429-line PR-scoped exception** — see `apply-progress.md` §PR-36. The estimate line above is the gate's text and is left as written.
 Scope: `src/migration/v1-config.ts`, `src/migration/v1-state.ts`, `test/migration/v1-config.test.ts`, `test/migration/v1-state.test.ts`.
 Requirements: read-side of `v1-migration › v1 files are backed up and never modified or deleted`.
 Runtime harness: temp `~/.agentbus`-shaped fixture directories (placeholders only).
 
-- [ ] 36.1 RED: write `test/migration/v1-config.test.ts` and `test/migration/v1-state.test.ts` against a placeholder fixture, asserting read-only parsing and that the quarantine-rename branch becomes a hard error (v1 files are never modified).
-- [ ] 36.2 GREEN: implement `src/migration/v1-config.ts` (SEAM from `telegram-agent-bus/src/config.ts:168-233`, read-only source, no token resolution from env) and `src/migration/v1-state.ts` (SEAM from `telegram-agent-bus/src/state.ts:252-439`, read-only source, `to_user_id` backfilled from the v1 roster).
-- [ ] 36.3 Verify: `npm run build && node --test "dist/test/migration/v1-config.test.js" "dist/test/migration/v1-state.test.js"`.
+- [x] 36.1 RED: write `test/migration/v1-config.test.ts` and `test/migration/v1-state.test.ts` against a placeholder fixture, asserting read-only parsing and that the quarantine-rename branch becomes a hard error (v1 files are never modified).
+- [x] 36.2 GREEN: implement `src/migration/v1-config.ts` (SEAM from `telegram-agent-bus/src/config.ts:168-233`, read-only source, no token resolution from env) and `src/migration/v1-state.ts` (SEAM from `telegram-agent-bus/src/state.ts:252-439`, read-only source, `to_user_id` backfilled from the v1 roster).
+- [x] 36.3 Verify: `npm run build && node --test "dist/test/migration/v1-config.test.js" "dist/test/migration/v1-state.test.js"`.
+
+*Apply-time note (session 36).* Decisions made by the orchestrator under the Director's full-autonomy
+delegation for this session (recorded in `apply-progress.md` §PR-36):
+1. **Error convention**: both readers return a typed discriminated-union result (`V1ConfigResult`,
+   `V1StateResult`), never throw — matching `shared/project-file.ts`/`client/binding.ts`/
+   `registry/loader.ts`'s established typed-refusal precedent, replacing v1's own throw-based
+   `ConfigError`/`StateError`.
+2. **The quarantine-rename branch becomes a hard error, exactly as the design's SEAM-change note
+   requires**: `v1-state.ts` never calls `renameSync`. Every branch that would have triggered v1's
+   `quarantineStateFile` (invalid JSON, non-object body, a future `state_version`, schema-invalid
+   after migration) now returns a typed refusal with the original file byte-identical and no sibling
+   file created — pinned directly by `assertFileUntouched` in the test twin. A missing `state.json`
+   and an I/O fault on an existing file are unchanged from v1 (default state; typed `unreadable`
+   refusal, respectively) — neither of those was ever a quarantine case in v1 either.
+3. **Output types stay v1-native** (`V1Config`, `V1State`, `V1ThreadRecord`, etc.), not reshaped into
+   `shared/thread-record.ts`'s `ThreadRecord` or `shared/project-file.ts`'s `ProjectRosterEntry` — that
+   conversion is PR-37's `synthesize.ts` job, out of this slice's scope.
+4. **`to_user_id` gains an optional roster-backed backfill** (`loadV1State(homeDir, roster?)`) — v1's
+   `loadState` never had a config available to it and always left the field `null`; a passed roster is
+   consulted only for threads still missing it after migration, never overwriting an already-resolved
+   value.
+5. **`STATE_VERSION` is NOT imported from `shared/constants.ts`** (design.md explicitly drops it there
+   for v2) — reproduced as a local, named `V1_STATE_VERSION = 2` constant, citing
+   `telegram-agent-bus/src/config.ts:129`.
+6. **Supporting declarations outside the pinned `state.ts:252-439` range** — the `State`/
+   `ThreadRecord`/`HistoryEntry`/`Conditions` interfaces, `defaultState()`, `noConditions()`
+   (`state.ts:15-190`) — are reproduced/adapted locally in `v1-state.ts`, disclosed as supporting and
+   NOT separately SEAM-pinned; `StateError` has no counterpart, superseded entirely by the typed
+   refusal union.
+7. **New leaf compile unit** `src/migration/tsconfig.json`, modeled on `src/client/tsconfig.json`
+   (`references: [{"path": "../shared"}]` only), with `{"path": "src/migration"}` added to the root
+   `tsconfig.json` (TS18003 precedent, PR-09a/PR-10).
+8. **Parent mutant sweep** (15 mutants across both files, generic harness): 13/15 killed at runtime,
+   2/15 killed at compile-time via legitimate TypeScript narrowing (a schema-success-check inversion,
+   and an OR→AND flip in the roster-backfill guard whose negation TypeScript can no longer prove
+   narrows `thread.to` to non-null before indexing the roster — the same "narrowed union turns a logic
+   bug into a compile-time catch" pattern already on record elsewhere in this project), both M0
+   controls survived correctly. The sweep surfaced one genuine value-level test gap independent of the
+   mutant result — no test asserted an already-resolved `to_user_id` is left untouched when a roster
+   is passed — closed with one added assertion before freezing.
+9. **`git ls-files`-based scanners need `git add -N` on the new files before `test:static`/the full
+   suite** (`provenance.test.ts` failed once for exactly this reason, confirmed and fixed — the
+   established gotcha from PR-32's own record, recurring here).
 
 #### PR-37 — synthesis + non-interactive CLI entry (D-24)
 Branch `f1/37-migration-synthesize-cli` → `main`. Depends: PR-36. Size: ≈390 lines, no exception.
