@@ -7190,10 +7190,10 @@ verifier; candidate `72c9cfb`). All three launched in parallel.
 confirmed the safety-critical property.** Per Judgment Day's own rule, SUGGESTION/info rows require no
 fix. This project's established practice across PR-29 through PR-35 nonetheless closes cheap,
 clearly-valid SUGGESTION-tier test-coverage gaps before finalizing rather than leaving them as pure
-disclosure, so five real, narrow gaps (Judge A's bot_token/chat_id pair, Judge B's EISDIR asymmetry,
-and the verifier's chat_id/bot_username/awaiting-preservation trio — chat_id overlaps between Judge A
-and the verifier, counted once) were closed with five new test cases (parent-inline, no `jd-fix-agent`
-needed — pure test additions, no source logic changed): `loadV1Config` gained tests for an existing but
+disclosure, so six real, narrow gaps (Judge A's bot_token/chat_id pair, Judge B's EISDIR asymmetry, and
+the verifier's chat_id/bot_username/awaiting-preservation/AGENTBUS_HOME-whitespace quartet — chat_id
+overlaps between Judge A and the verifier, counted once) were closed with six new test cases
+(parent-inline, no `jd-fix-agent` needed — pure test additions, no source logic changed): `loadV1Config` gained tests for an existing but
 unreadable `config.json` (EISDIR), a round-tripped `bot_token`, a rejected non-negative `chat_id`, and a
 rejected empty `bot_username`; `resolveV1AgentBusHome` gained a test documenting its current
 verbatim-untrimmed-override behavior (matches v1 exactly — not a defect, now explicit); `loadV1State`
@@ -7210,5 +7210,36 @@ run test:static` → **8/8**.
 **At the final tip:** `git diff --numstat main -- src test`: **931 authored lines** (`migration/
 tsconfig.json` 10/0, `migration/v1-config.ts` 107/0, `migration/v1-state.ts` 290/0, `fixtures/
 v1-provenance.json` 12/0, `migration/v1-config.test.ts` 146/0, `migration/v1-state.test.ts` 366/0) —
-grown from the candidate's 829 entirely by this correction round's five new tests, a disclosed
+grown from the candidate's 829 entirely by this correction round's six new tests, a disclosed
 **531-line PR-scoped exception**.
+
+**Scoped re-judgment round 1** (both judges, `72c9cfb..40a7ad4`; judges' frozen worktree moved to the
+correction tip via `git checkout`, not recreated — only the judges, not the verifier, needed a second
+look; first of the two-re-judgment budget). **Judge A and Judge B independently converged on the
+identical finding** (the fourth confirmed instance of this project's own "two judges converging
+independently is strong signal" pattern): this record's own "Merged findings" paragraph above claimed
+"five new test cases" when it actually described and shipped six (the `resolveV1AgentBusHome`
+whitespace-verbatim test was named in the same sentence but dropped from the tally) — both judges
+caught this by cross-checking the prose against the record's own before/after suite-count line two
+paragraphs later (996→1002 = +6, not +5), not by re-deriving anything themselves. Both independently
+confirmed: no source logic changed between the two commits (only test files and these two record
+files), all six new tests are genuine and non-vacuous against the real implementation, the round-1
+EISDIR fix genuinely closes Judge B's original finding (not superficial), and the tsconfig disclosure
+disposition of Judge A's original dead-reference finding is reasonable, not requiring reversal. Zero
+new CRITICAL/WARNING beyond the shared count-accuracy WARNING; zero fix-caused defects.
+
+**Corrected** (parent inline — the "five" → "six" text fix above, a pure prose correction with no code
+or behavior change, so no new test or targeted mutant is needed).
+
+Parent re-verification, independent of any subagent's own report: `rm -rf dist && npm test` → **1002
+tests, 1001 pass, 0 fail, 1 skip**, unchanged (a text-only change adds no new test); `npm run
+test:static` → **8/8**, unchanged.
+
+**JUDGMENT: APPROVED** for `72c9cfb..40a7ad4` (candidate `72c9cfb`; correction `40a7ad4`, covering both
+judges' and the verifier's SUGGESTION-tier test-coverage gaps — zero CRITICAL/WARNING from either judge
+at any round, both independently confirming the core read-only/never-modify safety property). **One of
+the two re-judgment rounds used** — the single new finding (both judges independently: a five-vs-six
+count error in this record's own prose) is a pure documentation fix with zero behavior change, the same
+judgment call this project's own PR-32/33/34/35 established for a narrow, well-understood, cleanly-closed
+residual. No native review ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (`risk:
+medium`, `review_due: true` recorded above, informational only).
