@@ -1137,6 +1137,8 @@ delegation for this session (recorded in `apply-progress.md` §PR-36):
    suite** (`provenance.test.ts` failed once for exactly this reason, confirmed and fixed — the
    established gotcha from PR-32's own record, recurring here).
 
+**JUDGMENT: APPROVED** (`72c9cfb..40a7ad4..d98d461`, one of the two re-judgment rounds used).
+
 #### PR-37 — synthesis + non-interactive CLI entry (D-24)
 Branch `f1/37-migration-synthesize-cli` → `main`. Depends: PR-36. Size: ≈390 lines, no exception.
 Scope: `src/migration/synthesize.ts`, `src/migration/main.ts`, `src/cli/main.ts` (add `migrate-v1` dispatch), `test/migration/synthesize.test.ts`, `test/migration/main.test.ts`.
