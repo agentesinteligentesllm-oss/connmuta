@@ -7143,3 +7143,72 @@ since PR-06b: the estimate priced only the primary deliverable, and full SEAM fi
 supporting v1 type/schema block, the comprehensive typed-refusal surface, and PT-22/strict-TDD-mandated
 test coverage of every refusal kind plus all four roster-backfill permutations) is what the overrun
 actually buys.
+
+**Native review assessment (informational, no native review run — a Judgment Day target).** `gentle-ai
+review assess --cwd . --agent claude-code --base-ref 364ae78 --committed-only --untracked-scope=exclude
+--expected-untracked-inventory=<sha256:85db95d…>` → `risk: medium` (reason: `executable_change` on
+`apply-progress.md`), `review_due: true` (`slice_budget_reached`). Per HANDOFF §2.3, START was not run
+for this candidate — Judgment Day replaces ordinary 4R and both must never run on one target.
+
+**Judgment Day** (frozen worktrees: `../telegram_bus_agent-worktrees/pr36-judges` for both judges,
+`../telegram_bus_agent-worktrees/pr36-verify` — junctioned `node_modules` — for the independent
+verifier; candidate `72c9cfb`). All three launched in parallel.
+
+- **Judge A: 2 SUGGESTION, 0 CRITICAL/WARNING.** (1) `src/migration/tsconfig.json`'s `references:
+  [{"path": "../shared"}]` is currently dead — neither new module imports anything from `shared/*` yet.
+  (2) `test/migration/v1-config.test.ts` never exercised `bot_token`'s round-trip or the `chat_id`
+  `.negative()` refinement's rejection path. Judge A independently confirmed the core read-only
+  guarantee by noting neither module imports any write-capable `fs` function, and confirmed
+  `migrateToCurrentV1`/`V1_STATE_VERSION`/`V1_REQUEST_REMINDER_WINDOW_HOURS` against the real v1 lines
+  it read directly; could not recompute the sha256 pins itself (no Bash available to judges) but
+  confirmed the cited line ranges exactly bound the ported content.
+- **Judge B: 1 SUGGESTION, 0 CRITICAL/WARNING.** `test/migration/v1-config.test.ts` had no
+  EISDIR-style "unreadable, existing file" test analogous to `v1-state.test.ts`'s directory-in-place
+  technique, an asymmetry in the disclosed "comprehensive" refusal-kind coverage. Independently
+  confirmed the same core safety property (no write-capable `fs` imports), confirmed
+  `migrateToCurrentV1` is a faithful line-for-line port against the real v1 source, confirmed the
+  roster-backfill's 5-permutation test coverage and TypeScript narrowing; same sha256 limitation as
+  Judge A.
+- **Independent verifier**: reproduced every factual claim exactly (both sha256 pins, the 829-line
+  size breakdown, the TS2538 compile-time-kill reproduction, `995`+1-skip-shaped suite health —
+  precisely worded as 996 total/995 pass/1 skip/0 fail, flagging the task brief's own off-by-one
+  phrasing, not a candidate defect — and 8/8 static gates). Directly executed 4 throwaway probes
+  against the compiled `dist/` proving byte-identical file + unchanged directory listing across
+  invalid-JSON, JSON-array, future-version and schema-invalid-after-migration inputs — independent
+  proof of the core safety property beyond trusting the test file's own assertions. Wrote 6 of its own
+  new mutants beyond the candidate's 15: 4 SURVIVED (a whitespace-padding trim gap in
+  `resolveV1AgentBusHome`, `chat_id`'s non-negative rejection untested, `bot_username`'s min-length
+  rejection untested, and a pre-set `awaiting` pass-through untested during migration), 2 were
+  legitimate compile-time BUILD-FAILs (a schema field-type mismatch, a discriminated-union literal
+  typo). None of the 4 survivors touch the core safety property (independently proven separately).
+  Also probed and reported: an empty-object `roster: {}` behaves identically to no roster passed
+  (correct); extra/unknown fields on either v1 file are silently stripped by the non-strict `z.object()`
+  schemas, matching v1's own permissive behavior (not a bug, previously undisclosed as an explicit
+  probed fact).
+
+**Merged findings — no contradictions, no CRITICAL/WARNING from either judge; both independently
+confirmed the safety-critical property.** Per Judgment Day's own rule, SUGGESTION/info rows require no
+fix. This project's established practice across PR-29 through PR-35 nonetheless closes cheap,
+clearly-valid SUGGESTION-tier test-coverage gaps before finalizing rather than leaving them as pure
+disclosure, so five real, narrow gaps (Judge A's bot_token/chat_id pair, Judge B's EISDIR asymmetry,
+and the verifier's chat_id/bot_username/awaiting-preservation trio — chat_id overlaps between Judge A
+and the verifier, counted once) were closed with five new test cases (parent-inline, no `jd-fix-agent`
+needed — pure test additions, no source logic changed): `loadV1Config` gained tests for an existing but
+unreadable `config.json` (EISDIR), a round-tripped `bot_token`, a rejected non-negative `chat_id`, and a
+rejected empty `bot_username`; `resolveV1AgentBusHome` gained a test documenting its current
+verbatim-untrimmed-override behavior (matches v1 exactly — not a defect, now explicit); `loadV1State`
+gained a test proving an already-set `awaiting` value survives migration untouched. Judge A's dead
+`../shared` tsconfig reference finding is disclosed, not changed: `src/migration/tsconfig.json` is the
+compile unit PR-37's `synthesize.ts` lands in next, and that module is expected to need `shared/*`
+(`computeRosterHash`, `ProjectRosterEntry`) — the reference is forward-provisioned for the same unit's
+very next slice, not dead weight; TypeScript does not error on an unused project reference.
+
+Parent re-verification after all fixes, independent of any subagent's own report: `rm -rf dist && npm
+run build` → 0 errors; `npm test` → **1002 tests, 1001 pass, 0 fail, 1 skip** (up from 996/995/1); `npm
+run test:static` → **8/8**.
+
+**At the final tip:** `git diff --numstat main -- src test`: **931 authored lines** (`migration/
+tsconfig.json` 10/0, `migration/v1-config.ts` 107/0, `migration/v1-state.ts` 290/0, `fixtures/
+v1-provenance.json` 12/0, `migration/v1-config.test.ts` 146/0, `migration/v1-state.test.ts` 366/0) —
+grown from the candidate's 829 entirely by this correction round's five new tests, a disclosed
+**531-line PR-scoped exception**.

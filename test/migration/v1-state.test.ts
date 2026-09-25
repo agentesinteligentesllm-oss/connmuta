@@ -194,6 +194,53 @@ test("loadV1State migrates a version-1 state: drops BROADCAST threads and derive
   });
 });
 
+test("loadV1State preserves an already-set awaiting field during migration instead of re-deriving it", () => {
+  withV1Home((homeDir) => {
+    const raw = {
+      next_update_id: 1,
+      last_fetch_at: null,
+      last_checkpoint: null,
+      seen_eids: {},
+      threads: {
+        "thread-preset-awaiting": {
+          status: "open",
+          opened_type: "REQUEST",
+          opened_eid: "eid-1",
+          from: "agent-placeholder-a",
+          to: "agent-placeholder-b",
+          body: "open request",
+          opened_at: "2026-01-01T00:00:00.000Z",
+          opened_message_id: 10,
+          via: "direct",
+          acked_at: null,
+          ack_count: 0,
+          resolved_at: null,
+          resolved_by: null,
+          basis: null,
+          // Pre-set to a value migration's own derivation (isOpen -> thread.to) would NOT produce:
+          // the null-coalescing pass-through must leave this alone, not overwrite it.
+          awaiting: "agent-placeholder-a",
+          history: [],
+        },
+      },
+      last_surfaced_digest: null,
+      conditions: {},
+    };
+    writeFileSync(join(homeDir, "state.json"), JSON.stringify(raw), "utf8");
+
+    const result = loadV1State(homeDir);
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(
+        result.state.threads["thread-preset-awaiting"]?.awaiting,
+        "agent-placeholder-a",
+        "an already-present awaiting value must survive migration untouched",
+      );
+    }
+  });
+});
+
 // --- Hard errors: the quarantine-rename branch becomes a hard error (v1 files are never modified) ---
 
 test("loadV1State returns an 'invalid_json' refusal and never touches the file", () => {

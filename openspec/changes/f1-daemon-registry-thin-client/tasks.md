@@ -1085,7 +1085,7 @@ disclosed **429-line PR-scoped exception**. See `apply-progress.md` §PR-35 for 
 
 #### PR-36 — read-only v1 config/state loaders (SEAM)
 Branch `f1/36-migration-v1-readers` → `main`. Depends: PR-35. Size: ≈360 lines, no exception.
-*Size reconciliation (session 36).* Estimated ≈360; **measured 829 authored lines (407 src + 410 test + 12 fixture) at the candidate, a disclosed 429-line PR-scoped exception** — see `apply-progress.md` §PR-36. The estimate line above is the gate's text and is left as written.
+*Size reconciliation (session 36).* Estimated ≈360; **measured 829 authored lines (407 src + 410 test + 12 fixture) at the candidate, a disclosed 429-line PR-scoped exception**; **931 authored lines (407 src + 512 test + 12 fixture) after the Judgment Day correction round, a disclosed 531-line PR-scoped exception** — see `apply-progress.md` §PR-36. The estimate line above is the gate's text and is left as written.
 Scope: `src/migration/v1-config.ts`, `src/migration/v1-state.ts`, `test/migration/v1-config.test.ts`, `test/migration/v1-state.test.ts`.
 Requirements: read-side of `v1-migration › v1 files are backed up and never modified or deleted`.
 Runtime harness: temp `~/.agentbus`-shaped fixture directories (placeholders only).
