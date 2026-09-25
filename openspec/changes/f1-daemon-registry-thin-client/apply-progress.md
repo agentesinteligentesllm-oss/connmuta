@@ -7052,3 +7052,194 @@ backlog row, and closed with a two-line textual addition rather than a behavior 
 judgment call this project's own PR-32/33/34 established for a narrow, well-understood, cleanly-closed
 residual, extended here to a SUGGESTION-tier residual rather than a WARNING-tier one. No native review
 ran for this candidate — a Judgment Day target, per HANDOFF §2.3.
+
+## PR-36 — `migration/v1-config.ts` + `migration/v1-state.ts` (read-only v1 SEAM readers; unit 11 `v1-migration` opens)
+
+**Route.** ODD with the SDD contract preserved, session 36 (Director full-autonomy delegation, Arena
+still down, `sdd-apply` preflight gate still closed). One delegated read-only mapper (36 tool uses,
+covering `tasks.md`'s PR-36/PR-37/PR-38 boundary, `specs/v1-migration/spec.md`'s exact read-side/
+write-side clause split, design.md's migration source-tree row and §12/§13 SEAM-change notes, both
+cited v1 ranges verbatim plus everything they call outside those ranges, both sha256 pins independently
+reproduced, `client/tsconfig.json`'s template shape, the PT-22 placeholder-fixture convention,
+`roster-hash.ts`/`project-file.ts`'s exported shapes, and the established typed-refusal convention
+across three sibling modules), then the orchestrator independently re-reproduced both sha256 pins
+before trusting them (matching the known-good `fetch.ts` hash first) and decided ten open design points
+directly from that evidence (below), then one delegated writer (`general-purpose`, sonnet), then a
+parent readback that found one doc-accuracy defect (fixed before freezing), then a parent mutant sweep
+(delegated to a fork to keep the build/test noise out of the orchestrator's own context) that found one
+genuine value-level test gap (closed before freezing).
+
+**Decisions (orchestrator, session 36), disclosed here and in `tasks.md`'s apply-time note and both
+modules' own doc comments.**
+1. Typed discriminated-union result, never throw (`V1ConfigResult`, `V1StateResult`) — matches
+   `shared/project-file.ts`/`client/binding.ts`/`registry/loader.ts`'s established convention.
+2. The quarantine-rename branch (v1's `quarantineStateFile`/`renameSync`) becomes a hard error: invalid
+   JSON, a non-object body, a future `state_version`, and post-migration schema failure all return a
+   typed refusal with the file completely untouched — pinned directly by an `assertFileUntouched`
+   helper in the test twin (byte-identical before/after, no sibling `.corrupt-*` file). A missing file
+   and an I/O fault on an existing file are unchanged from v1 (default state; typed `unreadable`
+   refusal) since neither was ever a quarantine case there either.
+3. Output types stay v1-native (`V1Config`, `V1State`, `V1ThreadRecord`, …), not reshaped into
+   `shared/thread-record.ts`'s `ThreadRecord` — that conversion belongs to PR-37's `synthesize.ts`.
+4. `to_user_id` gains an optional roster-backed backfill behind a new `roster` parameter v1 never had
+   (v1's `loadState` took no config); only threads still missing it after migration are touched, and an
+   already-resolved value is never overwritten.
+5. `STATE_VERSION` is not imported from `shared/constants.ts` (design.md explicitly drops it there for
+   v2) — reproduced as a local, named `V1_STATE_VERSION = 2` constant citing
+   `telegram-agent-bus/src/config.ts:129`.
+6. Supporting declarations outside the pinned `state.ts:252-439` range (`State`/`ThreadRecord`/
+   `HistoryEntry`/`Conditions`, `defaultState()`, `noConditions()`, `state.ts:15-190`) are reproduced
+   locally, disclosed as supporting and not separately SEAM-pinned.
+7. `getAgentBusHome` (inside the pinned config.ts range) is ported as `resolveV1AgentBusHome`, no
+   behavior change.
+8. "No token resolution from env" requires no code — `bot_token` is read verbatim from JSON, matching
+   v1 exactly; v1's own `resolveBotToken` (outside the pinned range) is not ported.
+9. New leaf compile unit `src/migration/tsconfig.json`, modeled on `src/client/tsconfig.json`
+   (`references: [{"path": "../shared"}]` only); root `tsconfig.json` gained `{"path": "src/migration"}`
+   (TS18003 precedent, PR-09a/PR-10).
+10. Both new fixture rows appended to `test/fixtures/v1-provenance.json`; both new files carry a
+    leading `/**` `Provenance:` header matching `daemon/admission.ts`'s exact format, including the
+    `(D-08)` verdict suffix the header regex requires (the writer caught this itself — the task brief's
+    shorthand example omitted the suffix, the writer correctly favored the real template's format and
+    probed the actual `provenance.test.ts` parser logic before trusting its own header text).
+
+**Parent readback.** Read both source files and both test files in full. `v1-state.ts`'s module header
+claimed `StateError` was "reproduced/adapted locally below" alongside the genuinely-reproduced
+`State`/`ThreadRecord`/`defaultState`/`noConditions` — it isn't: the throw-based error class has no
+counterpart in the typed-refusal design, superseded entirely by `V1StateRefusal`, not reproduced. Fixed
+before freezing (one doc-comment edit, no code change) — the same class of doc/code mismatch this
+project's own PR-33/PR-35 records flag as a recurring, judge-caught defect, caught here by the parent's
+own readback instead.
+
+**Parent mutant sweep.** Delegated to a fork (keeps the repeated build/test tool-call noise out of the
+orchestrator's own context; the fork inherits full context of both already-reviewed source files). 15
+mutants across both files (5 `v1-config.ts`, 10 `v1-state.ts`), explicit `[from, to]` pairs, one `M0`
+comment-only control per file. Result: both `M0` controls survived correctly; 13/15 functional mutants
+KILLED at runtime; 2/15 KILLED at compile time via legitimate TypeScript control-flow narrowing (an
+inverted schema-success check; an OR→AND flip in the roster-backfill skip guard, whose De Morgan
+negation TypeScript can no longer prove narrows `thread.to` to non-null before it indexes the roster —
+the same "a discriminated/narrowed type turns a logic bug into a compile-time catch, not a runtime
+survivor" pattern already on record elsewhere in this project, e.g. PR-31's `BindingResult`). Zero
+genuine runtime survivors. The fork additionally investigated, at the parent's explicit request, whether
+the compile-time-killed backfill-guard mutant was masking a real value-level test gap independent of the
+mutant result — it was: no existing test constructed a thread with an already non-null `to_user_id` and
+a roster passed, so "backfill must not clobber an existing value" was asserted only by code-path
+reasoning, not a direct assertion. Closed with one added test
+(`loadV1State leaves an already-resolved to_user_id untouched when a roster is passed`) before freezing.
+
+**Full suite + static gates, after the fix and the added test.** First run of the full suite (not just
+the two new test files) surfaced `provenance.test.ts` failing — not a code defect: the new files were
+untracked, and that test discovers vendor-provenanced files via a `git ls-files`-based scan, so it never
+saw them (the exact `git add -N` gotcha already on record from PR-32). Fixed with `git add -N` on the
+five new files (never `git add -N .`). Re-run clean: `rm -rf dist && npm run build` → 0 errors; `npm
+test` → **995 tests, 995 pass, 0 fail, 1 skip** (up from 976 pass/1 skip pre-PR-36, +19: 18 from the
+writer's own RED suite +1 from the readback-driven addition); `npm run test:static` → **8/8**.
+
+**At the candidate tip:** `git diff --numstat main -- src test`: **829 authored lines** (`migration/
+tsconfig.json` 10/0, `migration/v1-config.ts` 107/0, `migration/v1-state.ts` 290/0, `fixtures/
+v1-provenance.json` 12/0, `migration/v1-config.test.ts` 91/0, `migration/v1-state.test.ts` 319/0) — a
+disclosed **429-line PR-scoped exception** against the ≈360-line estimate, consistent with every slice
+since PR-06b: the estimate priced only the primary deliverable, and full SEAM fidelity (the reproduced
+supporting v1 type/schema block, the comprehensive typed-refusal surface, and PT-22/strict-TDD-mandated
+test coverage of every refusal kind plus all four roster-backfill permutations) is what the overrun
+actually buys.
+
+**Native review assessment (informational, no native review run — a Judgment Day target).** `gentle-ai
+review assess --cwd . --agent claude-code --base-ref 364ae78 --committed-only --untracked-scope=exclude
+--expected-untracked-inventory=<sha256:85db95d…>` → `risk: medium` (reason: `executable_change` on
+`apply-progress.md`), `review_due: true` (`slice_budget_reached`). Per HANDOFF §2.3, START was not run
+for this candidate — Judgment Day replaces ordinary 4R and both must never run on one target.
+
+**Judgment Day** (frozen worktrees: `../telegram_bus_agent-worktrees/pr36-judges` for both judges,
+`../telegram_bus_agent-worktrees/pr36-verify` — junctioned `node_modules` — for the independent
+verifier; candidate `72c9cfb`). All three launched in parallel.
+
+- **Judge A: 2 SUGGESTION, 0 CRITICAL/WARNING.** (1) `src/migration/tsconfig.json`'s `references:
+  [{"path": "../shared"}]` is currently dead — neither new module imports anything from `shared/*` yet.
+  (2) `test/migration/v1-config.test.ts` never exercised `bot_token`'s round-trip or the `chat_id`
+  `.negative()` refinement's rejection path. Judge A independently confirmed the core read-only
+  guarantee by noting neither module imports any write-capable `fs` function, and confirmed
+  `migrateToCurrentV1`/`V1_STATE_VERSION`/`V1_REQUEST_REMINDER_WINDOW_HOURS` against the real v1 lines
+  it read directly; could not recompute the sha256 pins itself (no Bash available to judges) but
+  confirmed the cited line ranges exactly bound the ported content.
+- **Judge B: 1 SUGGESTION, 0 CRITICAL/WARNING.** `test/migration/v1-config.test.ts` had no
+  EISDIR-style "unreadable, existing file" test analogous to `v1-state.test.ts`'s directory-in-place
+  technique, an asymmetry in the disclosed "comprehensive" refusal-kind coverage. Independently
+  confirmed the same core safety property (no write-capable `fs` imports), confirmed
+  `migrateToCurrentV1` is a faithful line-for-line port against the real v1 source, confirmed the
+  roster-backfill's 5-permutation test coverage and TypeScript narrowing; same sha256 limitation as
+  Judge A.
+- **Independent verifier**: reproduced every factual claim exactly (both sha256 pins, the 829-line
+  size breakdown, the TS2538 compile-time-kill reproduction, `995`+1-skip-shaped suite health —
+  precisely worded as 996 total/995 pass/1 skip/0 fail, flagging the task brief's own off-by-one
+  phrasing, not a candidate defect — and 8/8 static gates). Directly executed 4 throwaway probes
+  against the compiled `dist/` proving byte-identical file + unchanged directory listing across
+  invalid-JSON, JSON-array, future-version and schema-invalid-after-migration inputs — independent
+  proof of the core safety property beyond trusting the test file's own assertions. Wrote 6 of its own
+  new mutants beyond the candidate's 15: 4 SURVIVED (a whitespace-padding trim gap in
+  `resolveV1AgentBusHome`, `chat_id`'s non-negative rejection untested, `bot_username`'s min-length
+  rejection untested, and a pre-set `awaiting` pass-through untested during migration), 2 were
+  legitimate compile-time BUILD-FAILs (a schema field-type mismatch, a discriminated-union literal
+  typo). None of the 4 survivors touch the core safety property (independently proven separately).
+  Also probed and reported: an empty-object `roster: {}` behaves identically to no roster passed
+  (correct); extra/unknown fields on either v1 file are silently stripped by the non-strict `z.object()`
+  schemas, matching v1's own permissive behavior (not a bug, previously undisclosed as an explicit
+  probed fact).
+
+**Merged findings — no contradictions, no CRITICAL/WARNING from either judge; both independently
+confirmed the safety-critical property.** Per Judgment Day's own rule, SUGGESTION/info rows require no
+fix. This project's established practice across PR-29 through PR-35 nonetheless closes cheap,
+clearly-valid SUGGESTION-tier test-coverage gaps before finalizing rather than leaving them as pure
+disclosure, so six real, narrow gaps (Judge A's bot_token/chat_id pair, Judge B's EISDIR asymmetry, and
+the verifier's chat_id/bot_username/awaiting-preservation/AGENTBUS_HOME-whitespace quartet — chat_id
+overlaps between Judge A and the verifier, counted once) were closed with six new test cases
+(parent-inline, no `jd-fix-agent` needed — pure test additions, no source logic changed): `loadV1Config` gained tests for an existing but
+unreadable `config.json` (EISDIR), a round-tripped `bot_token`, a rejected non-negative `chat_id`, and a
+rejected empty `bot_username`; `resolveV1AgentBusHome` gained a test documenting its current
+verbatim-untrimmed-override behavior (matches v1 exactly — not a defect, now explicit); `loadV1State`
+gained a test proving an already-set `awaiting` value survives migration untouched. Judge A's dead
+`../shared` tsconfig reference finding is disclosed, not changed: `src/migration/tsconfig.json` is the
+compile unit PR-37's `synthesize.ts` lands in next, and that module is expected to need `shared/*`
+(`computeRosterHash`, `ProjectRosterEntry`) — the reference is forward-provisioned for the same unit's
+very next slice, not dead weight; TypeScript does not error on an unused project reference.
+
+Parent re-verification after all fixes, independent of any subagent's own report: `rm -rf dist && npm
+run build` → 0 errors; `npm test` → **1002 tests, 1001 pass, 0 fail, 1 skip** (up from 996/995/1); `npm
+run test:static` → **8/8**.
+
+**At the final tip:** `git diff --numstat main -- src test`: **931 authored lines** (`migration/
+tsconfig.json` 10/0, `migration/v1-config.ts` 107/0, `migration/v1-state.ts` 290/0, `fixtures/
+v1-provenance.json` 12/0, `migration/v1-config.test.ts` 146/0, `migration/v1-state.test.ts` 366/0) —
+grown from the candidate's 829 entirely by this correction round's six new tests, a disclosed
+**531-line PR-scoped exception**.
+
+**Scoped re-judgment round 1** (both judges, `72c9cfb..40a7ad4`; judges' frozen worktree moved to the
+correction tip via `git checkout`, not recreated — only the judges, not the verifier, needed a second
+look; first of the two-re-judgment budget). **Judge A and Judge B independently converged on the
+identical finding** (the fourth confirmed instance of this project's own "two judges converging
+independently is strong signal" pattern): this record's own "Merged findings" paragraph above claimed
+"five new test cases" when it actually described and shipped six (the `resolveV1AgentBusHome`
+whitespace-verbatim test was named in the same sentence but dropped from the tally) — both judges
+caught this by cross-checking the prose against the record's own before/after suite-count line two
+paragraphs later (996→1002 = +6, not +5), not by re-deriving anything themselves. Both independently
+confirmed: no source logic changed between the two commits (only test files and these two record
+files), all six new tests are genuine and non-vacuous against the real implementation, the round-1
+EISDIR fix genuinely closes Judge B's original finding (not superficial), and the tsconfig disclosure
+disposition of Judge A's original dead-reference finding is reasonable, not requiring reversal. Zero
+new CRITICAL/WARNING beyond the shared count-accuracy WARNING; zero fix-caused defects.
+
+**Corrected** (parent inline — the "five" → "six" text fix above, a pure prose correction with no code
+or behavior change, so no new test or targeted mutant is needed).
+
+Parent re-verification, independent of any subagent's own report: `rm -rf dist && npm test` → **1002
+tests, 1001 pass, 0 fail, 1 skip**, unchanged (a text-only change adds no new test); `npm run
+test:static` → **8/8**, unchanged.
+
+**JUDGMENT: APPROVED** for `72c9cfb..40a7ad4` (candidate `72c9cfb`; correction `40a7ad4`, covering both
+judges' and the verifier's SUGGESTION-tier test-coverage gaps — zero CRITICAL/WARNING from either judge
+at any round, both independently confirming the core read-only/never-modify safety property). **One of
+the two re-judgment rounds used** — the single new finding (both judges independently: a five-vs-six
+count error in this record's own prose) is a pure documentation fix with zero behavior change, the same
+judgment call this project's own PR-32/33/34/35 established for a narrow, well-understood, cleanly-closed
+residual. No native review ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (`risk:
+medium`, `review_due: true` recorded above, informational only).

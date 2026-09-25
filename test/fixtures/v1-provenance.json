@@ -142,5 +142,17 @@
     "v1Path": "src/index.ts:112-248",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/migration/v1-config.ts",
+    "v1Path": "src/config.ts:168-233",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
+  },
+  {
+    "v2Path": "src/migration/v1-state.ts",
+    "v1Path": "src/state.ts:252-439",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
   }
 ]
