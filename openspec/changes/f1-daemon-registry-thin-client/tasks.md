@@ -1469,23 +1469,34 @@ Scope: `docs/02-architecture/DATA-MODEL.md`, `docs/02-architecture/THREAT-MODEL.
 Requirements: proposal.md deliverable 15.
 Runtime harness: N/A — documentation.
 
-- [ ] 42.1 Finalize DATA-MODEL.md fields: `roster_snapshot`/`roster_hash` required (§2.4), `audit_log.reason` enum aligned to the classification codes used across PR-13/PR-22a/PR-26/PR-27, `updates.body` NULL rule (D-20), the two open points resolved in code (§8: `needs_action` VIEW, `seen_eids` as `UNIQUE` index, D-06).
-- [ ] 42.2 Update THREAT-MODEL.md §4 with the real test file names from design §15's PT → file mapping (e.g., PT-01 `test/security/wrong-room.test.ts`, PT-10 `test/ledger/inbox.test.ts`, PT-26 `test/client/handshake.test.ts` — full list per design.md:527).
-- [ ] 42.3 Close CHECKLIST.md pointers for B-13 (v1 migration, → PR-36–PR-38), B-15 (secret store, → PR-14), B-18 (token-shape validator, → PR-08); leave B-11, B-16, B-12, and the T22/organisation-marker items exactly as `pending Director decision` per design §19 — do not resolve them here.
-- [ ] 42.4 Verify: `npm run build && npm test && npm run test:static && npm run test:wrong-room` (full suite green, confirming every ADR "Tests that must pin it" row and every F1 PT id).
+- [x] 42.1 Finalize DATA-MODEL.md fields: `roster_snapshot`/`roster_hash` required (§2.4), `audit_log.reason` enum aligned to the classification codes used across PR-13/PR-22a/PR-26/PR-27, `updates.body` NULL rule (D-20), the two open points resolved in code (§8: `needs_action` VIEW, `seen_eids` as `UNIQUE` index, D-06).
+- [x] 42.2 Update THREAT-MODEL.md §4 with the real test file names from design §15's PT → file mapping (e.g., PT-01 `test/security/wrong-room.test.ts`, PT-10 `test/ledger/inbox.test.ts`, PT-26 `test/client/handshake.test.ts` — full list per design.md:527).
+- [x] 42.3 Close CHECKLIST.md pointers for B-13 (v1 migration, → PR-36–PR-38), B-15 (secret store, → PR-14), B-18 (token-shape validator, → PR-08); leave B-11, B-16, B-12, and the T22/organisation-marker items exactly as `pending Director decision` per design §19 — do not resolve them here.
+- [x] 42.4 Verify: `npm run build && npm test && npm run test:static && npm run test:wrong-room` (full suite green, confirming every ADR "Tests that must pin it" row and every F1 PT id).
+
+**Apply-time close-out (session 40).** Arena/Alpha debate `bus-v2-f1-pr-42-diff-audit-001`: `APPROVE`,
+`CONSENSUS` in one round, zero objections. THREAT-MODEL.md §4 swept against every PT-01..PT-33 row and found
+already accurate from incremental apply-time updates (no further correction beyond this session's own
+earlier PT-01/07/27/28 fixes). DATA-MODEL.md corrected in several places against the real shipped schema
+(`apply_outcome`'s real thread-lifecycle CHECK constraint replacing a stale v1-carryover enum; `updates.body`
+documented as its own column; `audit_log.reason`'s real vs. forward-declared values disclosed separately).
+CHECKLIST.md closes B-13, B-15 (F1/win-x64 scope), B-18; B-11/B-16/B-12/T22 correctly left pending Director
+decision. `docs/03-adr/INDEX.md` untouched. Verification: `npm test` 1084/1083/0/1 (unchanged from PR-41's
+tip, no src/test file touched), `test:static` 43/43, `test:wrong-room` 3/3. Merged as PR #47 (`b7e72f4`).
+**F1 (`f1-daemon-registry-thin-client`) is now 100% complete: 219/219 tasks, all 44 GitHub PRs merged.**
 
 ## Success Criteria Checklist
 
 Mirrors `proposal.md` "Success criteria" verbatim, with the closing PR(s) for each item.
 
-- [ ] All "Tests that must pin it" rows of ADR-0028 (6), ADR-0029 (8) and ADR-0030 (8) are green in CI — cumulative across PR-02 → PR-41; final CI gate confirmed at PR-41/PR-42.
-- [ ] The two-binding wrong-room CI job is green (PT-01) — PR-41.
-- [ ] Static assertions are green and non-vacuous over both built bundles (PT-27 with the D-01 clauses, PT-28, PT-07) — PR-39, PR-40.
-- [ ] The `DAEMON_DOWN` path makes zero network calls and sends no `Authorization` header (PT-26 a/b) — PR-33.
-- [ ] A v1 `~/.agentbus` fixture (placeholders only) migrates with `.bak-pre-v2-*` siblings, a synthesized registry, a secret-store entry and imported threads; the originals are unchanged — PR-38.
-- [ ] F1 pinning tests green: PT-02..PT-06, PT-08, PT-09 (win-x64), PT-10..PT-20 (PT-19 on Windows), PT-24..PT-28, PT-31, PT-33 (429 half); PT-21 pinned early against the scaffold — PT-21/PT-22 → PR-01a; PT-02 → PR-07a/PR-27; PT-03/04/16/31 → PR-22a; PT-05/06 → PR-08; PT-07 → PR-34/PR-40; PT-08 → PR-19; PT-09/19 → PR-14; PT-10 → PR-12; PT-11 → PR-12/PR-23; PT-12 → PR-15; PT-13 → PR-06; PT-14 → PR-23; PT-15 → PR-03/PR-26; PT-17 → PR-05; PT-18 → PR-09; PT-20 → PR-13; PT-24 → PR-30; PT-25 → PR-27; PT-26 → PR-33; PT-27 → PR-32/PR-40; PT-28 → PR-40; PT-33 → PR-22b/PR-28.
-- [ ] Every `src` file has a `test` twin; `npm test` and `npm run build` pass; no v1 production identifier in the tree (PT-22 deny-list) — enforced by `test/twins.test.ts` and `test/security/repo-scan.test.ts` (PR-01a), checked cumulatively in every later PR.
-- [ ] A re-run of `sdd-init` flips `openspec/config.yaml` `strict_tdd` to `true` against the real `npm test` — not itself a PR deliverable; an orchestrator/Director action after PR-42 merges, against the real `npm test` script fixed in PR-01a.
+- [x] All "Tests that must pin it" rows of ADR-0028 (6), ADR-0029 (8) and ADR-0030 (8) are green in CI — cumulative across PR-02 → PR-41; final CI gate confirmed at PR-41/PR-42.
+- [x] The two-binding wrong-room CI job is green (PT-01) — PR-41.
+- [x] Static assertions are green and non-vacuous over both built bundles (PT-27 with the D-01 clauses, PT-28, PT-07) — PR-39, PR-40.
+- [x] The `DAEMON_DOWN` path makes zero network calls and sends no `Authorization` header (PT-26 a/b) — PR-33.
+- [x] A v1 `~/.agentbus` fixture (placeholders only) migrates with `.bak-pre-v2-*` siblings, a synthesized registry, a secret-store entry and imported threads; the originals are unchanged — PR-38.
+- [x] F1 pinning tests green: PT-02..PT-06, PT-08, PT-09 (win-x64), PT-10..PT-20 (PT-19 on Windows), PT-24..PT-28, PT-31, PT-33 (429 half); PT-21 pinned early against the scaffold — PT-21/PT-22 → PR-01a; PT-02 → PR-07a/PR-27; PT-03/04/16/31 → PR-22a; PT-05/06 → PR-08; PT-07 → PR-34/PR-40; PT-08 → PR-19; PT-09/19 → PR-14; PT-10 → PR-12; PT-11 → PR-12/PR-23; PT-12 → PR-15; PT-13 → PR-06; PT-14 → PR-23; PT-15 → PR-03/PR-26; PT-17 → PR-05; PT-18 → PR-09; PT-20 → PR-13; PT-24 → PR-30; PT-25 → PR-27; PT-26 → PR-33; PT-27 → PR-32/PR-40; PT-28 → PR-40; PT-33 → PR-22b/PR-28.
+- [x] Every `src` file has a `test` twin; `npm test` and `npm run build` pass; no v1 production identifier in the tree (PT-22 deny-list) — enforced by `test/twins.test.ts` and `test/security/repo-scan.test.ts` (PR-01a), checked cumulatively in every later PR.
+- [ ] A re-run of `sdd-init` flips `openspec/config.yaml` `strict_tdd` to `true` against the real `npm test` — not itself a PR deliverable; an orchestrator/Director action after PR-42 merges, against the real `npm test` script fixed in PR-01a. **Left open deliberately** (session 40): this toggles a config file governing the SDD mode for the whole project, and switching sessions at a phase boundary (Director rule DN-04) is the right moment for a fresh session to take this action deliberately, not a drive-by flip at the tail of an already-long implementation session.
 
 ## Pending Director Decisions Carried Into Tasks
 
