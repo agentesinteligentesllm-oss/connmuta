@@ -1113,6 +1113,21 @@ visible.
 
 ---
 
+## `bus-v2-f1-archive-readiness-audit-001` — F1 archive-readiness technical audit (session 41, phase boundary)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-26 (session 41) |
+| Subject | Whether `f1-daemon-registry-thin-client` (218/219 tasks per `tasks.md`, `gentle-ai sdd-status` reporting `applyState: ready`, `dependencies.verify`/`archive: blocked`, `verifyReport: missing`) is technically ready for `sdd-verify` then `sdd-archive`, before the Director's phase-boundary decision (DN-04) on archiving F1 and/or starting F2. This is a technical-readiness audit, not the archive/F2 business decision itself, which stayed with the Director. Also served as this session's live Arena reachability check (a real `bridge_send`, not `curl`, per DN-09/the standing HANDOFF.md instruction). |
+| Authority | The Director, standing full autonomy ("aplica lo que consideres prudente... tienes toda mi autorización"). |
+| Round 1 | Kairo's `PROPOSAL` asked whether running `sdd-verify` before `sdd-archive` carried any technical risk given `verify`/`archive` both reading `"blocked"`, and whether the pending `tasks.md:1499` item (an `sdd-init` re-run flipping `strict_tdd` to `true`) posed any archive risk. Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with 2 objections: (1) a claim that `gentle-ai sdd-status` actually showed `verify`/`archive` as `"ready"` with `blockedReasons: []`, contradicting Kairo's proposal; (2) that `openspec/config.yaml:25` already read `strict_tdd: true`, so `tasks.md:1499` was stale, not a real pending action. |
+| Round 2 | Kairo's `COUNTER` refuted objection 1 with hard evidence — two independent fresh `gentle-ai sdd-status --json` runs (one before opening the debate, one after) both showed `dependencies.verify: "blocked"` and `dependencies.archive: "blocked"` verbatim, gated by `taskProgress.allComplete: false` (218/219), not an actual `"ready"` state — while fully accepting objection 2 with stronger evidence than requested: `git log --follow -p -- openspec/config.yaml` shows exactly one `strict_tdd` change in the file's entire history (`false`→`true`, commit `b0467c7`, session 3, 2026-09-16, immediately after PR-01a merged), never reverted. Alpha's second `AUDIT` returned `APPROVE`, `objections: []` — `CONSENSUS`, not re-litigating the `blocked`/`ready` wording dispute, converging on the same unified plan: check off `tasks.md:1499` as stale, re-run `sdd-status` to confirm the flip to `ready`, run `sdd-verify`, then `sdd-archive`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` in round 2 (one `COUNTER`/`AUDIT` exchange). `tasks.md:1499` checked off (219/219); a fresh `sdd-status` confirmed `taskProgress.allComplete: true`, `dependencies.verify` flipped to `"ready"` (`archive` stayed `"blocked"` pending a `verifyReport`, `nextRecommended: "verify"` — vindicating Kairo's round-1 reading over Alpha's round-1 citation). `sdd-verify` ran clean afterward (0 CRITICAL, 2 WARNING, 2 SUGGESTION; see `verify-report.md`, B-57, B-58). |
+| Left open, carried to the Director | The stale multi-session bookkeeping this debate surfaced (37 sessions narrating an already-completed action as pending) is disclosed in `state.yaml`'s `apply.session_41_correction` field and this row; not itself a new backlog item, since it required no further action beyond the checkbox fix already made. |
+| Consequence | Confirmed Arena/Alpha reachable at this session's start via a real, substantive `bridge_send` (not a synthetic ping) — DN-09's fast path used again successfully. Cleared the path to `sdd-verify` → `sdd-archive` for F1, per the Director's session-41 delegation. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an
