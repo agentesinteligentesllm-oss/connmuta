@@ -6,5 +6,15 @@
     "tsBuildInfoFile": "../../dist/.tsbuildinfo/migration.tsbuildinfo"
   },
   "include": ["**/*.ts"],
-  "references": [{ "path": "../shared" }]
+  // `../registry` and `../secret-store` are the registry/token-ref shapes `synthesize.ts`/`main.ts` build;
+  // `../ledger` is `openLedger`/`writeThreadRecord`/`withTransaction`; `../daemon` is `main.ts`'s own
+  // reuse of `daemon/home.ts`'s `resolveHomeDir` and `daemon/node-floor.ts`'s `isNodeAtOrAboveFloor`
+  // (PR-37, this unit's first source file to need any of the four).
+  "references": [
+    { "path": "../shared" },
+    { "path": "../registry" },
+    { "path": "../secret-store" },
+    { "path": "../ledger" },
+    { "path": "../daemon" }
+  ]
 }

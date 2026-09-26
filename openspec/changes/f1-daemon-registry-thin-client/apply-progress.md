@@ -7243,3 +7243,86 @@ count error in this record's own prose) is a pure documentation fix with zero be
 judgment call this project's own PR-32/33/34/35 established for a narrow, well-understood, cleanly-closed
 residual. No native review ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (`risk:
 medium`, `review_due: true` recorded above, informational only).
+
+---
+
+## PR-37 — `migration/synthesize.ts` + `migration/main.ts` + `cli/main.ts`'s `migrate-v1` dispatch
+
+**Route.** ODD with the SDD contract preserved, session 37 (Director full-autonomy delegation, Arena
+still down at the time this audit ran — mid-session the Director disclosed Arena is being brought back
+up and asked that PR-38 onward route through it once reachable; see HANDOFF.md). One delegated read-only
+mapper (`Explore`, 49 tool uses) resolved the apparent tension between the v1-migration spec's "no
+`project_id` bound" scenario and design §13/D-23's "synthesizes an active binding" (not a contradiction:
+`synthesize.ts`'s project-assignment input is optional, the spec scenario is the bare-call case, D-23 is
+the CLI-flags-supplied case) and confirmed every exact type/function signature `synthesize.ts`/`main.ts`
+needed to compose (`V1Config`/`V1State`, `Registry*` shapes, `SecretStore.set`'s async signature and
+internal `"bot:"` prefix, `writeThreadRecord`'s existing writer, `EXIT_MIGRATION_REFUSED`'s existing
+value, `cli/main.ts`'s `mcp`/`daemon stop` dispatch precedent). The orchestrator decided nine open design
+points from that evidence (recorded in `tasks.md`'s apply-time note), then one delegated writer
+(`general-purpose`, sonnet; RED confirmed compile-level `TS2307`×2 plus failing CLI dispatch tests, GREEN
+52/52), then a parent readback that found and fixed a real crash-consistency bug (registry write moved
+to happen AFTER the ledger write, not before — the idempotency check reads the registry alone, and every
+ledger writer is an upsert, so writing the registry last means a crash before it completes leaves a
+retry safe to redo) and added two tests for branches the writer had left uncovered (the
+already-registered-without-backup conflict, an unreadable-existing-registry refusal), then a parent
+mutant sweep (delegated to a `fork`, 18 mutants + `M0` control across all three changed files) that
+closed two genuine test gaps (a `roster_hash` value-level assertion; an idempotency case for a v1 home
+that never had `state.json`) and disclosed two accepted survivors (the `offsets` upsert-vs-insert
+mutant, unreachable via the public entry point; the ledger-before-registry write-order mutant, the
+parent's own mitigation, not practically unit-testable without fault injection mid-write).
+
+**Decisions (orchestrator, session 37)**, disclosed here and in `tasks.md`'s apply-time note and
+`main.ts`'s own doc comment — see that doc comment for the full list (secret-store probe runs even under
+`--dry-run`; "already migrated" semantics; merge-not-overwrite registry semantics; plain
+non-atomic `writeFileSync`; local reproduction of two private secret-store constants; thread
+`updated_at` stamped with the migration instant).
+
+**Judgment Day** (both blind judges over a shared frozen worktree at `a238680`; an independent verifier
+on its own worktree with a `node_modules` junction).
+
+Round 1: Judge A found 1 CRITICAL (no try/catch anywhere in `runMigration` — an unexpected I/O failure
+would crash with a raw stack trace) + 4 WARNING (untested: the internal node-floor gate, the keychain
+arm of `token_ref`, `--dry-run` with project args, `mergeRegistry` against a genuinely different
+pre-existing entry) + 2 SUGGESTION (undisclosed plaintext-token-in-backup; undocumented
+groups/projects duplicate-entry possibility). Judge B independently found the **same** try/catch
+CRITICAL, plus 3 more CRITICAL of its own: the "already migrated" check was scoped to today's backup
+date only (a later-day re-run of a successful migration produced a false conflict refusal); a newly
+requested project on an already-migrated bot was silently dropped by that same shortcut; and
+`openLedgerFn`'s quarantine status was never checked (a corrupt v2 ledger would silently open onto a
+fresh empty database). Judge A had explicitly considered the quarantine pattern already present in
+already-merged `daemon/bootstrap.ts` and declined to report it as PR-37-specific; the parent's call was
+to fix `migration/main.ts` anyway (worse consequence for one-shot historical-data import than the
+daemon's ongoing-operation case) and file **B-54** for `bootstrap.ts` separately. Judge B also found the
+`mergeRegistry` dedup gap (WARNING) and the same two test-coverage gaps Judge A found (SUGGESTION). The
+independent verifier reproduced the build/suite/static-gate claims exactly, corrected a stale size
+figure (the parent's own 1531 measured before the mutant-sweep fork's later test additions; actual 1565
+at that tip — the seventh confirmed instance of this project's "a parent's record is as fallible as a
+subagent's" pattern), confirmed the crash-consistency fix held under an actual injected mid-write
+failure (not just static reading), and swept 6 novel mutants (4 killed by tests, 2 legitimate
+BUILD-FAILs, 0 survivors).
+
+**Corrected** in `1047f64` via a scoped `jd-fix-agent` delegation (all 10 confirmed findings, each with
+a new pinning test — parent readback confirmed the delegate correctly renamed the catch parameter to
+`caughtError` rather than the delegate prompt's literal suggestion, avoiding a shadow of the existing
+`err` stderr closure). Parent re-verification: `rm -rf dist && npm run build` clean; `npm test` → **1041
+tests, 1040 pass, 0 fail, 1 skip**; `npm run test:static` → **8/8**.
+
+**Scoped re-judgment** (`a238680..1047f64`): Judge A found 0 new issues, independently re-verifying all
+11 items (its own 4 WARNING + 1 CRITICAL + 2 SUGGESTION, Judge B's 3 CRITICAL + 1 WARNING). Judge B found
+1 new WARNING: the date-scoping fix decoupled `backupExists` (any prior day) from the printed
+`backupDate` (still computed from `now()`), so a later-day re-run's success message claimed today's date
+as the migration date.
+
+**Corrected** in `9634ca2` (parent inline — both informational messages in that branch stopped claiming
+a specific date they can no longer verify precisely; one new assertion pinning that a later-day re-run's
+output never contains today's date string). Parent re-verification: `rm -rf dist && npm run build`
+clean; `npm test` → **1041 tests, 1040 pass, 0 fail, 1 skip** (unchanged count — a wording fix plus one
+assertion on existing output, no new test case); `npm run test:static` → **8/8**.
+
+**JUDGMENT: APPROVED** for `a238680..1047f64..9634ca2` (candidate; correction covering all 10 confirmed
+round-1 findings; re-judgment fix for Judge B's one WARNING residual). **One of the two re-judgment
+rounds used** — the single new finding was a narrow, well-understood, single-judge WARNING-tier residual
+on informational-message wording, the same judgment call this project's own PR-32 through PR-36
+established. No native review ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (`risk:
+high` — `process_boundary` on `src/cli/main.ts` — `review_due: true` (`high_risk`) recorded above,
+informational only). Full detail: tribunal record `bus-v2-f1-pr-37-audit-001`.
