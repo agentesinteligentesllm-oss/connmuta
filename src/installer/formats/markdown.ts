@@ -26,12 +26,16 @@ export const CLAUDE_MD_IMPORT_LINE = "@AGENTS.md";
 
 const BLOCK_BEGIN_MARKER = `<!-- ${PRODUCT_NAME}:begin -->`;
 const BLOCK_END_MARKER = `<!-- ${PRODUCT_NAME}:end -->`;
-const BLOCK_PATTERN = new RegExp(`${BLOCK_BEGIN_MARKER}\\n([\\s\\S]*?)\\n${BLOCK_END_MARKER}`);
+// \r?\n tolerates a CRLF file (e.g. a Windows checkout with core.autocrlf) — a bare \n here would
+// never match such a file, making parse() report no block present and duplicate it on every re-run.
+const BLOCK_PATTERN = new RegExp(`${BLOCK_BEGIN_MARKER}\\r?\\n([\\s\\S]*?)\\r?\\n${BLOCK_END_MARKER}`);
 
 export const agentsMdAdapter: FormatAdapter = {
 	parse(text: string): unknown {
 		const match = BLOCK_PATTERN.exec(text);
-		return match === null ? {} : { [PRODUCT_NAME]: match[1] };
+		// Normalized to \n regardless of the file's own line endings, so the identity check against
+		// `entry` (always \n-only) is not defeated by CRLF alone.
+		return match === null ? {} : { [PRODUCT_NAME]: match[1].replace(/\r\n/g, "\n") };
 	},
 
 	buildText(text: string, _entryPath: readonly string[], entry: unknown): string {

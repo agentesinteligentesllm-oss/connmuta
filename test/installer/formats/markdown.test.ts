@@ -67,6 +67,21 @@ test("an identical already-present AGENTS.md block is a no-op", () => {
 	});
 });
 
+test("an identical already-present AGENTS.md block on a CRLF file is still a no-op, not a duplicate", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "AGENTS.md");
+		const original = `# Notes\r\n\r\n${BLOCK_BEGIN_MARKER}\r\nbus protocol text\r\n${BLOCK_END_MARKER}\r\n`;
+		writeFileSync(target, original, "utf8");
+
+		const outcome = editFile({ path: target, adapter: agentsMdAdapter, entryPath: MARKDOWN_ENTRY_PATH, entry: "bus protocol text" });
+
+		// A CRLF file (e.g. a Windows checkout with core.autocrlf) must still be recognized as already
+		// carrying the block; treating it as absent would append a second, duplicate block on every run.
+		assert.equal(outcome, "noop");
+		assert.equal(readFileSync(target, "utf8"), original);
+	});
+});
+
 test("a different AGENTS.md block at the marker refuses with a diff and writes nothing", () => {
 	withTempDir((dir) => {
 		const target = join(dir, "AGENTS.md");

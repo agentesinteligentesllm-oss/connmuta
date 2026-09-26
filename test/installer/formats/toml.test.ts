@@ -86,6 +86,27 @@ test("appending to a present file is a pure append: every original byte is an un
 	});
 });
 
+test("an existing sibling mcp_servers.<other-tool> table survives untouched when conmuta's own table is appended", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.toml");
+		// The primary real-world Codex shape: another tool already installed its own MCP server table
+		// under [mcp_servers.<name>] (a real header, not an inline table), and this adapter must append
+		// its own sibling table alongside it without disturbing or conflicting with the existing one.
+		const original = ['[mcp_servers.other-tool]', 'command = "node"', 'args = ["other.js"]', ""].join("\n");
+		writeFileSync(target, original, "utf8");
+
+		const outcome = editFile({ path: target, adapter: tomlAdapter, entryPath: ENTRY_PATH, entry: { command: "node", args: ["x"] } });
+
+		assert.equal(outcome, "written");
+		const written = readFileSync(target, "utf8");
+		assert.equal(written.slice(0, original.length), original, "expected every original byte to be an unmodified prefix");
+
+		const parsed = tomlAdapter.parse(written) as { mcp_servers: Record<string, { command: string; args: string[] }> };
+		assert.deepEqual(parsed.mcp_servers["other-tool"], { command: "node", args: ["other.js"] });
+		assert.deepEqual(parsed.mcp_servers[MCP_SERVER_NAME], { command: "node", args: ["x"] });
+	});
+});
+
 test("an inline pre-existing mcp_servers table makes the append a re-parse mismatch, refused and restored", () => {
 	withTempDir((dir) => {
 		const target = join(dir, "config.toml");
