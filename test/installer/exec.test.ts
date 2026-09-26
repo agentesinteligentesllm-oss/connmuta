@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { win32 } from "node:path";
 
 import {
 	EXEC_FILE_OPTIONS,
@@ -35,20 +35,24 @@ function createFakeExec(): { execImpl: ExecFileImpl; calls: RecordedExecCall[] }
 	return { execImpl, calls };
 }
 
-/** What `icaclsExePath`/`regExePath` must resolve to, reconstructed the same way this module builds it. */
+/**
+ * What `icaclsExePath`/`regExePath` must resolve to, reconstructed the same way this module builds
+ * it. Always `win32` (never the platform-default `node:path`): these paths are Windows-shaped
+ * regardless of the host running this suite, since `icacls.exe`/`reg.exe` only exist on Windows.
+ */
 function expectedSystem32Path(exeName: string): string {
-	return join(process.env.SystemRoot ?? "C:\\Windows", "System32", exeName);
+	return win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", exeName);
 }
 
 test("icaclsExePath resolves to an absolute path under SystemRoot\\System32", () => {
 	const path = icaclsExePath();
-	assert.ok(isAbsolute(path), `expected an absolute path, got: ${path}`);
+	assert.ok(win32.isAbsolute(path), `expected an absolute path, got: ${path}`);
 	assert.equal(path, expectedSystem32Path("icacls.exe"));
 });
 
 test("regExePath resolves to an absolute path under SystemRoot\\System32", () => {
 	const path = regExePath();
-	assert.ok(isAbsolute(path), `expected an absolute path, got: ${path}`);
+	assert.ok(win32.isAbsolute(path), `expected an absolute path, got: ${path}`);
 	assert.equal(path, expectedSystem32Path("reg.exe"));
 });
 

@@ -1,5 +1,5 @@
 import { execFileSync, type ExecFileSyncOptionsWithStringEncoding } from "node:child_process";
-import { join } from "node:path";
+import { win32 } from "node:path";
 
 /**
  * The installer's sole exec allow-list (D-50, design.md §12.2): the only place under `src/installer/`
@@ -30,12 +30,16 @@ function systemRoot(): string {
 
 /** Absolute, allow-listed path to `icacls.exe`. */
 export function icaclsExePath(): string {
-	return join(systemRoot(), SYSTEM32_DIR_NAME, ICACLS_EXE_NAME);
+	// Always win32 join/isAbsolute (not the platform-default `node:path`): these paths are Windows-shaped
+	// (backslash `SystemRoot`) regardless of the host running the test suite, and both executables only
+	// ever exist on Windows — the platform-default join broke `isAbsolute` on a POSIX CI runner (native
+	// review finding R3-posix-path-assertions-fail).
+	return win32.join(systemRoot(), SYSTEM32_DIR_NAME, ICACLS_EXE_NAME);
 }
 
 /** Absolute, allow-listed path to `reg.exe`. */
 export function regExePath(): string {
-	return join(systemRoot(), SYSTEM32_DIR_NAME, REG_EXE_NAME);
+	return win32.join(systemRoot(), SYSTEM32_DIR_NAME, REG_EXE_NAME);
 }
 
 /** `execFileSync` options fixed for every allow-listed call: never a shell, output captured as text. */
