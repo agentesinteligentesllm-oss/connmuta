@@ -1128,6 +1128,21 @@ visible.
 
 ---
 
+## `bus-v2-f2-explore-decisions-001` — F2 exploration: 3 open decisions + adding Pi to the tool-config matrix
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-26 (session 41) |
+| Subject | Before `sdd-propose` for `f2-installer-and-doctor`: how to close backlog spike B-05 (installer config-matrix study, never run), how to merge into existing tool-config files without data loss, how to detect which tools are installed, and whether to add **Pi** (`@earendil-works/pi-coding-agent`, installed on this machine) to `OVERVIEW.md` §10.3's tool-config matrix. |
+| Authority | The Director, standing full autonomy, after reviewing Kairo's explanation of the three open questions and explicitly asking to add Pi and to leverage Alpha for the decision. |
+| Round 1 | Kairo's `PROPOSAL`: (1) close B-05 via F2's own write-then-readback tests instead of a separate manual spike; (2) merge algorithm = strict per-format parser + refuse-and-diff on ambiguity + pre-edit backup (mirroring F1's `*.bak-pre-v2-*` migration convention), never raw string/regex surgery; (3) tool detection via an explicit wizard checkbox list, no auto-detection for the first slice; (4) add Pi with paths Kairo had verified by reading the real installed CLI bundle (`~/.pi/agent/mcp.json` confirmed; the project-scoped path only inferred, disclosed as unconfirmed). Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with 3 objections: JSONC tolerance is required for the VS Code/Cursor/Claude Code/Gemini CLI/OpenCode/Antigravity config family (raw `JSON.parse` would reject valid commented files); Codex CLI's `.codex/config.toml` needs an explicit TOML parser dependency (`package.json` has none); B-05's closure tests need realistic pre-populated fixtures, not empty objects, or the non-destructive-merge property goes unpinned. Alpha additionally upgraded Pi from inferred to fully confirmed, citing a specific installed package (`pi-mcp-adapter/config.ts`) with the exact project-scoped path. |
+| Round 2 | Kairo independently re-verified all 4 points before accepting: the JSONC claim, via `~/.cursor/argv.json` on this machine explicitly using `//` comments and documenting itself as a commented config file (same tool family as `.cursor/mcp.json`); the TOML-dependency gap, via `package.json`'s real current dependency list; and Pi's exact citation, by reading `pi-mcp-adapter/config.ts` lines 16-22 and 183-197 directly — confirming not only the project-scoped `.pi/mcp.json` path but an unlisted extra fact, that Pi *also* reads the same shared `.mcp.json` project file Claude Code uses. Kairo's `CONSENSUS` accepted all 3 objections with `{n, claim, evidence}` and folded the new shared-surface fact into the decision record. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` in round 2 (one `AUDIT`/`CONSENSUS` exchange). All 4 decisions locked for `sdd-propose`: B-05 closes via realistic-fixture round-trip tests; merge = JSONC-tolerant parser for one config family + a new TOML parser dependency for Codex CLI + refuse-and-diff + pre-edit backup; detection = wizard checkboxes only; Pi added to the matrix with 3 confirmed surfaces (global, Pi-project, shared-project) and the shared-surface implication carried into design. |
+| Left open, carried to the Director | None new. |
+| Consequence | Recorded as an addendum to `openspec/changes/f2-installer-and-doctor/exploration.md` (no rewrite of the original explore content). Clears the way for `sdd-propose`. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an

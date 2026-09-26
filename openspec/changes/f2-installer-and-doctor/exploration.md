@@ -64,3 +64,18 @@ Proceed to `sdd-propose` for `f2-installer-and-doctor`, explicitly carrying forw
 ### Ready for Proposal
 
 Yes, with the explicit caveat that B-05's evidence gap and the merge-algorithm/detection-heuristic open questions should be raised with the Director before or during `sdd-propose` — this is a real, unresolved product decision, not a default the orchestrator should pick unattended.
+
+### Addendum (same session, after Director review): Pi added to the tool-config matrix, 3 decisions debated with Alpha
+
+The Director reviewed the three open questions above, asked for a detailed explanation, then authorized proceeding with Kairo's recommendation on all three and asked to add **Pi** (`@earendil-works/pi-coding-agent`, already installed on this machine) to the tool-config matrix. Kairo investigated Pi's real installed config surfaces directly (not from documentation) and debated all four points with Alpha before locking them (`bus-v2-f2-explore-decisions-001`, `CONSENSUS` after one `AUDIT`/`COUNTER` round):
+
+1. **B-05 closes via F2's own write-then-readback tests, not a separate spike** — with Alpha's added condition: every merge-test fixture must start from a config already containing at least one pre-existing, unrelated MCP server entry (and other non-MCP keys where the format has them), never an empty object, or the test would pass vacuously without pinning non-destructive merging.
+2. **Merge algorithm: strict per-format parser, refuse-and-diff on ambiguity, pre-edit backup** — with two added conditions Alpha caught: (a) the Claude Code/Cursor/VS Code/Gemini CLI/OpenCode/Antigravity project-config family needs a **JSONC-tolerant** parser, not raw `JSON.parse` — independently verified via `~/.cursor/argv.json` on this machine, which explicitly uses `//` comments and documents itself as such, confirming this tool family's own config-file convention; (b) Codex CLI's `.codex/config.toml` needs an explicit TOML parser added as a dependency (`package.json` currently has none) — F2's first slice must add both this and a JSONC parser alongside `@clack/prompts`.
+3. **Detection via wizard checkboxes, no auto-detect for v1** — fully endorsed by Alpha without changes.
+4. **Pi added to the matrix, upgraded from inferred to fully confirmed.** Investigated directly on this machine (not guessed): the real npm-global package is `@earendil-works/pi-coding-agent` (CLI binary `pi`, v0.86.1). A separate installed plugin package, `pi-mcp-adapter` (at `~/.pi/agent/npm/node_modules/pi-mcp-adapter/config.ts`), contains the actual MCP config path logic, confirmed by reading the source directly (lines 16-22, 183-197):
+   - **Global**: `getPiGlobalConfigPath()` → `~/.pi/agent/mcp.json` (key `mcpServers`, `{command,args}` shape — same shape as Claude Code/Cursor/Gemini CLI).
+   - **Project (Pi-specific)**: `getProjectPiConfigPath(cwd)` → `<cwd>/.pi/mcp.json`.
+   - **Project (shared)**: `getProjectConfigPath(cwd)` → `<cwd>/.mcp.json` — **Pi also reads the same project file Claude Code uses.** This is new information beyond the original exploration: `.mcp.json` is a multi-tool shared surface (at least Claude Code + Pi), so F2's merge logic and `doctor` checks must treat writes to it as affecting more than one tool, not as single-owner.
+
+No new backlog items filed from this debate; the three conditions above are carried directly into `sdd-propose` rather than deferred.
+
