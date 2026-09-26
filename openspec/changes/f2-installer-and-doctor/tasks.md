@@ -112,11 +112,11 @@ Scope: `src/installer/tool-targets.ts`, `src/installer/launcher.ts`, `test/insta
 Requirements: `tool-config-merge › Written entries are id-only stdio, zero env, never npx`; `› VS Code's differently-named key is used`; `› .mcp.json is treated as a shared surface across readers` (D-43 Pi rule); `› OpenCode config is written only at the project level`.
 Runtime harness: unit tests; no process spawn (only argv/entry construction is under test here).
 
-- [ ] 4.1 RED: `test/installer/launcher.test.ts` — `command = realpathSync(process.execPath)`, `args = [<abs dist/src/cli/main.js>, "mcp", "--project", <id>]`, zero `env` (D-42).
-- [ ] 4.2 GREEN: implement `installer/launcher.ts`.
-- [ ] 4.3 RED: `test/installer/tool-targets.test.ts` — entry shape per the 8-row matrix (§7.2): `mcpServers`/`servers`/`mcp` container per surface, `opencode.json`'s array-form `command`; never `npx`, `enableAllProjectMcpServers`, Codex `trust_level`, or any global-file target; Pi dedup rule (D-43): writing `.pi/mcp.json` skipped when Claude Code is selected in the same run or `.mcp.json` already holds an identical entry, and `.pi/mcp.json` selected otherwise; Pi's global `~/.pi/agent/mcp.json` never a target; OpenCode never targets a global path.
-- [ ] 4.4 GREEN: implement `installer/tool-targets.ts` (the 8-row matrix + entry builder + D-43 Pi rule).
-- [ ] 4.5 Verify: `npm run build && node --test "dist/test/installer/tool-targets.test.js" "dist/test/installer/launcher.test.js"`.
+- [x] 4.1 RED: `test/installer/launcher.test.ts` — `command = realpathSync(process.execPath)`, `args = [<abs dist/src/cli/main.js>, "mcp", "--project", <id>]`, zero `env` (D-42).
+- [x] 4.2 GREEN: implement `installer/launcher.ts`.
+- [x] 4.3 RED: `test/installer/tool-targets.test.ts` — entry shape per the 8-row matrix (§7.2): `mcpServers`/`servers`/`mcp` container per surface, `opencode.json`'s array-form `command`; never `npx`, `enableAllProjectMcpServers`, Codex `trust_level`, or any global-file target; Pi dedup rule (D-43): writing `.pi/mcp.json` skipped when Claude Code is selected in the same run or `.mcp.json` already holds an identical entry, and `.pi/mcp.json` selected otherwise; Pi's global `~/.pi/agent/mcp.json` never a target; OpenCode never targets a global path.
+- [x] 4.4 GREEN: implement `installer/tool-targets.ts` (the 8-row matrix + entry builder + D-43 Pi rule).
+- [x] 4.5 Verify: `npm run build && node --test "dist/test/installer/tool-targets.test.js" "dist/test/installer/launcher.test.js"`.
 
 #### PR-05 — 8×3 merge fixtures + B-05 closure integration test
 Branch `f2/05-tool-config-fixtures` → `main`. Depends: PR-04. Size: ≈350 lines, no exception.
