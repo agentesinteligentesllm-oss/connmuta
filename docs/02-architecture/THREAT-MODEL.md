@@ -155,6 +155,16 @@ Proposed identifiers. The F1 SDD spec assigns real file names; Strict TDD applie
 | PT-32 | Doctor flags a roster bot whose `getChatMember` status is `administrator` or `creator`. | installer unit | non-admin rule, v1:README.md:69-71 | F2 |
 | PT-33 | HTTP 429 → `RATE_LIMITED{retry_after_s}` with no auto-retry and an unmoved cursor; consecutive AUDIT+COUNTER turns are coalesced into one group post. | daemon unit · `test/daemon/poller.test.ts` (poller half) · `test/daemon/send/rate.test.ts` (send half) | v1 tasks.md:80 | F1, F5 |
 
+### 4.1 F2 installer/doctor threat-matrix boundaries
+
+The `f2-installer-and-doctor` design (`openspec/changes/f2-installer-and-doctor/design.md`, "Threat
+matrix") enumerates boundaries the installer/doctor CLI introduces; each `Applicable` row gains its
+own RED test in the PR that ships it, added to this table as F2 proceeds.
+
+| Boundary | Applicability | Design response | Planned RED tests |
+|---|---|---|---|
+| Filesystem writes outside the home | Applicable | One edit engine for every file the installer writes: `lstat` refuses a symlinked target or its parent before any write; an absent file creates its parent directories with no backup needed; a present file is strictly parsed per format and a conflicting same-named entry is refused with a diff, never silently overwritten; an exclusive pre-edit backup (`COPYFILE_EXCL`, retried with a finer timestamp on a same-second collision) precedes every write; the write itself goes through a temp file plus atomic rename, then a readback-and-re-parse assertion restores from the backup if the result is not exactly the intended entry. | `test/installer/file-edit.test.ts`: symlink target refused, symlinked parent refused, absent file creates parent directories with no backup taken, a parse error refuses citing the position, an identical same-named entry is a no-op, a different same-named entry refuses with a diff, a pre-existing backup filename collision never overwrites the earlier backup |
+
 ## 5. Focus areas
 
 ### 5.1 Wrong-room CI test (I1)
