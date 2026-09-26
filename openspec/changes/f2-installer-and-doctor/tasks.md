@@ -160,25 +160,48 @@ Runtime harness: unit tests over temp-dir project files; reuses the existing `pa
 - [x] 6b.2 GREEN: implement `shared/project-file-writer.ts` (`serializeProjectFile`, `verifyProjectFileMatches`, `writeProjectFile`), reusing `parseProjectFile`. Write-if-absent uses an exclusive (`wx`) write rather than an `exists()`-then-`write()` pair, closing a TOCTOU gap a native review found (`review-b3c7a8a705121e52`): a file created by another process between the check and the write would otherwise be silently overwritten.
 - [x] 6b.3 Verify: `npm run build && node --test "dist/test/shared/project-file-writer.test.js"`.
 
-#### PR-07 — `ledger-access.ts` + `registry-commit.ts` + `token-ref.ts`
-Branch `f2/07-registry-commit` → `main`. Depends: PR-06b. Size: ≈350 lines, no exception.
-Scope: `src/installer/ledger-access.ts`, `src/installer/registry-commit.ts`, `src/installer/token-ref.ts`, three test twins.
-Requirements: `registry-authoring › Every registry write is accompanied by an audit row`; underlies `installer-wizard › group add`/`project bind` writes; `secret-store › Installer writes a token through the existing secret-store API only` (token-ref half).
-Runtime harness: unit tests with an in-memory/temp ledger; the R6 audit-row assertion runs against a real `node:sqlite` file per D-41's evidence.
+**Design estimated ≈350 authored lines for all three modules in one slice; the real measured diff at
+apply time was 694 lines (81+109 ledger-access+twin, 158+235 registry-commit+twin, 38+62 token-ref
++twin, +11 a `tsconfig.json` project-reference edit) — re-sliced here at the three modules' own
+natural boundaries (tasks.md's own 7.1-7.2/7.3-7.4/7.5 grouping), confirmed independent of each other
+(no import between `registry-commit.ts`, `ledger-access.ts` or `token-ref.ts` — each is wired
+together only by a later caller, D-41).**
 
-- [ ] 7.1 RED: `test/installer/ledger-access.test.ts` — ledger absent ⇒ `openLedger()` creates at current version (only reachable from `setup`); present ⇒ opens with `PRAGMA busy_timeout = INSTALLER_LEDGER_BUSY_TIMEOUT_MS`; `user_version` mismatch refuses; the installer never migrates or quarantines.
-- [ ] 7.2 GREEN: implement `installer/ledger-access.ts`.
-- [ ] 7.3 RED: `test/installer/registry-commit.test.ts` — a successful write (`REGISTRY_CREATED`/`BOT_ADDED`/`GROUP_ADDED`/`PROJECT_BOUND`) commits exactly one audit row (`direction: "system"`, `outcome: "ok"`, `client_id: null`) inside the same `BEGIN IMMEDIATE` transaction as the registry rename; a refused change (fails validate-before-replace) produces no audit row and no registry write; a throw after the rename rolls back the row; two concurrent commits serialize on the immediate lock.
-- [ ] 7.4 GREEN: implement `installer/registry-commit.ts` (D-41: direct `appendAuditRow` + rename in one transaction).
-- [ ] 7.5 RED then GREEN: `test/installer/token-ref.test.ts` — `token-ref.ts` produces the same `token_ref` shape `migration/main.ts:82-89` uses privately (disclosed duplication; convergence is a backlog row, not a drive-by edit of a merged file).
-- [ ] 7.6 Verify: `npm run build && node --test "dist/test/installer/ledger-access.test.js" "dist/test/installer/registry-commit.test.js" "dist/test/installer/token-ref.test.js"`.
+#### PR-07a — `ledger-access.ts`
+Branch `f2/07a-ledger-access` → `main`. Depends: PR-06b. Size: 190 lines, no exception.
+Scope: `src/installer/ledger-access.ts`, `test/installer/ledger-access.test.ts`.
+Requirements: underlies `installer-wizard › group add`/`project bind` writes (D-41).
+Runtime harness: unit tests against a real `node:sqlite` file per D-41's evidence.
+
+- [x] 7a.1 RED: `test/installer/ledger-access.test.ts` — ledger absent ⇒ delegates to the daemon's `openLedger` (design §5.1, "only `setup` reaches this"), creating and migrating a fresh file to `LEDGER_SCHEMA_VERSION`; present ⇒ opens directly with `PRAGMA busy_timeout = INSTALLER_LEDGER_BUSY_TIMEOUT_MS`; a `user_version` mismatch (older or newer) refuses with `reason: "version_mismatch"`; the installer never migrates or quarantines an existing file.
+- [x] 7a.2 GREEN: implement `installer/ledger-access.ts` (`openInstallerLedger` — named to avoid colliding with the daemon's own exported `openLedger`).
+- [x] 7a.3 Verify: `npm run build && node --test "dist/test/installer/ledger-access.test.js"`.
+
+#### PR-07b — `registry-commit.ts`
+Branch `f2/07b-registry-commit` → `main`. Depends: PR-07a. Size: 393 lines, no exception.
+Scope: `src/installer/registry-commit.ts`, `test/installer/registry-commit.test.ts`.
+Requirements: `registry-authoring › Every registry write is accompanied by an audit row`.
+Runtime harness: unit tests with a real `node:sqlite` ledger file per D-41's evidence.
+
+- [x] 7b.1 RED: `test/installer/registry-commit.test.ts` — a successful write (`REGISTRY_CREATED`/`BOT_ADDED`/`GROUP_ADDED`/`PROJECT_BOUND`) commits exactly one audit row (`direction: "system"`, `outcome: "ok"`, `client_id: null`) inside the same `BEGIN IMMEDIATE` transaction as the registry rename; a refused change (fails validate-before-replace, decided before any transaction opens) produces no audit row and no registry write; a throw after a landed rename but before `COMMIT` rolls the row back and restores the pre-call bytes; two concurrent commits serialize on the immediate lock.
+- [x] 7b.2 GREEN: implement `installer/registry-commit.ts` (`commitRegistryChange`; D-41: direct `appendAuditRow` + a self-contained single-attempt temp-write-then-rename inside one `withTransaction`, reusing only `registry/writer.ts`'s pure `serializeRegistry`/`validateRegistryBytes` pair — `replaceRegistryFile` itself is not reusable here since it never throws on a rename failure, and a transaction rollback needs a throw).
+- [x] 7b.3 Verify: `npm run build && node --test "dist/test/installer/registry-commit.test.js"`.
+
+#### PR-07c — `token-ref.ts`
+Branch `f2/07c-token-ref` → `main`. Depends: PR-07b. Size: 100 lines, no exception.
+Scope: `src/installer/token-ref.ts`, `test/installer/token-ref.test.ts`.
+Requirements: `secret-store › Installer writes a token through the existing secret-store API only` (token-ref half).
+Runtime harness: unit tests, no real secret store needed (pure function over a `SecretStoreSelection` value).
+
+- [x] 7c.1 RED then GREEN: `test/installer/token-ref.test.ts` — `token-ref.ts` produces the same `token_ref` shape `migration/main.ts:82-89` uses privately (disclosed duplication; convergence is a backlog row, not a drive-by edit of a merged file), for both the keychain and file-fallback arms.
+- [x] 7c.2 Verify: `npm run build && node --test "dist/test/installer/token-ref.test.js"`.
 
 ### Unit 5 — Exec, ACL, autostart (D-40, D-49, D-50)
 
 **Design §17 row 8 estimated ≈450 authored lines for exec + ACL + autostart in one slice; split here at the exec/ACL vs. autostart module boundary to stay under the 400-line budget (PR-08 ≈220, PR-09 ≈250), rather than carry a disclosed overage into apply.**
 
 #### PR-08 — `exec.ts` + `acl.ts`
-Branch `f2/08-exec-acl` → `main`. Depends: PR-07. Size: ≈220 lines, no exception.
+Branch `f2/08-exec-acl` → `main`. Depends: PR-07c. Size: ≈220 lines, no exception.
 Scope: `src/installer/exec.ts`, `src/installer/acl.ts`, `test/installer/exec.test.ts`, `test/installer/acl.test.ts`.
 Requirements: `secret-store › Fallback file and daemon home are ACL'd` (idempotent re-run scenario). Threat matrix: Subprocess spawn (Applicable; the `icacls`/`reg` half).
 Runtime harness: `installer/exec.test.ts` asserts argv shape only (no real subprocess); `acl.test.ts`'s Windows path runs a real scratch-directory `icacls` round trip in CI.
