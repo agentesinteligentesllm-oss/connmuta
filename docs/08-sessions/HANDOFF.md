@@ -13,22 +13,30 @@
 
 ## §0 — Quick start
 
-**Check Arena Orion FIRST, before assuming Judgment Day — this has now held for thirteen
-consecutive sessions (PR-06 through PR-38), but never assume it stays that way.** Session 38 checked
-`curl --max-time 5 http://127.0.0.1:8766/mcp` live at its own start and got connection-refused (exit
-7, HTTP 000), identical to session 37. **Do not assume that is still true — check again, live, at
-the start of this session**, with the same `curl` probe and/or `gentle-ai review status` (its
-MCP-server connection list will show `arena` as either connected or `ECONNREFUSED`). If Arena
-responds: read [`docs/01-constitution/GOVERNANCE.md`](../01-constitution/GOVERNANCE.md)'s
-debate/audit process fresh before starting — that protocol has not been exercised in this project
-since early F1 and is not re-derived in this file; do not improvise it from memory of Judgment Day's
-shape, they are not the same protocol. If Arena is still down, everything in this file's §2 (the ODD
-+ Judgment Day pipeline) applies unchanged, exactly as it has for PR-06 through PR-38.
+**DN-09 (2026-09-25, still session 38): Alpha's audit now replaces Judgment Day whenever Arena
+responds — check the REAL bridge tool first, never `curl` alone.** PR-38 itself merged under the
+Judgment Day fallback (Arena checked down, twice, by `curl`, at that point in the session). Later in
+the SAME session, the Director stated Arena was reachable; `curl --max-time 5
+http://127.0.0.1:8766/mcp` still reported connection-refused (exit 7) when re-checked — TWICE,
+including immediately after a real send succeeded — but `mcp__arena__bridge_send` to `alpha` worked
+on the first try. **`curl` against that endpoint is not a reliable signal for this bridge.** The
+authoritative check from here on: attempt a real `bridge_send` (or `gentle-ai review status`'s own
+MCP connection list, not a raw `curl`) and trust ITS result. If Alpha responds: this is now the
+DEFAULT route, not a fallback — read
+[`docs/01-constitution/GOVERNANCE.md`](../01-constitution/GOVERNANCE.md) §2 and §3 (the fast path is
+already native: send a `PROPOSAL` naming the frozen candidate by pointer, never pasted code; a clean
+`AUDIT` with `APPROVE`+`objections: []` closes straight to `CONSENSUS` in one round; a real objection
+produces `APPROVE_WITH_CHANGES`, and Kairo corrects and lets Alpha re-`AUDIT` the delta, inside the
+existing round budget). **Do not additionally spawn `jd-judge-a`/`jd-judge-b` "just in case" when a
+real Alpha audit already ran** — DN-09 retires that duplication. If Alpha genuinely does not respond
+(a real `bridge_send` attempt errors or times out, not just a slow `curl`): fall through to this
+file's §2 point 1, the ODD + Judgment Day pipeline, exactly as PR-06 through PR-38 ran it.
 
 Session 38 merged **PR-38** (`test/fixtures/v1-home/{config,state}.json` + `test/migration/integration.test.ts`
-+ `docs/runbooks/migrate-from-v1.md`) with both blind judges, a separate independent verifier, and
-**both** of the two re-judgment rounds — the first PR since PR-31 to need both. **Unit 11
-`v1-migration` CLOSES. Unit 12 `static-assertions-plus-wrong-row-ci` opens with PR-39.**
++ `docs/runbooks/migrate-from-v1.md`) under the Judgment Day fallback — both blind judges, a separate
+independent verifier, and **both** of the two re-judgment rounds, the first PR since PR-31 to need
+both. **Unit 11 `v1-migration` CLOSES. Unit 12 `static-assertions-plus-wrong-room-ci` opens with
+PR-39** — the first slice with a real chance of running through Arena/Alpha instead, per DN-09.
 
 **Copy-paste prompt to start the next session:**
 
@@ -36,9 +44,9 @@ Session 38 merged **PR-38** (`test/fixtures/v1-home/{config,state}.json` + `test
 Continúa el cambio SDD `f1-daemon-registry-thin-client` en PR-39 (`test/security/predicates.ts` SEAM +
 `test/security/closure.ts` + twin, abre la unidad 12 `static-assertions-plus-wrong-room-ci`): lee
 primero `docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
-Antes de nada, verifica si la Arena Orion (http://127.0.0.1:8766/mcp) responde: si sí, la auditoría
-corre ahí (lee GOVERNANCE.md, ese protocolo no está resumido en el handoff); si no, cae de vuelta a
-ODD + Judgment Day (ambos jueces + verificador independiente) exactamente como las últimas 13 sesiones.
+Verifica Arena Orion con un `bridge_send` real, no con `curl` (confirmado poco fiable para este puente
+en sesión 38) — DN-09 ya ratificó que Alpha audita sola cuando Arena responde, sin duplicar con
+Judgment Day; si Alpha no responde de verdad, cae a ODD + Judgment Day como las últimas 13 sesiones.
 Tienes autorización total del Director para decidir y ejecutar todo sin pedir confirmación, en esta
 sesión y en todas las siguientes de este cambio, incluyendo el cierre y el mini-prompt para la próxima.
 ```
@@ -73,11 +81,15 @@ The working tree must be **clean**. The status command must print `nextRecommend
 
 ## §2 — Settled for the next slice (do not re-litigate; change only if the Director asks)
 
-**0. Arena-first routing (supersedes nothing below — it is a gate IN FRONT of everything else).**
-Check Arena reachability live at session start (§0). If reachable: the audit route for this slice is
-Arena tribunal debate, not Judgment Day — read `GOVERNANCE.md`'s debate process before acting on it,
-since this file does not carry that protocol's steps. If Arena is still down: fall through to point 1
-below, unchanged from every session since PR-06 (now thirteen in a row).
+**0. Arena-first routing, now DN-09-ratified as the default, not a fallback (supersedes nothing below
+— it is a gate IN FRONT of everything else).** Check Arena reachability live at session start (§0) with
+a REAL `bridge_send` attempt, not `curl` alone (confirmed unreliable for this bridge in session 38 —
+it reported connection-refused twice, including right after a real send succeeded). If Alpha responds:
+the audit route for this slice is a single Alpha `AUDIT` per `GOVERNANCE.md` §2/§3's fast path — do
+NOT also spawn `jd-judge-a`/`jd-judge-b`. If Alpha genuinely does not respond: fall through to point 1
+below, unchanged from every session since PR-06 (now thirteen sessions, though DN-09 means a
+fourteenth Judgment-Day session is no longer the default expectation — it only happens if Arena is
+truly down again).
 
 **1. Workflow (Judgment Day fallback): ODD, with every substantive SDD contract preserved.** `sdd-apply`
 dispatch is refused before the child launches (`SDD preflight cancelled or invalid; no session consent
@@ -239,6 +251,8 @@ file. Older pins are in `apply-progress.md` and in each module's header. SEAM pi
 
 | Item | State | Pointer |
 |---|---|---|
+| **`curl` against the documented Arena bridge endpoint is NOT a reliable reachability signal — DN-09, session 38** | `curl --max-time 5 http://127.0.0.1:8766/mcp` reported connection-refused (exit 7) TWICE in the same session, including immediately after a real `mcp__arena__bridge_send` call succeeded on the first try. The real tool call is authoritative; `curl` can false-negative. Always attempt a real `bridge_send` (or read `gentle-ai review status`'s own MCP connection list) before concluding Arena is down — do not trust `curl` alone, even though every prior session's §0 check used it. | DN-09, `docs/05-tribunal/INDEX.md`'s `judgment-day-alpha-judge-role-001` record |
+| **Alpha's audit now replaces Judgment Day whenever Arena responds — do not run both** | DN-09 (session 38): a single Alpha `AUDIT` (fast path, `APPROVE`+`objections: []` → `CONSENSUS` in one round) satisfies the mandatory pre-merge audit on its own. Spawning `jd-judge-a`/`jd-judge-b` in addition to a real Alpha audit is now a routing defect, not extra rigor. | `GOVERNANCE.md` §3, DN-09 |
 | **A real-child-process test exercises every collaborator the real build depends on, not just the one under test — confirmed again this session** | `test/migration/integration.test.ts` spawns the real, non-`--dry-run` `migrate-v1` CLI in all three of its scenarios; since a spawn boundary has no injection seam, all three (not just the one that reads a token back) call the real, non-injected secret store, and all three needed cleanup of the real OS keychain/file-fallback entry they create — found by direct empirical proof (a real leftover credential in Windows Credential Manager after the first green run), not by re-reading the brief more carefully. Check this explicitly for any future test that spawns a real, un-faked build. | `test/migration/integration.test.ts`, session 38 |
 | **`runMigration`'s `v2Home` has no CLI flag; the only lever for a real-child-process test to redirect it is overriding the spawned process's `HOME`/`USERPROFILE` env** | `daemon/home.ts`'s `resolveHomeDir` falls back to `os.homedir()` (which reads `USERPROFILE`/`HOME` on this Windows/Node combo) when no explicit value is given, and no CLI flag or env var passes one through. This is a deliberate, already-documented decision (`main.ts`'s own doc comment), not a newly found gap. | `src/daemon/home.ts`, `src/migration/main.ts` |
 | **A delegated `fork`'s first reply can make zero tool calls and just describe the plan in prose — confirmed this session** | The parent mutant-sweep fork's first response had `tool_uses: 0`; nothing had actually run. Resumed with an explicit "actually execute, do not describe" instruction and it then ran for real (6 real tool calls, genuine output). Treat a suspiciously fast, narrative-only background-agent reply as unverified, not as done — a different failure mode from the `ScheduleWakeup`-while-waiting anti-pattern sessions 32-36 recorded, which has NOT recurred for two sessions running now. | session 38 |
@@ -452,9 +466,11 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 - v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only** (an untracked `alpha_response.json`
   there is not ours; leave it). PR-39 needs one v1 read: `telegram-agent-bus/test/security.test.ts:25-101` for the
   SEAM extraction.
-- **Arena bridge status remains UNCERTAIN, not simply "down" — check live at the start of every session from here
-  on.** `.mcp.json` points at `http://127.0.0.1:8766/mcp`. Confirmed down (connection refused, exit 7) again at the
-  start of session 38, identical to session 37. Never quote or commit `.mcp.json`'s contents.
+- **Arena bridge status remains UNCERTAIN session to session — check live at the start of every session from here
+  on, with a real `bridge_send`, not `curl`.** `.mcp.json` points at `http://127.0.0.1:8766/mcp`. `curl` reported
+  connection-refused (exit 7) at the start of session 38 (matching session 37) AND again later the same session —
+  but a real `mcp__arena__bridge_send` call succeeded in that same later window, confirming Alpha was actually
+  reachable despite what `curl` said (DN-09; see §4). Never quote or commit `.mcp.json`'s contents.
 - The Engram MCP server (`plugin:engram:engram`) was reachable at the start of session 38; the `mem_save` tool
   itself still refused with "multiple active runtime sessions" on the first call (a known, long-standing condition,
   not a new disconnection) — the `engram` CLI fallback handled it without issue, as it has every session since 27.

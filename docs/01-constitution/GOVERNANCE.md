@@ -90,6 +90,25 @@ Rules of the debate:
 | **Every pull request unit, before merge** | at minimum one AUDIT on the diff by Alpha or Betelgeuse (work plan D11: "Alpha audits every unit BEFORE merge") |
 | A change ordered directly by the Director | recorded as a Director note; the audit of the diff still runs |
 
+**When Arena is unreachable at a session's own start.** F1's `apply` phase has run under a documented
+substitute, "Judgment Day," for every PR since PR-06 whenever the Arena bridge did not respond: two
+blind Claude subagents (`jd-judge-a`, `jd-judge-b`) audit the same frozen candidate independently, plus
+a separate agent that reproduces figures and re-runs verification. This satisfies row 3 above in spirit,
+never in the letter of D11 — DN-05 (Alpha audits everything) stays formally unsatisfied for every PR
+audited this way, disclosed in each PR's own tribunal record. The substitute's own operating detail
+(round budgets, correction actors, severity ledger) lives in the installed `judgment-day` skill and in
+`docs/08-sessions/HANDOFF.md`, not here.
+
+**When Arena responds (DN-09, 2026-09-25).** A single Alpha `AUDIT` on the diff — the fast path already
+native to the state machine in §2 (`APPROVE` with `objections: []` closes straight to `CONSENSUS` in one
+round) — satisfies this row on its own; do not additionally spawn `jd-judge-a`/`jd-judge-b` "for extra
+corroboration" when a real Arena audit is available. Confirm reachability with a real `bridge_send`
+call, never `curl` alone against the documented endpoint — the two have been observed to disagree
+(`curl` reporting connection-refused while a real send still succeeded), so the tool call is the
+authoritative signal. See the debate record `judgment-day-alpha-judge-role-001` for the full ruling and
+the trade-off it accepted (a single external auditor, not two independent ones, corroborated instead by
+this section's own evidence-only-objection discipline plus the writer's `COUNTER` power).
+
 Severity scale for findings, inherited from v1 (`docs/functional-audit/README.md:26-33`): **S1**
 defeats the stated objective or loses data; **S2** a realistic scenario produces wrong behaviour or
 an unusable experience; **S3** friction, inconsistency or latent risk; **P** a proposed new
