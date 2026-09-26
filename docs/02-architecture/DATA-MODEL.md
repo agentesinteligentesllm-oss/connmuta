@@ -97,8 +97,8 @@ Source of truth for **which of my bots serves which of my project folders**. Hum
 | `group_id` | integer | yes | `groups[]`, must equal `conmuta.json.group_id` | **At most one active binding per `group_id`** |
 | `agent_id` | string, wire regex | yes | the human at `project bind` | Must be a roster member whose `user_id` equals `bot_id` (v1 doctor check "agent_id present in own roster", `src/doctor.ts:52-87`) |
 | `status` | `"active"` \| `"suspended"` | yes | CLI / panel | Only `active` bindings are polled; suspension is a human action (I-1) |
-| `roster_snapshot` | array of `RosterEntry` | draft | copied from `conmuta.json` at bind time; refreshed by roster sync (F3) | Lets the daemon admit updates while no client is connected; a mismatch with the client-forwarded roster at session start is surfaced as condition `roster_drift`, never auto-resolved |
-| `roster_hash` | `sha256:<hex>` | draft | derived | Cheap drift check in the session handshake ([OVERVIEW.md §9](OVERVIEW.md#9-ipc-handshake-d3-objection-n2)) |
+| `roster_snapshot` | array of `RosterEntry`, min 1 | yes (shipped `src/registry/schema.ts`'s `z.array(rosterEntrySchema).min(1)`, no longer draft) | copied from `conmuta.json` at bind time; refreshed by roster sync (F3) | Lets the daemon admit updates while no client is connected; a mismatch with the client-forwarded roster at session start is surfaced as condition `roster_drift`, never auto-resolved |
+| `roster_hash` | `sha256:<hex>` | yes (shipped `src/registry/schema.ts`'s `z.string().regex(...)`, no longer draft) | derived | Cheap drift check in the session handshake ([OVERVIEW.md §9](OVERVIEW.md#9-ipc-handshake-d3-objection-n2)) |
 | `bound_at` | ISO 8601 UTC | yes | `project bind` | — |
 
 ### 2.5 Registry invariants (checked at every load, by `doctor`, and by the wizards)
@@ -184,9 +184,10 @@ Holds **admitted** updates only (I-4). Rejected updates leave a bodiless audit r
 | `message_date` | INTEGER (unix s) | yes | Telegram | Reminder math uses the Telegram date, never the envelope `ts` (v1 `src/protocol.ts:446-458`) |
 | `from_user_id` | INTEGER NOT NULL | yes | Telegram `message.from.id` | The verified sender (I-4) |
 | `from_agent_id` | TEXT NOT NULL | yes | roster reverse lookup | Overrides whatever the envelope claimed (v1 `src/tools/fetch.ts:538-565`) |
-| `eid` | TEXT(12 hex) NOT NULL | yes | envelope | `UNIQUE (project_id, eid)` — may replace the `seen_eids` aux table (F1) |
-| `envelope_json` | TEXT NOT NULL | yes | decoder + anchor translation | Validated envelope; the body is stored raw and **fenced at presentation**, not at rest |
-| `apply_outcome` | TEXT | yes | `applyEnvelope` | `applied` \| `noted` \| `not_mine` \| `duplicate` \| `unapplied` (v1 `ApplyOutcome`, `src/protocol.ts:18-31`) |
+| `eid` | TEXT(12 hex) NOT NULL | yes | envelope | `UNIQUE (project_id, eid)` — replaces the `seen_eids` aux table (F1 resolution, §8; shipped as `ledger/schema.ts`'s `UNIQUE (project_id, eid)` on this table) |
+| `envelope_json` | TEXT NOT NULL | yes | decoder + anchor translation | Validated envelope **without the body key** (`ledger/schema.ts`'s own inline comment); the body is stored raw in its own column below and **fenced at presentation**, not at rest |
+| `body` | TEXT | nullable | decoder | `NULL` for `apply_outcome IN ('rejected','ignored')` (D-20); populated otherwise |
+| `apply_outcome` | TEXT NOT NULL | yes | `applyEnvelope`/admission | Shipped enum (`ledger/schema.ts`'s `CHECK` constraint): `opened` \| `acked` \| `replied` \| `resolved` \| `noted` \| `not_mine` \| `ignored` \| `rejected` — a thread-lifecycle vocabulary, **not** v1's flatter `applied`/`duplicate`/`unapplied` set (v1 `ApplyOutcome`, `src/protocol.ts:18-31`), which this draft previously and incorrectly carried over verbatim |
 | `received_at` | TEXT (ISO) | yes | daemon | — |
 
 ### 3.3 `threads` — one row per (binding, thread)
@@ -216,7 +217,7 @@ Mirrors v1's `ThreadRecord` (v1 `src/state.ts:29-87`) so `applyEnvelope` (v1 `sr
 
 ### 3.4 `needs_action` — the "my turn" queue per binding
 
-In v1 this is a pure derivation: open `REQUEST` thread whose `awaiting === me` (v1 `src/protocol.ts:475-477`). F1 decides whether it is a **VIEW** over `threads` or a maintained table; the columns are the same either way.
+In v1 this is a pure derivation: open `REQUEST` thread whose `awaiting === me` (v1 `src/protocol.ts:475-477`). **Resolved in F1** (PR-12): a `CREATE VIEW needs_action` over `threads`, backed by the `threads_needs_action` index (`ledger/schema.ts`), not a maintained table.
 
 | Column | Type | Required | Source of truth | Notes |
 |---|---|---|---|---|
@@ -256,7 +257,7 @@ Answers bundle: research[security-isolation] T10 ("no local audit trail") withou
 | `eid`, `envelope_type` | TEXT | nullable | No body, ever, for `reject` |
 | `from_user_id`, `to_user_id` | INTEGER | nullable | Numeric ids only |
 | `outcome` | TEXT CHECK IN (`ok`,`degraded`,`rejected`,`dropped`) | yes | — |
-| `reason` | TEXT | nullable | Closed enum, at least: `WRONG_ROOM`, `foreign_chat`, `unknown_sender`, `non_envelope`, `malformed`, `unsupported_version`, `duplicate`, `SECRET_PATTERN_DETECTED`, `ROUNDS_EXHAUSTED`, `RATE_LIMITED`, `TELEGRAM_CONFLICT`, `DAEMON_START`, `DAEMON_STOP`, `REGISTRY_RELOAD`, `BINDING_CHANGED`, `DOCTOR_PROBE` |
+| `reason` | TEXT | nullable | Open string, not a DB-level closed enum (`shared/ipc-contract.ts`'s `ipcErrorSchema.code` doc applies the same reasoning here). Shipped in F1, grepped against every `appendAuditRow`/`reason:` call site across `src/daemon/{admission,poller,bindings,send/send-path,ipc/routes}.ts`: `foreign_chat`, `unknown_sender`, `non_envelope`, `unsupported_version`, `malformed`, `duplicate`, `unanchored`, `unauthorized`, `stale`, `not_requestable`, `replayed` (admission/protocol-apply, lowercase — `self_echo` is the one admission outcome that deliberately writes **no** audit row at all, design §8.2 step 5), `WRONG_ROOM`, `SECRET_PATTERN_DETECTED`, `RATE_LIMITED` (send-path), `TELEGRAM_CONFLICT` (poller), `BINDING_CHANGED` (bindings/routes). `ROUNDS_EXHAUSTED` (F5 Arena-light), `DAEMON_START`/`DAEMON_STOP`/`REGISTRY_RELOAD`/`DOCTOR_PROBE` (F2/F3 lifecycle/doctor) are forward-declared for later phases and do not exist in F1's shipped code yet — kept here as the reserved vocabulary those phases will use, not implied to be live today |
 
 Retention and export per binding are configurable (named constants, F1). Never stored: rejected bodies, tokens, raw error text (I-2, I-5).
 
@@ -353,7 +354,7 @@ Every numeric constant is a named constant with its reasoning (constitution: nam
 |---|---|
 | `project_id` format (UUID v4 vs slug) | F1 |
 | Roster delivery to the daemon (registry snapshot vs client-forwarded at session start) and the F3 roster-sync mechanism | F1 / F3 |
-| `needs_action` as VIEW vs table; `seen_eids` as table vs UNIQUE index | F1 |
+| `needs_action` as VIEW vs table; `seen_eids` as table vs UNIQUE index | **Resolved in F1** (PR-12): `needs_action` ships as a `CREATE VIEW` backed by the `threads_needs_action` index (`ledger/schema.ts`); `seen_eids` was folded into `UNIQUE (project_id, eid)` on `updates`, no separate table |
 | Bearer derivation (raw per-boot secret vs session token) | Spike B-08, F1 |
 | Keyring prebuilds on win-x64 / darwin-arm64 and ACL fallback tests | B-15 |
 | Audit-log retention and export format | F1 |
