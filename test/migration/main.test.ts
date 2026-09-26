@@ -442,6 +442,11 @@ test("running migrate-v1 again on a LATER day is still recognized as idempotent,
       false,
       "a later-day re-run must not fall into the conflict-refusal branch",
     );
+    assert.equal(
+      outs.some((line) => line.includes("20260316")),
+      false,
+      "the message must never claim today's date as the migration date — backupExists no longer tracks which date actually matched (Judgment Day correction, session 37 round 2)",
+    );
   });
 });
 

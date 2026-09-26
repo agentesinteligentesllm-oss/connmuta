@@ -351,12 +351,12 @@ export async function runMigration(options: RunMigrationOptions = {}): Promise<R
 					return { exitCode: EXIT_MIGRATION_REFUSED };
 				}
 			}
-			out(`${LOG_PREFIX}: bot ${botId} was already migrated on ${backupDate}; nothing to do`);
+			out(`${LOG_PREFIX}: bot ${botId} was already migrated previously; nothing to do`);
 			return { exitCode: 0 };
 		}
 		if (alreadyRegistered) {
 			err(
-				`${LOG_PREFIX}: bot ${botId} is already present in the v2 registry at ${registryPath}, but no matching ${backupDate} backup was found; refusing rather than risk a duplicate entry`,
+				`${LOG_PREFIX}: bot ${botId} is already present in the v2 registry at ${registryPath}, but no matching backup (of any date) was found; refusing rather than risk a duplicate entry`,
 			);
 			return { exitCode: EXIT_MIGRATION_REFUSED };
 		}
