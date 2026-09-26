@@ -1435,11 +1435,31 @@ Scope: `test/security/wrong-room.test.ts`, `.github/workflows/ci.yml` (add the n
 Requirements: `send-path › chat_id must equal the binding's group_id or the send is refused` (PT-01, full two-binding CI scenario).
 Runtime harness: `startDaemon` booted in-process with a temp home, two bindings, one `FakeTelegramClient` per token, two sessions.
 
-- [ ] 41.1 RED: write `test/security/wrong-room.test.ts` boots two bindings (A, B), N sends from each session, asserts the per-fake `sentMessages[].chat_id` partition never crosses, then wires a guard with the wrong group and asserts `WRONG_ROOM` plus an audit row.
-- [ ] 41.2 GREEN: this scenario should already pass against PR-21/PR-27's room-guard and send-path implementations; if it does not, the gap is a defect in those PRs to fix here, not new production code.
-- [ ] 41.3 Add the named `test:wrong-room` CI step (`.github/workflows/ci.yml`, after `npm run build`, before `npm pack --dry-run`).
-- [ ] 41.4 Verify: `npm run build && npm run test:wrong-room`.
-- [ ] 41.5 Docs: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 41.1 RED: write `test/security/wrong-room.test.ts` boots two bindings (A, B), N sends from each session, asserts the per-fake `sentMessages[].chat_id` partition never crosses, then wires a guard with the wrong group and asserts `WRONG_ROOM` plus an audit row.
+- [x] 41.2 GREEN: this scenario should already pass against PR-21/PR-27's room-guard and send-path implementations; if it does not, the gap is a defect in those PRs to fix here, not new production code.
+- [x] 41.3 Add the named `test:wrong-room` CI step (`.github/workflows/ci.yml`, after `npm run build`, before `npm pack --dry-run`).
+- [x] 41.4 Verify: `npm run build && npm run test:wrong-room`.
+- [x] 41.5 Docs: update the file-name cell(s) of PT-01 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+
+**Apply-time close-out (session 40).** Arena/Alpha debate `bus-v2-f1-pr-41-diff-audit-001`: `APPROVE`,
+`CONSENSUS` in one round, zero objections, including explicit endorsement of the harness decision (see
+below). No source change needed — confirmed true: the real registry/reconciliation path structurally
+cannot produce a wrong-room condition (`bindings.ts`'s `buildTransport` always derives the guard's
+`groupId` and send-path's `chat_id` from the same `binding.group_id`), so the test constructs the
+mismatch directly instead. **Harness deviation from this block's own Runtime-harness line above:** the
+test does not call `startDaemon` (PR-40a) — `DaemonOptions` has no `createTransport` override, and adding
+one solely to match this block's literal wording, rather than to reach a state the real system can ever
+occupy, was judged (and Alpha agreed) not worth the surface added to an already-audited module. It uses the
+same `createIpcServer`+`createSessionRoutes`+`BindingsReconciler` composition `test/daemon/ipc/routes.test.ts`
+(PR-31) already uses — the identical pipeline `startDaemon` wires. `41.3`'s CI step and `test:wrong-room`
+script already existed from an earlier PR, globbing zero files until this test landed. Landed at 352
+authored test lines against the ≈180-line estimate — over, but no exception needed since `tasks.md`'s own
+budget rule applies to `src`+`test`, and no `src` file changed; the growth is entirely two full-stack
+integration scenarios (real HMAC handshake, two sessions, N sends, a forced refusal) rather than unit-level
+assertions. Full suite **1084 tests** (1083 pass, 1 pre-existing skip, +2 over PR-40b's 1082), `test:static`
+**43/43** (+2), `test:wrong-room` **3/3** (2 real + a harmless glob match on the compiled `.d.ts`). Merged as
+PR #46 (`d1b4a60`). **Unit 12 `static-assertions-plus-wrong-room-ci` is fully closed. Unit 13
+`Documentation` (PR-42, the final F1 slice) remains.**
 
 ### Unit 13 — Documentation
 
