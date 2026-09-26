@@ -60,21 +60,39 @@ Runtime harness: N/A — dependency pins and unit test over exported constants.
 
 ### Unit 2 — Edit engine (D-32, D-36, D-45)
 
-#### PR-02 — `file-edit.ts` core pipeline + `formats/jsonc.ts`
-Branch `f2/02-file-edit-jsonc` → `main`. Depends: PR-01. Size: ≈380 lines, no exception.
-Scope: `src/installer/file-edit.ts`, `src/installer/formats/jsonc.ts`, `test/installer/file-edit.test.ts`, `test/installer/formats/jsonc.test.ts`.
-Requirements: `tool-config-merge › Strict per-format parse` (JSONC scenarios); `tool-config-merge › Merge is refuse-and-diff on ambiguity`; `tool-config-merge › Every merge takes a pre-edit backup and preserves surrounding bytes`. Threat matrix: Filesystem writes outside the home (Applicable).
+**Design estimated ≈380 authored lines for the core pipeline + JSONC adapter in one slice; the real
+measured diff at apply time was 753 lines (343+211 for the pipeline+twin, 72+127 for the JSONC
+adapter+twin) — apply-time re-sliced here at the file-edit.ts vs. formats/jsonc.ts boundary, the
+same existing module split PR-03 already uses for toml/markdown. The seven-step pipeline itself
+(file-edit.ts, 343 lines + its 211-line test twin = 554) has no further clean split without breaking
+either Strict TDD's twin-file coherence or the pipeline's own single-module contract (design §4.1
+describes it as one interdependent seven-step sequence) — carried as a disclosed, PR-scoped
+exception, following F1's own PR-05 precedent for a genuinely cohesive module.**
+
+#### PR-02a — `file-edit.ts` core pipeline
+Branch `f2/02a-file-edit-core` → `main`. Depends: PR-01. Size: 554 lines, **disclosed PR-scoped
+exception** (154 lines over the 400 budget; see re-slice note above).
+Scope: `src/installer/file-edit.ts`, `test/installer/file-edit.test.ts`, `docs/02-architecture/THREAT-MODEL.md` (§4.1 row).
+Requirements: `tool-config-merge › Merge is refuse-and-diff on ambiguity`; `tool-config-merge › Every merge takes a pre-edit backup and preserves surrounding bytes`. Threat matrix: Filesystem writes outside the home (Applicable).
 Runtime harness: unit tests over temp-dir fixtures; no daemon/client process.
 
-- [ ] 2.1 RED: `test/installer/file-edit.test.ts` — symlink target refused (step 1), symlinked parent refused, absent file creates parents with no backup, present-with-parse-error refuses with position, same-named identical entry is a no-op, same-named different entry refuses with a diff, pre-existing backup name collision is handled (`COPYFILE_EXCL` + `BACKUP_SUFFIX_PREFIX` second-resolution timestamp).
-- [ ] 2.2 GREEN: implement `installer/file-edit.ts`'s seven-step pipeline (design §4.1): lstat/symlink refusal, create-if-absent, strict parse dispatch, same-named-entry check, backup, temp+rename write, readback+re-parse semantic-delta assertion; restore-from-backup on step-7 failure.
-- [ ] 2.3 RED: `test/installer/formats/jsonc.test.ts` — comments/trailing commas parse cleanly; `modify`+`applyEdits` produces exactly one localized insertion; EOL/indent learned from the first indented line, `JSON_DEFAULT_INDENT` only when none exists; a parse error refuses without writing.
-- [ ] 2.4 GREEN: implement `installer/formats/jsonc.ts` (design §4.2 JSON/JSONC row) wired into `file-edit.ts`'s per-format dispatch.
-- [ ] 2.5 Verify: `npm run build && node --test "dist/test/installer/file-edit.test.js" "dist/test/installer/formats/jsonc.test.js"`.
-- [ ] 2.6 Docs: THREAT-MODEL §4 — pin the "Filesystem writes outside the home" row to `file-edit.test.ts`.
+- [x] 2a.1 RED: `test/installer/file-edit.test.ts` — symlink target refused (step 1), symlinked parent refused, absent file creates parents with no backup, present-with-parse-error refuses with position, same-named identical entry is a no-op, same-named different entry refuses with a diff, pre-existing backup name collision is handled (`COPYFILE_EXCL` + `BACKUP_SUFFIX_PREFIX` second-resolution timestamp).
+- [x] 2a.2 GREEN: implement `installer/file-edit.ts`'s seven-step pipeline (design §4.1): lstat/symlink refusal, create-if-absent, strict parse dispatch, same-named-entry check, backup, temp+rename write, readback+re-parse semantic-delta assertion; restore-from-backup on step-7 failure. Exposes a `FormatAdapter` interface for the per-format dispatch PR-02b/PR-03 plug into.
+- [x] 2a.3 Docs: THREAT-MODEL §4 — add the "Filesystem writes outside the home" row (did not exist before this slice), pinned to `file-edit.test.ts`.
+- [x] 2a.4 Verify: `npm run build && node --test "dist/test/installer/file-edit.test.js"`.
+
+#### PR-02b — `formats/jsonc.ts`
+Branch `f2/02b-jsonc-format` → `main`. Depends: PR-02a. Size: 199 lines, no exception.
+Scope: `src/installer/formats/jsonc.ts`, `test/installer/formats/jsonc.test.ts`.
+Requirements: `tool-config-merge › Strict per-format parse` (JSONC scenarios).
+Runtime harness: unit tests over temp-dir fixtures; no daemon/client process.
+
+- [x] 2b.1 RED: `test/installer/formats/jsonc.test.ts` — comments/trailing commas parse cleanly; `modify`+`applyEdits` produces exactly one localized insertion; EOL/indent learned from the first indented line, `JSON_DEFAULT_INDENT` only when none exists; a parse error refuses without writing.
+- [x] 2b.2 GREEN: implement `installer/formats/jsonc.ts` (design §4.2 JSON/JSONC row) wired into `file-edit.ts`'s `FormatAdapter` dispatch (PR-02a).
+- [x] 2b.3 Verify: `npm run build && node --test "dist/test/installer/formats/jsonc.test.js"`.
 
 #### PR-03 — `formats/toml.ts` + `formats/markdown.ts`
-Branch `f2/03-toml-markdown` → `main`. Depends: PR-02. Size: ≈350 lines, no exception.
+Branch `f2/03-toml-markdown` → `main`. Depends: PR-02b. Size: ≈350 lines, no exception.
 Scope: `src/installer/formats/toml.ts`, `src/installer/formats/markdown.ts`, `test/installer/formats/toml.test.ts`, `test/installer/formats/markdown.test.ts`.
 Requirements: `tool-config-merge › Strict per-format parse` (TOML scenarios); `tool-config-merge › Merge is refuse-and-diff on ambiguity`; `installer-wizard › Instruction files are written once and trust steps are printed, never bypassed`.
 Runtime harness: unit tests over temp-dir fixtures.
