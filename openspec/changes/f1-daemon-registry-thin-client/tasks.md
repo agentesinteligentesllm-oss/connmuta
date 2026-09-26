@@ -1330,11 +1330,13 @@ Scope: `test/security/predicates.ts`, `test/security/closure.ts`, `test/security
 Requirements: risk mitigation groundwork for `daemon-lifecycle › Static bundle assertions and packaging conformance` (predicates half).
 Runtime harness: N/A — pure static analysis over `dist/src/**` after `tsc -b`.
 
-- [ ] 39.1 RED: add the SEAM fixture entry for `test/security/predicates.ts` and confirm `provenance.test.ts` fails before the file exists.
-- [ ] 39.2 GREEN: implement `test/security/predicates.ts` as a SEAM extracted from `telegram-agent-bus/test/security.test.ts:25-101` (read-only source, ≈77 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `test/security.test.ts`, and `Changes: (1) extracted lines 25-101 into a reusable module; (2) imports relocated`.
-- [ ] 39.3 RED: write a `test/security/closure.test.ts` unit test asserting `closure.ts`'s relative-import walker correctly resolves a two-hop fixture closure and correctly excludes an unrelated module.
-- [ ] 39.4 GREEN: implement `test/security/closure.ts` (transitive closure of relative `import`/`export … from` specifiers over `dist/src/**`).
-- [ ] 39.5 Verify: `npm run build && node --test "dist/test/security/predicates.test.js" "dist/test/security/closure.test.js" "dist/test/security/provenance.test.js"`.
+- [x] 39.1 RED: add the SEAM fixture entry for `test/security/predicates.ts` and confirm `provenance.test.ts` fails before the file exists.
+- [x] 39.2 GREEN: implement `test/security/predicates.ts` as a SEAM extracted from `telegram-agent-bus/test/security.test.ts:25-101` (read-only source, ≈77 lines) with a provenance header `verdict: SEAM`, `v1 body sha256` of `test/security.test.ts`, and `Changes: (1) extracted lines 25-101 into a reusable module; (2) imports relocated`.
+- [x] 39.3 RED: write a `test/security/closure.test.ts` unit test asserting `closure.ts`'s relative-import walker correctly resolves a two-hop fixture closure and correctly excludes an unrelated module.
+- [x] 39.4 GREEN: implement `test/security/closure.ts` (transitive closure of relative `import`/`export … from` specifiers over `dist/src/**`).
+- [x] 39.5 Verify: `npm run build && node --test "dist/test/security/predicates.test.js" "dist/test/security/closure.test.js" "dist/test/security/provenance.test.js"`.
+
+> **Apply-time note (session 39, `bus-v2-f1-pr-39-audit-001`/`-002`, both Alpha CONSENSUS):** Scope gained a sixth file, `test/security/predicates.test.ts` (AS-IS, v1 `test/security.test.ts:107-169`, `Changes: none.`), missing from the original Scope line above even though 39.5's own verify command already ran it — Alpha's audit caught the gap. `v1-provenance.json` carries two new entries, not one. The actual RED/GREEN order shipped was: 39.1 RED (both fixture entries) → RED `predicates.test.ts` → GREEN `predicates.ts` → RED `closure.test.ts` → GREEN `closure.ts` → 39.5 Verify (all three compiled test files). Landed at 290 authored lines (est. ≈197), no `size:exception`. Merged as PR #43 (`d85ca2c`), tribunal record `bus-v2-f1-pr-39-audit-001`/`-002`/`bus-v2-f1-pr-39-diff-audit-001` — first PR since PR-05 with DN-05 genuinely satisfied (real Alpha audit, not the Judgment Day substitute). `design.md:519`'s stale `44-101`/`AS-IS` citation for `predicates.ts` is unrelated to this note and tracked as **B-55** instead.
 
 #### PR-40 — client/daemon bundle assertion tables (PT-27, PT-28, PT-07)
 Branch `f1/40-security-bundle-tables` → `main`. Depends: PR-39. Size: ≈380 lines, no exception.

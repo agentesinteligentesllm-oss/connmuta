@@ -4,6 +4,77 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 39 — PR-39 (opens unit 12 `static-assertions-plus-wrong-room-ci`); first genuine DN-05 pass via real Arena/Alpha
+
+- **Date**: 2026-09-25 → 2026-09-26 (UTC; the session started 2026-09-25 and the merge landed just after
+  UTC midnight).
+- **Authority**: the Director delegated the whole session with full autonomy, no confirmation
+  checkpoints, explicitly for this session and every following one on this change, including close-out
+  and the next mini-prompt, and asked that Arena Orion be checked with a real `bridge_send` (not `curl`
+  alone, per DN-09/session 38's own finding) before assuming Judgment Day. A real `bridge_send` to Alpha
+  succeeded on the first try — Arena is up this session. Per DN-09, this routes PR-39's audit through a
+  single Alpha `AUDIT` instead of `jd-judge-a`/`jd-judge-b`.
+- **PR-39** `test/security/predicates.ts` (SEAM, v1 `test/security.test.ts:25-101`) + `test/security/predicates.test.ts`
+  (AS-IS, v1:107-169) + `test/security/closure.ts` (new) + `test/security/closure.test.ts` (new) + a
+  5-file cross-directory fixture + 2 new `v1-provenance.json` entries — PR #43 (`d85ca2c`, candidate
+  `a47e484`, tribunal records `bus-v2-f1-pr-39-audit-001`/`-002`/`bus-v2-f1-pr-39-diff-audit-001`).
+  **The first PR since PR-05 with DN-05 genuinely satisfied** — audited by a real Alpha `AUDIT`, not the
+  Judgment Day substitute every PR from PR-06 through PR-38 needed. Before writing code, found and
+  resolved a real contradiction between `design.md:519` (stale, pre-`bus-v2-f1-tasks-001` text: v1 range
+  `44-101`, verdict `AS-IS`) and the ratified tribunal ruling (`bus-v2-f1-tasks-001` item 2: `25-101`,
+  verdict `SEAM`) — confirmed the ruling closed chronologically after the design audit and is the only
+  reading consistent with its own ~77-line estimate; filed as **B-55** rather than resolved silently.
+  Alpha's first `AUDIT` (`bus-v2-f1-pr-39-audit-001`) returned `APPROVE_WITH_CHANGES`: the plan never
+  ported v1's 9 detector unit tests (`test/security.test.ts:107-169`) into `test/security/predicates.test.ts`
+  even though the verify step already ran it — verified directly against the v1 file (exactly 9 `test()`
+  blocks, 63 lines) before accepting via `COUNTER`. While preparing to implement, found a second issue
+  through reading `provenance.test.ts`'s actual mechanics rather than its prose: labeling the ported test
+  file SEAM (as the first debate assumed) would make its own `assert.notEqual` check fail deterministically,
+  since a faithful port needs zero body modification; `design.md:440`'s own table (`tool-output.ts`,
+  `tool-schemas.ts`, both range-extract AS-IS) proved the "whole-file" restriction governs
+  `size:exception` eligibility only, not verdict eligibility. Opened a second debate
+  (`bus-v2-f1-pr-39-audit-002`, a closed `CONSENSUS` cannot take a `PATCH`) to correct the verdict to
+  AS-IS; Alpha confirmed in the same round. Implementation: porting `predicates.ts` surfaced a real bug
+  — `DIST_SRC_DIR`'s relative URL needed `../../src/`, not v1's `../src/`, since this module sits one
+  directory level deeper than v1's flat `test/security.test.ts`. `closure.ts`/`closure.test.ts` delegated
+  to a `general-purpose` writer with every fact pre-resolved; parent readback confirmed the delegate's
+  report byte-for-byte against the actual files before trusting it. Parent mutant sweep (`odd/sweep.mjs`,
+  5 mutants against `closure.ts`): `M0` control survived (correct); `M4` (drop discovered specifiers)
+  killed; `M1` (nullish-coalescing operand order) and `M2` (remove the push-time visited guard) both
+  survived and were confirmed true equivalent mutants by exhaustive tracing, not just observed survival
+  — M1 because the regex's two alternation branches populate mutually exclusive capture groups, M2
+  because the pop-time guard alone already guarantees termination and an identical final `Set` for any
+  finite graph, cyclic or not; `M3` (resolve against the entry's directory instead of the referencing
+  file's own directory) initially survived against a flat single-directory fixture — a real gap against
+  the module's own doc comment — closed by restructuring the fixture to cross a real directory boundary
+  with a same-named decoy file. Third debate (`bus-v2-f1-pr-39-diff-audit-001`, the frozen-diff pre-merge
+  audit) returned clean `APPROVE` in round 1, independently re-verifying the provenance hashes, the
+  closure algorithm and both equivalent-mutant proofs.
+- **Board**: 187/210 checkboxes (39.1–39.5 plus an apply-time amendment note for the sixth file); 46 PR
+  header lines, 42 now cover `PR-01`..`PR-39` (45 distinct GitHub PRs merged); 1054 tests (1053 pass, 1
+  pre-existing skip, 0 fail; +10 over the 1044 baseline, 0 regressions); `test:static` 18/18 (+10 over 8).
+  Green on both CI legs at the first run. **Unit 11 `v1-migration` stays closed; unit 12
+  `static-assertions-plus-wrong-room-ci` opens and closes its first slice.** 290 authored lines against a
+  ≈197 estimate (revised to ≈260 after Alpha's scope correction), no `size:exception` needed.
+- **Native review**: not assessed — this PR ran the Arena/Alpha audit path (DN-09), not the RDD
+  Judgment-Day fallback; per HANDOFF §2.3 the two audit mechanisms are not layered on one target.
+- **Backlog**: **B-55** filed (`design.md:519`'s stale v1-range/verdict citation for `predicates.ts`,
+  text-only fix at the next `design.md` touch).
+- **Incident**: right after `gh pr merge` reported the merge complete on GitHub, a local `git fetch`/`git pull`
+  failed repeatedly with `fatal: unable to access '...': getaddrinfo() thread failed to start` — a
+  git-for-Windows-specific libcurl DNS-resolution fault, not a real connectivity or authorization loss:
+  `gh`'s own network stack kept working the entire time (`gh pr view` confirmed `state: MERGED`,
+  `mergeCommit: d85ca2c`), and a later retry (after continuing with local, network-free documentation
+  work in the meantime) succeeded cleanly with no data at risk — local `main` was simply stale by one
+  merge commit, never diverged, and fast-forwarded cleanly once the fetch succeeded. `gh pr merge`'s
+  `--delete-branch` local cleanup step DID complete despite the same fault (it needs no network), so the
+  local feature branch was already gone by the time the fetch was retried — nothing to recover, since
+  every file's content was independently already known and verified in-session. Distinct from this
+  project's other known Arena-`curl`-unreliability finding (DN-09/session 38): that one was about a
+  probe tool under-reporting reachability; this one is about a mutating git operation itself failing
+  transiently on this machine's git binary specifically, while a sibling tool (`gh`) using a different
+  network stack kept working throughout.
+
 ## Session 38 — PR-38 (closes unit 11 `v1-migration`); no new backlog; Arena still down
 
 - **Date**: 2026-09-25.
