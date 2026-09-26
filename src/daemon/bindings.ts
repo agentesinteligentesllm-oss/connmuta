@@ -32,7 +32,11 @@ export interface BindingsReconcilerOptions {
   readonly loader?: RegistryLoader;
   readonly createPoller?: PollerFactory;
   readonly createTransport?: TransportFactory;
-  readonly createTelegramClient?: (bot: RegistryBot) => TelegramClient;
+  /**
+   * PR-40a: widened to admit a `Promise<TelegramClient>` — the real production factory resolves the
+   * bot's token from `SecretStore.get` (async) before constructing a `TelegramApiClient`.
+   */
+  readonly createTelegramClient?: (bot: RegistryBot) => TelegramClient | Promise<TelegramClient>;
 }
 
 export interface ManagedBinding {
@@ -106,7 +110,7 @@ export class BindingsReconciler {
   private readonly loader?: RegistryLoader;
   private readonly createPoller?: PollerFactory;
   private readonly createTransport?: TransportFactory;
-  private readonly createTelegramClient?: (bot: RegistryBot) => TelegramClient;
+  private readonly createTelegramClient?: (bot: RegistryBot) => TelegramClient | Promise<TelegramClient>;
   private readonly managedBindings = new Map<string, ManagedBinding>();
 
   constructor(options: BindingsReconcilerOptions = {}) {
@@ -152,7 +156,7 @@ export class BindingsReconciler {
       return await this.createTransport(binding, config);
     }
     if (this.createTelegramClient && bot) {
-      const rawClient = this.createTelegramClient(bot);
+      const rawClient = await this.createTelegramClient(bot);
       // Rate discipline (PR-28, `send/rate.ts`): inserted BELOW the room guard so it sees every
       // outbound `sendMessage` — group or direct — before the AS-IS transports can flatten a 429's
       // `retry_after_s`. Skipped when this reconciler holds no ledger connection, since there is

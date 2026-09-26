@@ -1,14 +1,20 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-/** Matches a relative (`./`, `../`) specifier in a static `import`/`export ... from` statement; a bare specifier (e.g. `"node:fs"`, `"zod"`) never matches because the captured group requires a leading `.`. */
+/**
+ * Matches a relative (`./`, `../`) specifier in a static `import`/`export ... from` statement, a bare
+ * `import "./..."` statement, or a dynamic `import("./...")` call (D-25: `daemon/main.ts` reaches
+ * `bootstrap.ts` only through `await import("./bootstrap.js")`, never a static specifier). A bare
+ * specifier (e.g. `"node:fs"`, `"zod"`) never matches because every captured group requires a leading
+ * `.`.
+ */
 const RELATIVE_IMPORT_RE =
-  /\b(?:import|export)\b[^'"]*?from\s+["'](\.[^"']+)["']|\bimport\s+["'](\.[^"']+)["']/g;
+  /\b(?:import|export)\b[^'"]*?from\s+["'](\.[^"']+)["']|\bimport\s+["'](\.[^"']+)["']|\bimport\s*\(\s*["'](\.[^"']+)["']/g;
 
 function relativeSpecifiers(source: string): string[] {
   const specifiers: string[] = [];
   for (const match of source.matchAll(RELATIVE_IMPORT_RE)) {
-    const specifier = match[1] ?? match[2];
+    const specifier = match[1] ?? match[2] ?? match[3];
     if (specifier !== undefined) specifiers.push(specifier);
   }
   return specifiers;

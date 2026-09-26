@@ -490,6 +490,42 @@ describe("BindingsReconciler (registry hot-reload, poller lifecycle, BINDING_CHA
     assert(managed.roomGuard instanceof RoomGuardClient);
   });
 
+  it("buildTransport awaits a Promise-returning createTelegramClient before wrapping it (PR-40a)", async () => {
+    const fakeClient: TelegramClient = {
+      async getUpdates() {
+        return [];
+      },
+      async sendMessage(params) {
+        return {
+          message_id: 1,
+          chat: { id: Number(params.chat_id), type: "group" },
+          date: 1,
+          text: params.text,
+        };
+      },
+      async getMe() {
+        return { id: 1234567, is_bot: true, username: "test_bot" };
+      },
+      async getChat() {
+        return { id: -1001234567890, type: "group" };
+      },
+    };
+
+    const reconciler = new BindingsReconciler({
+      createTelegramClient: async () => fakeClient,
+    });
+
+    await reconciler.reconcile(baseRegistry);
+    const managed = reconciler.getBinding("prj-alpha");
+    assert(managed !== undefined);
+    assert(managed.transport instanceof DualWriteTransport);
+
+    // A resolved client wrongly left as a pending Promise would fail HERE: RoomGuardClient/GroupTransport
+    // call `.sendMessage` on whatever `createTelegramClient` returned, and a Promise object has no such
+    // method — this call throws unless `buildTransport` actually `await`s the factory first.
+    await managed!.transport!.send("hello", []);
+  });
+
   it("buildTransport uses custom createTransport when provided (JD-A-003, JD-B-002)", async () => {
     const customTransport = {
       send: async () => ({

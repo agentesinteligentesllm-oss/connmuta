@@ -1,12 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
 import { LockHeldError, readLockFile } from "../../src/daemon/lifecycle/lock.js";
 import { readRunFile } from "../../src/daemon/lifecycle/run-file.js";
 import type { SecretStore } from "../../src/secret-store/types.js";
+import type { TelegramClient } from "../../src/daemon/telegram.js";
+import type { Registry } from "../../src/registry/schema.js";
+import { REGISTRY_VERSION } from "../../src/shared/constants.js";
+
+// `fetch(...)` against a `http://127.0.0.1:<port>/...` URL sends `Host: 127.0.0.1:<port>` by
+// construction — exactly what `daemon/ipc/server.ts`'s own-loopback check expects — so no explicit
+// override is needed (and `Host` is a forbidden header name for `fetch` to set directly anyway).
+function ipcUrl(port: number, path: string): string {
+  return `http://127.0.0.1:${port}${path}`;
+}
+
+const NONCE_HEX = "0".repeat(64);
+const HMAC_HEX = "1".repeat(64);
+const ROSTER_HASH = `sha256:${"2".repeat(64)}`;
 
 function createTempHome(): string {
   return mkdtempSync(join(tmpdir(), "conmuta-bootstrap-test-"));
@@ -172,6 +186,230 @@ test("bootstrap: getLastSessionSeenAt reflects client_cursors.last_seen_at in th
     assert.equal(getLastSessionSeenAt(db), Date.parse(time2));
 
     await daemon.stop();
+  } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: mounts GET /identity and POST /session on the real IPC server (PR-40a)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({ homeDir, secretStore: fakeStore });
+
+    const identityResponse = await fetch(ipcUrl(daemon.port, `/identity?nonce=${NONCE_HEX}`));
+    assert.equal(identityResponse.status, 200);
+    const identityBody = (await identityResponse.json()) as {
+      proof: string;
+      server_nonce: string;
+      pid: number;
+      build: string;
+    };
+    assert.equal(typeof identityBody.proof, "string");
+    assert.equal(identityBody.pid, process.pid);
+
+    // No registry binding exists for this project, so `POST /session` must reach `createSessionRoutes`'s
+    // own UNBOUND_PROJECT refusal — not a bare route-not-found 404, which is what an unmounted route (the
+    // pre-PR-40a raw 404 handler) would answer instead.
+    const sessionResponse = await fetch(ipcUrl(daemon.port, "/session"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "test-project",
+        group_id: -1001234567890,
+        roster_hash: ROSTER_HASH,
+        host: "claude-code",
+        pid: process.pid,
+        hmac: HMAC_HEX,
+        server_nonce: NONCE_HEX,
+      }),
+    });
+    const sessionBody = (await sessionResponse.json()) as { code?: string };
+    assert.equal(sessionBody.code, "UNBOUND_PROJECT");
+  } finally {
+    // A dangling, un-`unref`'d listening server would otherwise hang the whole test process on an
+    // assertion failure above (RED) — stop unconditionally, regardless of what threw.
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: reconciles an active registry binding at boot and again on the next heartbeat tick (PR-40a)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  let getUpdatesCalls = 0;
+  const fakeClient: TelegramClient = {
+    async getUpdates() {
+      getUpdatesCalls++;
+      // A real getUpdates() long-polls Telegram for MAX_LONGPOLL_SECONDS, which is what naturally paces
+      // poller.ts's loop in production. Resolving instantly here would busy-spin that same real loop as
+      // fast as the CPU allows — a self-inflicted microtask livelock that starves the whole process's
+      // event loop (including every other test's setTimeout-based waits). A short macrotask delay keeps
+      // the loop realistic without slowing the test down.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return [];
+    },
+    async sendMessage(params) {
+      return { message_id: 1, chat: { id: Number(params.chat_id), type: "group" }, date: 1, text: params.text };
+    },
+    async getMe() {
+      return { id: 555111222, is_bot: true, username: "test_bot" };
+    },
+    async getChat() {
+      return { id: -1009876543210, type: "group" };
+    },
+  };
+
+  const registry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [
+      {
+        bot_id: 555111222,
+        username: "test_bot",
+        token_ref: { store: "keychain", account: "bot:555111222" },
+        added_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+    groups: [{ group_id: -1009876543210, added_at: "2026-09-01T00:00:00.000Z" }],
+    projects: [{ project_id: "prj-wired", path: homeDir }],
+    bindings: [
+      {
+        project_id: "prj-wired",
+        bot_id: 555111222,
+        group_id: -1009876543210,
+        agent_id: "@wired-agent",
+        status: "active",
+        roster_snapshot: [{ agent_id: "@wired-agent", user_id: 555111222, username: "test_bot" }],
+        roster_hash: ROSTER_HASH,
+        bound_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registry));
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 15,
+      telegramClientFactory: async () => fakeClient,
+    });
+
+    // Reconciled at boot: BindingsReconciler.reconcile() writes one BINDING_CHANGED audit row per
+    // newly-active binding, and the poller's first getUpdates() call proves the poller actually started
+    // (not merely constructed).
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const bootCallCount = getUpdatesCalls;
+    assert.ok(bootCallCount > 0, "poller must have started and called getUpdates() at least once by boot");
+
+    const auditRows = daemon.ledger.db
+      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
+      .all() as Record<string, unknown>[];
+    assert.equal(auditRows.length, 1);
+    assert.equal(auditRows[0].project_id, "prj-wired");
+
+    // Reconciled again on the heartbeat tick: an unchanged registry reconciles to a no-op (matches
+    // BindingsReconciler's own "does nothing when active bindings are unchanged" contract), so the audit
+    // row count must stay at 1 rather than grow on every tick.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const auditRowsAfterTicks = daemon.ledger.db
+      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
+      .all() as Record<string, unknown>[];
+    assert.equal(auditRowsAfterTicks.length, 1, "an unchanged registry must not re-fire BINDING_CHANGED on every tick");
+
+    // Real hot-reload (D-12): a mutant that disables tick-driven reconciliation entirely would still
+    // pass every assertion above (an unchanged registry stays a no-op either way), so this is the one
+    // case that actually distinguishes "reconciled on every tick" from "reconciled once at boot,
+    // never again". Add a genuinely new binding after boot and prove the NEXT tick — not boot — is what
+    // picks it up.
+    const registryWithSecondBinding: Registry = {
+      ...registry,
+      bots: [
+        ...registry.bots,
+        {
+          bot_id: 555111223,
+          username: "test_bot_2",
+          token_ref: { store: "keychain", account: "bot:555111223" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [...registry.groups, { group_id: -1009876543211, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [...registry.projects, { project_id: "prj-wired-2", path: homeDir }],
+      bindings: [
+        ...registry.bindings,
+        {
+          project_id: "prj-wired-2",
+          bot_id: 555111223,
+          group_id: -1009876543211,
+          agent_id: "@wired-agent-2",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@wired-agent-2", user_id: 555111223, username: "test_bot_2" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithSecondBinding));
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const auditRowsAfterAdd = daemon.ledger.db
+      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
+      .all() as Record<string, unknown>[];
+    assert.equal(
+      auditRowsAfterAdd.length,
+      2,
+      "a binding added to the registry after boot must be reconciled on the next heartbeat tick, not only at boot",
+    );
+    assert.ok(auditRowsAfterAdd.some((row) => row.project_id === "prj-wired-2"));
+
+    await daemon.stop();
+
+    // stop() must call reconciler.stopAll(): the poller loop must actually terminate, not merely have its
+    // handle discarded — proven by the call count going quiet after a grace period.
+    const callCountAtStop = getUpdatesCalls;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(getUpdatesCalls, callCountAtStop, "poller must stop calling getUpdates() once stop() resolves");
+  } finally {
+    // See the previous test's comment: stop unconditionally so a RED assertion never leaves a dangling
+    // listening server (or a still-running poller loop) hanging the test process.
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: stop() closes the real IPC server — a subsequent request is refused (PR-40a)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  try {
+    const daemon = await startDaemon({ homeDir, secretStore: fakeStore });
+    const port = daemon.port;
+
+    await daemon.stop();
+
+    await assert.rejects(
+      () => fetch(ipcUrl(port, `/identity?nonce=${NONCE_HEX}`)),
+      "a request after stop() must be refused (connection closed), not answered",
+    );
   } finally {
     cleanupTempHome(homeDir);
   }
