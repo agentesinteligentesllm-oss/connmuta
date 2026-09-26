@@ -41,13 +41,29 @@ function createFakeExec(): { execImpl: ExecFileImpl; calls: RecordedExecCall[] }
  * regardless of the host running this suite, since `icacls.exe`/`reg.exe` only exist on Windows.
  */
 function expectedSystem32Path(exeName: string): string {
-	return win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", exeName);
+	return win32.join(process.env.SystemRoot || "C:\\Windows", "System32", exeName);
 }
 
 test("icaclsExePath resolves to an absolute path under SystemRoot\\System32", () => {
 	const path = icaclsExePath();
 	assert.ok(win32.isAbsolute(path), `expected an absolute path, got: ${path}`);
 	assert.equal(path, expectedSystem32Path("icacls.exe"));
+});
+
+test("an empty SystemRoot falls back to the default root instead of producing a relative path", () => {
+	const original = process.env.SystemRoot;
+	process.env.SystemRoot = "";
+	try {
+		const path = icaclsExePath();
+		assert.ok(win32.isAbsolute(path), `expected an absolute path even with SystemRoot="", got: ${path}`);
+		assert.equal(path, win32.join("C:\\Windows", "System32", "icacls.exe"));
+	} finally {
+		if (original === undefined) {
+			delete process.env.SystemRoot;
+		} else {
+			process.env.SystemRoot = original;
+		}
+	}
 });
 
 test("regExePath resolves to an absolute path under SystemRoot\\System32", () => {

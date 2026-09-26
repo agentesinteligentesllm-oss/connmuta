@@ -9,10 +9,10 @@ import { runIcacls, type ExecFileImpl } from "./exec.js";
  * D-49, THREAT-MODEL §5.5).
  *
  * On Windows this strips inherited ACEs and grants the current user full control with the inheritable
- * `(OI)(CI)` flags, so files the daemon creates later under the home (identity file, ledger, fallback
- * token file) inherit the grant — THREAT-MODEL's own literal command omitted these flags; D-49 corrects
- * that. `icacls`'s `/grant:r` **replaces** rather than appends the named trustee's access, so re-running
- * this on an already-hardened home reissues the identical grant instead of duplicating or widening it.
+ * `(OI)(CI)` flags (D-49; THREAT-MODEL §5.5 documents the same command), so files the daemon creates
+ * later under the home (identity file, ledger, fallback token file) inherit the grant. `icacls`'s
+ * `/grant:r` **replaces** rather than appends the named trustee's access, so re-running this on an
+ * already-hardened home reissues the identical grant instead of duplicating or widening it.
  *
  * On POSIX there is no ACL and no inheritance to set up — design §11 is a Windows-only mechanism, since
  * `fs.chmod` on Windows only ever touches the read-only bit (THREAT-MODEL §5.5). The equivalent here is

@@ -3,8 +3,8 @@ import { win32 } from "node:path";
 
 /**
  * The installer's sole exec allow-list (D-50, design.md §12.2): the only place under `src/installer/`
- * that calls into `node:child_process`. Both this PR's `acl.ts` and PR-09's `autostart.ts` reach the
- * system only through the two runners this module exposes.
+ * that calls into `node:child_process`. `acl.ts` and `autostart.ts` reach the system only through the
+ * two runners this module exposes.
  *
  * Node has no registry API and no Windows ACL API, so both operations must shell out. Every target is
  * resolved to an absolute path under `%SystemRoot%\System32`, never a bare command name: the same
@@ -23,23 +23,35 @@ const DEFAULT_SYSTEM_ROOT = "C:\\Windows";
 const ICACLS_EXE_NAME = "icacls.exe";
 const REG_EXE_NAME = "reg.exe";
 
-/** Resolves `%SystemRoot%`, falling back to {@link DEFAULT_SYSTEM_ROOT} when the environment omits it. */
+/**
+ * Resolves `%SystemRoot%`, falling back to {@link DEFAULT_SYSTEM_ROOT} when the environment omits it
+ * or sets it to an empty string — nullish coalescing alone would accept `""` and turn every
+ * downstream `win32.join` call into a relative path, which `execFileSync` would then resolve against
+ * the current working directory instead of a fixed system location.
+ */
 function systemRoot(): string {
-	return process.env.SystemRoot ?? DEFAULT_SYSTEM_ROOT;
+	return process.env.SystemRoot || DEFAULT_SYSTEM_ROOT;
+}
+
+/** Resolves `dirName`/`exeName` under {@link systemRoot}, always as a `win32`-shaped absolute path (D-50). */
+function resolveAllowListedExe(exeName: string): string {
+	// `win32`, never the platform-default `node:path`: these paths are Windows-shaped regardless of the
+	// host running the test suite, and both allow-listed executables only ever exist on Windows.
+	const resolved = win32.join(systemRoot(), SYSTEM32_DIR_NAME, exeName);
+	if (!win32.isAbsolute(resolved)) {
+		throw new Error(`installer/exec.ts: refusing to run a non-absolute path: ${resolved}`);
+	}
+	return resolved;
 }
 
 /** Absolute, allow-listed path to `icacls.exe`. */
 export function icaclsExePath(): string {
-	// Always win32 join/isAbsolute (not the platform-default `node:path`): these paths are Windows-shaped
-	// (backslash `SystemRoot`) regardless of the host running the test suite, and both executables only
-	// ever exist on Windows — the platform-default join broke `isAbsolute` on a POSIX CI runner (native
-	// review finding R3-posix-path-assertions-fail).
-	return win32.join(systemRoot(), SYSTEM32_DIR_NAME, ICACLS_EXE_NAME);
+	return resolveAllowListedExe(ICACLS_EXE_NAME);
 }
 
 /** Absolute, allow-listed path to `reg.exe`. */
 export function regExePath(): string {
-	return win32.join(systemRoot(), SYSTEM32_DIR_NAME, REG_EXE_NAME);
+	return resolveAllowListedExe(REG_EXE_NAME);
 }
 
 /** `execFileSync` options fixed for every allow-listed call: never a shell, output captured as text. */
