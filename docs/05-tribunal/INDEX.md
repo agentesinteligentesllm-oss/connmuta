@@ -1143,6 +1143,21 @@ visible.
 
 ---
 
+## `bus-v2-session-41-full-audit-001` — Full session-41 audit: F1 close-out + F2 planning cycle
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-26 (session 41) |
+| Subject | The Director asked for a comprehensive audit of everything done this session before continuing: F1's archive close-out (commits `7ec0039`, `5c5e444`, `7421d2e`, `3865b23`) and F2's complete SDD planning cycle, explore through tasks (commits `439746b`, `2fc6f14`, `bd88ad8`, `cd79d28`, `eee60d0`, `2fb1d71`) — 10 commits, 41 files, 3,185 insertions. |
+| Authority | The Director, explicit request: "quiero que le pidas a tu colaborador alpha una auditoría para estar seguros de que todo está en orden." |
+| Round 1 | Kairo's `PROPOSAL` asked Alpha to verify F1's corrected bookkeeping (tasks.md:1499, archive-report.md, CHECKLIST.md B-58/59/60), spot-check design.md claims Kairo hadn't independently verified (D-43's `pi-mcp-adapter` load order, D-48's exact file list), and verify tasks.md's 100% requirement/scenario coverage claim. Alpha's `AUDIT` returned `APPROVE`, `objections: []` — closing directly to `CONSENSUS` per the fast-path rule. |
+| Verification note (disclosed, not softened) | Alpha's verdict and every substantive claim in it were independently re-verified by Kairo and found **true** — but Alpha's own citations were **systematically wrong** in file path and line number, even though the underlying facts were correct. It cited the archived F1 folder as `.../2026-09-26-f1-bus-core-infrastructure/` twice — a directory that does not exist anywhere in this repository (the real name, which Kairo created earlier this session, is `f1-daemon-registry-thin-client`) — and gave wrong line numbers for `archive-report.md` (cited 43-45; the real line is 56) and `CHECKLIST.md` (cited 112-117; the real rows are 72-74). By contrast, its `pi-mcp-adapter/config.ts` citations (558-580, 670-728 for D-43) were exactly correct — `mergeServerMaps` genuinely starts at line 670. Kairo verified every claim directly against the real files before accepting the `CONSENSUS`, rather than trusting the citations. This extends this project's own "a parent's record is as fallible as a subagent's" lesson (sessions 31-40) to debate partners: a collaborator's verdict can be substantively correct while its receipts are fabricated, and the two must be checked separately. No new debate was opened to relitigate this with Alpha, since the underlying conclusion held and the debate was already terminal (`CONSENSUS` accepts no further envelope on the same conversation); disclosed here instead. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` in one round. No blockers or discrepancies found in the substance of either F1's close-out or F2's planning cycle. F2 is ready for `sdd-apply`. |
+| Left open, carried to the Director | None new — the citation-accuracy finding is a process lesson (Engram observation #3662), not a defect in any shipped artifact. |
+| Consequence | Session 41's F1 archive and F2 planning cycle (explore → propose → spec → design → tasks) are both confirmed correct and complete. Next session's first action is `sdd-apply` for `f2-installer-and-doctor`, starting at PR-01 per `tasks.md`. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an

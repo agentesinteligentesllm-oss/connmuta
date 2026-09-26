@@ -4,6 +4,54 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 41 — F1 archived; F2 (`f2-installer-and-doctor`) fully planned and audited
+
+- **Date**: 2026-09-26 (UTC).
+- **Authority**: the Director asked one question at the phase boundary (archive F1 / start F2 /
+  both, and order), then delegated the decision back in full ("aplica lo que consideres
+  prudente... tienes toda mi autorización"). Two further real product decisions were asked and
+  answered mid-session (start-at-login in scope for F2, D-40; gitignore vs commit tool configs,
+  D-52) — both genuinely unresolved product calls, not defaults picked unattended.
+- **F1 close-out** (`7ec0039`, `5c5e444`, `7421d2e`, `3865b23`): an Arena/Alpha audit
+  (`bus-v2-f1-archive-readiness-audit-001`) found `tasks.md`'s "one remaining item" (`strict_tdd`)
+  had actually been done since session 3 — a 37-session bookkeeping drift, corrected to 219/219.
+  `sdd-verify` (F1's first-ever verify pass) then `sdd-archive` (F1's first-ever archive) ran clean;
+  `openspec/specs/` created for the first time in this project (9 domains, 47 requirements, 85
+  scenarios). The archive commit (46 files, 24,153 lines) triggered this project's first full
+  end-to-end native RDD review: high risk, 4 lenses, one real CRITICAL (an arithmetic error in
+  `archive-report.md`'s own PR-count formula), fixed and approved; advisory findings (wrong spec
+  counts, a self-referential stale backlog row) fixed in a follow-up commit. Real merged-PR count
+  corrected to 47 (not the "44" every prior session's status line repeated). Filed B-57, B-58, B-59.
+- **F2 planning** (`439746b`, `2fc6f14`, `bd88ad8`, `cd79d28`, `eee60d0`, `2fb1d71`): full explore →
+  propose → spec → design → tasks cycle for the installer/doctor phase. Exploration added Pi
+  (`@earendil-works/pi-coding-agent`) to the tool-config matrix, investigated directly on this
+  machine (global `~/.pi/agent/mcp.json`, project `.pi/mcp.json`, and a shared `.mcp.json` also read
+  by Claude Code — confirmed via the installed `pi-mcp-adapter` plugin's real source). Debated with
+  Alpha before locking (`bus-v2-f2-explore-decisions-001`): B-05 closes via write-then-readback
+  merge tests instead of a manual spike; merge is JSONC-tolerant parsing + a new TOML dependency +
+  refuse-and-diff + pre-edit backup; tool detection is wizard-checkbox-only. Design (D-41..D-52)
+  resolved all open technical questions with evidence verified against the real F1 codebase: the
+  installer writes its own R6 audit row directly (not via IPC, which doesn't exist at first run);
+  byte-preserving merge via `jsonc-parser`/`smol-toml`; found the real merged-file edit list is 4
+  files, not the 2 the proposal named; found THREAT-MODEL.md's `icacls` command missing `(OI)(CI)`
+  flags in all 3 places (a real pre-existing doc bug, independently confirmed). Tasks sliced this
+  into 20 PR blocks (~5,900 lines), 100% spec-requirement traceability, ready for `sdd-apply`.
+- **Full-session audit** (`bus-v2-session-41-full-audit-001`): Alpha reviewed both parts, returned
+  `APPROVE`/`CONSENSUS`. Every substantive claim verified true on independent re-check — but Alpha's
+  own citations were repeatedly wrong (a cited directory, `f1-bus-core-infrastructure`, does not
+  exist anywhere in this repo; two cited line numbers were wrong for files whose content it
+  correctly described). Disclosed as a process lesson, not a defect in any shipped artifact
+  (Engram obs #3662): a collaborator's verdict and its citations must be verified separately.
+- **Process notes**: `ScheduleWakeup`'s dynamic-loop mechanism was used once to wait on a
+  `run_in_background` Bash command — the wrong tool for that (the harness notifies on completion
+  without it); worked without harm but disclosed. `gentle-ai sync` fixed one `managed_assets_outdated`
+  RDD failure mid-session. Engram MCP `mem_save` failed for 4 of 5 SDD phase sub-agents this session
+  (same known "multiple active runtime sessions" issue); the `engram` CLI fallback handled every one.
+- **Pointers**: [`docs/05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) (3 new debate records);
+  [`docs/06-backlog/CHECKLIST.md`](../06-backlog/CHECKLIST.md) (B-57 through B-60);
+  `openspec/changes/archive/2026-09-26-f1-daemon-registry-thin-client/` (F1's full archive);
+  `openspec/changes/f2-installer-and-doctor/` (F2's full planning set).
+
 ## Session 40 — PR-40a/PR-40b/PR-41/PR-42; F1 (`f1-daemon-registry-thin-client`) closes 100% complete
 
 - **Date**: 2026-09-26 (UTC).
