@@ -162,6 +162,13 @@ for (const target of TOOL_CONFIG_TARGETS) {
 
 			assertBytesOutsideContainerPreserved(target, adapter, originalText, writtenText);
 
+			// CRLF must survive inside the rewritten container too, not just outside it (task 5.1):
+			// a merge that reformatted the edited container with bare LF would still pass every other
+			// assertion here, since those only check the untouched prefix/suffix.
+			if (originalText.includes("\r\n")) {
+				assert.equal(writtenText.replace(/\r\n/g, "").includes("\n"), false, `${target.id}: expected no bare LF once every CRLF is stripped from the merged output`);
+			}
+
 			const parsed = adapter.parse(writtenText) as Record<string, unknown>;
 			const container = parsed[target.containerKey] as Record<string, unknown>;
 			assert.deepEqual(container[MCP_SERVER_NAME], intendedEntry);
