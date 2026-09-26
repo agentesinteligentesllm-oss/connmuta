@@ -7380,5 +7380,68 @@ substantive mutants were KILLED on the first pass — zero survivors, zero BUILD
 Parent independently re-confirmed `git diff main -- src/migration/main.ts src/migration/synthesize.ts`
 empty and the full suite green (1044/1043/1 skip) before trusting the result.
 
-**Judgment Day** (pending — both blind judges over a frozen worktree, plus a separate independent
-verifier; to be appended below once complete).
+**Judgment Day** (frozen worktrees at `e0c9763`; `jd-judge-a` + `jd-judge-b` in parallel, plus this
+project's own separate independent verifier on its own worktree with a `node_modules` junction —
+both rounds used, a first for the full budget since PR-31, and the first Judgment Day target in this
+project that shipped no `src/` change at all).
+
+**Round 1**: both judges independently converged on the identical 2 CRITICAL, both in
+`docs/runbooks/migrate-from-v1.md` — Step 2's summary falsely claimed a project-less migration
+imports thread history (`synthesize.ts` returns `threads: []` with no project, contradicting the
+runbook's own Step 3 two paragraphs later); and the recovery-path paragraph falsely claimed a bot
+migrated without a project could gain its *first* binding on a later re-run, when `main.ts` refuses
+ANY project addition to an already-migrated bot unconditionally, not only a second one — the same
+false premise repeated at the "Hand-editing the registry" section. Judge B additionally rated the
+dry-run wording overstatement WARNING (Judge A: SUGGESTION — a legitimate severity split on the
+identical underlying fact, not a contradiction) and found the sibling-convention gap
+(`spawnMigrateV1` missing the `existsSync(CLI_ENTRY)` pre-check every comparable real-child-process
+test in this repo already has). The independent verifier confirmed all three reproducible figures
+exactly (451 lines, 1044/1043/1 skip, 8/8 static, zero flakiness across 4 consecutive runs), directly
+probed the real migrated artifacts field-by-field (every thread field matched the fixture), and ran 6
+novel mutants of its own: 1 killed, 1 build-fail (a `from`/`to` type-swap TypeScript's own type system
+already rejects — informational, not a realistic bypass concern for this codebase), 4 survived — real,
+disclosed defense-in-depth advisories (thread-body content, `mergeRegistry`'s groups-dedup path never
+exercised since every scenario starts from an empty registry, the printed project-file's roster
+content, `token_ref.account`'s `"bot:"` prefix metadata), each already covered by PR-37's own unit
+tests in the same `npm test` run and judged by the verifier itself as non-blocking.
+
+**Corrected** in `eec6e57` (parent inline, small confirmed batch): both CRITICALs (the second one
+fixed at both locations the false premise repeated); the dry-run wording tightened at all three
+places it appeared; the `existsSync` gap closed; and Judge A's own remaining SUGGESTION addressed (a
+test comment overstating `last_fetch_at`'s relevance — the field is parsed but never consumed
+anywhere in the migration path). Landed at 465 authored lines, a 175-line PR-scoped exception (up
+from 161 pre-correction). Parent re-verification: `npm run build` clean; `node --test
+integration.test.js` 3/3; `npm test` and `npm run test:static` run CONCURRENTLY the first time,
+self-inflicting a spurious `tsc -b` race against the shared `dist/` (one assertion failed against a
+mid-rewrite build); a sequential re-run then hit an unrelated, pre-existing flaky IPC test
+(`routes.test.js`, `ECONNRESET`, matching the B-39 flake pattern); a third sequential run was clean —
+**1044 tests, 1043 pass, 0 fail, 1 skip**; `npm run test:static` → **8/8**. Neither failure was a
+regression from the fix; logged as a cautionary against running build-invoking commands concurrently
+on this machine, not as a defect in this PR.
+
+**Scoped re-judgment round 1** (`e0c9763..eec6e57`): Judge B returned clean, all 4 of its round-1
+items independently re-verified resolved. Judge A found ONE new fix-caused CRITICAL, single-judge:
+the correction fixed Step 3's body (project binding refused unconditionally) but left its own section
+heading reading "can be done later," reintroducing the identical contradiction one level up — heading
+vs. body instead of body vs. body. The parent verified this directly (a file-wide grep for "later"
+before trusting a single-judge finding) rather than accepting it on citation alone.
+
+**Corrected** in `6c35405` (parent inline, one line): the heading alone, changed to "optional, but
+only in the same run as the migration"; swept the whole file for any other leak of the old framing,
+found none. Parent re-verification: `npm run build` clean; `integration.test.js` 3/3; `npm test` and
+`npm run test:static` run sequentially this time — **1044/1043/0 fail/1 skip**, **8/8**.
+
+**Scoped re-judgment round 2** (`eec6e57..6c35405`, final — budget exhausted regardless of outcome):
+both judges returned clean (`{"findings":[]}`), each independently re-reading the full runbook for
+any residual contradiction and finding none. Both rounds of the two-re-judgment budget were spent
+rather than skipped, since the round-2 finding was CRITICAL-tier: this project's own established "a
+narrow, well-understood single-judge residual doesn't need the second round" precedent has so far
+been applied only to WARNING/SUGGESTION-tier round-2 residuals (PR-30 through PR-37), and this slice
+did not extend it to a CRITICAL one, even though the fix itself was a single heading phrase.
+
+**JUDGMENT: APPROVED** for `e0c9763..eec6e57..6c35405` (candidate; two correction commits, each
+covering every confirmed finding of its round; both scoped re-judgment rounds used — the first PR
+since PR-31 to need both, PR-32 through PR-37 having each needed only one). No native review ran for
+this candidate — a Judgment Day target, per HANDOFF §2.3 (this slice shipped no `src/` change, so no
+`assess` risk tier applies in the usual sense; recorded here as informational only). Full detail:
+tribunal record `bus-v2-f1-pr-38-audit-001`.

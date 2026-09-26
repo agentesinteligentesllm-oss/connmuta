@@ -1203,10 +1203,10 @@ Scope: `test/fixtures/v1-home/` (placeholder `config.json`/`state.json`), `test/
 Requirements: `v1-migration › v1 files are backed up and never modified or deleted` (full scenario); `v1-migration › The >24h cursor gap is stated, never silently absorbed`.
 Runtime harness: `conmuta migrate-v1` invoked as a real child process against the fixture (design §15 "Integration" layer, temp homes).
 
-- [ ] 38.1 RED: write `test/migration/integration.test.ts` covering "originals are byte-identical after migration", "fixture migrates with a synthesized registry and secret entry", and "stale cursor carries forward without a false recovery claim" (> `BOT_API_RETENTION_HOURS`).
-- [ ] 38.2 GREEN: build `test/fixtures/v1-home/config.json`/`state.json` (placeholders only, PT-22 deny-list clean) and run the migration CLI from PR-37 against it until 38.1 passes.
-- [ ] 38.3 Write `docs/runbooks/migrate-from-v1.md` (deliverable of this change, design §13): the >24h cursor gap, the one-poller rule, rollback steps (`conmuta daemon stop`, remove `~/.conmuta`, delete keyring entries `bot:<bot_id>`, resume v1), the backup still holds the token, null-anchor threads fail closed, hand-editing the registry until F2's wizards exist.
-- [ ] 38.4 Verify: `npm run build && node --test "dist/test/migration/integration.test.js"`.
+- [x] 38.1 RED: write `test/migration/integration.test.ts` covering "originals are byte-identical after migration", "fixture migrates with a synthesized registry and secret entry", and "stale cursor carries forward without a false recovery claim" (> `BOT_API_RETENTION_HOURS`).
+- [x] 38.2 GREEN: build `test/fixtures/v1-home/config.json`/`state.json` (placeholders only, PT-22 deny-list clean) and run the migration CLI from PR-37 against it until 38.1 passes.
+- [x] 38.3 Write `docs/runbooks/migrate-from-v1.md` (deliverable of this change, design §13): the >24h cursor gap, the one-poller rule, rollback steps (`conmuta daemon stop`, remove `~/.conmuta`, delete keyring entries `bot:<bot_id>`, resume v1), the backup still holds the token, null-anchor threads fail closed, hand-editing the registry until F2's wizards exist.
+- [x] 38.4 Verify: `npm run build && node --test "dist/test/migration/integration.test.js"`.
 
 **Apply-time notes (session 38):**
 1. **Arena Orion checked live at session start, still unreachable** (`curl --max-time 5
@@ -1276,6 +1276,51 @@ Runtime harness: `conmuta migrate-v1` invoked as a real child process against th
     `git diff main -- src/migration/main.ts src/migration/synthesize.ts` is empty (both files restored
     correctly) before trusting the result. Full suite re-confirmed green after the sweep: 1044/1043/1
     skip/0 fail.
+11. **Judgment Day, both rounds used their full adversarial value on a docs-only candidate — a first
+    for this project.** Frozen worktrees at `e0c9763`; `jd-judge-a` + `jd-judge-b` in parallel, plus this
+    project's own separate independent verifier (`general-purpose`, its own worktree with a
+    `node_modules` junction). **Round 1**: both judges independently converged on the identical 2
+    CRITICAL — `docs/runbooks/migrate-from-v1.md`'s Step 2 falsely claimed a project-less migration
+    imports thread history (`synthesize.ts` returns `threads: []` with no project — the runbook
+    contradicted its own Step 3 two paragraphs later); and the runbook falsely claimed a bot migrated
+    without a project could gain its *first* binding on a later re-run, when `main.ts` refuses ANY
+    project addition to an already-migrated bot unconditionally. Judge B additionally rated the
+    dry-run wording overstatement WARNING (Judge A: SUGGESTION — a legitimate severity split on the
+    identical underlying fact, not a contradiction) and found one more SUGGESTION (`spawnMigrateV1`
+    missing the sibling-file `existsSync(CLI_ENTRY)` convention). The independent verifier confirmed
+    all three reproducible figures exactly (451 lines, 1044/1043/1 skip, 8/8 static, zero flakiness
+    across 4 runs), directly probed the real migrated artifacts (every thread field correct), and ran
+    6 of its own novel mutants: 1 killed, 1 build-fail (an equivalent-under-TypeScript's-own-type-system
+    case), 4 survived — real, disclosed defense-in-depth advisories (thread-body content,
+    `mergeRegistry`'s dedup path, the printed project-file's roster, `token_ref` metadata), all already
+    covered by PR-37's own unit tests and judged by the verifier itself as non-blocking.
+    **Corrected** (`eec6e57`, parent inline): both CRITICALs (the second one at both places the false
+    premise repeated — Step 3's own paragraph and the "Hand-editing" section), the dry-run wording, the
+    `existsSync` gap, and Judge A's own remaining SUGGESTION (a comment overstating
+    `last_fetch_at`'s relevance — that field is parsed but never consumed anywhere in the migration
+    path). Landed at 465 lines, a 175-line exception. **Scoped re-judgment round 1**: Judge B returned
+    clean (all 4 of its items resolved); Judge A found ONE new fix-caused CRITICAL, single-judge — the
+    correction fixed Step 3's body but left its own heading reading "can be done later," reintroducing
+    the identical contradiction one level up. Verified directly by the parent (a file-wide grep for
+    "later" ruled out any other instance) before trusting a single-judge finding, per this project's
+    own established practice. **Second correction** (`6c35405`, parent inline): the heading alone,
+    swept the whole file for any other leak of the old framing, found none. **Scoped re-judgment round
+    2 (final; budget exhausted regardless of outcome)**: both judges returned clean
+    (`{"findings":[]}`), each independently re-reading the full file for any residual contradiction.
+    Both rounds of the two-re-judgment budget were spent rather than skipped, since the round-2 finding
+    was CRITICAL-tier — this project's own established "a narrow, well-understood single-judge residual
+    doesn't need the second round" precedent is reserved for WARNING/SUGGESTION-tier round-2 residuals,
+    confirmed unchanged by this slice, not extended to a CRITICAL one. Full suite and `test:static`
+    reconfirmed green after every correction, each time run sequentially — a first attempt ran `npm
+    test` and `npm run test:static` concurrently, self-inflicting a spurious `tsc -b` race (one file's
+    single assertion failed against a `dist/` mid-rewrite by the other process); the very next
+    sequential run hit an unrelated, pre-existing flaky IPC test (`ECONNRESET`, matching the B-39 flake
+    pattern) instead; a third sequential run was clean, confirming neither was a real regression —
+    logged here as a cautionary, not a defect in this PR.
+
+**JUDGMENT: APPROVED** (`e0c9763..eec6e57..6c35405`, both of the two re-judgment rounds used — the
+first PR since PR-31 to need both (PR-32 through PR-37 each needed only one), and the first Judgment
+Day target in this project that shipped no `src/` change at all).
 
 ### Unit 12 — Static assertions + wrong-room CI
 
