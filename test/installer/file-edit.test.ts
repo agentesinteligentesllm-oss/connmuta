@@ -48,6 +48,26 @@ const fakeAdapter: FormatAdapter = {
 	},
 };
 
+/**
+ * A {@link FormatAdapter} whose `buildText` always returns the `"CORRUPTED"` sentinel, and whose
+ * `parse` throws on exactly that sentinel — standing in for a write step 7's readback catches (a
+ * write that somehow produced content the format can no longer parse back).
+ */
+const corruptingAdapter: FormatAdapter = {
+	parse(text) {
+		if (text.trim() === "") {
+			return {};
+		}
+		if (text.trim() === "CORRUPTED") {
+			throw new FileEditRefusal("parse-error", "invalid content: mock post-write corruption");
+		}
+		return JSON.parse(text) as unknown;
+	},
+	buildText() {
+		return "CORRUPTED";
+	},
+};
+
 /** Runs `body` against a fresh temp directory and removes it afterwards, even on failure. */
 function withTempDir(body: (dir: string) => void): void {
 	const dir = mkdtempSync(join(tmpdir(), "conmuta-file-edit-"));
@@ -105,6 +125,23 @@ test("refuses when the target's parent directory is a symlink (step 1)", () => {
 		linkDirectory(realDir, parentLink);
 		const target = join(parentLink, "config.json");
 
+		assert.throws(
+			() => editFile({ path: target, adapter: fakeAdapter, entryPath: ENTRY_PATH, entry: { command: "node" } }),
+			(error: unknown) => error instanceof FileEditRefusal && error.reason === "symlink",
+		);
+	});
+});
+
+test("refuses a dangling symlink target instead of silently treating it as absent (step 1)", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.json");
+		const missingTarget = join(dir, "does-not-exist");
+		linkDirectory(missingTarget, target);
+
+		// existsSync(target) is false here (it follows the link to a target that doesn't exist), which
+		// is exactly the gap a naive existsSync-gated check would fall through: this must still refuse
+		// as a symlink, not fall through to step 2's create-if-absent branch.
+		assert.equal(existsSync(target), false);
 		assert.throws(
 			() => editFile({ path: target, adapter: fakeAdapter, entryPath: ENTRY_PATH, entry: { command: "node" } }),
 			(error: unknown) => error instanceof FileEditRefusal && error.reason === "symlink",
@@ -207,5 +244,36 @@ test("a pre-existing backup filename collision never overwrites the earlier back
 
 		const written = JSON.parse(readFileSync(target, "utf8")) as { mcpServers: { conmuta: unknown } };
 		assert.deepEqual(written.mcpServers.conmuta, { command: "node" });
+	});
+});
+
+test("step 7 restores the previous file from backup when the written content fails to re-parse", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.json");
+		const original = JSON.stringify({ mcpServers: {} }, null, 2);
+		writeFileSync(target, original, "utf8");
+
+		assert.throws(
+			() => editFile({ path: target, adapter: corruptingAdapter, entryPath: ENTRY_PATH, entry: { command: "node" } }),
+			(error: unknown) => error instanceof FileEditRefusal && error.reason === "verification-failed",
+		);
+
+		// Restored byte-for-byte from the pre-edit backup, not left holding the corrupted write.
+		assert.equal(readFileSync(target, "utf8"), original);
+	});
+});
+
+test("step 7 removes a newly-created file when the written content fails to re-parse", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "new-config.json");
+
+		assert.throws(
+			() => editFile({ path: target, adapter: corruptingAdapter, entryPath: ENTRY_PATH, entry: { command: "node" } }),
+			(error: unknown) => error instanceof FileEditRefusal && error.reason === "verification-failed",
+		);
+
+		// No backup existed to restore from (the file didn't exist before this call), so the failed
+		// write is removed rather than left behind as a corrupted, half-installed file.
+		assert.equal(existsSync(target), false);
 	});
 });

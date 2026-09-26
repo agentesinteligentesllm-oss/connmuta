@@ -85,12 +85,14 @@ export function editFile(options: EditFileOptions): EditFileOutcome {
 	const now = options.now ?? (() => new Date());
 
 	// Step 1: refuse a symlinked target or parent. A rename-over would replace the link with a
-	// regular file, silently breaking whatever the link was pointing the user's setup at.
+	// regular file, silently breaking whatever the link was pointing the user's setup at. Checked via
+	// lstatSync directly (never existsSync, which follows links and reports a dangling symlink's
+	// target as absent, letting a broken link bypass this refusal entirely).
 	const parent = dirname(path);
-	if (existsSync(parent) && lstatSync(parent).isSymbolicLink()) {
+	if (isSymlink(parent)) {
 		throw new FileEditRefusal("symlink", `refusing to edit: parent directory is a symlink: ${parent}`);
 	}
-	if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
+	if (isSymlink(path)) {
 		throw new FileEditRefusal("symlink", `refusing to edit: target is a symlink: ${path}`);
 	}
 
@@ -175,6 +177,24 @@ export function describeValueType(value: unknown): string {
 		return "an array";
 	}
 	return typeof value;
+}
+
+/**
+ * Reports whether `path` is a symlink, including a dangling one whose target no longer exists.
+ *
+ * `lstatSync` (unlike `existsSync`/`statSync`) never follows the link, so it still succeeds — and
+ * still reports `isSymbolicLink() === true` — when the link's target is gone. Only a genuinely
+ * absent path (nothing at all, not even a link) throws `ENOENT`, which this treats as "not a symlink".
+ */
+function isSymlink(path: string): boolean {
+	try {
+		return lstatSync(path).isSymbolicLink();
+	} catch (error) {
+		if (isErrno(error, "ENOENT")) {
+			return false;
+		}
+		throw error;
+	}
 }
 
 /** Reads the written file back, re-parses it, and confirms the delta is exactly the intended entry. */
