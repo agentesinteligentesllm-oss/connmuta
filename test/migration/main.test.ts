@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { runMigration } from "../../src/migration/main.js";
-import { EXIT_MIGRATION_REFUSED, REGISTRY_VERSION } from "../../src/shared/constants.js";
+import { EXIT_MIGRATION_REFUSED, EXIT_NODE_FLOOR, REGISTRY_VERSION } from "../../src/shared/constants.js";
+import { computeRosterHash } from "../../src/shared/roster-hash.js";
 import type { SecretStore } from "../../src/secret-store/types.js";
 import type { SecretStoreSelection } from "../../src/secret-store/index.js";
 
@@ -78,7 +79,74 @@ function fakeSecretStore(): {
   return { impl: async () => ({ store }), calls };
 }
 
+/** A `SecretStore` stand-in reporting `kind: "keychain"`, so the keychain arm of `token_ref` is exercised. */
+function fakeKeychainSecretStore(): {
+  impl: () => Promise<SecretStoreSelection>;
+  calls: Array<{ botId: string; token: string }>;
+} {
+  const tokens = new Map<string, string>();
+  const calls: Array<{ botId: string; token: string }> = [];
+  const store: SecretStore = {
+    kind: "keychain",
+    async get(botId) {
+      return tokens.get(botId) ?? null;
+    },
+    async set(botId, token) {
+      tokens.set(botId, token);
+      calls.push({ botId, token });
+    },
+    async delete(botId) {
+      tokens.delete(botId);
+    },
+  };
+  return { impl: async () => ({ store }), calls };
+}
+
 const FIXED_NOW = () => new Date("2026-03-15T12:00:00.000Z");
+
+// --- Internal Node-floor gate ---
+
+test("runMigration returns EXIT_NODE_FLOOR when the injected nodeVersion is below the floor", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    const errs: string[] = [];
+
+    const result = await runMigration({
+      v1Home,
+      v2Home,
+      nodeVersion: "16.0.0",
+      stderr: (line) => errs.push(line),
+    });
+
+    assert.equal(result.exitCode, EXIT_NODE_FLOOR);
+    assert.ok(errs.some((line) => /Node\.js/.test(line)));
+  });
+});
+
+// --- Unexpected failures: caught, not crashed ---
+
+test("runMigration returns exitCode 1 and reports the message only (no stack) when a collaborator throws unexpectedly", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+    const secretStore = fakeSecretStore();
+    const errs: string[] = [];
+
+    const result = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      selectSecretStoreImpl: secretStore.impl,
+      openLedgerImpl: () => {
+        throw new Error("disk full");
+      },
+      stderr: (line) => errs.push(line),
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(errs.length, 1);
+    assert.equal(errs[0], "disk full", "the exact message, and nothing else, must reach stderr");
+    assert.equal(errs[0].includes("at "), false, "a stack trace must never leak to stderr");
+  });
+});
 
 // --- Headline: no token available anywhere, and the env is never consulted (D-24) ---
 
@@ -220,6 +288,23 @@ test("runMigration reads the token from stdin when --token-stdin is given and co
   });
 });
 
+test("runMigration stores the token under the keychain arm and writes the matching token_ref shape", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+    const secretStore = fakeKeychainSecretStore();
+
+    const result = await runMigration({ v1Home, v2Home, now: FIXED_NOW, selectSecretStoreImpl: secretStore.impl });
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(secretStore.calls, [{ botId: "555000001", token: "placeholder-v1-bot-token" }]);
+
+    const registry = JSON.parse(readFileSync(join(v2Home, "registry.json"), "utf8")) as {
+      bots: readonly { bot_id: number; token_ref: { store: string; account?: string; path?: string } }[];
+    };
+    assert.deepEqual(registry.bots[0].token_ref, { store: "keychain", account: "bot:555000001" });
+  });
+});
+
 test("runMigration refuses when --token-stdin is given but stdin is empty", async () => {
   await withTempDirs(async (v1Home, v2Home) => {
     writeV1Fixture(v1Home);
@@ -327,6 +412,109 @@ test("running migrate-v1 twice is still idempotent when v1's state.json never ex
   });
 });
 
+test("running migrate-v1 again on a LATER day is still recognized as idempotent, not a same-day-only backup check", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+
+    const first = await runMigration({
+      v1Home,
+      v2Home,
+      now: () => new Date("2026-03-15T12:00:00.000Z"),
+      selectSecretStoreImpl: fakeSecretStore().impl,
+    });
+    assert.equal(first.exitCode, 0);
+
+    const secondStore = fakeSecretStore();
+    const outs: string[] = [];
+    const second = await runMigration({
+      v1Home,
+      v2Home,
+      now: () => new Date("2026-03-16T09:00:00.000Z"),
+      selectSecretStoreImpl: secondStore.impl,
+      stdout: (line) => outs.push(line),
+    });
+
+    assert.equal(second.exitCode, 0);
+    assert.equal(secondStore.calls.length, 0, "a later-day re-run must not call secretStore.set again");
+    assert.ok(outs.some((line) => /already migrated/i.test(line)));
+    assert.equal(
+      outs.some((line) => /refusing/i.test(line)),
+      false,
+      "a later-day re-run must not fall into the conflict-refusal branch",
+    );
+  });
+});
+
+// --- Already-migrated bot + a newly requested project binding: honest refusal, not silent drop ---
+
+test("re-running migrate-v1 with the SAME already-bound project args stays idempotent", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+
+    const first = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      projectId: "prj-example",
+      projectPath: "/abs/path/to/project",
+      selectSecretStoreImpl: fakeSecretStore().impl,
+    });
+    assert.equal(first.exitCode, 0);
+    const registryAfterFirst = readFileSync(join(v2Home, "registry.json"), "utf8");
+
+    const secondStore = fakeSecretStore();
+    const outs: string[] = [];
+    const second = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      projectId: "prj-example",
+      projectPath: "/abs/path/to/project",
+      selectSecretStoreImpl: secondStore.impl,
+      stdout: (line) => outs.push(line),
+    });
+
+    assert.equal(second.exitCode, 0);
+    assert.equal(secondStore.calls.length, 0);
+    assert.equal(
+      readFileSync(join(v2Home, "registry.json"), "utf8"),
+      registryAfterFirst,
+      "registry.json must not change when re-run with the same already-bound project",
+    );
+    assert.ok(outs.some((line) => /already migrated/i.test(line)));
+  });
+});
+
+test("re-running migrate-v1 with a newly requested project on an already bot-migrated setup refuses honestly instead of silently dropping it", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+
+    const first = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      selectSecretStoreImpl: fakeSecretStore().impl,
+    });
+    assert.equal(first.exitCode, 0, "first run migrates the bot/group only, no project bound yet");
+
+    const secondStore = fakeSecretStore();
+    const errs: string[] = [];
+    const second = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      projectId: "prj-newly-requested",
+      projectPath: "/abs/path/to/other-project",
+      selectSecretStoreImpl: secondStore.impl,
+      stderr: (line) => errs.push(line),
+    });
+
+    assert.equal(second.exitCode, EXIT_MIGRATION_REFUSED);
+    assert.equal(secondStore.calls.length, 0, "a refused project-binding request must not touch the secret store");
+    assert.ok(errs.some((line) => /project/i.test(line) && /already migrated/i.test(line)));
+  });
+});
+
 // --- --dry-run: no writes, informational report ---
 
 test("runMigration --dry-run writes nothing and reports what would happen", async () => {
@@ -353,6 +541,34 @@ test("runMigration --dry-run writes nothing and reports what would happen", asyn
     );
     assert.deepEqual(readdirSync(v2Home), [], "dry-run must not write under v2Home");
     assert.ok(outs.some((line) => /dry run/i.test(line)));
+  });
+});
+
+test("runMigration --dry-run with project args prints the proposed conmuta.json preview without writing anything", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+    const secretStore = fakeSecretStore();
+    const outs: string[] = [];
+
+    const result = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      dryRun: true,
+      projectId: "prj-example",
+      projectPath: "/abs/path/to/project",
+      selectSecretStoreImpl: secretStore.impl,
+      stdout: (line) => outs.push(line),
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(secretStore.calls.length, 0);
+    assert.deepEqual(readdirSync(v2Home), [], "dry-run must not write under v2Home even with project args");
+    assert.ok(outs.some((line) => /dry run/i.test(line)));
+    assert.ok(
+      outs.some((line) => line.includes('"schema_version"')),
+      "expected the proposed conmuta.json preview to be printed under --dry-run with project args",
+    );
   });
 });
 
@@ -498,5 +714,119 @@ test("runMigration refuses when --project-id is given without --project-path", a
 
     assert.equal(result.exitCode, EXIT_MIGRATION_REFUSED);
     assert.equal(secretStore.calls.length, 0);
+  });
+});
+
+// --- A quarantined ledger: refuse rather than silently migrate into a fresh, empty database ---
+
+test("runMigration refuses and closes the db when openLedger returns a quarantined result, without writing registry.json", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+    const secretStore = fakeSecretStore();
+    const errs: string[] = [];
+    let closeCallCount = 0;
+    const fakeDb = { close: () => { closeCallCount++; } };
+    const quarantinedPath = join(v2Home, "ledger.corrupt-1234567890.db");
+
+    const result = await runMigration({
+      v1Home,
+      v2Home,
+      now: FIXED_NOW,
+      selectSecretStoreImpl: secretStore.impl,
+      openLedgerImpl: () => ({
+        status: "quarantined" as const,
+        reason: "corruption" as const,
+        quarantinedPath,
+        db: fakeDb as unknown as DatabaseSync,
+        path: join(v2Home, "ledger.db"),
+        schemaVersion: 1,
+      }),
+      stderr: (line) => errs.push(line),
+    });
+
+    assert.equal(result.exitCode, EXIT_MIGRATION_REFUSED);
+    assert.equal(closeCallCount, 1, "the quarantined db must be closed");
+    assert.equal(existsSync(join(v2Home, "registry.json")), false, "registry.json must never be written when the ledger is quarantined");
+    assert.ok(errs.some((line) => line.includes("corruption") && line.includes(quarantinedPath)));
+  });
+});
+
+// --- mergeRegistry: groups/projects deduped by id, and additive over unrelated pre-existing entries ---
+
+test("migrating into an existing registry whose group_id matches this config's chat_id does not duplicate the group entry", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+    const existingRegistry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [],
+      groups: [{ group_id: -1001111111111, title: "Existing Group Title", added_at: "2026-01-01T00:00:00.000Z" }],
+      projects: [],
+      bindings: [],
+    };
+    writeFileSync(join(v2Home, "registry.json"), JSON.stringify(existingRegistry), "utf8");
+    const secretStore = fakeSecretStore();
+
+    const result = await runMigration({ v1Home, v2Home, now: FIXED_NOW, selectSecretStoreImpl: secretStore.impl });
+
+    assert.equal(result.exitCode, 0);
+    const registry = JSON.parse(readFileSync(join(v2Home, "registry.json"), "utf8")) as {
+      groups: readonly { group_id: number; title?: string }[];
+    };
+    const matching = registry.groups.filter((group) => group.group_id === -1001111111111);
+    assert.equal(matching.length, 1, "the group must appear exactly once after merging, not duplicated");
+    assert.equal(matching[0].title, "Existing Group Title", "the EXISTING entry must win on a collision, not the re-derived synthesis");
+  });
+});
+
+test("mergeRegistry is additive: migrating a new bot preserves an unrelated pre-existing bot/group/project/binding untouched", async () => {
+  await withTempDirs(async (v1Home, v2Home) => {
+    writeV1Fixture(v1Home, { config: { bot_token: "placeholder-v1-bot-token" } });
+    const unrelatedRosterSnapshot = [{ agent_id: "@agent-placeholder-c", user_id: 999999999, username: "unrelated" }];
+    const existingRegistry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [
+        {
+          bot_id: 999999999,
+          username: "unrelated_bot",
+          token_ref: { store: "file", path: "/placeholder/unrelated-token" },
+          added_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      groups: [{ group_id: -1009999999999, title: "Unrelated Group", added_at: "2026-01-01T00:00:00.000Z" }],
+      projects: [{ project_id: "prj-unrelated", path: "/abs/unrelated" }],
+      bindings: [
+        {
+          project_id: "prj-unrelated",
+          bot_id: 999999999,
+          group_id: -1009999999999,
+          agent_id: "@agent-placeholder-c",
+          status: "active",
+          roster_snapshot: unrelatedRosterSnapshot,
+          roster_hash: computeRosterHash(unrelatedRosterSnapshot),
+          bound_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(v2Home, "registry.json"), JSON.stringify(existingRegistry), "utf8");
+    const secretStore = fakeSecretStore();
+
+    const result = await runMigration({ v1Home, v2Home, now: FIXED_NOW, selectSecretStoreImpl: secretStore.impl });
+
+    assert.equal(result.exitCode, 0);
+    const registry = JSON.parse(readFileSync(join(v2Home, "registry.json"), "utf8")) as {
+      bots: readonly { bot_id: number }[];
+      groups: readonly { group_id: number }[];
+      projects: readonly { project_id: string }[];
+      bindings: readonly { project_id: string }[];
+    };
+    assert.equal(registry.bots.length, 2, "both the unrelated bot and the newly migrated bot must be present");
+    assert.ok(registry.bots.some((bot) => bot.bot_id === 999999999));
+    assert.ok(registry.bots.some((bot) => bot.bot_id === 555000001));
+    assert.equal(registry.groups.length, 2);
+    assert.ok(registry.groups.some((group) => group.group_id === -1009999999999));
+    assert.equal(registry.projects.length, 1, "no project was requested by this migration, so only the pre-existing one remains");
+    assert.equal(registry.projects[0].project_id, "prj-unrelated");
+    assert.equal(registry.bindings.length, 1);
+    assert.equal(registry.bindings[0].project_id, "prj-unrelated");
   });
 });
