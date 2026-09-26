@@ -1338,11 +1338,63 @@ Runtime harness: N/A — pure static analysis over `dist/src/**` after `tsc -b`.
 
 > **Apply-time note (session 39, `bus-v2-f1-pr-39-audit-001`/`-002`, both Alpha CONSENSUS):** Scope gained a sixth file, `test/security/predicates.test.ts` (AS-IS, v1 `test/security.test.ts:107-169`, `Changes: none.`), missing from the original Scope line above even though 39.5's own verify command already ran it — Alpha's audit caught the gap. `v1-provenance.json` carries two new entries, not one. The actual RED/GREEN order shipped was: 39.1 RED (both fixture entries) → RED `predicates.test.ts` → GREEN `predicates.ts` → RED `closure.test.ts` → GREEN `closure.ts` → 39.5 Verify (all three compiled test files). Landed at 290 authored lines (est. ≈197), no `size:exception`. Merged as PR #43 (`d85ca2c`), tribunal record `bus-v2-f1-pr-39-audit-001`/`-002`/`bus-v2-f1-pr-39-diff-audit-001` — first PR since PR-05 with DN-05 genuinely satisfied (real Alpha audit, not the Judgment Day substitute). `design.md:519`'s stale `44-101`/`AS-IS` citation for `predicates.ts` is unrelated to this note and tracked as **B-55** instead.
 
-#### PR-40 — client/daemon bundle assertion tables (PT-27, PT-28, PT-07)
-Branch `f1/40-security-bundle-tables` → `main`. Depends: PR-39. Size: ≈380 lines, no exception.
+#### PR-40 — client/daemon bundle assertion tables (PT-27, PT-28, PT-07) — **re-sliced at apply time into PR-40a/PR-40b**
+
+**Apply-time re-slice (session 40, Arena debate `bus-v2-f1-pr-40-audit-001`, Alpha `CONSENSUS`).** Computing
+the real closure from `dist/src/daemon/main.js` before writing any assertion (HANDOFF's own standing
+instruction) found that `src/daemon/bootstrap.ts` — unchanged since PR-16 — never wires the daemon's IPC
+layer (`createIpcServer`, `createIdentityHandler`, `createSessionRoutes`), the poller (`startPoller`), or
+`BindingsReconciler` into `startDaemon`: the computed closure is only 4 files
+(`daemon/main.js`, `daemon/node-floor.js`, `daemon/lifecycle/lock.js`, `shared/constants.js`), because
+`daemon/main.ts:8`'s `await import("./bootstrap.js")` (D-25) is a dynamic import the static closure walker
+cannot traverse, and `bootstrap.ts` itself never references any of the already-merged, already-audited
+`admission.ts`/`poller.ts`/`ipc/*`/`transport/*`/`send/*`/`serve/*` modules (confirmed via `git log
+--follow` — only PR-16's own two commits touch the file — and grep: zero call sites outside
+`bootstrap.ts`'s own declared-but-unread `telegramClientFactory` option). This was already disclosed twice
+in this project's own record (`apply-progress.md`'s PR-27 and PR-31 sections: "wiring it is the IPC
+slice's job, not a drive-by edit"; "`bootstrap.ts` does not wire it in at all yet — a later PR's job") but
+no PR from PR-32 through PR-42 actually names it. Writing PR-40's assertions against this closure would be
+vacuous (design.md §14's daemon-column rows police files the closure cannot contain), and PR-41's
+`wrong-room.test.ts` cannot pass either (no send ever reaches a transport). Re-sliced, same in-place
+precedent as PR-06/PR-08/PR-09/PR-22:
+
+  - **PR-40a** (`f1/40a-daemon-composition-wiring`, new — not in the original tasks-phase plan): wires
+    `startDaemon` to a real composition root — `createIpcServer` with `createIdentityHandler` (`GET
+    /identity`) and `createSessionRoutes` (`POST/DELETE /session`, `/tools/*`) mounted as its handlers;
+    `BindingsReconciler` given a real `createTelegramClient` (built from `secretStore.get` +
+    `TelegramApiClient`) and `createPoller` (`startPoller`); reconciliation run at boot and on every
+    existing heartbeat tick (D-12). Four Alpha-mandated must-fix points, all accepted: (1)
+    `test/security/closure.ts` gains dynamic-`import()` traversal (disclosed, in scope here since it is a
+    prerequisite for PR-40b's own daemon-closure computation); (2) `createIdentityHandler` mounted
+    alongside `createSessionRoutes` (PT-26 handshake needs `GET /identity` reachable); (3)
+    `daemon/bindings.ts`'s `createTelegramClient` widened to `TelegramClient | Promise<TelegramClient>`
+    (disclosed out-of-scope edit, same pattern PR-28 used for `send-path.ts`/`validate.ts`/`bindings.ts`),
+    `buildTransport` awaits it; (4) `stop()` closes the real `IpcServerHandle` and calls
+    `reconciler.stopAll()` instead of only the raw `http.Server`. No PT id of its own — this closes the gap
+    PT-01 (PR-41), PT-26 (already-merged tests) and PT-27/PT-28 (PR-40b) all silently depended on.
+  - **PR-40b** (`f1/40-security-bundle-tables`, unchanged from the original PR-40 Scope/Requirements/Runtime
+    harness below): now runs against the real, complete daemon closure PR-40a produces.
+
+Full debate record: `docs/05-tribunal/INDEX.md` (`bus-v2-f1-pr-40-audit-001`).
+
+Branch `f1/40-security-bundle-tables` → `main`. Depends: PR-40a. Size: ≈380 lines, no exception.
 Scope: `test/security/client-bundle.test.ts`, `test/security/daemon-bundle.test.ts`.
 Requirements: `daemon-lifecycle › Static bundle assertions and packaging conformance` (PT-27 with the D-01 multi-clause spawn assertion, PT-28); `thin-client-tools › Client-local error payload constructor` (PT-07 bundle-scan half).
 Runtime harness: static scan over `dist/src/client/**`/`dist/src/daemon/**` after `tsc -b`, each predicate exercised against a seeded negative fixture so the scan cannot pass vacuously.
+
+**PR-40a's own task list (no PT id; closes the wiring gap the re-slice note above describes):**
+
+- [ ] 40a.1 RED: `test/security/closure.test.ts` — a fixture entry with a dynamic `import("./x.js")` must appear in `computeClosure`'s result.
+- [ ] 40a.2 GREEN: extend `test/security/closure.ts`'s `RELATIVE_IMPORT_RE`/`relativeSpecifiers` to also match the dynamic-import-call form.
+- [ ] 40a.3 RED: `test/daemon/bindings.test.ts` — a `createTelegramClient` returning `Promise<TelegramClient>` must be awaited and used by `buildTransport`.
+- [ ] 40a.4 GREEN: widen `BindingsReconcilerOptions.createTelegramClient` to `(bot: RegistryBot) => TelegramClient | Promise<TelegramClient>` and `await` it in `buildTransport`.
+- [ ] 40a.5 RED: `test/daemon/bootstrap.test.ts` — new cases: `GET /identity` and `POST /session` reachable through the daemon's real IPC server; an active registry binding is reconciled (poller + transport constructed) at boot; a registry change is reconciled again on the next heartbeat tick; `stop()` closes the IPC server and stops every active poller.
+- [ ] 40a.6 GREEN: rewrite `startDaemon`/`stop` in `src/daemon/bootstrap.ts` to build the real composition root (`createIpcServer` + `createIdentityHandler` + `createSessionRoutes`, `BindingsReconciler` with a real `createTelegramClient`/`createPoller`, reconciliation at boot and on `onTick`).
+- [ ] 40a.7 Verify: `npm run build && npm test && npm run test:static` (sequential, never concurrent).
+- [ ] 40a.8 Mutant sweep on the new/changed logic in `bootstrap.ts`, `bindings.ts`, `closure.ts`.
+- [ ] 40a.9 Freeze, pre-merge diff audit with Alpha, merge.
+
+**PR-40b's own task list (the original PR-40 plan, unchanged):**
 
 - [ ] 40.1 RED: write `test/security/client-bundle.test.ts` ("bundle scan finds exactly one spawn site": `hasChildProcessReference` matches exactly once at `client/spawn.js`, `spawn(` count == 1, literal argv, `shell: false`; forbidden `node:sqlite`/`api.telegram.org`/`getUpdates`/`@napi-rs/keyring`/`secrets/`; each predicate seeded-fails on a negative fixture).
 - [ ] 40.2 GREEN: make 40.1 pass against the built client closure from PR-32/PR-34 (adjust closure boundaries only if the scan finds an unintended cross-import; no new source files expected).

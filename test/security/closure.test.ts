@@ -26,3 +26,14 @@ test("computeClosure resolves a two-hop chain across a directory boundary (entry
     "sub/a.js's './b.js' must resolve to sub/b.js, not to a same-named decoy next to the entry file",
   );
 });
+
+test("computeClosure follows a dynamic import(\"./...\") call, not just a static import/export ... from specifier", () => {
+  // src/daemon/main.ts's own D-25 gate reaches src/daemon/bootstrap.ts through exactly this form
+  // (`await import("./bootstrap.js")`) — a walker that only understood static specifiers would silently
+  // stop at daemon/main.js and report a near-empty daemon closure.
+  const closure = computeClosure(fixturePath("dynamic-entry.js"));
+
+  assert.equal(closure.size, 2);
+  assert.ok(closure.has(fixturePath("dynamic-entry.js")));
+  assert.ok(closure.has(fixturePath("dynamic-target.js")));
+});
