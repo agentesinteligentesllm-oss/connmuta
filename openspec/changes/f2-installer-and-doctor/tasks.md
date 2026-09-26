@@ -97,11 +97,11 @@ Scope: `src/installer/formats/toml.ts`, `src/installer/formats/markdown.ts`, `te
 Requirements: `tool-config-merge › Strict per-format parse` (TOML scenarios); `tool-config-merge › Merge is refuse-and-diff on ambiguity`; `installer-wizard › Instruction files are written once and trust steps are printed, never bypassed`.
 Runtime harness: unit tests over temp-dir fixtures.
 
-- [ ] 3.1 RED: `test/installer/formats/toml.test.ts` — append-only append of `stringify({ mcp_servers: { [MCP_SERVER_NAME]: entry } })`; every original byte is a prefix of the result; an inline `mcp_servers = {…}` or a conflicting dotted key produces a re-parse delta mismatch, refused by `file-edit.ts` step 7.
-- [ ] 3.2 GREEN: implement `installer/formats/toml.ts` (design §4.2 TOML row) wired into the dispatch.
-- [ ] 3.3 RED: `test/installer/formats/markdown.test.ts` — `AGENTS.md` absent ⇒ template written, ≤ `AGENTS_MD_MAX_LINES` lines; present ⇒ delimited block append, identical block is a no-op, different block refuses with a diff; `CLAUDE.md` absent ⇒ `@AGENTS.md`, present without that line ⇒ line appended.
-- [ ] 3.4 GREEN: implement `installer/formats/markdown.ts` (design §4.2 Markdown row).
-- [ ] 3.5 Verify: `npm run build && node --test "dist/test/installer/formats/toml.test.js" "dist/test/installer/formats/markdown.test.js"`.
+- [x] 3.1 RED: `test/installer/formats/toml.test.ts` — append-only append of `stringify({ mcp_servers: { [MCP_SERVER_NAME]: entry } })`; every original byte is a prefix of the result; an inline `mcp_servers = {…}` or a conflicting dotted key produces a re-parse delta mismatch, refused by `file-edit.ts` step 7.
+- [x] 3.2 GREEN: implement `installer/formats/toml.ts` (design §4.2 TOML row) wired into the dispatch.
+- [x] 3.3 RED: `test/installer/formats/markdown.test.ts` — `AGENTS.md` absent ⇒ template written, ≤ `AGENTS_MD_MAX_LINES` lines; present ⇒ delimited block append, identical block is a no-op, different block refuses with a diff; `CLAUDE.md` absent ⇒ `@AGENTS.md`, present without that line ⇒ line appended.
+- [x] 3.4 GREEN: implement `installer/formats/markdown.ts` (design §4.2 Markdown row).
+- [x] 3.5 Verify: `npm run build && node --test "dist/test/installer/formats/toml.test.js" "dist/test/installer/formats/markdown.test.js"`.
 
 ### Unit 3 — Tool-config matrix (D-33, D-34, D-42, D-43)
 
