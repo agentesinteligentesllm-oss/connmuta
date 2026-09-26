@@ -9,6 +9,13 @@
   // A referenced composite project with no inputs is TS18003, and `npm run build` builds every
   // project this one references — so each of `../daemon` and `../client` stayed absent until its
   // own first `.ts` landed. `../daemon` was re-added when PR-15 shipped its first source file;
-  // `../client` is re-added here in PR-32, its own first source file.
-  "references": [{ "path": "../shared" }, { "path": "../daemon" }, { "path": "../client" }]
+  // `../client` is re-added here in PR-32, its own first source file. `../migration` is added in
+  // PR-37 for the same reason `../client` was: the `migrate-v1` branch's dynamic
+  // `import("../migration/main.js")` needs the project referenced for `tsc -b` to resolve its types.
+  "references": [
+    { "path": "../shared" },
+    { "path": "../daemon" },
+    { "path": "../client" },
+    { "path": "../migration" }
+  ]
 }

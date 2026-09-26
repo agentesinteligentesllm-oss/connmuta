@@ -6,6 +6,7 @@
 // and a pre-commit hook reads that silence as "clean" (PT-05). `test/cli/main.test.ts` pins the
 // emitted line so this can fail instead of regressing.
 import { readFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { EXIT_NODE_FLOOR, EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
@@ -27,7 +28,7 @@ export interface CliIo {
 }
 
 /**
- * One line per invocation form this build wires; `mcp` and `migrate-v1` land later.
+ * One line per invocation form this build wires.
  *
  * The usage text describes what **this build accepts**, not the requirement's bracket notation: the
  * spec spells the surface `conmuta validate [<path> | --stdin]`, and this CLI refuses a bare
@@ -38,9 +39,11 @@ const USAGE_LINES = [
 	`usage: ${PRODUCT_NAME} validate <path> | --stdin`,
 	`       ${PRODUCT_NAME} daemon stop [--home <dir>]`,
 	`       ${PRODUCT_NAME} mcp --project <id>`,
+	`       ${PRODUCT_NAME} migrate-v1 [--v1-home <dir>] [--project-id <slug>] [--project-path <abs dir>] [--token-stdin] [--dry-run]`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
 	`  daemon stop   stop the running daemon after confirming identity (D-29)`,
 	`  mcp           start the MCP server for an IDE host (ADR-0029)`,
+	`  migrate-v1    one-shot v1-to-v2 migration (D-24); non-interactive, refuses on any precondition failure`,
 ];
 
 /** Report a usage failure: a short reason, then the usage block. Always {@link EXIT_USAGE}. */
@@ -151,8 +154,87 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 		})();
 	}
 
-	// Only `validate`, `daemon stop` and `mcp` are wired in this CLI slice. The remaining reserved
-	// subcommands are named so a caller that tries one gets a usage error instead of a stub that
+	if (command === "migrate-v1") {
+		// Same Judgment Day correction as the `mcp` branch above, and the same reason: the gate must run
+		// before this branch's own flag parsing, not after.
+		let belowNodeFloor = false;
+		enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+		if (belowNodeFloor) {
+			return EXIT_NODE_FLOOR;
+		}
+
+		let v1Home: string | undefined;
+		let projectId: string | undefined;
+		let projectPath: string | undefined;
+		let tokenStdin = false;
+		let dryRun = false;
+		for (let i = 0; i < rest.length; i++) {
+			const arg = rest[i];
+			if (arg === "--v1-home") {
+				if (i + 1 >= rest.length || rest[i + 1].startsWith("--")) {
+					return usageError(io, "--v1-home requires a directory");
+				}
+				v1Home = rest[++i];
+			} else if (arg.startsWith("--v1-home=")) {
+				v1Home = arg.slice("--v1-home=".length);
+				if (v1Home.length === 0) {
+					return usageError(io, "--v1-home requires a directory");
+				}
+			} else if (arg === "--project-id") {
+				if (i + 1 >= rest.length || rest[i + 1].startsWith("--")) {
+					return usageError(io, "--project-id requires a value");
+				}
+				projectId = rest[++i];
+			} else if (arg.startsWith("--project-id=")) {
+				projectId = arg.slice("--project-id=".length);
+				if (projectId.length === 0) {
+					return usageError(io, "--project-id requires a value");
+				}
+			} else if (arg === "--project-path") {
+				if (i + 1 >= rest.length || rest[i + 1].startsWith("--")) {
+					return usageError(io, "--project-path requires a value");
+				}
+				projectPath = rest[++i];
+			} else if (arg.startsWith("--project-path=")) {
+				projectPath = arg.slice("--project-path=".length);
+				if (projectPath.length === 0) {
+					return usageError(io, "--project-path requires a value");
+				}
+			} else if (arg === "--token-stdin") {
+				tokenStdin = true;
+			} else if (arg === "--dry-run") {
+				dryRun = true;
+			} else if (arg.startsWith("--")) {
+				return usageError(io, `unknown option '${arg}'`);
+			} else {
+				return usageError(io, `unexpected argument '${arg}'`);
+			}
+		}
+		if ((projectId === undefined) !== (projectPath === undefined)) {
+			return usageError(io, "--project-id and --project-path must be given together");
+		}
+		if (projectPath !== undefined && !isAbsolute(projectPath)) {
+			return usageError(io, "--project-path must be an absolute path");
+		}
+
+		return (async () => {
+			const { runMigration } = await import("../migration/main.js");
+			const result = await runMigration({
+				v1Home,
+				projectId,
+				projectPath,
+				tokenStdin,
+				dryRun,
+				stdout: io.out,
+				stderr: io.err,
+				readStdinToken: io.readStdin,
+			});
+			return result.exitCode;
+		})();
+	}
+
+	// Only `validate`, `daemon stop`, `mcp` and `migrate-v1` are wired in this CLI slice. Any other
+	// subcommand is named so a caller that tries one gets a usage error instead of a stub that
 	// pretends to work.
 	if (command !== "validate") {
 		return usageError(io, `unknown command '${command}'`);

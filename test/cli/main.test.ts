@@ -7,7 +7,14 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { runCli, type CliIo } from "../../src/cli/main.js";
-import { EXIT_NODE_FLOOR, EXIT_UNBOUND_PROJECT, EXIT_USAGE, EXIT_VALIDATION_FAILED, PRODUCT_NAME } from "../../src/shared/constants.js";
+import {
+  EXIT_MIGRATION_REFUSED,
+  EXIT_NODE_FLOOR,
+  EXIT_UNBOUND_PROJECT,
+  EXIT_USAGE,
+  EXIT_VALIDATION_FAILED,
+  PRODUCT_NAME,
+} from "../../src/shared/constants.js";
 
 // dist/test/cli/main.test.js -> repo root is three levels up.
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -149,8 +156,13 @@ test("an unreadable path is a usage error that names the path", () => {
   assert.match(captured.err.join("\n"), /absent-conmuta\.json/);
 });
 
+// `migrate-v1` is not in this loop: unlike `daemon` (needs a subcommand) and `mcp` (needs
+// `--project`), every one of its own flags is optional (`--v1-home` defaults, `--project-id`/
+// `--project-path` are an opt-in pair, D-23), so a bare invocation is a legitimate call that runs
+// against the real default homes — not a usage error. Its own dispatch is exercised below instead,
+// always against an isolated `--v1-home`.
 test("a subcommand reserved for a later slice is a usage error, not a stub that pretends to work", () => {
-  for (const reserved of ["daemon", "mcp", "migrate-v1"]) {
+  for (const reserved of ["daemon", "mcp"]) {
     const captured = makeIo();
     assert.equal(runCli([reserved], captured.io), EXIT_USAGE);
     assert.match(captured.err.join("\n"), /usage:/);
@@ -294,6 +306,67 @@ test("`mcp` checks the Node-floor gate before parsing --project, so a below-floo
     assert.equal(result, EXIT_NODE_FLOOR, "expected a synchronous EXIT_NODE_FLOOR, not the async --project dispatch branch");
     assert.match(captured.err.join("\n"), /Node\.js/);
     assert.doesNotMatch(captured.err.join("\n"), /--project/);
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(process, "version", originalDescriptor);
+    }
+  }
+});
+
+// --- migrate-v1 subcommand dispatch ---
+
+// Always run against an isolated `--v1-home`, never the real default: an empty directory refuses at
+// the config-load step (before any v2-home read/write), which is what makes this a safe dispatch test
+// rather than one that touches the real `~/.agentbus`/`~/.conmuta`.
+test("`migrate-v1 --v1-home <dir>` reaches the real migration module through the dynamic import with correctly parsed flags, and returns its own refusal exit code", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-cli-migrate-v1-"));
+  try {
+    const captured = makeIo();
+    const result = await runCli(["migrate-v1", "--v1-home", dir], captured.io);
+    assert.equal(result, EXIT_MIGRATION_REFUSED);
+
+    const second = makeIo();
+    const secondResult = await runCli(["migrate-v1", `--v1-home=${dir}`], second.io);
+    assert.equal(secondResult, EXIT_MIGRATION_REFUSED);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("`migrate-v1` requires --project-id and --project-path together", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["migrate-v1", "--project-id", "prj-example"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /--project-id and --project-path must be given together/);
+});
+
+test("`migrate-v1 --project-path` must be an absolute path", () => {
+  const captured = makeIo();
+  assert.equal(
+    runCli(["migrate-v1", "--project-id", "prj-example", "--project-path", "relative/path"], captured.io),
+    EXIT_USAGE,
+  );
+  assert.match(captured.err.join("\n"), /--project-path must be an absolute path/);
+});
+
+test("`migrate-v1` with an unknown option is a usage error", () => {
+  const captured = makeIo();
+  assert.equal(runCli(["migrate-v1", "--verbose"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown option '--verbose'/);
+});
+
+// Same Judgment Day correction as `mcp`'s own gate test above: the Node-floor gate must fire before
+// migrate-v1's own flag parsing, so a malformed invocation on a below-floor Node still reports the
+// actionable Node version message.
+test("`migrate-v1` checks the Node-floor gate before parsing its flags, reporting EXIT_NODE_FLOOR on a below-floor Node", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(process, "version");
+  try {
+    Object.defineProperty(process, "version", { value: "v0.1.0", configurable: true });
+
+    const captured = makeIo();
+    const result = runCli(["migrate-v1", "--project-id"], captured.io);
+    assert.equal(result, EXIT_NODE_FLOOR, "expected a synchronous EXIT_NODE_FLOOR, not the async migration dispatch branch");
+    assert.match(captured.err.join("\n"), /Node\.js/);
+    assert.doesNotMatch(captured.err.join("\n"), /--project-id/);
   } finally {
     if (originalDescriptor) {
       Object.defineProperty(process, "version", originalDescriptor);
