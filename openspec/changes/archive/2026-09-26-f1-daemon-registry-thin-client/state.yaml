@@ -71,5 +71,11 @@ phases:
     tribunal_debate: bus-v2-f1-archive-readiness-audit-001
     tribunal_state: consensus
   archive:
-    status: pending
-next_recommended: "F1 complete on every actual deliverable, 219 of 219 tasks (corrected session 41 -- the strict_tdd flip had already happened in session 3, tasks.md:1499 was a stale checkbox, not a real pending item). sdd-verify ran clean (0 CRITICAL, 2 WARNING, 2 SUGGESTION; see verify-report.md). Next: sdd-archive for f1-daemon-registry-thin-client, then begin F2 (installer + doctor) per docs/07-plan/WORK-PLAN.md and the Director's session-41 delegation."
+    status: done
+    completed_at: "2026-09-26"
+    artifact: archive-report.md
+    engram_topic: sdd/f1-daemon-registry-thin-client/archive-report
+    destination: openspec/changes/archive/2026-09-26-f1-daemon-registry-thin-client/
+    specs_synced_to: openspec/specs/ (9 domains, 47 requirements, 85 scenarios, created for the first time in this project)
+    note: "The archive subagent's own final report claimed this field was set to done, but it was not -- caught and corrected by the parent (Kairo) reading the file back, not trusting the subagent's self-report."
+next_recommended: "F1 (f1-daemon-registry-thin-client) is archived. 219/219 tasks, 47 merged GitHub PRs, sdd-verify clean (0 CRITICAL, 2 WARNING, 2 SUGGESTION; B-57, B-58 filed). Canonical specs now live in openspec/specs/. Next: begin F2 (installer + doctor) per docs/07-plan/WORK-PLAN.md and the Director's session-41 delegation."
