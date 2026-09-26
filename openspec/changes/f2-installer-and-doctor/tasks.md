@@ -88,9 +88,9 @@ Scope: `src/installer/formats/jsonc.ts`, `test/installer/formats/jsonc.test.ts`.
 Requirements: `tool-config-merge › Strict per-format parse` (JSONC scenarios).
 Runtime harness: unit tests over temp-dir fixtures; no daemon/client process.
 
-- [ ] 2b.1 RED: `test/installer/formats/jsonc.test.ts` — comments/trailing commas parse cleanly; `modify`+`applyEdits` produces exactly one localized insertion; EOL/indent learned from the first indented line, `JSON_DEFAULT_INDENT` only when none exists; a parse error refuses without writing.
-- [ ] 2b.2 GREEN: implement `installer/formats/jsonc.ts` (design §4.2 JSON/JSONC row) wired into `file-edit.ts`'s `FormatAdapter` dispatch (PR-02a).
-- [ ] 2b.3 Verify: `npm run build && node --test "dist/test/installer/formats/jsonc.test.js"`.
+- [x] 2b.1 RED: `test/installer/formats/jsonc.test.ts` — comments/trailing commas parse cleanly; `modify`+`applyEdits` produces exactly one localized insertion; EOL/indent learned from the first indented line, `JSON_DEFAULT_INDENT` only when none exists; a parse error refuses without writing.
+- [x] 2b.2 GREEN: implement `installer/formats/jsonc.ts` (design §4.2 JSON/JSONC row) wired into `file-edit.ts`'s `FormatAdapter` dispatch (PR-02a).
+- [x] 2b.3 Verify: `npm run build && node --test "dist/test/installer/formats/jsonc.test.js"`.
 
 #### PR-03 — `formats/toml.ts` + `formats/markdown.ts`
 Branch `f2/03-toml-markdown` → `main`. Depends: PR-02b. Size: ≈350 lines, no exception.
