@@ -6,7 +6,12 @@
     "tsBuildInfoFile": "../../dist/.tsbuildinfo/installer.tsbuildinfo"
   },
   "include": ["**/*.ts"],
-  // `../shared` is the only reference this unit needs: `installer/constants.ts` derives its own
-  // values from `PRODUCT_NAME` and `EXIT_VALIDATION_FAILED`.
-  "references": [{ "path": "../shared" }]
+  // `../shared` is `installer/constants.ts`'s own dependency (`PRODUCT_NAME`, `EXIT_VALIDATION_FAILED`).
+  // `../ledger`, `../registry` and `../secret-store` are added in PR-07: `ledger-access.ts` opens the
+  // daemon's ledger (`ledger/open.ts`, `ledger/migrations.ts`); `registry-commit.ts` commits a registry
+  // change inside one ledger transaction (`ledger/audit.ts`, `ledger/transaction.ts`, `registry/loader.ts`,
+  // `registry/writer.ts`, `registry/schema.ts`); `token-ref.ts` builds a `RegistryTokenRef`
+  // (`registry/schema.ts`) from a `secret-store/index.ts` selection. `installer` is the consumer of all
+  // three, never the reverse (design §2.2's compile-unit table).
+  "references": [{ "path": "../shared" }, { "path": "../ledger" }, { "path": "../registry" }, { "path": "../secret-store" }]
 }
