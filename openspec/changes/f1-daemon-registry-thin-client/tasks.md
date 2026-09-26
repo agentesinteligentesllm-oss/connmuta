@@ -1208,6 +1208,75 @@ Runtime harness: `conmuta migrate-v1` invoked as a real child process against th
 - [ ] 38.3 Write `docs/runbooks/migrate-from-v1.md` (deliverable of this change, design §13): the >24h cursor gap, the one-poller rule, rollback steps (`conmuta daemon stop`, remove `~/.conmuta`, delete keyring entries `bot:<bot_id>`, resume v1), the backup still holds the token, null-anchor threads fail closed, hand-editing the registry until F2's wizards exist.
 - [ ] 38.4 Verify: `npm run build && node --test "dist/test/migration/integration.test.js"`.
 
+**Apply-time notes (session 38):**
+1. **Arena Orion checked live at session start, still unreachable** (`curl --max-time 5
+   http://127.0.0.1:8766/mcp` → connection refused, exit 7, HTTP 000) — falls back to ODD + Judgment
+   Day, the thirteenth consecutive session on this route.
+2. **Real-child-process runtime harness confirmed load-bearing, not merely descriptive**: this block's
+   own header (this line, written at PR-37's authoring time) is the authoritative source, corroborated
+   by PR-37's own forward-reference ("Runtime harness: end-to-end fixture run deferred to PR-38") and
+   this project's established precedent for reading design §15's "Integration" layer as process-boundary
+   testing (PR-08b, `conmuta validate`). `design.md`'s own §15 Integration row (line 547) only says
+   "temp homes" — the words "real child process(es)" there belong exclusively to the adjacent Lifecycle
+   row (line 544); the child-process requirement is `tasks.md`'s own commitment, not design.md's.
+3. **`runMigration`'s `v2Home` option has no CLI flag** (confirmed by reading `cli/main.ts`'s
+   `migrate-v1` dispatch directly) — the only way to redirect v2's home away from the real user profile
+   for a real child-process invocation is overriding the spawned process's `HOME`/`USERPROFILE` env
+   (`daemon/home.ts`'s `resolveHomeDir` falls back to `os.homedir()`). This is a test-construction
+   detail, not a product gap: `main.ts`'s own doc comment already states `v2Home` is "never exposed as
+   a CLI flag — design §13 names none," a prior deliberate decision, not one newly surfaced here.
+4. **Fixture placeholder convention resolved in favor of `test/migration/main.test.ts`'s own
+   `@`-prefixed agent ids** (`"@agent-placeholder-a"`), the convention already proven end-to-end
+   through a real `runMigration` call and validated against the registry schema — over a second,
+   unrelated existing test file's bare-id convention, which is a pre-existing inconsistency elsewhere
+   in the repo, not reconciled by this slice.
+5. **A suspected inconsistency was checked and refuted before being reported**: `tokenRef.account` for
+   the keychain branch is prefixed (`"bot:" + botId`, `main.ts:366-369`) while `selection.store.set`
+   passes the bare id (`main.ts:409`). Read `secret-store/keyring.ts` directly: the keyring adapter
+   itself prepends the same `"bot:"` prefix internally — the real OS keychain account and the
+   registry's documented `token_ref.account` are consistent. No defect; no backlog item filed.
+6. **`gap_warning`/`retention_warning` cannot be asserted right after migration**: both
+   (`daemon/serve/fetch.ts`, `daemon/serve/status.ts`) fire only from a non-null
+   `offsets.last_poll_ok_at`, and migration's own `writeOffsetRow` never sets that column. Scenario
+   38.1's third case ("stale cursor... no false recovery claim") is therefore scoped to migration's own
+   guarantee (verbatim cursor carry-forward, no false claim in its own stdout/stderr) rather than to
+   those two daemon-runtime fields; the runbook (38.3) is what satisfies the spec requirement's separate
+   "the runbook MUST state this limitation" clause.
+7. **The writer's own diligence caught two defects in the original brief before the parent readback
+   had to**, both confirmed by direct reproduction rather than assumption: (a) the real files land
+   under `<v2Home>/.conmuta/`, not `<v2Home>/` directly (the `HOME_DIR_NAME` suffix `resolveHomeDir`
+   always appends); (b) all three scenarios, not only the one that reads the token back, spawn the
+   real (non-`--dry-run`) CLI and therefore always call the real, non-injected secret store — a spawn
+   boundary has no injection seam — so cleanup of the real OS keychain/file-fallback entry had to be
+   centralized across every scenario's `finally`, not just one. Verified: a real `bot:555000001`
+   credential was left in the actual Windows Credential Manager after the first green run before this
+   fix, and confirmed clean after it, including across the full 1044-test suite run.
+8. **Parent readback found no defect** — the first slice since session 28 where the mandatory parent
+   readback (HANDOFF §2 point 4) did not itself surface a new issue, because the writer's own two
+   corrections above already covered what the readback would have caught. The parent independently
+   re-ran `npm test` (1044/1043/1 skip) and `npm run test:static` (8/8) directly rather than trusting
+   the writer's self-report, and both matched exactly.
+9. **Size reconciliation**: measured 451 authored lines (`git diff --stat main`, additions-only since
+   all four files are new: `docs/runbooks/migrate-from-v1.md` 183, `test/fixtures/v1-home/config.json`
+   10, `test/fixtures/v1-home/state.json` 37, `test/migration/integration.test.ts` 221) against this
+   block's own ≈290-line estimate — **a disclosed 161-line PR-scoped exception**. No line was trimmed
+   or padded to fit the estimate; the overage is the runbook's full coverage of every design §13 item
+   plus an operator-usable troubleshooting/rollback/command-reference section, and the real-child-process
+   integration test's own necessary setup/teardown infrastructure (temp homes, real secret-store
+   cleanup, three independently-isolated scenarios).
+10. **Parent mutant sweep** (delegated to a `fork`; the fork's first reply made zero tool calls and had
+    to be resumed with an explicit "actually execute, do not describe" instruction before it ran for
+    real — noted here since it is the kind of subagent-report gap this project's own discipline exists
+    to catch): 6 mutants + an `M0` control against `main.ts`, 1 mutant + an `S-M0` control against
+    `synthesize.ts`, each aimed at exactly one of the three scenarios' own named claims. **Both controls
+    survived (harness sound); all 6 substantive mutants (corrupted `botId` derivation, each of the two
+    skipped backups, a wrong secret-store token, a false-recovery-claim success message, a cursor reset
+    to 0) were KILLED on the first pass — zero survivors, zero BUILD-FAIL, zero AMBIGUOUS.** No test gap
+    found; nothing to pin, nothing to argue as equivalent. Parent independently re-confirmed
+    `git diff main -- src/migration/main.ts src/migration/synthesize.ts` is empty (both files restored
+    correctly) before trusting the result. Full suite re-confirmed green after the sweep: 1044/1043/1
+    skip/0 fail.
+
 ### Unit 12 — Static assertions + wrong-room CI
 
 #### PR-39 — predicates (SEAM) + closure walker

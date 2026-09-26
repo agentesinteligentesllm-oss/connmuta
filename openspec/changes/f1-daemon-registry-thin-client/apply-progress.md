@@ -7326,3 +7326,59 @@ on informational-message wording, the same judgment call this project's own PR-3
 established. No native review ran for this candidate — a Judgment Day target, per HANDOFF §2.3 (`risk:
 high` — `process_boundary` on `src/cli/main.ts` — `review_due: true` (`high_risk`) recorded above,
 informational only). Full detail: tribunal record `bus-v2-f1-pr-37-audit-001`.
+
+---
+
+## PR-38 — `test/fixtures/v1-home/` + `test/migration/integration.test.ts` + `docs/runbooks/migrate-from-v1.md`
+
+**Route.** ODD with the SDD contract preserved, session 38 (Director full-autonomy delegation carried
+forward for this session and all following ones on this change; see the Director's own prompt).
+**Arena Orion checked live at session start, still unreachable** (`curl --max-time 5
+http://127.0.0.1:8766/mcp` → connection refused, exit 7, HTTP 000) — the thirteenth consecutive session
+on the ODD + Judgment Day fallback since PR-06. Three parallel delegated read-only mappers
+(`general-purpose`, sonnet) resolved every open design point before any code was written: (A) the exact
+`v1-config.ts`/`v1-state.ts`/`synthesize.ts`/`main.ts`/`cli/main.ts` contracts, including the
+undocumented fact that `runMigration`'s `v2Home` has no CLI flag; (B) PT-22's exact regex/deny-list,
+`test/fixtures/**` conventions, the real-child-process spawn precedent (`test/security/pack.test.ts`,
+`test/cli/main.test.ts` — not `test/daemon/main.test.ts`'s long-running-server pattern), and
+`BOT_API_RETENTION_HOURS`'s exact consumers; (C) the verbatim two spec.md scenarios and a check on
+whether "real child process" is design.md-mandated (it is not, explicitly — design §15's Integration
+row says only "temp homes"; the mandate is `tasks.md:1204`'s own original task-block header,
+corroborated by PR-37's forward-reference and the PR-08b precedent). Two further targeted parent reads
+(`main.ts`'s success-stdout section, `secret-store/keyring.ts`) resolved the last two open questions
+directly, including refuting a suspected `tokenRef.account`/keyring-key inconsistency before it was
+ever reported. One delegated writer (`general-purpose`, sonnet; RED confirmed `ENOENT` on the fixture
+copy step across all three scenarios identically — no new `src/` file, so no compile-level RED; GREEN
+3/3) self-corrected two gaps in the orchestrator's own brief via direct empirical reproduction rather
+than assuming it: the real files land under `<v2Home>/.conmuta/`, and all three scenarios (not only the
+one that reads a token back) needed real-secret-store cleanup, since a real child-process spawn has no
+injection seam. Parent readback (direct read of all 4 files, independent re-run of `npm test` and
+`npm run test:static`) found no defect — the first slice since session 28 where this step did not
+itself surface a new issue, because the writer's own two corrections already covered it.
+
+**Decisions (orchestrator, session 38)**, disclosed here and in `tasks.md`'s apply-time note: the
+`@`-prefixed fixture-id convention (`test/migration/main.test.ts`'s, proven end-to-end, over a second,
+unrelated file's bare-id convention); the `spawnSync`+`HOME`/`USERPROFILE`-env-override spawn mechanism
+(not the daemon's async/polling pattern, which fits a long-running server, not a one-shot CLI); scoping
+the "stale cursor" scenario to migration's own output/ledger behavior rather than to
+`gap_warning`/`retention_warning` (both gated on `offsets.last_poll_ok_at`, which migration never sets);
+and treating the real-child-process runtime harness as settled scope from `tasks.md:1204` itself, not an
+open design question.
+
+**Size reconciliation**: 451 authored lines (`git diff --stat main`, additions-only — all four files
+are new) against this block's own ≈290-line estimate — **a disclosed 161-line PR-scoped exception**,
+independently re-measured by the parent, not just taken from the writer's report. No line trimmed or
+padded to fit the estimate.
+
+**Parent mutant sweep** (delegated to a `fork`; its first reply made zero tool calls — described the
+plan instead of running it — and had to be resumed with an explicit execute-not-describe instruction):
+6 mutants + `M0` control against `main.ts` (corrupted `botId` derivation, each of the two skipped
+backups, a wrong secret-store token, a false-recovery-claim success message), 1 mutant + `S-M0` control
+against `synthesize.ts` (cursor reset to 0), each aimed at exactly one of the three scenarios' own named
+claims — not at re-auditing already-merged PR-37 code generally. **Both controls survived; all 6
+substantive mutants were KILLED on the first pass — zero survivors, zero BUILD-FAIL, zero AMBIGUOUS.**
+Parent independently re-confirmed `git diff main -- src/migration/main.ts src/migration/synthesize.ts`
+empty and the full suite green (1044/1043/1 skip) before trusting the result.
+
+**Judgment Day** (pending — both blind judges over a frozen worktree, plus a separate independent
+verifier; to be appended below once complete).
