@@ -1419,6 +1419,16 @@ green on rerun. Merged as PR #44 (`4f564c1`).
 - [x] 40.5 Verify: `npm run build && npm run test:static`.
 - [x] 40.6 Docs: update the file-name cell(s) of PT-07, PT-27, PT-28 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
+**Apply-time close-out (session 40).** Arena/Alpha debate `bus-v2-f1-pr-40b-diff-audit-001`: `APPROVE`,
+`CONSENSUS` in one round, zero objections. Landed at 390 authored test lines (client-bundle.test.ts 133,
+daemon-bundle.test.ts 257), within the ≈380-line estimate, no exception needed. Full suite **1082 tests**
+(1081 pass, 1 pre-existing skip, +22 over PR-40a's 1060), `test:static` **41/41** (+22 over 19). Client
+closure 18 files, daemon closure 61 (matches PR-40a's own measurement). Three design.md §14 staleness
+points found and disclosed, not silently forced: `client/spawn.ts`'s real call site is `spawnImpl(...)`;
+`daemon/poller.ts`'s `while (!signal.aborted)` loop does not match the shared `hasUnboundedLoopReference`
+predicate; `daemon/send/rate.ts`'s `RateLimitRecorder` is a fourth legitimate `.sendMessage(` site — filed
+as **B-56**. Merged as PR #45 (`7e1771c`). **PR-40 (a+b combined) is fully closed; next slice is PR-41.**
+
 #### PR-41 — two-binding wrong-room CI job (PT-01)
 Branch `f1/41-security-wrong-room-ci` → `main`. Depends: PR-40. Size: ≈180 lines, no exception.
 Scope: `test/security/wrong-room.test.ts`, `.github/workflows/ci.yml` (add the named `test:wrong-room` step).
