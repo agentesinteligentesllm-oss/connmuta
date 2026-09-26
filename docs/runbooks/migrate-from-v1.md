@@ -66,7 +66,7 @@ is never read from an environment variable:
 printf '%s' "$BOT_TOKEN" | conmuta migrate-v1 --v1-home /path/to/.agentbus --token-stdin
 ```
 
-## Step 3: bind a project (optional, can be done later)
+## Step 3: bind a project (optional, but only in the same run as the migration)
 
 To also bind the bot's group to a project in the same run, add `--project-id` and
 `--project-path` together (both or neither):
