@@ -1384,15 +1384,31 @@ Runtime harness: static scan over `dist/src/client/**`/`dist/src/daemon/**` afte
 
 **PR-40a's own task list (no PT id; closes the wiring gap the re-slice note above describes):**
 
-- [ ] 40a.1 RED: `test/security/closure.test.ts` — a fixture entry with a dynamic `import("./x.js")` must appear in `computeClosure`'s result.
-- [ ] 40a.2 GREEN: extend `test/security/closure.ts`'s `RELATIVE_IMPORT_RE`/`relativeSpecifiers` to also match the dynamic-import-call form.
-- [ ] 40a.3 RED: `test/daemon/bindings.test.ts` — a `createTelegramClient` returning `Promise<TelegramClient>` must be awaited and used by `buildTransport`.
-- [ ] 40a.4 GREEN: widen `BindingsReconcilerOptions.createTelegramClient` to `(bot: RegistryBot) => TelegramClient | Promise<TelegramClient>` and `await` it in `buildTransport`.
-- [ ] 40a.5 RED: `test/daemon/bootstrap.test.ts` — new cases: `GET /identity` and `POST /session` reachable through the daemon's real IPC server; an active registry binding is reconciled (poller + transport constructed) at boot; a registry change is reconciled again on the next heartbeat tick; `stop()` closes the IPC server and stops every active poller.
-- [ ] 40a.6 GREEN: rewrite `startDaemon`/`stop` in `src/daemon/bootstrap.ts` to build the real composition root (`createIpcServer` + `createIdentityHandler` + `createSessionRoutes`, `BindingsReconciler` with a real `createTelegramClient`/`createPoller`, reconciliation at boot and on `onTick`).
-- [ ] 40a.7 Verify: `npm run build && npm test && npm run test:static` (sequential, never concurrent).
-- [ ] 40a.8 Mutant sweep on the new/changed logic in `bootstrap.ts`, `bindings.ts`, `closure.ts`.
-- [ ] 40a.9 Freeze, pre-merge diff audit with Alpha, merge.
+- [x] 40a.1 RED: `test/security/closure.test.ts` — a fixture entry with a dynamic `import("./x.js")` must appear in `computeClosure`'s result.
+- [x] 40a.2 GREEN: extend `test/security/closure.ts`'s `RELATIVE_IMPORT_RE`/`relativeSpecifiers` to also match the dynamic-import-call form.
+- [x] 40a.3 RED: `test/daemon/bindings.test.ts` — a `createTelegramClient` returning `Promise<TelegramClient>` must be awaited and used by `buildTransport`.
+- [x] 40a.4 GREEN: widen `BindingsReconcilerOptions.createTelegramClient` to `(bot: RegistryBot) => TelegramClient | Promise<TelegramClient>` and `await` it in `buildTransport`.
+- [x] 40a.5 RED: `test/daemon/bootstrap.test.ts` — new cases: `GET /identity` and `POST /session` reachable through the daemon's real IPC server; an active registry binding is reconciled (poller + transport constructed) at boot; a registry change is reconciled again on the next heartbeat tick; `stop()` closes the IPC server and stops every active poller.
+- [x] 40a.6 GREEN: rewrite `startDaemon`/`stop` in `src/daemon/bootstrap.ts` to build the real composition root (`createIpcServer` + `createIdentityHandler` + `createSessionRoutes`, `BindingsReconciler` with a real `createTelegramClient`/`createPoller`, reconciliation at boot and on `onTick`).
+- [x] 40a.7 Verify: `npm run build && npm test && npm run test:static` (sequential, never concurrent).
+- [x] 40a.8 Mutant sweep on the new/changed logic in `bootstrap.ts`, `bindings.ts`, `closure.ts`.
+- [x] 40a.9 Freeze, pre-merge diff audit with Alpha, merge.
+
+**Apply-time close-out (session 40).** Two Arena/Alpha debates, both `CONSENSUS`: `bus-v2-f1-pr-40-audit-001`
+(pre-code plan, the diagnosis and the PR-40a/PR-40b re-slice, 4 must-fix points) and
+`bus-v2-f1-pr-40a-diff-audit-001` (pre-merge diff audit, 2 more findings — `ipcServer` leaking on a boot
+failure between `listen()` and `return`; `onTick` had no re-entrancy guard against `setInterval` overlapping
+an in-flight `reconcile()`, both fixed with a new regression test each). A parent-run mutant sweep on top of
+the delegated implementation additionally found and fixed a real regression the delegate's own tests missed:
+`onTick` calling `registry.sync()` directly before `reconciler.reconcile()` (no-arg) silently broke D-12
+hot-reload for any binding added after boot, since both calls share one `RegistryLoader` instance. Real
+daemon closure went from 4 files to 61 (`admission.ts`/`poller.ts`/`ipc/*`/`transport/*`/`send/*`/`serve/*`/
+`telegram.ts`/`ledger/*`/`registry/*`/`secret-store/*` all now reachable from `daemon/main.js`). Landed at
+**635 authored src+test lines** with a disclosed **235-line PR-scoped exception** across two commits
+(`a1b6711` the wiring, `ccda66d` the two Alpha-found robustness fixes). Full suite **1060 tests** (1059 pass,
+1 pre-existing skip, +6 over the 1054 baseline), `test:static` **19/19** (+1). CI's Node 26 leg hit the
+pre-existing `heartbeat: ticks at periodMs` flake (B-39, in a file this PR never touched) on the first run;
+green on rerun. Merged as PR #44 (`4f564c1`).
 
 **PR-40b's own task list (the original PR-40 plan, unchanged):**
 
