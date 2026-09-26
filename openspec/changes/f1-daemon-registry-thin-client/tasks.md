@@ -1141,14 +1141,61 @@ delegation for this session (recorded in `apply-progress.md` §PR-36):
 
 #### PR-37 — synthesis + non-interactive CLI entry (D-24)
 Branch `f1/37-migration-synthesize-cli` → `main`. Depends: PR-36. Size: ≈390 lines, no exception.
+*Size reconciliation (session 37).* Estimated ≈390; **measured 1,970 authored lines (461 src + 837 test in `migration/main.ts`+twin, 188 src + 296 test in `synthesize.ts`+twin, 88 + 77 in `cli/main.ts`+twin, plus 23 tsconfig lines) at the final tip, a disclosed 1,580-line PR-scoped exception** — see `apply-progress.md` §PR-37. The estimate line above is the gate's text and is left as written.
 Scope: `src/migration/synthesize.ts`, `src/migration/main.ts`, `src/cli/main.ts` (add `migrate-v1` dispatch), `test/migration/synthesize.test.ts`, `test/migration/main.test.ts`.
 Requirements: `v1-migration › Migration synthesizes the registry, secret-store entry and ledger rows` (env-only-refused scenario, D-24); `v1-migration › Minimal non-interactive migration entry point`.
 Runtime harness: end-to-end fixture run deferred to PR-38; this PR unit-tests synthesis and CLI parsing in isolation.
 
-- [ ] 37.1 RED: write `test/migration/synthesize.test.ts` ("project assignment stays a mandatory human action": no `project_id` bound to the synthesized pair) and `test/migration/main.test.ts` ("env-only token is refused, nothing is written": `AGENTBUS_BOT_TOKEN` present but never read, `EXIT_MIGRATION_REFUSED`, zero writes).
-- [ ] 37.2 GREEN: implement `src/migration/synthesize.ts` (registry `bots[]`/`groups[]`/`projects[]`/`bindings[]`, secret-store `set`, ledger `offsets`/`threads`/`thread_history`/`binding_state` rows per design §13 step 5) and `src/migration/main.ts` (`--v1-home`, `--project-id`, `--project-path`, `--token-stdin`, `--dry-run`; token only from `config.bot_token` or stdin, D-24).
-- [ ] 37.3 Wire `migrate-v1` as a dynamic-`import()` subcommand in `src/cli/main.ts`.
-- [ ] 37.4 Verify: `npm run build && node --test "dist/test/migration/synthesize.test.js" "dist/test/migration/main.test.js"`.
+- [x] 37.1 RED: write `test/migration/synthesize.test.ts` ("project assignment stays a mandatory human action": no `project_id` bound to the synthesized pair) and `test/migration/main.test.ts` ("env-only token is refused, nothing is written": `AGENTBUS_BOT_TOKEN` present but never read, `EXIT_MIGRATION_REFUSED`, zero writes).
+- [x] 37.2 GREEN: implement `src/migration/synthesize.ts` (registry `bots[]`/`groups[]`/`projects[]`/`bindings[]`, secret-store `set`, ledger `offsets`/`threads`/`thread_history`/`binding_state` rows per design §13 step 5) and `src/migration/main.ts` (`--v1-home`, `--project-id`, `--project-path`, `--token-stdin`, `--dry-run`; token only from `config.bot_token` or stdin, D-24).
+- [x] 37.3 Wire `migrate-v1` as a dynamic-`import()` subcommand in `src/cli/main.ts`.
+- [x] 37.4 Verify: `npm run build && node --test "dist/test/migration/synthesize.test.js" "dist/test/migration/main.test.js"`.
+
+*Apply-time note (session 37).* Decisions made by the orchestrator under the Director's full-autonomy
+delegation for this session (recorded in `apply-progress.md` §PR-37):
+1. **The v1-migration spec's "no `project_id` bound" scenario and D-23's "synthesizes an active
+   binding" are not contradictory**: `synthesize.ts`'s project-assignment input is optional. Called
+   bare, `projects[]`/`bindings[]`/`threads[]`/`bindingState` all come back empty (`offsets` is the one
+   row that is never project-scoped). `main.ts`'s CLI flags are the human's explicit choice at
+   invocation time.
+2. **`main.ts` implements the full design §13 flow** (steps 1–6, including the backup-copy step and its
+   idempotent "already migrated" shortcut), not just token/refusal plumbing — `tasks.md`'s RED line
+   names one headline scenario per test file, but this project's established strict-TDD pattern
+   requires full refusal-kind and success-path coverage for everything GREEN implements.
+3. **Registry persistence is new in this codebase**: no writer existed before this PR.
+   `~/.conmuta/registry.json` is validated (`registry/schema.ts`'s `parseRegistryDocument`) before every
+   write; a second migration into an existing registry is a merge (arrays extended, then the whole
+   merged document re-validated), not an overwrite; written with a plain `writeFileSync` (disclosed,
+   not atomic — a one-shot, non-interactive, human-run tool with no concurrent writer).
+4. **Real writes happen in this order: backups, secret-store token, ledger, registry LAST** — not
+   "registry then ledger" as design §13's prose lists them (that prose describes step 5's content, not
+   a write order). Caught by the parent's own pre-Judgment-Day readback: the idempotency check reads
+   the registry alone, and every ledger writer here is an `ON CONFLICT ... DO UPDATE` upsert, so writing
+   the registry last means a crash before it completes leaves a retry safe to redo.
+5. **No `Provenance:` header** on either new file — confirmed no v1 migration tool exists to vendor
+   from.
+6. **Parent mutant sweep** (delegated to a `fork`, 18 mutants + an `M0` control across the three
+   changed files): 2 genuine test gaps closed (a `roster_hash` value-level assertion; an
+   idempotency case for a v1 home that never had `state.json`); 2 disclosed, accepted survivors (the
+   `offsets` upsert-vs-insert mutant, unreachable via the public `runMigration` entry point; the
+   ledger-before-registry write-order mutant, the parent's own crash-consistency mitigation, not
+   practically unit-testable without fault injection mid-write).
+7. **Judgment Day, both rounds used their full adversarial value**: round 1 found 4 CRITICAL (2
+   independently converged: no try/catch anywhere in `runMigration`; separately, Judge B found the
+   idempotency check was scoped to today's date only, that a newly-requested project on an
+   already-migrated bot was silently dropped, and that a quarantined ledger was never detected — the
+   last of which Judge A had explicitly considered and treated as a pre-existing `daemon/bootstrap.ts`
+   pattern rather than PR-37-specific, filed as **B-54** rather than fixed here). All 10 confirmed
+   findings corrected via a scoped `jd-fix-agent` delegation, each with a new pinning test. The
+   independent verifier corrected a stale size figure the parent had measured before the mutant-sweep
+   fork's own later test additions (1531 claimed vs. 1565 actual at that tip) — the seventh confirmed
+   instance of this project's "a parent's own record prose is exactly as fallible as a subagent's"
+   pattern. The one re-judgment round found a single new WARNING (Judge B: the idempotency fix
+   decoupled the backup-exists check from the printed `backupDate`, so a later-day re-run's success
+   message claimed today's date as the migration date) — corrected inline, one message-wording fix plus
+   a pinning assertion, without needing the second round.
+
+**JUDGMENT: APPROVED** (`a238680..1047f64..9634ca2`, one of the two re-judgment rounds used).
 
 #### PR-38 — placeholder fixture, end-to-end migration test, runbook
 Branch `f1/38-migration-fixture-runbook` → `main`. Depends: PR-37. Size: ≈290 lines, no exception.
