@@ -88,7 +88,7 @@ Success is WORK-PLAN F2 validation: ADR-0031 installer tests, one merge test per
 | D-36 | **Merge preserves bytes outside the inserted entry** (comments, key order, formatting); design selects edit-in-place APIs, not parse-and-reserialize. | A reserialize drops JSONC/TOML comments: data loss |
 | D-37 | **Token handling**: `bot add` reads the token once, masked; `getMe` goes through F1's redacting client; the token goes straight to the secret store; never in argv, env, logs or errors. The online `doctor` tier runs daemon-side. | Invariant 2; OVERVIEW §10.4 |
 | D-38 | **F2 verbs**: `setup`, `bot add`, `group add`, `project bind <path>`, `doctor`. | OVERVIEW §10.2 proposed names |
-| D-39 | **Edits to merged F1 files** (`src/cli/main.ts`, `src/daemon/ipc/routes.ts`) each get their own disclosed slice. | Freeze-doctrine precedent (B-43, B-54) |
+| D-39 | **Edits to merged F1 files** each get their own disclosed slice. **Amended by design (D-48)**: the actual list is 4 files, not the 2 named here — `src/cli/main.ts` (dispatch), `src/shared/ipc-contract.ts` (route + schemas), `src/daemon/telegram.ts` (adds `getChatMember` to the class only), and `src/daemon/bootstrap.ts` (wiring). `src/daemon/ipc/routes.ts` is NOT edited after all — design chose a new `daemon/ipc/doctor.ts` module instead (D-44). | Freeze-doctrine precedent (B-43, B-54); corrected by `sdd-design` after reading the real merged files |
 | D-40 | **Start-at-login is in scope for F2**, resolving F1's own explicit deferral (`design.md:298`, "the start-at-login registration (F2) becomes the recommended path"), which `WORK-PLAN.md`'s F2 row never named. Implemented as an opt-in `setup` checkbox writing the mechanism OVERVIEW §7.1 already specifies (`HKCU\...\Run` on Windows, `LaunchAgents` plist on macOS); no services, no Task Scheduler, no pm2; removable by re-running `setup` and unchecking. | Director decision, session 41 |
 
 ## Invariants touched (CONSTITUTION §2)
@@ -116,7 +116,10 @@ F2 emits `AGENTBUS/2` and accepts `/1` and `/2`. **No wire change:** F2 does not
 | `src/registry/writer.ts`, project-file writer + twins | New | Registry and `conmuta.json` authoring |
 | `src/installer/autostart.ts` + twin | New | D-40: Windows `HKCU\...\Run` value / macOS `LaunchAgents` plist, opt-in, idempotent, removable |
 | `src/cli/main.ts` | Modified | Verb dispatch (own slice) |
-| `src/daemon/ipc/routes.ts` | Modified | Online doctor route (own slice) |
+| `src/shared/ipc-contract.ts` | Modified | `/doctor` route + schemas (own slice, corrected by design D-48) |
+| `src/daemon/telegram.ts` | Modified | Adds `getChatMember` to the class only (own slice, corrected by design D-48) |
+| `src/daemon/bootstrap.ts` | Modified | Wires `doctorClientFor` (own slice, corrected by design D-48) |
+| `src/daemon/ipc/doctor.ts` | New | Online doctor route — design D-44 chose a new module over editing `routes.ts` |
 | `test/security/installer-bundle.test.ts`, fixtures per format | New | Static assertions, B-05 fixtures |
 | `docs/02-architecture/OVERVIEW.md`, `THREAT-MODEL.md` §4, `docs/06-backlog/CHECKLIST.md` | Modified | Pi row, detection wording, PT names, B-05/B-17 |
 
