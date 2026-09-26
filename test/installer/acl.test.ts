@@ -12,16 +12,15 @@ import { icaclsExePath, REAL_EXEC_FILE, EXEC_FILE_OPTIONS, type ExecFileImpl } f
  * `installer/acl.ts` (design.md §11, D-49, THREAT-MODEL §5.5; tasks.md PR-08 sub-task 8.3): the Windows
  * DACL / POSIX mode hardening `setup` applies to the daemon home once.
  *
- * The Windows argv-shape test injects a fake exec implementation; the grantee-list, inheritance-flag
- * and idempotent-re-run assertions run a **real** `icacls` round trip against a scratch temp directory
- * this file creates and removes itself — never a real system path, never `$HOME`. Mirrors the pattern
- * `test/secret-store/file-fallback.test.ts` already established for PT-19's own real `icacls` round
- * trip (its grantee/negative list is intentionally duplicated here in miniature rather than importing
- * from that already-merged, frozen test file across an unrelated compile boundary).
+ * The Windows argv-shape test injects a fake exec implementation; the grantee, inheritance-flag and
+ * idempotent-re-run assertions run a **real** `icacls` round trip against a scratch temp directory
+ * this file creates and removes itself — never a real system path, never `$HOME`. Mirrors the real-
+ * round-trip pattern `test/secret-store/file-fallback.test.ts` already established for PT-19. Grantee
+ * assertions parse `icacls`'s own ACE lines ({@link aclTrustees}) rather than substring-matching the
+ * raw output, which also contains the queried path — a scratch temp directory sitting under the
+ * current user's profile can otherwise make the username match the path text, not a real ACE (native
+ * review findings R2-001/R2-002/R3-idempotency-count-fragile/R3-only-user-not-proved).
  */
-
-/** Windows grantee names that must never appear on a hardened home's DACL (subset of PT-19's own list). */
-const FORBIDDEN_GRANTEES = ["BUILTIN\\Users", "Everyone", "Authenticated Users", "S-1-1-0", "S-1-5-32-545"];
 
 /** Runs `body` against a fresh scratch directory and removes it afterwards, even on failure. */
 function withScratchHome(body: (home: string) => void): void {
@@ -40,9 +39,23 @@ function qualifiedCurrentUser(): string {
 	return domain === "" ? username : `${domain}\\${username}`;
 }
 
-/** Real `icacls <path>` output: what the DACL assertions read. */
-function aclOf(path: string): string {
-	return REAL_EXEC_FILE(icaclsExePath(), [path], EXEC_FILE_OPTIONS);
+/**
+ * Real `icacls <path>` output with the leading path stripped from its first line.
+ *
+ * `icacls`'s own output starts with the queried path followed by its first ACE on the same line
+ * (`<path> <trustee>:(...)`, continuation ACEs indented on their own lines below). A scratch temp
+ * directory normally sits under the current user's profile path, so the path itself can contain the
+ * username — matching or counting against the *raw* output would then find a false hit in the path
+ * text, not a real ACE (native review findings R2-001/R2-002/R3-idempotency-count-fragile).
+ */
+function aclEntriesOf(path: string): string {
+	const raw = REAL_EXEC_FILE(icaclsExePath(), [path], EXEC_FILE_OPTIONS);
+	return raw.startsWith(path) ? raw.slice(path.length) : raw;
+}
+
+/** Extracts each ACE's trustee name from `icacls` output already stripped of its leading path. */
+function aclTrustees(entriesText: string): string[] {
+	return [...entriesText.matchAll(/^[ \t]*(\S[^\r\n]*?):\(/gm)].map((match) => match[1].trim());
 }
 
 test(
@@ -74,15 +87,15 @@ test(
 		withScratchHome((home) => {
 			hardenHomeAcl({ homeDir: home });
 
-			const acl = aclOf(home);
+			const entries = aclEntriesOf(home);
 			const user = qualifiedCurrentUser();
-			const forbidden = FORBIDDEN_GRANTEES.filter((grantee) => acl.includes(grantee));
-			assert.deepEqual(forbidden, [], `hardened home DACL lists non-user grantee(s): ${forbidden.join(", ")}\n${acl}`);
-			assert.ok(
-				acl.toUpperCase().includes(user.toUpperCase()),
-				`expected the hardened home DACL to list the current user (${user})\n${acl}`,
+			const trustees = aclTrustees(entries).map((trustee) => trustee.toUpperCase());
+			assert.deepEqual(
+				trustees,
+				[user.toUpperCase()],
+				`expected exactly one ACE, granting only the current user (${user})\n${entries}`,
 			);
-			assert.ok(acl.includes("(OI)") && acl.includes("(CI)"), `expected inheritable (OI)(CI) flags in the ACL\n${acl}`);
+			assert.ok(entries.includes("(OI)") && entries.includes("(CI)"), `expected inheritable (OI)(CI) flags in the ACL\n${entries}`);
 		});
 	},
 );
@@ -95,12 +108,14 @@ test(
 			hardenHomeAcl({ homeDir: home });
 			hardenHomeAcl({ homeDir: home });
 
-			const acl = aclOf(home);
+			const entries = aclEntriesOf(home);
 			const user = qualifiedCurrentUser();
-			const occurrences = acl.toUpperCase().split(user.toUpperCase()).length - 1;
-			assert.equal(occurrences, 1, `expected the current user to appear exactly once after two runs\n${acl}`);
-			const forbidden = FORBIDDEN_GRANTEES.filter((grantee) => acl.includes(grantee));
-			assert.deepEqual(forbidden, [], `re-run must not widen the grant: ${forbidden.join(", ")}\n${acl}`);
+			const trustees = aclTrustees(entries).map((trustee) => trustee.toUpperCase());
+			assert.deepEqual(
+				trustees,
+				[user.toUpperCase()],
+				`expected exactly one ACE for the current user after two runs, neither duplicated nor widened\n${entries}`,
+			);
 		});
 	},
 );
