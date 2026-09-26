@@ -53,7 +53,7 @@ When sources disagree, this report applies the ranking above and cites where fix
 - `proposal.md` — Present. Final proposal with 15 scope items, 10 decisions (D-01..D-10), all invariants touched.
 - `specs/` — Present. 9 domains + README.md (all 47 requirements, 85 scenarios).
 - `design.md` — Present. Final design with 30 design points (D-11..D-30), 20 units, 13,000 estimated authored lines.
-- `tasks.md` — Present. **219/219 tasks complete** (100%). Reconciles 45 `#### PR-XX` header rows against 47 real GitHub PRs (PR-06, PR-08, PR-09, PR-40 each apply-time re-sliced into 2; PR-15/16/17 consolidated into 1; net 47 = 45 - 4 + 8 - 1 + 4 - 3).
+- `tasks.md` — Present. **219/219 tasks complete** (100%). Reconciles 45 `#### PR-XX` header rows against 47 real GitHub PRs (PR-06, PR-08, PR-09, PR-40 each apply-time re-sliced into 2, +8 PRs from 4 headers; PR-15/16/17 consolidated into 1, +1 PR from 3 headers; net 47 = 45 - 4 - 3 + 8 + 1).
 - `exploration.md` — Present. Pre-proposal research (8 questions, 14 answers).
 - `state.yaml` — Present. Full phase history (explore → propose → spec → design → tasks → apply → verify → archive).
 - `verify-report.md` — Present. Verification findings (0 CRITICAL, 2 WARNING, 2 SUGGESTION; none gate archive).
