@@ -154,5 +154,17 @@
     "v1Path": "src/state.ts:252-439",
     "commit": "bf8f365",
     "verdict": "SEAM"
+  },
+  {
+    "v2Path": "test/security/predicates.ts",
+    "v1Path": "test/security.test.ts:25-101",
+    "commit": "bf8f365",
+    "verdict": "SEAM"
+  },
+  {
+    "v2Path": "test/security/predicates.test.ts",
+    "v1Path": "test/security.test.ts:107-169",
+    "commit": "bf8f365",
+    "verdict": "AS-IS"
   }
 ]
