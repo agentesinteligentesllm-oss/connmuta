@@ -1412,12 +1412,12 @@ green on rerun. Merged as PR #44 (`4f564c1`).
 
 **PR-40b's own task list (the original PR-40 plan, unchanged):**
 
-- [ ] 40.1 RED: write `test/security/client-bundle.test.ts` ("bundle scan finds exactly one spawn site": `hasChildProcessReference` matches exactly once at `client/spawn.js`, `spawn(` count == 1, literal argv, `shell: false`; forbidden `node:sqlite`/`api.telegram.org`/`getUpdates`/`@napi-rs/keyring`/`secrets/`; each predicate seeded-fails on a negative fixture).
-- [ ] 40.2 GREEN: make 40.1 pass against the built client closure from PR-32/PR-34 (adjust closure boundaries only if the scan finds an unintended cross-import; no new source files expected).
-- [ ] 40.3 RED: write `test/security/daemon-bundle.test.ts` ("daemon bundle scan is clean and non-vacuous": no `child_process`; `node:fs` confined to the allow-listed home-scoped modules; `sendMessage` confined to transport modules reachable only from an IPC handler; unbounded loop confined to `poller.js`, which imports no transport module; timers confined to the allow-list including `serve/fetch.js` with the reverse-import-graph exclusion of `transport/*`/`send/*`).
-- [ ] 40.4 GREEN: make 40.3 pass against the built daemon closure from PR-15–PR-31 (adjust nothing in source; this PR only adds tests, per the twin rule the daemon files were already implemented).
-- [ ] 40.5 Verify: `npm run build && npm run test:static`.
-- [ ] 40.6 Docs: update the file-name cell(s) of PT-07, PT-27, PT-28 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
+- [x] 40.1 RED: write `test/security/client-bundle.test.ts` ("bundle scan finds exactly one spawn site": `hasChildProcessReference` matches exactly once at `client/spawn.js`, `spawn(` count == 1, literal argv, `shell: false`; forbidden `node:sqlite`/`api.telegram.org`/`getUpdates`/`@napi-rs/keyring`/`secrets/`; each predicate seeded-fails on a negative fixture).
+- [x] 40.2 GREEN: make 40.1 pass against the built client closure from PR-32/PR-34 (adjust closure boundaries only if the scan finds an unintended cross-import; no new source files expected).
+- [x] 40.3 RED: write `test/security/daemon-bundle.test.ts` ("daemon bundle scan is clean and non-vacuous": no `child_process`; `node:fs` confined to the allow-listed home-scoped modules; `sendMessage` confined to transport modules reachable only from an IPC handler; unbounded loop confined to `poller.js`, which imports no transport module; timers confined to the allow-list including `serve/fetch.js` with the reverse-import-graph exclusion of `transport/*`/`send/*`).
+- [x] 40.4 GREEN: make 40.3 pass against the built daemon closure from PR-15–PR-31 (adjust nothing in source; this PR only adds tests, per the twin rule the daemon files were already implemented).
+- [x] 40.5 Verify: `npm run build && npm run test:static`.
+- [x] 40.6 Docs: update the file-name cell(s) of PT-07, PT-27, PT-28 in `docs/02-architecture/THREAT-MODEL.md` §4 with the test files this PR adds (same PR; tribunal `bus-v2-f1-tasks-001` item 5).
 
 #### PR-41 — two-binding wrong-room CI job (PT-01)
 Branch `f1/41-security-wrong-room-ci` → `main`. Depends: PR-40. Size: ≈180 lines, no exception.
