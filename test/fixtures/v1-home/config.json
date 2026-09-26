@@ -1,0 +1,10 @@
+{
+  "agent_id": "@agent-placeholder-a",
+  "bot_username": "placeholder_bot",
+  "chat_id": -1001111111111,
+  "roster": {
+    "@agent-placeholder-a": { "username": "placeholder_a", "user_id": 555000001 },
+    "@agent-placeholder-b": { "username": "placeholder_b", "user_id": 222222 }
+  },
+  "bot_token": "placeholder-v1-bot-token"
+}
