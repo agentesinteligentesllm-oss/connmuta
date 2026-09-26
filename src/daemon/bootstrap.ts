@@ -17,7 +17,7 @@ import { deleteRunFile, writeRunFile, type DaemonRunPayload } from "./lifecycle/
 import { BindingsReconciler } from "./bindings.js";
 import { startPoller } from "./poller.js";
 import { TelegramApiClient, type TelegramClient } from "./telegram.js";
-import { createIpcServer, type IpcHandler } from "./ipc/server.js";
+import { createIpcServer, type IpcHandler, type IpcServerHandle } from "./ipc/server.js";
 import type { IpcRouteKey } from "../shared/ipc-contract.js";
 import { createIdentityHandler, PendingHandshakeStore } from "./ipc/handshake.js";
 import { createSessionRoutes, type RoutesDeps } from "./ipc/routes.js";
@@ -108,6 +108,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
 
   let ledger: LedgerOpenResult | undefined;
   let reconciler: BindingsReconciler | undefined;
+  let ipcServer: IpcServerHandle | undefined;
 
   try {
     ledger = openLedger({ homeDir: dirs.homeDir, now: options?.now });
@@ -133,7 +134,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     };
 
     const handlers: Partial<Record<IpcRouteKey, IpcHandler>> = {};
-    const ipcServer = createIpcServer({
+    ipcServer = createIpcServer({
       handlers,
       log: (message) => writeDaemonLog(dirs.runDir, message),
     });
@@ -187,7 +188,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
       stopPromise = (async () => {
         heartbeat.stop();
         await reconciler!.stopAll();
-        await ipcServer.close();
+        await ipcServer!.close();
         deleteRunFile(dirs.runDir, runFile.pid);
         lock.release();
         try {
@@ -200,52 +201,71 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     };
 
     let lastSweepAt: string | null = null;
+    // `setInterval` (heartbeat.ts) does not wait for a prior async `onTick` to settle before scheduling
+    // the next one — if `reconciler.reconcile()` ever takes longer than `periodMs` (a slow secret-store
+    // lookup, a slow registry read), an overlapping tick would race the same synchronous
+    // `!current`-then-async-add check in `BindingsReconciler.reconcile` (bindings.ts), starting two
+    // pollers for the same bot and colliding on Telegram's own single-poller-per-token 409 (PR-40a
+    // Alpha audit). Skipping a whole tick when the previous one is still in flight is simpler and safer
+    // than partially guarding just the reconcile call, since retention/idle checks reading the same
+    // ledger mid-reconcile carry no correctness requirement to run on every single tick.
+    let ticking = false;
     const heartbeat = startHeartbeat({
       periodMs: options?.heartbeatPeriodMs ?? HEARTBEAT_PERIOD_MS,
       updateLockHeartbeat: () => {
         lock.updateHeartbeat();
       },
       onTick: async () => {
-        // `reconciler.reconcile()` (no argument) calls `registry.sync()` itself — `registry` here is the
-        // same `RegistryLoader` instance passed to `BindingsReconciler`'s `loader` option (PR-40a). A
-        // separate `registry.sync()` call here would consume the "loaded" transition first, leaving the
-        // reconciler's own internal sync permanently seeing "unchanged" and, once at least one binding is
-        // already active, silently never picking up a later registry change (D-12 hot-reload broken).
-        await reconciler!.reconcile();
-
-        const nowIso = new Date(options?.now ? options.now() : Date.now()).toISOString();
-        if (isRetentionSweepDue(lastSweepAt, nowIso)) {
-          try {
-            sweepRetention(ledger!.db, { now: nowIso });
-            lastSweepAt = nowIso;
-          } catch {
-            // Retention sweep failure must not crash heartbeat
-          }
+        if (ticking) return;
+        ticking = true;
+        try {
+          await tick();
+        } finally {
+          ticking = false;
         }
-
-        checkIdleShutdown({
-          now: options?.now,
-          startedAt,
-          getLastSessionSeenAt: () => getLastSessionSeenAt(ledger!.db),
-          getOpenThreadCount: () => {
-            try {
-              const row = ledger!.db
-                .prepare("SELECT count(*) as c FROM threads WHERE status = 'open'")
-                .get() as { c: number } | undefined;
-              return row?.c ?? 0;
-            } catch {
-              return 0;
-            }
-          },
-          onIdle: () => {
-            void stop();
-          },
-        });
       },
       onError: (err) => {
         writeDaemonLog(dirs.runDir, `heartbeat tick failed: ${err instanceof Error ? err.message : String(err)}`);
       },
     });
+
+    async function tick(): Promise<void> {
+      // `reconciler.reconcile()` (no argument) calls `registry.sync()` itself — `registry` here is the
+      // same `RegistryLoader` instance passed to `BindingsReconciler`'s `loader` option (PR-40a). A
+      // separate `registry.sync()` call here would consume the "loaded" transition first, leaving the
+      // reconciler's own internal sync permanently seeing "unchanged" and, once at least one binding is
+      // already active, silently never picking up a later registry change (D-12 hot-reload broken).
+      await reconciler!.reconcile();
+
+      const nowIso = new Date(options?.now ? options.now() : Date.now()).toISOString();
+      if (isRetentionSweepDue(lastSweepAt, nowIso)) {
+        try {
+          sweepRetention(ledger!.db, { now: nowIso });
+          lastSweepAt = nowIso;
+        } catch {
+          // Retention sweep failure must not crash heartbeat
+        }
+      }
+
+      checkIdleShutdown({
+        now: options?.now,
+        startedAt,
+        getLastSessionSeenAt: () => getLastSessionSeenAt(ledger!.db),
+        getOpenThreadCount: () => {
+          try {
+            const row = ledger!.db
+              .prepare("SELECT count(*) as c FROM threads WHERE status = 'open'")
+              .get() as { c: number } | undefined;
+            return row?.c ?? 0;
+          } catch {
+            return 0;
+          }
+        },
+        onIdle: () => {
+          void stop();
+        },
+      });
+    }
 
     return {
       dirs,
@@ -259,6 +279,9 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
   } catch (err) {
     if (reconciler) {
       await reconciler.stopAll().catch(() => {});
+    }
+    if (ipcServer) {
+      await ipcServer.close().catch(() => {});
     }
     if (ledger) {
       try {

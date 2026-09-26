@@ -391,6 +391,114 @@ test("bootstrap: reconciles an active registry binding at boot and again on the 
   }
 });
 
+test("bootstrap: an overlapping heartbeat tick does not start a second poller while a slow reconcile is in flight (PR-40a Alpha audit)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  let factoryCalls = 0;
+  const fakeClient: TelegramClient = {
+    async getUpdates() {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return [];
+    },
+    async sendMessage(params) {
+      return { message_id: 1, chat: { id: Number(params.chat_id), type: "group" }, date: 1, text: params.text };
+    },
+    async getMe() {
+      return { id: 999888777, is_bot: true, username: "test_bot" };
+    },
+    async getChat() {
+      return { id: -1005556667778, type: "group" };
+    },
+  };
+
+  // Boot with NO active binding at all: the boot-time `reconciler.reconcile()` call (bootstrap.ts, before
+  // the heartbeat even starts) runs strictly serially before any tick can fire, so a slow factory there
+  // would never actually race a tick — the addition below must happen AFTER boot, while the heartbeat is
+  // already running, for the race the guard defends against to be reachable at all.
+  const emptyRegistry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [],
+    groups: [],
+    projects: [],
+    bindings: [],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(emptyRegistry));
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      // Shorter than the artificial factory delay below: several ticks are guaranteed to fire while the
+      // first tick's reconcile() is still awaiting its factory — without the re-entrancy guard, each of
+      // those overlapping ticks would see the binding as `!current` (bindings.ts's synchronous
+      // check-then-async-add races) and call the factory again for the same binding.
+      heartbeatPeriodMs: 5,
+      telegramClientFactory: async () => {
+        factoryCalls++;
+        // Longer than several heartbeat periods, so multiple ticks are guaranteed to fire before this
+        // resolves if the guard does not skip them.
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return fakeClient;
+      },
+    });
+
+    const registryWithBinding: Registry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [
+        {
+          bot_id: 999888777,
+          username: "test_bot",
+          token_ref: { store: "keychain", account: "bot:999888777" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [{ group_id: -1005556667778, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [{ project_id: "prj-slow", path: homeDir }],
+      bindings: [
+        {
+          project_id: "prj-slow",
+          bot_id: 999888777,
+          group_id: -1005556667778,
+          agent_id: "@slow-agent",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@slow-agent", user_id: 999888777, username: "test_bot" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithBinding));
+
+    // Several 5ms ticks will observe the new file before the first one's factory call (40ms) resolves.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    // One binding-add calls the factory exactly twice by design: once for `buildTransport`'s own
+    // `createTelegramClient` (bootstrap.ts's `reconciler` construction) and once for `createPoller`'s
+    // own `buildTelegramClient` call. A guard failure would double this (or worse), because a second,
+    // overlapping tick's `reconcile()` would race the same add before the first one finishes it.
+    assert.equal(
+      factoryCalls,
+      2,
+      "the re-entrancy guard must skip every tick that overlaps an in-flight reconcile, not just log a warning",
+    );
+
+    const auditRows = daemon.ledger.db
+      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
+      .all() as Record<string, unknown>[];
+    assert.equal(auditRows.length, 1, "a raced double-add would also show up as a duplicate BINDING_CHANGED row");
+  } finally {
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
 test("bootstrap: stop() closes the real IPC server — a subsequent request is refused (PR-40a)", async () => {
   const homeDir = createTempHome();
   const fakeStore: SecretStore = {
