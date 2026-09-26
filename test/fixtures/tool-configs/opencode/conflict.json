@@ -1,0 +1,7 @@
+{
+	"mcp": {
+		"other-tool": { "type": "local", "command": ["python3", "keep-this-other-entry"] },
+		"conmuta": { "type": "local", "command": ["old-pre-existing-command", "old/path/main.js"] }
+	},
+	"customSetting": "keep-this-custom-value"
+}

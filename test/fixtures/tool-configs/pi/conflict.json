@@ -1,0 +1,7 @@
+{
+	"mcpServers": {
+		"other-tool": { "command": "node", "args": ["keep-this-other-entry"] },
+		"conmuta": { "command": "old-pre-existing-command", "args": ["old/path/main.js"] }
+	},
+	"customSetting": "keep-this-custom-value"
+}

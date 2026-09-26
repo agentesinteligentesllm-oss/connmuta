@@ -1,0 +1,6 @@
+{
+	"servers": {
+		"other-tool": { "type": "stdio", "command": "python3", "args": ["keep-this-other-entry"] }
+	},
+	"customSetting": "keep-this-custom-value"
+}

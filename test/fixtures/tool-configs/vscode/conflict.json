@@ -1,0 +1,7 @@
+{
+	"servers": {
+		"other-tool": { "type": "stdio", "command": "python3", "args": ["keep-this-other-entry"] },
+		"conmuta": { "type": "stdio", "command": "old-pre-existing-command", "args": ["old/path/main.js"] }
+	},
+	"customSetting": "keep-this-custom-value"
+}
