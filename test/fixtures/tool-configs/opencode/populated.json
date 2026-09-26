@@ -1,0 +1,7 @@
+{
+	/* keep this comment */
+	"mcp": {
+		"other-tool": { "type": "local", "command": ["python3", "keep-this-other-entry"] }
+	},
+	"customSetting": "keep-this-custom-value"
+}

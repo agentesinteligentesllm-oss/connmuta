@@ -1,0 +1,4 @@
+customSetting = "keep-this-custom-value"
+
+[mcp_servers.broken
+command = "python3"

@@ -1,0 +1,9 @@
+customSetting = "keep-this-custom-value"
+
+[mcp_servers.other-tool]
+command = "python3"
+args = ["keep-this-other-entry"]
+
+[mcp_servers.conmuta]
+command = "old-pre-existing-command"
+args = ["old/path/main.js"]

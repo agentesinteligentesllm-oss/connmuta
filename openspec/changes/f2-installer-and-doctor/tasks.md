@@ -124,13 +124,13 @@ Scope: `test/fixtures/tool-configs/<tool>/{populated,conflict,malformed}.*` (8 t
 Requirements: `tool-config-merge › Strict per-format parse` (fail-closed scenario); `› Merge is refuse-and-diff on ambiguity` (all 8 surfaces); `› Every merge takes a pre-edit backup and preserves surrounding bytes` (all 8 surfaces); D-31 (B-05 closes here).
 Runtime harness: integration test over the built `file-edit.js`/`formats/*.js`/`tool-targets.js` against real fixture files in a temp dir per surface.
 
-- [ ] 5.1 Author `populated` fixtures for the 8 surfaces: an unrelated MCP entry, non-MCP keys, `//`/`/* */` comments where the format allows, CRLF for at least one JSON fixture (D-31 Alpha condition: never an empty object).
-- [ ] 5.2 Author `conflict` fixtures: a same-named entry under `MCP_SERVER_NAME` with a different `command`/table than the one the merge would write.
-- [ ] 5.3 Author `malformed` fixtures: a syntax error under each format's parser.
-- [ ] 5.4 RED then GREEN (per surface, 8 cases each): `test/installer/tool-config-merge.test.ts` — `populated` merges with byte-for-byte preservation outside the inserted range and a `*.bak-pre-v2-<date>` backup present; `conflict` refuses with a diff and no write; `malformed` refuses as a parse error and no write.
-- [ ] 5.5 RED then GREEN: identical same-named entry on a second run is a no-op (idempotent re-run), not a refusal.
-- [ ] 5.6 Verify: `npm run build && node --test "dist/test/installer/tool-config-merge.test.js"`.
-- [ ] 5.7 Backlog: close B-05 pointer to this test file (final CHECKLIST.md edit deferred to PR-20's close-out, per F1's own single-close-out convention).
+- [x] 5.1 Author `populated` fixtures for the 8 surfaces: an unrelated MCP entry, non-MCP keys, `//`/`/* */` comments where the format allows, CRLF for at least one JSON fixture (D-31 Alpha condition: never an empty object).
+- [x] 5.2 Author `conflict` fixtures: a same-named entry under `MCP_SERVER_NAME` with a different `command`/table than the one the merge would write.
+- [x] 5.3 Author `malformed` fixtures: a syntax error under each format's parser.
+- [x] 5.4 RED then GREEN (per surface, 8 cases each): `test/installer/tool-config-merge.test.ts` — `populated` merges with byte-for-byte preservation outside the inserted range and a `*.bak-pre-v2-<date>` backup present; `conflict` refuses with a diff and no write; `malformed` refuses as a parse error and no write.
+- [x] 5.5 RED then GREEN: identical same-named entry on a second run is a no-op (idempotent re-run), not a refusal.
+- [x] 5.6 Verify: `npm run build && node --test "dist/test/installer/tool-config-merge.test.js"`.
+- [x] 5.7 Backlog: close B-05 pointer to this test file (final CHECKLIST.md edit deferred to PR-20's close-out, per F1's own single-close-out convention — not made in this PR).
 
 ### Unit 4 — Registry and project-file authoring (D-35, D-41)
 

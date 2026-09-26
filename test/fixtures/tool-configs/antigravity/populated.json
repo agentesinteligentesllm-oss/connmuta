@@ -1,0 +1,7 @@
+{
+	/* keep this comment */
+	"mcpServers": {
+		"other-tool": { "command": "node", "args": ["keep-this-other-entry"] }
+	},
+	"customSetting": "keep-this-custom-value"
+}
