@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,8 +30,9 @@ import { BACKUP_SUFFIX_PREFIX, MCP_SERVER_NAME } from "../../src/installer/const
  * - `OLD_COMMAND_MARKER`: the conflict fixture's own pre-existing `conmuta`-entry command.
  * - `COMMENT_MARKER`: present only in the 4 populated fixtures with a line or block comment
  *   (`claude-code`, `gemini-cli`: line comments; `opencode`, `antigravity`: block comments).
- *   `claude-code/populated.json` additionally uses CRLF line endings (the one JSON fixture
- *   carrying that convention, per tasks.md 5.1).
+ *   `claude-code/populated.json` is installed with CRLF line endings (the one JSON fixture
+ *   carrying that convention, per tasks.md 5.1) — applied by {@link installFixture} at copy time,
+ *   never committed as CRLF bytes (this repo's `.gitattributes` would flatten those to LF anyway).
  */
 
 const UNRELATED_ARG_MARKER = "keep-this-other-entry";
@@ -69,11 +70,28 @@ function withTempProjectDir(body: (projectDir: string) => void): void {
 	}
 }
 
+/**
+ * The one fixture exercising CRLF input (tasks.md 5.1). Committed as plain LF — this repo's
+ * `.gitattributes` (`* text=auto eol=lf`) would silently flatten any committed CRLF bytes back to
+ * LF on checkout, defeating the fixture's purpose without failing any test — so CRLF is applied
+ * here, at copy time, the same way `jsonc.test.ts`'s own CRLF case builds it in memory rather than
+ * relying on a file's committed bytes.
+ */
+const CRLF_FIXTURE: { readonly toolId: ToolConfigTarget["id"]; readonly name: FixtureName } = {
+	toolId: "claude-code",
+	name: "populated",
+};
+
 /** Copies `name`'s fixture to `target`'s resolved path under `projectDir`, creating parent dirs. */
 function installFixture(projectDir: string, target: ToolConfigTarget, name: FixtureName): string {
 	const destPath = resolveToolConfigPath(projectDir, target);
 	mkdirSync(dirname(destPath), { recursive: true });
-	copyFileSync(fixturePath(target, name), destPath);
+	if (target.id === CRLF_FIXTURE.toolId && name === CRLF_FIXTURE.name) {
+		const lfText = readFileSync(fixturePath(target, name), "utf8");
+		writeFileSync(destPath, lfText.replace(/\r?\n/g, "\r\n"));
+	} else {
+		copyFileSync(fixturePath(target, name), destPath);
+	}
 	return destPath;
 }
 
@@ -127,8 +145,10 @@ for (const target of TOOL_CONFIG_TARGETS) {
 
 	test(`${target.id}: populated merges, preserves surrounding bytes, and takes a backup`, () => {
 		withTempProjectDir((projectDir) => {
-			const originalText = readFileSync(fixturePath(target, "populated"), "utf8");
 			const path = installFixture(projectDir, target, "populated");
+			// Read back what installFixture actually wrote (not the source fixture path): the
+			// claude-code case is CRLF-converted at copy time and must be compared against that.
+			const originalText = readFileSync(path, "utf8");
 
 			const outcome = editFile({ path, adapter, entryPath, entry: intendedEntry });
 
