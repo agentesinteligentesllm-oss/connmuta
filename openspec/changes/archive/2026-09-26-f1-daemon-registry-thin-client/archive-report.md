@@ -27,15 +27,15 @@ When sources disagree, this report applies the ranking above and cites where fix
 
 | Domain | Spec File | Status | Note |
 |--------|-----------|--------|------|
-| daemon-lifecycle | `openspec/specs/daemon-lifecycle/spec.md` | Created | 9 requirements, ~40 scenarios |
-| durable-inbox | `openspec/specs/durable-inbox/spec.md` | Created | 8 requirements, ~30 scenarios |
-| ipc-handshake | `openspec/specs/ipc-handshake/spec.md` | Created | 6 requirements, ~18 scenarios |
-| ledger | `openspec/specs/ledger/spec.md` | Created | 5 requirements, ~15 scenarios |
-| project-binding | `openspec/specs/project-binding/spec.md` | Created | 4 requirements, ~10 scenarios |
-| secret-store | `openspec/specs/secret-store/spec.md` | Created | 3 requirements, ~8 scenarios |
-| send-path | `openspec/specs/send-path/spec.md` | Created | 4 requirements, ~10 scenarios |
-| thin-client-tools | `openspec/specs/thin-client-tools/spec.md` | Created | 5 requirements, ~12 scenarios |
-| v1-migration | `openspec/specs/v1-migration/spec.md` | Created | 3 requirements, ~8 scenarios |
+| daemon-lifecycle | `openspec/specs/daemon-lifecycle/spec.md` | Created | 8 requirements, 14 scenarios |
+| durable-inbox | `openspec/specs/durable-inbox/spec.md` | Created | 7 requirements, 13 scenarios |
+| ipc-handshake | `openspec/specs/ipc-handshake/spec.md` | Created | 6 requirements, 14 scenarios |
+| ledger | `openspec/specs/ledger/spec.md` | Created | 4 requirements, 7 scenarios |
+| project-binding | `openspec/specs/project-binding/spec.md` | Created | 4 requirements, 11 scenarios |
+| secret-store | `openspec/specs/secret-store/spec.md` | Created | 3 requirements, 5 scenarios |
+| send-path | `openspec/specs/send-path/spec.md` | Created | 5 requirements, 7 scenarios |
+| thin-client-tools | `openspec/specs/thin-client-tools/spec.md` | Created | 6 requirements, 8 scenarios |
+| v1-migration | `openspec/specs/v1-migration/spec.md` | Created | 4 requirements, 6 scenarios |
 
 **Total**: 47 requirements, 85 scenarios across 9 new capability domains (all capabilities created in F1, none modified).
 
@@ -118,7 +118,6 @@ Per the verify phase (session 41, completed 2026-09-26):
 | Static tests | 43 pass | `npm run test:static` clean. |
 | Wrong-room CI | 3 pass | `npm run test:wrong-room` clean (closed unit 12). |
 | Authored lines (approx.) | ~13,000 | Per design §20; cross-checked against v1 line counts; excludes vendored bodies under `size:exception` (~1,760 lines of PR-02/PR-20 AS-IS hash-pinned imports). |
-| PR avg size | ~260 lines | Non-exception authored total ÷ 43 PR slices = ~11,240 ÷ 43 ≈ 261 lines/PR. |
 | Specs (capabilities) | 9 domains | 47 requirements, 85 scenarios. |
 | Delta specs merged | 9/9 | All 9 copied to `openspec/specs/` with empty diff. |
 
