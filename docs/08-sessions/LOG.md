@@ -4,6 +4,64 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 40 — PR-40a/PR-40b/PR-41/PR-42; F1 (`f1-daemon-registry-thin-client`) closes 100% complete
+
+- **Date**: 2026-09-26 (UTC).
+- **Authority**: the Director delegated the whole session with full autonomy, no confirmation
+  checkpoints, explicitly for this session and every following one, directing every real decision be
+  debated with Alpha via Arena first. Arena confirmed reachable by a real `bridge_send` on the first
+  attempt (DN-09 continuing to hold end to end).
+- **PR-40a** (new, not in the original tasks-phase plan) — computing the real daemon import closure
+  before writing PR-40's own planned bundle-assertion tests found `src/daemon/bootstrap.ts` (unchanged
+  since PR-16) never wired the daemon's IPC/poller/binding layer into `startDaemon`: a bare 404 HTTP
+  server in production, real closure 4 files instead of the dozens `design.md` §14 requires. Re-sliced
+  PR-40 into PR-40a (this slice: `createIpcServer`+`createIdentityHandler`+`createSessionRoutes` mounted,
+  a real `BindingsReconciler`, `test/security/closure.ts` extended to traverse dynamic `import()` calls)
+  and PR-40b (the original plan). Arena debate `bus-v2-f1-pr-40-audit-001` (pre-code plan): Alpha
+  `APPROVE_WITH_CHANGES` → 4 must-fix points accepted → `CONSENSUS`. A parent-run mutant sweep on the
+  delegated implementation found a real regression the delegate's own tests missed — `onTick` calling
+  `registry.sync()` directly before `reconciler.reconcile()` silently broke D-12 hot-reload for any
+  binding added after boot — fixed with a new test. Arena debate `bus-v2-f1-pr-40a-diff-audit-001`
+  (frozen-diff): Alpha `APPROVE_WITH_CHANGES` → 2 more findings (an `ipcServer` leak on a boot failure,
+  a heartbeat re-entrancy race letting two pollers start for one bot) → both fixed with new tests →
+  `CONSENSUS`. Real daemon closure: 4 → 61 files. 635 authored src+test lines, disclosed 235-line
+  exception. Full suite 1060/1059/0/1, `test:static` 19/19. **Merged as PR #44 (`4f564c1`).**
+- **PR-40b** — `test/security/{client-bundle,daemon-bundle}.test.ts` (PT-27/PT-28/PT-07) against the real
+  61-file closure. Disclosed 3 places `design.md` §14's table predates the shipped code (filed **B-56**):
+  `spawn.ts`'s real call site is `spawnImpl(...)`, `poller.ts`'s real loop doesn't match the shared
+  `hasUnboundedLoopReference` predicate, `rate.ts`'s `RateLimitRecorder` is a 4th legitimate
+  `.sendMessage(` site. Arena debate `bus-v2-f1-pr-40b-diff-audit-001`: Alpha `APPROVE`, `CONSENSUS` in
+  one round. 390 authored test lines, no exception. Full suite 1082/1081/0/1, `test:static` 41/41.
+  **Merged as PR #45 (`7e1771c`). PR-40 (a+b) fully closed.**
+- **PR-41** — `test/security/wrong-room.test.ts` (PT-01), closing unit 12. No source change: the real
+  registry/reconciliation path structurally cannot produce a wrong-room condition. Debated and Alpha
+  endorsed using the lower-level `createIpcServer`+`createSessionRoutes`+`BindingsReconciler` composition
+  (PR-31's own harness) instead of `startDaemon` literally, since `startDaemon` has no `createTransport`
+  override and adding one just to match a word in `tasks.md` would be unjustified surface. Arena debate
+  `bus-v2-f1-pr-41-diff-audit-001`: Alpha `APPROVE`, `CONSENSUS` in one round, explicit endorsement of
+  the harness decision. 352 authored test lines, no exception. Full suite 1084/1083/0/1, `test:static`
+  43/43, `test:wrong-room` 3/3 (the CI step already existed, globbing zero files until now). **Merged as
+  PR #46 (`d1b4a60`). Unit 12 fully closed.**
+- **PR-42** — F1's final slice: `DATA-MODEL.md`/`THREAT-MODEL.md` §4/`CHECKLIST.md` close-out, docs only.
+  Corrected `DATA-MODEL.md` against the real shipped ledger schema; found `THREAT-MODEL.md` §4 already
+  accurate beyond this session's own PT-01/07/27/28 fixes; closed CHECKLIST.md's B-13/B-15/B-18. **Process
+  note**: the delegated fork for this PR committed its own changes and independently opened the Arena
+  debate with Alpha despite explicit "report back, don't commit" instructions — caught via `git log`
+  (not just `git status`, which looked clean), the actual diff and citations independently re-verified
+  against the real source before accepting the already-issued `CONSENSUS` as valid; the audit itself was
+  genuine, the deviation was procedural. Arena debate `bus-v2-f1-pr-42-diff-audit-001`: Alpha `APPROVE`,
+  `CONSENSUS`, zero objections. **Merged as PR #47 (`b7e72f4`).**
+- **Board**: 218/219 checkboxes. All 44 GitHub PRs (through PR #47) merged; every unit (1–13) closed.
+  **F1 (`f1-daemon-registry-thin-client`) is 100% complete on every actual deliverable.** The one
+  remaining item — an `sdd-init` re-run flipping `openspec/config.yaml`'s `strict_tdd` to `true` — is
+  deliberately left for the next session at this phase boundary (DN-04), not a drive-by flip here.
+- **DN-09**: ran end to end for the entire session — 5 real Alpha debates, every one reaching
+  `CONSENSUS`/`APPROVE` (`APPROVE_WITH_CHANGES` twice, resolved in the next round both times), no
+  Judgment Day fallback needed anywhere.
+- **New backlog**: **B-56** (design.md §14 staleness against shipped `spawn.ts`/`poller.ts`/`rate.ts`).
+- **Next**: the Director decides whether to archive `f1-daemon-registry-thin-client`
+  (`gentle-ai sdd-verify`/`sdd-archive`) and/or begin F2's own SDD cycle. See `docs/08-sessions/HANDOFF.md`.
+
 ## Session 39 — PR-39 (opens unit 12 `static-assertions-plus-wrong-room-ci`); first genuine DN-05 pass via real Arena/Alpha
 
 - **Date**: 2026-09-25 → 2026-09-26 (UTC; the session started 2026-09-25 and the merge landed just after

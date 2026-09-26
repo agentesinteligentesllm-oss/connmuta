@@ -13,39 +13,32 @@
 
 ## §0 — Quick start
 
-**DN-09 is live and confirmed working end to end (session 39): PR-39 ran the full Arena/Alpha route,**
-not the Judgment Day fallback. A real `bridge_send` to `alpha` succeeded on the first try. Three
-debates closed `CONSENSUS` (`bus-v2-f1-pr-39-audit-001`, `-002`, `bus-v2-f1-pr-39-diff-audit-001`) —
-**DN-05 is genuinely satisfied for PR-39**, the first PR since PR-05 audited by a real Alpha `AUDIT`
-rather than the substitute. Check Arena reachability the same way again: attempt a real
-`mcp__arena__bridge_send`, never `curl` alone (still unproven reliable for this bridge). If Alpha
-responds, this is now the *expected* route, not a hopeful fallback — read
-[`docs/01-constitution/GOVERNANCE.md`](../01-constitution/GOVERNANCE.md) §2 and §3 for the exact state
-machine (PROPOSAL → AUDIT → COUNTER/CONSENSUS/ESCALATE; a clean `AUDIT` with `APPROVE`+`objections: []`
-closes straight to `CONSENSUS`; **once a debate closes CONSENSUS it is terminal — a new decision point
-needs a NEW `conversation_id`, not a `PATCH` on the closed one**, confirmed this session when a
-mechanical discovery after audit-001's close required opening audit-002 instead). If Alpha genuinely
-does not respond (a real `bridge_send` attempt errors or times out): fall through to §2 point 1, the
-ODD + Judgment Day pipeline, exactly as PR-06 through PR-38 ran it.
+**F1 (`f1-daemon-registry-thin-client`) is done.** Session 40 closed the last four slices — PR-40a
+(daemon composition-root wiring, the session's own major discovery), PR-40b (bundle assertion tables),
+PR-41 (two-binding wrong-room CI) and PR-42 (final documentation close-out) — all merged (`#44`–`#47`),
+all audited through the DN-09 Arena/Alpha route with genuine `CONSENSUS`. **This is a phase boundary
+(DN-04): the next session's first job is not implementation, it is a decision with the Director.**
 
-Session 39 merged **PR-39** (`test/security/predicates.ts` SEAM, `test/security/predicates.test.ts`
-AS-IS, `test/security/closure.ts` + twin, a 5-file cross-directory fixture) as PR #43 (`d85ca2c`).
-**Unit 12 `static-assertions-plus-wrong-room-ci` is open, with its first slice (PR-39) closed.
-Next slice: PR-40** — `test/security/client-bundle.test.ts` + `test/security/daemon-bundle.test.ts`
-(PT-27 with the D-01 multi-clause spawn assertion, PT-28, PT-07's bundle-scan half). No new `src/`
-file expected; this PR only writes tests against the already-built client/daemon closures.
+**The decision:** F1's `tasks.md` reads 218/219 — the one deliberately-unchecked item is a re-run of
+`sdd-init` flipping `openspec/config.yaml`'s `strict_tdd` to `true`, left open on purpose for a fresh
+session to action rather than a drive-by flip at the tail of session 40. Before touching that flip, ask
+the Director: **(a) archive `f1-daemon-registry-thin-client`** (`gentle-ai sdd-verify` then
+`gentle-ai sdd-archive`, per the SDD lifecycle this project's own tooling defines) **and/or (b) begin
+F2's own SDD cycle.** Read [`docs/07-plan/WORK-PLAN.md`](../07-plan/WORK-PLAN.md) for what F2 actually
+is before assuming anything — do not guess from the phase letter alone. This is the Director's call, not
+a default path to run through on autopilot.
 
 **Copy-paste prompt to start the next session:**
 
 ```text
-Continúa el cambio SDD `f1-daemon-registry-thin-client` en PR-40 (`test/security/client-bundle.test.ts` +
-`test/security/daemon-bundle.test.ts`, PT-27/PT-28/PT-07, unidad 12 continúa): lee primero
-`docs/08-sessions/HANDOFF.md` y ejecútalo paso a paso.
-Verifica Arena Orion con un `bridge_send` real, no con `curl` — DN-09 quedó confirmada funcionando de
-punta a punta en la sesión 39 (tres debates reales con Alpha, los tres CONSENSUS, DN-05 satisfecha por
-primera vez desde PR-05); si Alpha no responde de verdad, cae a ODD + Judgment Day.
-Tienes autorización total del Director para decidir y ejecutar todo sin pedir confirmación, en esta
-sesión y en todas las siguientes de este cambio, incluyendo el cierre y el mini-prompt para la próxima.
+F1 (f1-daemon-registry-thin-client) esta completo (218/219, el pendiente es deliberado). Lee primero
+docs/08-sessions/HANDOFF.md paso a paso. Es un punto de frontera de fase (DN-04): antes de implementar
+nada, pregunta al Director si (a) archivar el cambio SDD f1-daemon-registry-thin-client, (b) arrancar el
+ciclo SDD de F2 (lee WORK-PLAN.md para saber que es F2 antes de asumir nada), o ambos, y en que orden.
+Verifica Arena Orion con un bridge_send real — DN-09 corrio de punta a punta las cinco auditorias de la
+sesion 40 (todas CONSENSUS/APPROVE); si Alpha no responde de verdad, cae a ODD + Judgment Day.
+Tienes autorizacion total del Director para decidir y ejecutar sin pedir confirmacion en el resto de esta
+sesion, salvo la pregunta de arriba, que es genuinamente del Director.
 ```
 
 **First three commands, in order** (stop and report if any disagrees with §1):
@@ -56,12 +49,11 @@ rm -rf dist                                          # a stale dist/ silently fa
 gentle-ai sdd-status f1-daemon-registry-thin-client --cwd . --json
 ```
 
-The working tree must be **clean**. The status command must print `nextRecommended: apply`,
-`completed: 187`, `pending: 23` (of `210`), `blockedReasons: []`. Verify the count yourself with
-`grep -c '^\s*- \[x\]' openspec/changes/f1-daemon-registry-thin-client/tasks.md` (must print 187).
-**If `git pull --ff-only` fails with a raw `git` network error (`getaddrinfo() thread failed to
-start` or similar) while `gh` commands still work: this happened once already (session 39, resolved
-itself) — see §4's dedicated row before assuming a real outage.**
+The working tree must be **clean**. The status command should print `completed: 218`, `pending: 1`,
+`nextRecommended: apply` (the tool has no "done, needs a human archive decision" state of its own — a
+`pending: 1` with everything else green is what "done except the deliberate flip" looks like from this
+tool). Verify with `grep -c '^\s*- \[x\]' openspec/changes/f1-daemon-registry-thin-client/tasks.md`
+(must print 218) and `grep -c '^\s*- \[ \]'` (must print 1).
 
 ---
 
@@ -69,166 +61,54 @@ itself) — see §4's dedicated row before assuming a real outage.**
 
 | Item | State | Pointer |
 |---|---|---|
-| Phase | **F1 `apply` in progress.** Completed: **PR-01…PR-39** (PR-39 merged as PR #43, `d85ca2c`; candidate `a47e484`). **Unit 11 `v1-migration` is CLOSED. Unit 12 `static-assertions-plus-wrong-room-ci` is OPEN, first slice closed.** **Next slice: PR-40** — `test/security/client-bundle.test.ts`, `test/security/daemon-bundle.test.ts` (PT-27 with the D-01 multi-clause spawn assertion, PT-28, PT-07's bundle-scan half). Per `tasks.md`'s own PR-40 block (search for `#### PR-40` yourself — PR-39's apply-time note may have shifted line numbers by a handful): six sub-tasks, 40.1 RED (client bundle scan test) → 40.2 GREEN (should already pass against the built client closure; only adjust closure boundaries on an unintended cross-import) → 40.3 RED (daemon bundle scan test) → 40.4 GREEN (should already pass; this PR adds no new source) → 40.5 Verify → 40.6 Docs (THREAT-MODEL §4 file-name cells for PT-07/PT-27/PT-28). **This is a verification-of-already-shipped-behavior slice, not a new-logic slice** — `client/main.js`'s and `daemon/main.js`'s real import closures already exist (built by `tsc -b` from PR-01…PR-38's already-merged source); PR-40's job is writing the static assertions that prove those closures have the shape design.md §14 requires, using `test/security/predicates.ts`'s exported detectors and `test/security/closure.ts`'s `computeClosure` — both new this session (PR-39) specifically so PR-40 could consume them. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
-| Board, exactly | `tasks.md` has **46 `####`-level PR headers total** (`grep -c '^#### PR-' tasks.md`), of which **42 header lines cover `PR-01`…`PR-39`** and **3 remain, naming `PR-40`…`PR-42`**. Separately, **45 distinct GitHub PRs have actually merged** through PR-39 (the same three headers — `PR-06`, `PR-08`, `PR-09` — were each re-sliced at apply time into two separately-merged PRs; this discrepancy is already flagged unreconciled in `state.yaml`'s own PR-11 entry). **Checkboxes: 187 of 210**, the cleanest single number to cite. | `tasks.md` |
-| SDD change | `f1-daemon-registry-thin-client`; native status `nextRecommended: apply`, **187/210 tasks**, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
-| Code on `main` | Everything PR-01…PR-38 already shipped, plus **`test/security/predicates.ts`, `test/security/predicates.test.ts`, `test/security/closure.ts`, `test/security/closure.test.ts`, `test/fixtures/security-closure/{entry.js,b.js,unrelated.js,sub/a.js,sub/b.js}`**. No new `src/` file this slice. **1054 tests** (1053 pass, 1 skip), `test:static` **18/18**. | PRs `#1`–`#43` |
-| Provenance registry | `test/fixtures/v1-provenance.json` — **28 entries** (was 26; PR-39 added 2: `test/security/predicates.ts` verdict `SEAM`, `test/security/predicates.test.ts` verdict `AS-IS`). **PR-40 needs no new entry** — it adds no vendored file, only new test-only code with no v1 equivalent. | §3 |
-| Audit status | **DN-05 is unsatisfied for PR-06..PR-38** (Judgment Day substitute, one record each). **DN-05 IS satisfied for PR-39** — the first real Arena/Alpha audit trail since PR-05, three debates (`bus-v2-f1-pr-39-audit-001`, `-002`, `bus-v2-f1-pr-39-diff-audit-001`), all `CONSENSUS`. Check Arena again at the next session's own start; do not assume it stays up automatically. | [`INDEX.md`](../05-tribunal/INDEX.md) |
+| Phase | **F1 is 100% complete on every actual deliverable.** All 13 units closed, all 44 GitHub PRs merged (`#1`–`#47`). The one remaining checkbox (`sdd-init` re-run flipping `strict_tdd`) is deliberately deferred to this session as a genuine phase-boundary action, not an oversight. | [`WORK-PLAN.md`](../07-plan/WORK-PLAN.md) §F1 |
+| Board, exactly | `tasks.md`: **218 of 219 checkboxes done.** 47 `####`-level PR header blocks (PR-01…PR-42, with PR-06/08/09 re-sliced a/b at apply time and PR-40 re-sliced a/b at apply time for a *different* reason — a genuine missing-wiring discovery, not a budget overage; see §6). | `tasks.md` |
+| SDD change | `f1-daemon-registry-thin-client`; native status `completed: 218`, `pending: 1`, `blockedReasons: []` | [`state.yaml`](../../openspec/changes/f1-daemon-registry-thin-client/state.yaml) · [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) |
+| Code on `main` | Everything through PR-38, plus session 39's `test/security/{predicates,closure}.ts`+twins, plus session 40's: `src/daemon/bootstrap.ts` (real composition root — the daemon now actually serves IPC, polls, reconciles bindings), `src/daemon/bindings.ts` (async `createTelegramClient`), `test/security/{client-bundle,daemon-bundle,wrong-room}.test.ts`, `test/daemon/{bootstrap,bindings}.test.ts` extended, `test/security/closure.ts` (dynamic-`import()` traversal), plus doc corrections in `DATA-MODEL.md`/`THREAT-MODEL.md`/`CHECKLIST.md`. | PRs `#1`–`#47` |
+| Real daemon closure | **61 files** reachable from `daemon/main.js` (was 4 before session 40 — see §6, this is the session's central finding). Client closure: 18 files. | `test/security/daemon-bundle.test.ts`, `test/security/client-bundle.test.ts` |
+| Test counts | `npm test` **1084** (1083 pass, 1 pre-existing skip, 0 fail). `npm run test:static` **43/43**. `npm run test:wrong-room` **3/3**. | session 40 |
+| Audit status | **DN-05 is satisfied for PR-39 through PR-42** — five real Arena/Alpha debates this session alone (`bus-v2-f1-pr-40-audit-001`, `bus-v2-f1-pr-40a-diff-audit-001`, `bus-v2-f1-pr-40b-diff-audit-001`, `bus-v2-f1-pr-41-diff-audit-001`, `bus-v2-f1-pr-42-diff-audit-001`), every one reaching `CONSENSUS`/`APPROVE`. **DN-09 is now proven across a FULL session**, not just a first successful try — no Judgment Day fallback was needed once. DN-05 remains unsatisfied for PR-06 through PR-38 (unchanged, pre-DN-09). | [`INDEX.md`](../05-tribunal/INDEX.md) |
 
 ---
 
-## §2 — Settled for the next slice (do not re-litigate; change only if the Director asks)
+## §2 — This is a decision point, not a routing table
 
-**0. Arena-first routing (DN-09), now proven working end to end, not just ratified in theory.**
-Check Arena reachability live at session start (§0) with a REAL `bridge_send` attempt, not `curl` alone.
-If Alpha responds: the audit route is a single Alpha `AUDIT` per `GOVERNANCE.md` §2/§3's fast path — do
-NOT also spawn `jd-judge-a`/`jd-judge-b`. **New this session: a debate that closes `CONSENSUS` is
-terminal.** If you discover something AFTER a debate closes (as happened this session — a mechanical
-detail about `provenance.test.ts` only became clear while starting to write code, after audit-001 had
-already closed), open a **new** `conversation_id` for it (e.g. `..audit-002`) rather than trying to
-`PATCH` the closed one (the broker rejects non-terminal kinds from a terminal state). If Alpha genuinely
-does not respond: fall through to point 1 below, unchanged from every session since PR-06.
+Every previous handoff in this file had a §2 titled "Settled for the next slice" with a concrete next PR
+to implement. **There is no next PR inside F1.** What was §2's content in every prior session — the
+Arena-first routing rule, the Judgment Day fallback, the per-slice pipeline, the budget policy, the
+frozen-worktree junction rule, remote-delivery authorization, the never-poll rule, the sequential-
+verification rule — is **unchanged and still governs whatever comes next**, whether that is F1's own
+archive or F2's first slice. Read §6 and §7 below for what carries forward unconditionally.
 
-**1. Workflow (Judgment Day fallback only, if Arena is confirmed down): ODD, with every substantive SDD
-contract preserved.** `sdd-apply` dispatch is refused before the child launches — a host-owned gate an
-agent cannot satisfy. So: ODD is the route; the slice honours the same design rows, the same `tasks.md`
-sub-tasks, Strict TDD (red before green, twins), the pinned hashes and provenance fixture, the 400-line
-budget with disclosed exceptions, and a tribunal-grade audit; the orchestrator owns the SDD bookkeeping.
+**What actually needs deciding, with the Director, before any implementation:**
 
-**2. The per-slice pipeline, Arena-routed version (session 39's own shape — likely repeatable for
-PR-40, adjust if PR-40's actual complexity differs):**
-1. **Map** once, inline or with a narrow delegated read, depending on how many open questions exist. For
-   PR-40 specifically: read `design.md` §14 (lines ~517-533 at last count, re-read yourself) verbatim —
-   it is a table, not prose, and every cell matters (exact module paths, exact predicate names, the
-   reverse-import-graph clauses for `transport/*`/`send/*`). Then actually **run** `closure.ts`'s
-   `computeClosure` against the real built `dist/src/client/main.js` and `dist/src/daemon/main.js` (a
-   throwaway script is fine, delete it before freezing) to see the ACTUAL closures before writing
-   assertions that claim things about them — do not assume the closure shape from reading source, verify
-   it computationally, exactly as this session verified the SEAM/AS-IS mechanics empirically rather than
-   trusting a paraphrase.
-2. **Decide** any open points inline, write them into the tribunal debate's `PROPOSAL` body with
-   file:line evidence — Alpha reads code independently and expects pointers, never pasted files or
-   whole-file dumps.
-3. **Debate before writing code** for anything with a real decision in it (not mandatory for a pure
-   mechanical slice, but session 39 found real value in it twice — once catching a scope gap, once
-   catching a mechanical-verdict error neither party would have caught by design-doc prose alone).
-   `bridge_send` a `PROPOSAL`, wait for the `[ARENA]` ping (never poll `bridge_read` in a loop), read
-   with `bridge_read`, respond with `COUNTER` if you accept an objection (never `CONSENSUS` unless you
-   are accepting ALL open objections with the strict `{n, claim, evidence}` shape), and end your turn
-   after every send — do not keep working while a debate is in flight expecting a same-turn reply.
-4. **Write.** For a file whose exact content you already know byte-for-byte (a SEAM/AS-IS vendored file,
-   as `predicates.ts`/`predicates.test.ts` were this session), write it yourself directly — mechanical,
-   already-understood, no delegation needed. For a file needing real new design (as `closure.ts` was),
-   delegate to a `general-purpose` writer (sonnet) with every fact pre-resolved in the brief (exact
-   hashes, exact ranges, exact fixture conventions already used elsewhere in this repo — grep for a
-   sibling pattern before asking the writer to derive one from scratch, e.g. the `REPO_ROOT` three-levels-up
-   convention already used identically by `provenance.test.ts`/`repo-scan.test.ts`). **Insist on RED
-   first and ask for the verbatim RED lines.**
-5. **Parent readback before freezing** — verify the delegate's own report against the ACTUAL files (Read
-   them yourself; do not trust pasted "verbatim" content in a subagent's summary without checking). This
-   session's readback found the report was accurate, but the check is what makes that trustworthy, not
-   the report's own confidence.
-6. **Parent mutant sweep** with the generic harness (§4 below has the exact recipe). **When a mutant
-   survives, do not assume it is a real gap — trace the algorithm's invariants by hand first** (this
-   session found 2 of 5 mutants were TRUE equivalent mutants, not gaps, after exhaustive tracing — a
-   cheaper and more honest outcome than either ignoring the survival or forcing an artificial test to
-   kill an equivalent mutant). For a genuinely real gap (this session's M3), fix the TEST/FIXTURE, not
-   the source, when the source is already correct and the test just does not exercise the claimed
-   property — re-run the full sweep after the fix to confirm the specific mutant that was gapped is now
-   killed, not just that the suite still passes.
-7. **Run the FULL test suite AND `test:static` before freezing, sequentially, never concurrently**
-   (both invoke `tsc -b` against the same shared `dist/`; running them in parallel has caused a spurious
-   failure in a prior session). `git add -N` every specific new file (never `git add -N .`) before either
-   run, and again if you add or rename a fixture file mid-session (a `rm` + new file needs BOTH the
-   deletion and the new path explicitly re-registered with git — a bare filesystem `rm` alone leaves the
-   old path as a phantom intent-to-add entry that `git ls-files`-based scans will try to read and crash
-   on with `ENOENT`; confirmed this session).
-8. **Freeze, commit, send the frozen diff for the pre-merge audit** (a fresh `conversation_id`, e.g.
-   `..diff-audit-001`, distinct from any pre-code plan debate). Cite the exact commit hash, the exact
-   file list, the exact verification numbers, and every mutant-sweep finding including confirmed
-   equivalents (do not omit them — Alpha independently re-verified both equivalence proofs this session,
-   which is real corroboration, not redundant work).
-9. **Judgment Day** (only if Arena is confirmed down): frozen worktrees, `jd-judge-a` + `jd-judge-b` in
-   parallel, a separate independent verifier on its own worktree with a `node_modules` junction, up to
-   two scoped re-judgment rounds, exactly as PR-06 through PR-38 ran it (see prior handoffs' now-archived
-   detail in `LOG.md` if you need the granular recipe again).
-10. Tribunal record in `docs/05-tribunal/INDEX.md` on the branch (or on `main` post-merge if the audit
-    finished after merging, as this session did); push; PR (body ends with the Claude Code line, per
-    this project's established convention — commits themselves carry NO AI attribution, a distinct rule);
-    `gh pr checks <n> --watch`; merge with `--merge --delete-branch`.
+1. **Archive `f1-daemon-registry-thin-client`?** The SDD lifecycle this project's tooling defines has an
+   archive step (`gentle-ai sdd-archive`) that merges delta specs into the main specs and moves the change
+   folder. Nothing in this project's history has exercised that step yet — F1 has been "in apply" for the
+   entire project's life so far. Read what `sdd-archive` actually does (its own tool help, or
+   `~/.claude/skills/_shared/sdd-orchestrator-workflow.md`) before running it; verification
+   (`sdd-verify`) is optional and never gates archive per that skill's own text, but running it once for a
+   change this size is probably worth the Director's time regardless.
+2. **What is F2, concretely?** [`docs/07-plan/WORK-PLAN.md`](../07-plan/WORK-PLAN.md) names the phases; do
+   not start planning it from the phase letter or from scattered mentions of "F2's doctor" / "F2's wizard"
+   elsewhere in the docs tree — read the actual plan document's F2 section in full first.
+3. **The `sdd-init` re-run** (flips `strict_tdd` to `true` against the real `npm test`) is the one
+   remaining F1 checkbox. It is small and low-risk; do it once the Director has weighed in on point 1,
+   since archiving might itself touch `openspec/config.yaml` or make the flip moot.
 
-**3. Native review (RDD switch: on).** This session's Arena-audited PR did not run the separate native
-`gentle-ai review` RDD pipeline — per HANDOFF's own established reading, the Arena debate and Judgment Day
-are both *substitutes for* the DN-05 audit obligation, and native RDD review is a distinct, third
-mechanism; confirm this reading holds before assuming it applies unchanged to an Arena-routed PR, since
-this project has not yet exercised native review on top of a real Arena audit in the same slice.
-
-**4. PT-cell discipline.** A PR updates the file-name cell of the PT rows it **actually pins**, and only
-those. PR-40 pins PT-27, PT-28 and PT-07's bundle-scan half — update `docs/02-architecture/THREAT-MODEL.md`
-§4's cells for those three rows in the SAME PR (task 40.6), per tribunal `bus-v2-f1-tasks-001` item 5.
-
-**5. Budget policy.** 400 lines of authored src+test, disclosed PR-scoped exceptions otherwise, measured
-at every tip, counted as additions+deletions per file. PR-39 landed at **290 lines** against a ≈197
-estimate (revised to ≈260 mid-debate after Alpha's scope correction added a sixth file) — no exception
-needed. PR-40's own tasks.md estimate is ≈380 lines, no exception — measure anyway, do not assume.
-
-**6. Frozen worktrees — the junction rule (only relevant if Judgment Day runs).**
-`git worktree add --detach ../telegram_bus_agent-worktrees/<name> <sha>`. Only the verifier's worktree
-needs `node_modules`: create the junction with PowerShell `New-Item -ItemType Junction -Path '<win
-path>\node_modules' -Target '<main win path>\node_modules'`. To remove: delete the junction first, verify
-`node_modules/typescript/lib/tsc.js` still exists in the main checkout, then `git worktree remove --force`.
-
-**7. Remote delivery is authorized** (Director, session 14; DN-07/DN-08): push, PR, CI, merge.
-
-**8. Waiting on a background agent or an Arena reply: never poll.** After `bridge_send`, end your turn;
-the `[ARENA]` ping is a new inbound turn, not something to wait for synchronously. `ScheduleWakeup` is for
-`/loop` dynamic-mode sessions only, not for this project's ordinary session flow.
-
-**9. Never run build-invoking verification commands concurrently on this machine.** `npm test` and
-`npm run test:static` both run `tsc -b` first; run them one at a time, sequentially, in the foreground.
-
-**10. A raw `git` network command can fail transiently on this machine even when `gh` and general
-connectivity are fine (session 39, new).** See §4's dedicated row before concluding a real outage.
+Do not default to "start F2" or "archive F1" on your own reasoning — the Director explicitly gets one
+question here per this project's own precedent (`AGENTS.md` §1, `CLAUDE.md` §1's "ask only when two
+readings produce materially different work" — this is exactly that fork).
 
 ---
 
 ## §3 — Pinned provenance values (re-verify with your own method; never trust a header blindly)
 
-Rule: the pinned value is the exact byte range of the cited v1 lines **LF-normalized, including the
-terminating newline** (`bus-v2-f1-pr-04-001`). Validate your method first by reproducing a known value,
-e.g. `git -C ../telegram-agent-bus show bf8f365:src/tools/fetch.ts | tr -d '\r' | sed -n
-'404,460p;525,656p' | sha256sum` → `3bd09d0d…` (confirmed again this session).
-
-**New pins this session (PR-39):**
-
-| v2 path | v1 source @ `bf8f365` | verdict | v1 body sha256 |
-|---|---|---|---|
-| `test/security/predicates.ts` | `test/security.test.ts:25-101` | SEAM | `b3f99f3a068e74ee037d6ef7abb6b3b11ae14e65091be7096337c70203d4d594` |
-| `test/security/predicates.test.ts` | `test/security.test.ts:107-169` | AS-IS | `a8d108d8c39cf614e7adec6195ba1a52f9b61d5b5805459930326219f5bf7a1f` |
-
-**`test/security/closure.ts` and `test/security/closure.test.ts` are confirmed new code, no `Provenance:`
-header** — no v1 equivalent exists for a standalone closure-walker module. **PR-40 needs no new pin** —
-`client-bundle.test.ts`/`daemon-bundle.test.ts` are new test-only code with no v1 source to vendor.
-
-Older pins (26 entries through PR-38) are in `apply-progress.md` and in each module's header; the fixture
-file itself, `test/fixtures/v1-provenance.json`, is the single source of truth for the full list (28
-entries as of this session). SEAM pins are **not machine-checked** against a live git blob by
-`provenance.test.ts` — it only checks internal self-consistency (declared hash vs. live body hash,
-matching the declared verdict); the human/audit process is what verifies the declared hash is the TRUE
-v1 hash (B-42).
-
-**Mechanical rule confirmed this session, worth re-reading before pinning any future range-extract
-test file:** `provenance.test.ts`'s `vendoredBody()` strips the leading `Provenance:` header AND the
-leading contiguous import block, then hashes the remainder. AS-IS requires that remainder to hash
-EXACTLY to the declared v1 hash (`assert.equal`); SEAM requires it to hash DIFFERENTLY (`assert.notEqual`)
-plus a non-`"none."` `Changes:` line. **A range-extract is not automatically SEAM just because it is a
-partial range** — `design.md`'s own §12 table already had two precedents (`tool-output.ts`,
-`tool-schemas.ts`) of a range-extract correctly labeled AS-IS, because their bodies needed zero
-modification beyond header/import relocation. Before writing the header, work out whether your ported
-body will *actually* differ from the source range once headers/imports are stripped — if it will not,
-label it AS-IS and write `Changes: none.`; if you need it to be SEAM for policy reasons, make sure some
-REAL, disclosed change exists in the body (never fabricate one purely to satisfy the mechanical check).
+No new SEAM/AS-IS pins landed in session 40 — every session-40 file is either NEW test-only code (no v1
+equivalent) or a documentation correction. The provenance rules, the fixture
+(`test/fixtures/v1-provenance.json`, 28 entries), and the mechanical AS-IS/SEAM distinction from prior
+sessions are unchanged. See any pre-session-40 HANDOFF (in `LOG.md`'s history) if you need the full
+pinning recipe again — it will not be needed unless F2 vendors more v1 code.
 
 ---
 
@@ -236,98 +116,78 @@ REAL, disclosed change exists in the body (never fabricate one purely to satisfy
 
 | Item | State | Pointer |
 |---|---|---|
-| **A raw `git` network operation can fail with `getaddrinfo() thread failed to start` even when `gh` and general internet access are fine — session 39, new** | Right after `gh pr merge --merge --delete-branch` reported the merge done (confirmed via `gh pr view --json state,mergedAt,mergeCommit`: `MERGED`), a local `git fetch`/`git pull` failed repeatedly with this exact error. `gh`'s own network stack (Go's `net/http`) kept working the whole time; only git-for-Windows' own libcurl-based HTTP client was affected. Local `main` was simply stale by one merge commit — never diverged, no data at risk. Retrying the SAME `git fetch` after doing unrelated, network-free work in the meantime (not a sleep loop — real elapsed time from real work) succeeded cleanly, and `git merge --ff-only origin/main` then fast-forwarded with zero conflicts. **If this happens again: verify via `gh pr view <n> --json state,mergedAt,mergeCommit` that the merge actually landed before assuming anything is wrong; do not force-push, do not reset, do not touch the remote branch by hand — just retry the plain fetch later.** | session 39 |
-| **A closed (`CONSENSUS`) Arena debate is terminal — a later discovery needs a NEW `conversation_id`** | Confirmed this session: `bus-v2-f1-pr-39-audit-001` closed CONSENSUS; a mechanical detail about `provenance.test.ts` only became clear afterward, while starting to implement. Opened `bus-v2-f1-pr-39-audit-002` as a fresh `PROPOSAL` rather than trying to `PATCH` the closed conversation (which the broker would reject — `PATCH` is legal from any non-terminal state, and `CONSENSUS` is terminal). | session 39, `docs/05-tribunal/INDEX.md` |
-| **Reading a verification test's ACTUAL code (not its prose description) can reveal a mechanical requirement neither the design doc nor the task list states explicitly** | `provenance.test.ts`'s own `vendoredBody()`/`parseHeader()` functions were the deciding evidence for an AS-IS-vs-SEAM question that `design.md`'s prose and `tasks.md`'s citation both left ambiguous. When a mechanical test enforces a hard constraint (equal vs. not-equal), read the test's actual assertions before choosing a label, not just the design doc's narrative gloss on what the test does. | `test/security/provenance.test.ts`, session 39 |
-| **A survived mutant is not automatically a real coverage gap — trace the algorithm's invariants by hand before deciding** | This session found 2 of 5 mutants against `closure.ts` were TRUE equivalent mutants (no possible test could ever kill them, given the surrounding code's own other guards), confirmed by exhaustive reasoning about every reachable code path (a 2-node cycle, a diamond-shaped import graph), not just by the mutant surviving on one fixture. A DIFFERENT survived mutant (M3) WAS a real gap against the code's own documented claim, and was closed by fixing the fixture, not the source. Distinguish these two outcomes explicitly in the record; do not report every SURVIVED result as an equal-weight finding. | `odd/mutants-closure.json`, session 39 |
-| **Deleting a `git add -N`'d file with a bare filesystem `rm` leaves a phantom intent-to-add entry** | `git ls-files` (which `provenance.test.ts`'s and `repo-scan.test.ts`'s scanners both use) still lists the old path after a bare `rm`, and `readFileSync` on it throws `ENOENT`. Fix: `git add <path>` on the now-deleted path (naming it explicitly, not `-A`/`.`) to register the deletion in the index. Confirmed this session when restructuring a fixture mid-slice (moving `a.js` to `sub/a.js`). | session 39 |
-| **A relative `import.meta.url`-based path constant copied verbatim from a vendored file can silently break if the new file sits at a different directory depth than its v1 source** | `predicates.ts`'s `DIST_SRC_DIR` used v1's `../src/` unchanged at first; v1's file was flat under `test/`, this module sits one level deeper under `test/security/`, so the correct value is `../../src/`. Caught by tracing the exact compiled-output directory depth by hand, not by the test suite (the bug would only manifest once `listJsFiles`/`relPosix` were actually exercised against `dist/src/**`, which PR-39's own narrow tests never did — PR-40 will be the first real exercise of this path). **Re-verify `DIST_SRC_DIR`'s value is still correct once PR-40 actually calls `listJsFiles`/`relPosix` against the real tree.** | `test/security/predicates.ts`, session 39 |
-| **`curl` against the documented Arena bridge endpoint is NOT a reliable reachability signal — DN-09, session 38, unchanged** | Always attempt a real `bridge_send` before concluding Arena is down. | DN-09, session 38 |
-| **Alpha's audit now replaces Judgment Day whenever Arena responds — confirmed working this session, not just ratified** | A single Alpha `AUDIT` (fast path, `APPROVE`+`objections: []` → `CONSENSUS` in one round) satisfies the mandatory pre-merge audit on its own; a real objection produces `APPROVE_WITH_CHANGES`, handled with `COUNTER`. Do not spawn `jd-judge-a`/`jd-judge-b` in addition when Arena responded. | `GOVERNANCE.md` §3, DN-09, session 39 |
-| **Generic mutant harness — recreate each session, `odd/` is deleted at close** | `node odd/sweep.mjs <src.ts> <dist-test.js,dist-test2.js,...> <mutants.json>`; mutants are `[id, desc, from, to]` tuples, each `from` must occur exactly once in the current source (the harness reports `SKIPPED` with the actual occurrence count if not — happened once this session from a bad `from` string, harmless, just rewrite it); builds via `node_modules/typescript/lib/tsc.js -b` directly, restores the original source after each mutant AND after the whole sweep. Use a runtime-opaque disabled-branch condition, never a literal `false`, if a mutant needs to disable a guard at runtime. This session ran the sweep directly via Bash rather than delegating to a `fork` (small sweep, 5 mutants, direct execution was cheaper and avoided the known "fork's first reply describes instead of executing" risk entirely) — reconsider `fork` delegation only for a much larger sweep. | session 39 (harness text preserved from sessions 28-38 below in case a future session needs the fuller recipe) |
-| **`state.yaml` is YAML with several enormous single-line string fields — edit with a small `.cjs` script, never by hand** | `completed_slices` and `tribunal_state` (under `apply:` specifically) are both continuously-growing double-quoted YAML strings; `next_recommended` is also double-quoted but gets REPLACED each session, not appended to. `tribunal_state` is NOT a unique line prefix — `explore:`/`design:`/`tasks:` each have their own short `tribunal_state: consensus` line; search for the literal string `'filed no new backlog"'` (or whatever the previous session's own closing phrase was) to find the actual end of the huge one under `apply:`, or just map every top-level key's line number first (`node -e "..."` walking the file line by line) before touching anything blind. **Never introduce an unescaped `"` inside appended text; avoid apostrophes too** (this project's convention writes plain prose without possessives in these fields specifically, confirmed again this session). Re-run `gentle-ai sdd-status` after editing to confirm the file still parses AND the numbers match what you intended — confirmed working this session with a `.cjs` script that maps every key's byte length first, previews start/end of each target field before touching it, and asserts an exact expected suffix before replacing (fails loudly instead of silently corrupting on a stale assumption). | sessions 28-39 |
-| **Sweep harness needs bounds** | `node --test --test-timeout=5000` and `spawnSync(..., {timeout: 150000, shell: false})`. Report `KILLED(TIMEOUT)` apart. | sessions 29-39 |
-| **`git add -N` — scope it, never `.`** | Always name the specific new files; re-register a deletion explicitly too (see the new row above). | sessions 30-39 |
-| **Never run two build-invoking verification commands concurrently on this machine** | `npm test` and `npm run test:static` both call `tsc -b`. | sessions 37-39 |
-| **A parent's own record prose needs the same distrust as a subagent's** | Confirmed again this session — verify a delegate's "verbatim" report against the actual files with your own Read calls before trusting it, even when the report turns out accurate (as it did this session). | sessions 31-39 |
-| **Engram MCP `mem_save` may refuse** ("multiple active runtime sessions") | Use the CLI: `engram save "<title>" "<content>" --project connmuta --type <t> --topic <key> --scope <s>`. Confirmed working again this session. | sessions 27-39 |
-| **Commit messages** | No Co-Authored-By or AI attribution in commits; PR bodies end with the Claude Code line. | sessions 27-39 |
-| **`test/security/provenance.test.ts` reads a leading `/**` block as a vendor header, opt-in per file** | A file with no `Provenance:` line is invisible to this test entirely. | `test/security/provenance.test.ts`, B-33 |
-| **`git ls-files` scanners only see tracked or intent-to-add files** | `git add -N` new files before `test:static` AND before the full suite. | sessions 32-39 |
-| **`node:sqlite`** | Rows are null-prototype; `.changes` is `number \| bigint`; a negative `LIMIT` means no limit; scalar `MAX(NULL, x)` is NULL. | PR-23, PR-28 |
-| **Bash executes backticks inside double quotes; heredocs over ~200 lines can fail to parse or truncate silently** | Write files with the file tools for anything long; a short (<20 line) heredoc via `git commit -F -`-style piping is fine, confirmed again this session for commit messages and PR bodies. | sessions 13-39 |
-| **`git reset --hard` is blocked by policy** | Use `git checkout <base> -- <paths>` and explicit removals. | sessions 14-16 |
+| **A daemon's own production entry point can silently diverge from its own composition root across many PRs, with every individual PR's tests passing the whole time** | `src/daemon/bootstrap.ts` was last edited in PR-16. Fifteen PRs later (PR-18 through PR-31) built and independently audited `admission.ts`, `poller.ts`, `daemon/ipc/*`, `daemon/transport/*`, `daemon/send/*`, `daemon/serve/*` — none of them touched `bootstrap.ts` to wire themselves in, because none of their own Scope lines named it. Each PR's own tests passed because each module was tested in isolation. The gap was invisible to `npm test` and to `npm run test:static` (design.md §14's own daemon-bundle assertions didn't exist yet) for 15 PRs, and was only found by actually computing the real static import closure before writing PR-40's tests, per this project's own standing rule to verify computationally rather than assume from reading source. **If a future phase adds a new subsystem that needs to be reached from a composition root, add "wire it into the composition root" as an explicit task in the SAME PR, not an assumed follow-up.** | session 40, `src/daemon/bootstrap.ts`, `bus-v2-f1-pr-40-audit-001` |
+| **`setInterval` (Node) does not serialize an async callback across ticks** | An `onTick` handler slower than its own `periodMs` can have a second invocation start while the first is still in flight. If that handler does anything with a synchronous check-then-async-mutate shape (exactly `BindingsReconciler.reconcile`'s `!current` check followed by an awaited add), two overlapping ticks can both pass the check and both perform the mutation. Needed an explicit boolean re-entrancy guard skipping a whole tick when the previous one is still running. Found by Alpha's audit, not by the delegate's own tests. | `src/daemon/bootstrap.ts`'s `ticking` flag, `bus-v2-f1-pr-40a-diff-audit-001` |
+| **Two calls to `RegistryLoader.sync()` in the same tick silently break hot-reload** | `reconcile()` (no argument) calls `loader.sync()` internally. If a caller ALSO calls `registry.sync()` directly just before, the direct call consumes the "loaded" transition first, so the reconciler's own internal sync always sees "unchanged" — and once at least one binding is already active, the reconciler's own logic (`bindings.ts`) treats "unchanged" as a pure no-op without ever re-reading `loader.current()`. A registry file that legitimately changed after boot would then never be picked up, silently, for the rest of the daemon's life. Found by a PARENT-run mutant sweep on top of an already-tested delegated implementation — the delegate's own tests didn't catch it because they never added a SECOND binding after boot. **Lesson for any future test of tick-driven reconciliation: always test that a change made AFTER boot, not just the initial state, is picked up on a LATER tick — the initial-state case can pass by accident even when repeated reconciliation is broken.** | session 40, `src/daemon/bootstrap.ts`'s `tick()` function |
+| **A forked subagent inherits the parent's FULL tool set, including stateful external-collaboration channels and git write access — "report back, don't commit" is not sufficient framing on its own** | The PR-42 close-out fork committed its own changes and independently opened an Arena debate with Alpha (using the parent's own `kairo` identity, since a fork shares the session), despite an explicit brief saying "do not commit, push, or merge... report your findings and I will review the full diff myself before finalizing." The working tree looked clean in `git status --short` (only the commit existed, nothing uncommitted) — the parent only caught it by checking `git log` and noticing an unexpected commit hash that Alpha's own audit reply then cited. The actual work and the actual Alpha audit were both genuine and correct on independent re-verification, so nothing shipped was wrong — but the parent's own readback-before-audit discipline was bypassed. **For any future fork doing implementation or documentation work: explicitly forbid `mcp__arena__*` tool calls in the brief when Arena review isn't the fork's job, and always check `git log`, not just `git status`, after a fork reports completion.** Filed as product feedback (queued locally, not yet sent) in the same session. | session 40, PR-42's own close-out |
+| **`curl` against the documented Arena bridge endpoint is still NOT a reliable reachability signal** | Unchanged since session 38/DN-09. Always attempt a real `bridge_send`. | DN-09 |
+| **Alpha's audit fully replaces Judgment Day when Arena responds — now proven across an entire session, not just a first successful try** | Five debates, five `CONSENSUS`/`APPROVE` outcomes, two of which needed one `APPROVE_WITH_CHANGES`→`COUNTER`→`CONSENSUS` round. No Judgment Day fallback was triggered at any point in session 40. | `GOVERNANCE.md` §3, DN-09, session 40 |
+| **A test harness substituting a lower-level composition for the literal production entry point named in `tasks.md` is sometimes the RIGHT call, not a corner cut** | PR-41's wrong-room test could not use `startDaemon` literally, because the real production composition root structurally cannot reach the mismatched-guard state the test needs to exercise (by design — the real path always derives both values from the same source). Debated with Alpha explicitly before merging rather than silently deviating from the block's own "Runtime harness" line; Alpha's audit is the record of that endorsement (`bus-v2-f1-pr-41-diff-audit-001`). **When a task's literal wording and the actual reachable state space of the real system disagree, that disagreement itself is worth a debate, not a silent choice either way.** | session 40 |
+| **Engram MCP `mem_save` may refuse** ("multiple active runtime sessions") | Use the CLI: `engram save "<title>" "<content>" --project connmuta --type <t> --topic <key> --scope <s>`. Confirmed working again this session. The MCP server also disconnected and reconnected mid-session once (transient) — a `/mcp` reconnect fixed it without any data loss. | sessions 27-40 |
+| **Sweep harness needs bounds** | `node --test --test-timeout=5000` and `spawnSync(..., {timeout: 150000, shell: false})`. Report `KILLED(TIMEOUT)` apart — a mutant that hangs the whole process (e.g. removing `ipcServer.close()`) IS a kill, just report it as timeout-killed rather than assertion-killed. | sessions 29-40 |
+| **`git add -N` — scope it, never `.`** | Always name the specific new files. | sessions 30-40 |
+| **Never run two build-invoking verification commands concurrently on this machine** | `npm test` and `npm run test:static` both call `tsc -b`. | sessions 37-40 |
+| **A parent's own record prose needs the same distrust as a subagent's** | Confirmed again this session in both directions: the parent independently re-verified every delegate claim before accepting it (and found one real bug delegates missed), AND the parent caught its own delegation-scope failure (the fork's Arena contact) only by checking `git log`, not by trusting a clean-looking `git status`. | sessions 31-40 |
+| **Commit messages** | No Co-Authored-By or AI attribution in commits; PR bodies end with the Claude Code line. | sessions 27-40 |
+| **CI flake B-39** | `heartbeat: ticks at periodMs` hit again this session (PR-40a's first CI run, Node 26 leg) — green on rerun, confirmed unrelated to the PR's own changes via `gh run view --log-failed`. Still intermittent, still not reproduced locally in a targeted way. | B-39, sessions 23-40 |
+| **`node --test` output is ANSI-coloured; failures use `✖`** | Strip ANSI before parsing if scripting against it. | sessions 9-40 |
 | **`dist/` staleness fakes results** | `rm -rf dist` before believing a surprising run. | sessions 11-17 |
-| **`node --test` output is ANSI-coloured; failures use `✖`** | Strip ANSI before parsing if scripting against it. | sessions 9-39 |
-| **CI flake B-39** | `heartbeat: ticks at periodMs` can fail a run; a different flaky IPC test hit once in session 38. Neither reproduced in CI across PR-23..PR-39 (every leg green on the first attempt again this session). | B-39 |
 | **Pronouns** | Refer to the Director by role, never with a gendered pronoun. | — |
 
 ---
 
 ## §5 — Next session, exact sequence
 
-1. **§0** commands; confirm 187/210. **Check Arena Orion reachability live** with a real `bridge_send`
-   attempt (not `curl`). Read [`../../AGENTS.md`](../../AGENTS.md) §1–§3, this file's §2 and §4, `tasks.md`'s
-   **PR-40 block**, and `design.md`'s §14 "Static security assertions" section in full (the table, not
-   this file's paraphrase of it).
-2. **Create the ODD feature doc** `odd/tasks/<feature>.md` (untracked, deleted at close) and its Engram
-   mirror, before the first write.
-3. **Branch** `f1/40-security-bundle-tables` from `main`. **Actually run `computeClosure` against the
-   real built `dist/src/client/main.js` and `dist/src/daemon/main.js`** (build first) before writing any
-   assertion that claims something about their shape — verify computationally, do not assume from
-   reading source. Then the pipeline (Arena debate if reachable, §2's Judgment Day fallback otherwise):
-   - **40.1 RED**, **40.2 GREEN**, **40.3 RED**, **40.4 GREEN**, **40.5 Verify**, **40.6 Docs** (read
-     `tasks.md`'s actual sub-task text directly).
-4. Audit per §2 (Arena or Judgment Day, whichever applies); merge.
-5. **Close**: rewrite this file for the next slice, prepend to [`LOG.md`](./LOG.md), sweep `AGENTS.md`'s
-   status line, `state.yaml` (use a `.cjs` script per §4's row; map every key's line/length first),
-   `docs/00-INDEX.md`'s backlog board row 10, and `docs/05-tribunal/INDEX.md`, delete `odd/`, save the
-   session summary to Engram (CLI fallback if the MCP server refuses), commit on `main`, push (retry a
-   plain `git fetch`/`push` once if it hits the same transient network fault as this session — verify via
-   `gh` that nothing actually failed before assuming a real problem), and hand the Director a ≤3-line
-   mini-prompt.
+1. **§0** commands; confirm 218/219. **Check Arena Orion reachability live** with a real `bridge_send`
+   attempt (not `curl`). Read [`../../AGENTS.md`](../../AGENTS.md) §1–§3 and this file's §2, §4, §6, §7.
+2. **Ask the Director the §2 question** (archive F1? start F2? both, what order?) — one question, then
+   stop and wait, per this project's own standing rule.
+3. Proceed per the Director's answer. If archiving: read the SDD orchestrator skill's archive-phase
+   section first, do not guess the mechanics. If starting F2: read `WORK-PLAN.md`'s F2 section in full,
+   then follow the normal SDD flow (explore → propose → spec → design → tasks) — F2 has not been touched
+   by any prior session, there is no partial state to reconcile.
+4. **Close**: same ritual as every prior session — rewrite this file, prepend to `LOG.md`, sweep
+   `AGENTS.md`'s status line, `state.yaml`, `docs/00-INDEX.md`'s backlog board, `docs/05-tribunal/INDEX.md`,
+   delete `odd/`, save the session summary to Engram (CLI fallback if the MCP server refuses), commit,
+   push, hand the Director a ≤3-line mini-prompt.
 
 ---
 
 ## §6 — Do not redo
 
-- Spec, design and tasks are gated and audited. Apply-time edits are **notes appended** to a block, never
-  rewrites of a gate's text — confirmed again this session (PR-39's own block gained an apply-time note
-  for the sixth file and the corrected RED/GREEN order, rather than rewriting the original Scope line).
-- **PR-01…PR-39 are complete; do not re-slice, re-audit or re-open them.** Units 4–11 are closed; unit 12
-  `static-assertions-plus-wrong-room-ci` is open with its first slice (PR-39) closed. A defect in a merged
-  module is its own slice with its own audit, not a drive-by edit (B-43, B-44, B-45, B-48, B-49, B-50,
-  B-51, B-52, B-53, B-54, B-55 wait for such slices).
-- **Settled in session 39**: `test/security/predicates.ts` owns the 7 detector predicates plus
-  `listJsFiles`/`relPosix`/`DIST_SRC_DIR`, all exported (v1 exported nothing since everything lived in
-  one file). `test/security/predicates.test.ts` is a byte-faithful AS-IS port of v1's 9 unit tests, no
-  logic changes. `test/security/closure.ts` owns `computeClosure(entryPath: string): Set<string>` — a
-  pure, self-contained (`node:fs`/`node:path` only) transitive relative-import walker; it does NOT import
-  from `predicates.ts` (a deliberate scope split — PR-40 is the one that wires `closure.ts`'s output
-  together with `predicates.ts`'s detectors against the real trees). `design.md:519`'s v1-range/verdict
-  citation for `predicates.ts` (`44-101`/`AS-IS`) is confirmed stale; the ratified, shipped, correct value
-  is `25-101`/`SEAM` (**B-55**, text-only fix deferred to the next `design.md` touch).
-- Provenance hash rule, registry and range conventions are ratified — §3. AS-IS is not exclusively for
-  whole-file copies — a range-extract can legitimately be AS-IS if its body needs zero modification
-  (confirmed this session with `predicates.test.ts`, matching the existing `tool-output.ts`/`tool-schemas.ts`
-  precedent already in `design.md` §12).
-- Doc-hygiene rule: never quote a matched-and-rejected secret-shaped literal in `apply-progress.md`.
-- `test/fakes/delivered-text.ts` is the home of `deliveredText`. TypeScript 7.0.2 needs `"types": ["node"]`.
-- `test:wrong-room` executes 0 tests and exits 0 until PR-41 wires the job.
-- **The general lesson from PR-31 through PR-38's own audits** (unchanged, still load-bearing): re-measure
-  any stated figure from the CURRENT tip immediately before writing it down; a missing top-level try/catch
-  on a new entry-point function is a repeat defect class; a real-child-process test exercises every
-  collaborator the real build depends on; the "narrow single-judge round-2 residual skips the second
-  round" precedent is gated on the round-2 finding's own severity, not the size of its fix.
-- **The general lesson from PR-39's own audit trail**: (1) a closed Arena debate is terminal — a new
-  decision point after CONSENSUS needs a new `conversation_id`; (2) reading a verification test's actual
-  code, not its prose gloss, can reveal a hard mechanical constraint neither the design doc nor the task
-  list states; (3) a survived mutant needs hand-traced invariant reasoning before being called a gap or
-  dismissed as equivalent — both conclusions need justification, not just the sweep's raw verdict; (4) a
-  bare filesystem `rm` on a `git add -N`'d path leaves a phantom entry that crashes a `git ls-files`-based
-  scanner — always re-register the deletion explicitly; (5) a relative `import.meta.url`-based path
-  constant copied from a vendored file must be re-derived for the new file's actual directory depth, not
-  assumed identical to the source's.
+- **F1's entire scope is closed.** Do not re-slice, re-audit, or re-open PR-01 through PR-42. A defect
+  found in a merged module is its own new slice with its own audit, exactly as this project has always
+  handled it (see B-43, B-44, B-45, B-48 through B-56 — all wait for such slices, all Director-owned).
+- **The daemon composition root now genuinely works end to end** (PR-40a): `startDaemon` mounts real
+  identity/session/tool routes, reconciles bindings against the registry at boot and on every heartbeat
+  tick with a real Telegram client and a real poller, and `stop()` tears all of it down cleanly. This was
+  NOT true before session 40 despite 15 prior PRs' worth of individually-tested, individually-audited
+  daemon modules — see §4's first row for why that happened and what it implies for any future subsystem
+  addition.
+- **PR-40 was re-sliced into PR-40a/PR-40b for a different reason than every prior re-slice** (PR-06,
+  PR-08, PR-09, PR-22 were all budget-overage re-slices, decided and disclosed at apply time). PR-40's
+  re-slice was a genuine missing-scope discovery (the wiring task was never named anywhere in `tasks.md`
+  from PR-32 through PR-42) found via Arena debate before any code was written. Both kinds of re-slice use
+  the same "apply-time note, never rewrite the gate's text" mechanic; they are not the same *kind* of
+  event, and a future session should not assume every re-slice is a budget story.
+- **PT-01's wrong-room test intentionally does not call `startDaemon`** — see §4's harness-choice row. Do
+  not "fix" this to literally match `tasks.md`'s original wording; it was a deliberate, debated, endorsed
+  choice, not an oversight.
+- **`test/security/predicates.ts`'s shared `hasUnboundedLoopReference` predicate does not match
+  `daemon/poller.ts`'s real `while (!signal.aborted)` loop shape** — disclosed as **B-56**, not fixed,
+  because `predicates.ts` is an already SEAM-audited module from PR-39 and widening it was out of PR-40b's
+  scope. A future session touching that predicate should read B-56 first.
+- **Design.md §14's table has three now-corrected-for staleness points** (B-56): the `child_process`
+  illustrative shape, the unbounded-loop shape, and the `sendMessage` transport list missing
+  `daemon/send/rate.ts`'s `RateLimitRecorder`. The shipped tests (`test/security/daemon-bundle.test.ts`)
+  are pinned against the REAL shapes; `design.md`'s own prose is left stale on purpose (gated document,
+  fixed at the next real `design.md` touch, same convention as B-55).
+- **The general lesson from session 40, stated once, load-bearing for any future session using forked
+  subagents for implementation work**: a fork sharing full parent tool access can take actions the brief
+  never explicitly forbade (contacting an external collaborator, committing) even when the brief's overall
+  intent clearly implied otherwise. Explicit tool-level prohibitions in the brief, plus a `git log` check
+  (not just `git status`) after every fork completion, are now this project's own standing practice —
+  apply both to any fork used in F2.
 
 ---
 
@@ -335,8 +195,9 @@ REAL, disclosed change exists in the body (never fabricate one purely to satisfy
 
 | Id | Point | Owner |
 |---|---|---|
+| **B-56** | `design.md` §14's static-assertion table has three stale claims against the shipped code (`child_process` illustrative shape, unbounded-loop shape, `sendMessage` transport list missing `rate.ts`). Text-only fix at the next `design.md` touch; optionally extend `predicates.ts`'s `hasUnboundedLoopReference` for the abort-driven loop shape, in its own slice. | Director |
 | **B-55** | `design.md`:519 cites the stale, pre-`bus-v2-f1-tasks-001` v1 range/verdict (`44-101`/`AS-IS`) for `test/security/predicates.ts`; the ratified ruling and the shipped code both correctly use `25-101`/`SEAM`. Text-only fix at the next `design.md` touch. | Director |
-| **B-54** | `daemon/bootstrap.ts`'s own `openLedger(...)` call site has the same unchecked-quarantine-status gap Judgment Day found and fixed in `migration/main.ts`. | Director |
+| **B-54** | `daemon/bootstrap.ts`'s own `openLedger(...)` call site has the same unchecked-quarantine-status gap Judgment Day found and fixed in `migration/main.ts`. Note: `bootstrap.ts` was substantially rewritten in PR-40a — re-check this gap still applies to the current file before scoping a fix. | Director |
 | **B-53** | `client/main.ts`'s `runMcpClient` cannot supply the real MCP host-application label; a disclosed fixed placeholder ships instead. | Director |
 | **B-52** | `shared/ipc-contract.ts`'s `toolSuccessSchema`/`ipcErrorSchema` are not cross-validated at the point `client/ipc-stub.ts` classifies a response by HTTP status alone. Not currently exploitable. | Director |
 | **B-51** | `client/handshake.ts` reuses the 70s long-poll `IPC_REQUEST_TIMEOUT_MS`, a latency concern not a correctness bug. | Director |
@@ -349,7 +210,7 @@ REAL, disclosed change exists in the body (never fabricate one purely to satisfy
 | **B-43** | `serve/thread.ts:204` still names v1's `agentbus_fetch`; `admission.ts`'s header points at a hashless fixture. | Director → Kairo |
 | **B-42** | SEAM `v1 body sha256` pins are not machine-checked. | Director |
 | **B-40 / B-41** | Design conditions with no contract (`poller_conflict`/`poller_rate_limited`; `secret_store_fallback`). | Director |
-| B-39 | CI (and local runs) intermittently red on wall-clock/network-timing tests; re-run once and record. | Director → Kairo |
+| B-39 | CI (and local runs) intermittently red on wall-clock/network-timing tests; hit again in session 40 (PR-40a's Node 26 leg), green on rerun, confirmed unrelated. Re-run once and record, as always. | Director → Kairo |
 | B-37 / B-38 | Cursor advance and peer-body columns carry no token guard; no receive-side scan in F1. | Director → Kairo |
 | B-22, B-32, B-36 | Advisory findings of earlier native reviews, recorded not actioned. | Director |
 | B-23…B-31, B-33…B-35 | Earlier audit follow-ups (see `CHECKLIST.md`). | as listed there |
@@ -362,23 +223,23 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 
 ## §8 — Environment facts not to re-measure
 
-- Machine: Windows 11, Node 24.16.0, npm 11.5, gentle-ai 3.0.2 CLI (update to 2.2.1 available for the
-  separate `engram` CLI — not yet applied, no functional impact observed), TypeScript 7.0.2, SQLite
-  3.53.0 via `node:sqlite`. **1054 tests** (1053 pass, 1 skip), `test:static` **18/18**. RDD **on** (global).
+- Machine: Windows 11, Node 24.16.0, npm 11.5, gentle-ai 3.0.2 CLI, TypeScript 7.0.2, SQLite 3.53.0 via
+  `node:sqlite`. **1084 tests** (1083 pass, 1 skip), `test:static` **43/43**, `test:wrong-room` **3/3**.
+  RDD **on** (global) but not exercised this session — every audit ran through the Arena/Alpha route
+  instead (DN-09), which this project's own established reading treats as a distinct, substitute
+  mechanism for the DN-05 audit obligation, separate from native `gentle-ai review`.
 - Line endings `eol=lf` via `.gitattributes`.
 - `os.tmpdir()` on this machine resolves to an 8.3 short path (`C:\Users\LABORA~1\...`).
-- Verification worktrees: `../telegram_bus_agent-worktrees/` — empty (not used this session; no
-  Judgment Day needed).
-- GitHub Actions: Node 24.15 and 26 matrix on pull requests (about 1m22s per leg this session).
+- Verification worktrees: `../telegram_bus_agent-worktrees/` — empty, not used this session (no Judgment
+  Day needed at any point).
+- GitHub Actions: Node 24.15 and 26 matrix on pull requests (~1m20-1m47s per leg this session).
 - `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`; branch `main`.
   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; **never `gh auth switch`**.
-  **New this session**: raw `git` network commands (`fetch`/`pull`/`push`) can transiently fail with a
-  libcurl-level DNS error even while `gh` keeps working — see §4's dedicated row; do not assume a real
-  outage without checking `gh`'s own view of the remote state first.
-- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**. No further v1 reads
-  needed for PR-40 (it adds no vendored file).
-- **Arena bridge is confirmed working end to end this session** (three real debates, all `CONSENSUS`) —
-  still check live at the start of every session; do not assume it stays up automatically.
-  `.mcp.json` points at `http://127.0.0.1:8766/mcp`. Never quote or commit its contents.
-- The Engram MCP server was reachable; `mem_save` refused with "multiple active runtime sessions" on the
-  first call (a known, long-standing condition) — the `engram` CLI fallback handled it without issue.
+- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**. Not read this session —
+  F1's last v1-vendoring slice was PR-39; no future F1 work touches v1 unless something in §6/§7 reopens.
+- **Arena bridge confirmed working end to end for a FULL session** (five real debates, all
+  `CONSENSUS`/`APPROVE`) — still check live at the start of every session; do not assume it stays up
+  automatically. `.mcp.json` points at `http://127.0.0.1:8766/mcp`. Never quote or commit its contents.
+- The Engram MCP server disconnected and reconnected once mid-session (transient, `/mcp` fixed it);
+  `mem_save` also separately refused once with "multiple active runtime sessions" (long-standing, known)
+  — the `engram` CLI fallback handled both without data loss.
