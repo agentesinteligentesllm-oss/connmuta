@@ -27,14 +27,18 @@ precondition failure.
 
 ## Step 1: dry run
 
-Run the command once with `--dry-run` to see what it would do, with no writes at all:
+Run the command once with `--dry-run` to see what it would do, without writing your migrated data
+anywhere:
 
 ```sh
 conmuta migrate-v1 --v1-home /path/to/.agentbus --dry-run
 ```
 
 This reports which secret store would hold the token, what backups would be created, and a
-summary of what would be written to the v2 ledger. Nothing on disk changes.
+summary of what would be written to the v2 ledger. None of your migrated data is written anywhere.
+The one exception: a self-cleaning secret-store probe (a write-read-delete round trip against a
+placeholder credential, never your bot's actual token) runs on every invocation, including a dry
+run, to detect an unusable credential store early.
 
 ## Step 2: migrate the bot (no project yet)
 
@@ -50,8 +54,9 @@ conmuta migrate-v1: migrated bot <bot_id> into <v2-home>
 
 This single run: backs up `config.json` and `state.json` in place (see "What gets backed up"
 below); stores the bot token in the OS keychain, or the ACL'd file fallback if the keychain is
-unavailable on this machine; and writes the bot, the group, the offsets row, and the imported
-threads into the v2 registry and ledger under `~/.conmuta`.
+unavailable on this machine; and writes the bot, the group, and the offsets row into the v2
+registry and ledger under `~/.conmuta`. **No thread history is imported yet** — thread import is
+keyed by project, so it only happens once a project is bound (step 3 below).
 
 If `config.json` has no `bot_token` field, add `--token-stdin` and pipe the token in instead — the
 token is never accepted as a command-line argument (it would be visible in process listings) and
@@ -87,10 +92,11 @@ conmuta migrate-v1: proposed conmuta.json for /abs/path/to/project (commit this 
 
 **This tool never writes into a repository.** Copy the printed JSON into `conmuta.json` at the
 project root yourself and commit it — assigning the project folder is deliberately a human action.
-If you migrated the bot without a project in step 2, you can re-run with `--project-id`/
-`--project-path` later to add the binding, as long as no project has been bound to that bot yet;
-adding a *second* project to an already-migrated bot is not supported by this build and is refused
-with a reason (hand-edit the registry instead — see "Hand-editing the registry" below).
+**Bind the project in the same run as the migration, if you want one at all.** This build refuses
+to add a project binding after the fact — even a first one — to a bot that has already been
+migrated; the refusal is unconditional, not limited to a *second* project. If you already migrated
+the bot without a project in step 2, adding one later via this command is not supported; hand-edit
+the registry instead (see "Hand-editing the registry" below).
 
 ## What gets backed up
 
@@ -132,7 +138,7 @@ since left the roster, expect them to be inert after migration rather than deliv
 
 ## Hand-editing the registry (until F2 ships project-management wizards)
 
-This build of `conmuta` has no interactive commands for adding a second project to an
+This build of `conmuta` has no interactive commands for adding a project — first or second — to an
 already-migrated bot, renaming a group, or similar registry edits — those wizards are planned for a
 later phase (F2). Until then, hand-editing `~/.conmuta/registry.json` directly is permitted (the
 registry is a human-owned file outside the daemon's own write path). Stop the daemon first
@@ -180,4 +186,4 @@ conmuta migrate-v1 [--v1-home <dir>] [--project-id <slug>] [--project-path <abs 
 | `--project-id <slug>` | Only with `--project-path` | Both or neither. |
 | `--project-path <abs dir>` | Only with `--project-id` | Must be an absolute path; the project directory itself does not need to exist yet. |
 | `--token-stdin` | No | Reads the bot token from stdin when `config.json` has no `bot_token`. Never pass a token as a plain argument or environment variable. |
-| `--dry-run` | No | Runs every check identically but performs no writes. |
+| `--dry-run` | No | Runs every check identically but performs no migration writes (a self-cleaning secret-store probe still runs — see step 1). |

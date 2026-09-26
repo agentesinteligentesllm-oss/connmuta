@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,10 @@ import { HOME_DIR_NAME } from "../../src/shared/constants.js";
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const CLI_ENTRY = join(REPO_ROOT, "dist/src/cli/main.js");
 const FIXTURE_DIR = join(REPO_ROOT, "test/fixtures/v1-home");
+
+// Matches the established convention in test/cli/main.test.ts and test/cli/validate.test.ts: fail
+// fast with an actionable message rather than a generic spawn error if dist/ is missing or stale.
+assert.ok(existsSync(CLI_ENTRY), `expected the built CLI at ${CLI_ENTRY}: run 'npm run build' first`);
 
 /** The fixture's `config.roster[config.agent_id].user_id` — becomes the migrated `bot_id`. */
 const FIXTURE_BOT_ID = 555000001;
@@ -189,7 +193,11 @@ test("fixture migrates with a synthesized registry and secret entry", async () =
 test("stale cursor carries forward without a false recovery claim", async () => {
   const homes = setupTempHomes();
   try {
-    // The fixture's state.last_fetch_at is already >24h stale by construction (see the fixture file).
+    // Note: the fixture's state.last_fetch_at happens to be >24h old, but that field is parsed and
+    // then never consumed anywhere in the migration path (loadV1State/synthesizeMigration/
+    // runMigration) — it plays no role in the assertions below. What actually proves "stale cursor,
+    // no false claim" is next_update_id's verbatim carry-forward and the absence of recovery
+    // language in the process's own output, both checked next.
     const result = spawnMigrateV1(homes);
     assert.equal(result.status, 0, `expected exit 0, got ${String(result.status)}: ${result.stderr}`);
 
