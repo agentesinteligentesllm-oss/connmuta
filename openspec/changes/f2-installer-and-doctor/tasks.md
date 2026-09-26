@@ -52,11 +52,11 @@ Scope: `package.json`, `npm-shrinkwrap.json`, `src/installer/constants.ts`, `tes
 Requirements: underlies every capability; design §3's ten named constants (`MCP_SERVER_NAME`, `EXIT_INSTALLER_REFUSED`, `EXIT_DOCTOR_FAILED`, `INSTALLER_LEDGER_BUSY_TIMEOUT_MS`, `BACKUP_SUFFIX_PREFIX`, `JSON_DEFAULT_INDENT`, `AGENTS_MD_MAX_LINES`, `AUTOSTART_RUN_KEY`, `AUTOSTART_VALUE_NAME`, `AUTOSTART_LAUNCHD_LABEL`, `DOCTOR_PROOF_LABEL`, `REGISTRY_REPLACE_ATTEMPTS`) each with the reasoning design already gives.
 Runtime harness: N/A — dependency pins and unit test over exported constants.
 
-- [ ] 1.1 Add exact-pinned `@clack/prompts`, `jsonc-parser`, `smol-toml` to `package.json`/`npm-shrinkwrap.json` (design §2.3; never ranges).
-- [ ] 1.2 RED: write a throwaway import-smoke test exercising `jsonc-parser`'s `modify`/`applyEdits` as named ESM imports from the built `dist` (design §16 risk: UMD/ESM `exports` map may fail named imports); if it fails, fall back to a default import and record the fallback here before continuing.
-- [ ] 1.3 RED: write `test/installer/constants.test.ts` asserting every constant in design §3 plus a collision check against no `shared/constants.ts` `EXIT_*` value.
-- [ ] 1.4 GREEN: implement `src/installer/constants.ts` with each constant carrying its design §3 reasoning as a doc comment (named-constant rule).
-- [ ] 1.5 Verify: `npm run build && node --test "dist/test/installer/constants.test.js"`.
+- [x] 1.1 Add exact-pinned `@clack/prompts`, `jsonc-parser`, `smol-toml` to `package.json`/`npm-shrinkwrap.json` (design §2.3; never ranges).
+- [x] 1.2 RED: write a throwaway import-smoke test exercising `jsonc-parser`'s `modify`/`applyEdits` as named ESM imports from the built `dist` (design §16 risk: UMD/ESM `exports` map may fail named imports); if it fails, fall back to a default import and record the fallback here before continuing. No fallback needed — named ESM imports resolved on the first try (`test/installer/jsonc-smoke.test.ts`).
+- [x] 1.3 RED: write `test/installer/constants.test.ts` asserting every constant in design §3 plus a collision check against no `shared/constants.ts` `EXIT_*` value.
+- [x] 1.4 GREEN: implement `src/installer/constants.ts` with each constant carrying its design §3 reasoning as a doc comment (named-constant rule).
+- [x] 1.5 Verify: `npm run build && node --test "dist/test/installer/constants.test.js"`.
 
 ### Unit 2 — Edit engine (D-32, D-36, D-45)
 

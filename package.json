@@ -24,12 +24,15 @@
     "test:wrong-room": "tsc -b && node --test \"dist/test/security/*wrong-room*\""
   },
   "dependencies": {
+    "@clack/prompts": "1.8.1",
     "@modelcontextprotocol/sdk": "1.30.0",
-    "zod": "4.6.5",
-    "@napi-rs/keyring": "2.1.0"
+    "@napi-rs/keyring": "2.1.0",
+    "jsonc-parser": "3.3.1",
+    "smol-toml": "1.9.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "typescript": "7.0.2",
-    "@types/node": "24.13.5"
+    "@types/node": "24.13.5",
+    "typescript": "7.0.2"
   }
 }

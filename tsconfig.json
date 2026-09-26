@@ -11,6 +11,7 @@
   "references": [
     { "path": "src/shared" },
     { "path": "src/cli" },
+    { "path": "src/installer" },
     { "path": "src/registry" },
     { "path": "src/ledger" },
     { "path": "src/secret-store" },

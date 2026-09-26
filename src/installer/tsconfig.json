@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../dist",
+    "tsBuildInfoFile": "../../dist/.tsbuildinfo/installer.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  // `../shared` is the only reference this unit needs: `installer/constants.ts` derives its own
+  // values from `PRODUCT_NAME` and `EXIT_VALIDATION_FAILED`.
+  "references": [{ "path": "../shared" }]
+}
