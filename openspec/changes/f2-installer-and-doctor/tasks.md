@@ -134,20 +134,34 @@ Runtime harness: integration test over the built `file-edit.js`/`formats/*.js`/`
 
 ### Unit 4 — Registry and project-file authoring (D-35, D-41)
 
-#### PR-06 — `registry/writer.ts` + `shared/project-file-writer.ts`
-Branch `f2/06-registry-project-writers` → `main`. Depends: PR-05. Size: ≈350 lines, no exception.
-Scope: `src/registry/writer.ts`, `src/shared/project-file-writer.ts`, `test/registry/writer.test.ts`, `test/shared/project-file-writer.test.ts`.
-Requirements: `registry-authoring › Registry writes are validate-before-replace`; `› conmuta.json writer writes identifiers only, write-if-absent or verify`.
-Runtime harness: unit tests over temp-dir registry/project files; reuses the existing `parseRegistryText`/`parseProjectFile` from F1.
+**Design estimated ≈350 authored lines for both writers in one slice; the real measured diff at apply
+time was 593 lines (136+168 for the registry writer+twin, 143+146 for the project-file writer+twin)
+— re-sliced here at the existing `registry/writer.ts` vs. `shared/project-file-writer.ts` module
+boundary (the two modules share no code and address two entirely different files, `registry.json`
+vs. `conmuta.json`), the same pattern PR-02's re-slice already used.**
 
-- [ ] 6.1 RED: `test/registry/writer.test.ts` — a valid change replaces the file atomically after passing schema + R1–R6; a change that would fail R1 leaves the on-disk file byte-identical and makes no partial write; `REGISTRY_REPLACE_ATTEMPTS` bounded retry on `EPERM`/`EBUSY` then refuse with the backup intact.
-- [ ] 6.2 GREEN: implement `registry/writer.ts` (`serializeRegistry`, `validateRegistryBytes`, `replaceRegistryFile`), pure of the ledger.
-- [ ] 6.3 RED: `test/shared/project-file-writer.test.ts` — absent file writes identifiers-only (`schema_version`, `project_id`, `group_id`, `roster`); an existing file matching the intended binding is left untouched and reported as already correct; an existing file disagreeing with the intended binding is refused, naming the disagreement, with no overwrite.
-- [ ] 6.4 GREEN: implement `shared/project-file-writer.ts` (`serializeProjectFile`, `verifyProjectFileMatches`), reusing `parseProjectFile`.
-- [ ] 6.5 Verify: `npm run build && node --test "dist/test/registry/writer.test.js" "dist/test/shared/project-file-writer.test.js"`.
+#### PR-06a — `registry/writer.ts`
+Branch `f2/06a-registry-writer` → `main`. Depends: PR-05. Size: 304 lines, no exception.
+Scope: `src/registry/writer.ts`, `test/registry/writer.test.ts`.
+Requirements: `registry-authoring › Registry writes are validate-before-replace`.
+Runtime harness: unit tests over temp-dir registry files; reuses the existing `parseRegistryText` from F1.
+
+- [x] 6a.1 RED: `test/registry/writer.test.ts` — a valid change replaces the file atomically after passing schema + R1-R3 (via `parseRegistryText`); a change that would fail R1 leaves the on-disk file byte-identical and makes no partial write; `REGISTRY_REPLACE_ATTEMPTS` bounded retry on a rename failure then refuses, original intact (no backup concept here, unlike `installer/file-edit.ts` — refusing simply means never renaming over the original); a `writeTemp` failure returns a typed `replace-failed` outcome instead of throwing raw (native review fix, `review-b3c7a8a705121e52`).
+- [x] 6a.2 GREEN: implement `registry/writer.ts` (`serializeRegistry`, `validateRegistryBytes`, `replaceRegistryFile`), pure of the ledger. `REGISTRY_REPLACE_ATTEMPTS` is a disclosed, exported duplicate of `installer/constants.ts`'s value (design §2.2's compile-unit table forbids the reverse import), pinned equal by its own test.
+- [x] 6a.3 Verify: `npm run build && node --test "dist/test/registry/writer.test.js"`.
+
+#### PR-06b — `shared/project-file-writer.ts`
+Branch `f2/06b-project-file-writer` → `main`. Depends: PR-06a. Size: 289 lines, no exception.
+Scope: `src/shared/project-file-writer.ts`, `test/shared/project-file-writer.test.ts`.
+Requirements: `registry-authoring › conmuta.json writer writes identifiers only, write-if-absent or verify`.
+Runtime harness: unit tests over temp-dir project files; reuses the existing `parseProjectFile` from F1.
+
+- [x] 6b.1 RED: `test/shared/project-file-writer.test.ts` — absent file writes identifiers-only (`schema_version`, `project_id`, `group_id`, `roster`); an existing file matching the intended binding (including a differently-ordered roster) is left untouched and reported as already correct; an existing file disagreeing with the intended binding is refused, naming the disagreement, with no overwrite; an unparseable existing file is refused as `"unparseable"`, never overwritten.
+- [x] 6b.2 GREEN: implement `shared/project-file-writer.ts` (`serializeProjectFile`, `verifyProjectFileMatches`, `writeProjectFile`), reusing `parseProjectFile`. Write-if-absent uses an exclusive (`wx`) write rather than an `exists()`-then-`write()` pair, closing a TOCTOU gap a native review found (`review-b3c7a8a705121e52`): a file created by another process between the check and the write would otherwise be silently overwritten.
+- [x] 6b.3 Verify: `npm run build && node --test "dist/test/shared/project-file-writer.test.js"`.
 
 #### PR-07 — `ledger-access.ts` + `registry-commit.ts` + `token-ref.ts`
-Branch `f2/07-registry-commit` → `main`. Depends: PR-06. Size: ≈350 lines, no exception.
+Branch `f2/07-registry-commit` → `main`. Depends: PR-06b. Size: ≈350 lines, no exception.
 Scope: `src/installer/ledger-access.ts`, `src/installer/registry-commit.ts`, `src/installer/token-ref.ts`, three test twins.
 Requirements: `registry-authoring › Every registry write is accompanied by an audit row`; underlies `installer-wizard › group add`/`project bind` writes; `secret-store › Installer writes a token through the existing secret-store API only` (token-ref half).
 Runtime harness: unit tests with an in-memory/temp ledger; the R6 audit-row assertion runs against a real `node:sqlite` file per D-41's evidence.
