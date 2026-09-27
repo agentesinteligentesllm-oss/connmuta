@@ -12,10 +12,15 @@
   // `../client` is re-added here in PR-32, its own first source file. `../migration` is added in
   // PR-37 for the same reason `../client` was: the `migrate-v1` branch's dynamic
   // `import("../migration/main.js")` needs the project referenced for `tsc -b` to resolve its types.
+  // `../installer` and `../registry` are added in PR-13 for the identical reason: the new
+  // `setup`/`bot`/`group`/`project` branch's dynamic imports of `../installer/*` (including
+  // `../installer/wizards/*`) and, inside `project bind`'s own input collection, `../registry/loader.js`.
   "references": [
     { "path": "../shared" },
     { "path": "../daemon" },
     { "path": "../client" },
-    { "path": "../migration" }
+    { "path": "../migration" },
+    { "path": "../installer" },
+    { "path": "../registry" }
   ]
 }
