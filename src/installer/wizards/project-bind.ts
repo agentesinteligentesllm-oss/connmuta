@@ -257,6 +257,12 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 		// throws a `FileEditRefusal`, which is not caught here and propagates out of this whole
 		// function — the existing, pre-D-52 behavior this PR does not change. A gitignore check is
 		// therefore only ever reached for a target whose write genuinely succeeded.
+		//
+		// `ensureGitignored` itself never throws (native review review-dab29630c76690a2,
+		// R4-ensureGitignored-unguarded-throw-partial-bind): unlike `editFile`'s load-bearing write,
+		// `.gitignore` coverage is best-effort hygiene, so a read/write failure there is caught inside
+		// `ensureGitignored` and reported via the `failed` result variant instead of aborting the rest
+		// of this loop — a target's own tool-config write already succeeded by the time it runs.
 		const outcome = editFile({
 			path: resolveToolConfigPath(options.targetDir, target),
 			adapter: adapterFor(target.relativePath),

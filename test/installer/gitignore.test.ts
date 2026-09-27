@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -122,6 +122,17 @@ test("a commented-out or negated line never counts as coverage", () => {
 
 		assert.deepEqual(result, { alreadyCovered: false, appendedLine: "/.cursor/mcp.json" });
 		assert.equal(readFileSync(join(projectDir, ".gitignore"), "utf8"), `${before}/.cursor/mcp.json\n`);
+	});
+});
+
+test("a .gitignore that cannot be read (e.g. a directory in its place) reports a caught failure instead of throwing", () => {
+	withTempProjectDir((projectDir) => {
+		mkdirSync(join(projectDir, ".gitignore"));
+
+		const result = ensureGitignored(projectDir, ".cursor/mcp.json");
+
+		assert.deepEqual(result.alreadyCovered, false);
+		assert.ok("failed" in result && result.failed);
 	});
 });
 

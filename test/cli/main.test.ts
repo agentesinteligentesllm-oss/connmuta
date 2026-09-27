@@ -509,3 +509,21 @@ test("reportProjectBindOutcome prints nothing extra when every gitignore entry w
   assert.deepEqual(captured.out, ["project bound: prj-example"]);
 });
 
+// A caught ensureGitignored failure (R4-ensureGitignored-unguarded-throw-partial-bind) is reported on
+// stderr rather than silently dropped or thrown, and the bind itself is still reported as successful:
+// the tool config for that target was already written before the gitignore step ran.
+test("reportProjectBindOutcome reports a failed gitignore update on stderr without failing the bind", () => {
+  const captured = makeIo();
+  const result: ProjectBindOutcome = {
+    outcome: "bound",
+    project_id: "prj-example",
+    toolConfigResults: new Map<ToolId, EditFileOutcome>([["claude-code", "created"]]),
+    gitignoreResults: new Map<ToolId, GitignoreCheckResult>([["claude-code", { alreadyCovered: false, failed: true, reason: "EACCES" }]]),
+    instructionFiles: { agentsMd: "created", claudeMd: "created" },
+  };
+
+  assert.equal(reportProjectBindOutcome(captured.io, result), 0);
+  assert.deepEqual(captured.out, ["project bound: prj-example"]);
+  assert.deepEqual(captured.err, [`${PRODUCT_NAME}: could not update .gitignore for claude-code: EACCES`]);
+});
+

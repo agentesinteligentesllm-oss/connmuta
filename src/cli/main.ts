@@ -257,9 +257,14 @@ export function reportProjectBindOutcome(io: CliIo, result: ProjectBindOutcome):
 		case "bound":
 			io.out(`project bound: ${result.project_id}`);
 			for (const [toolId, gitignoreResult] of result.gitignoreResults) {
-				if (!gitignoreResult.alreadyCovered) {
-					io.out(`${PRODUCT_NAME}: .gitignore updated (${toolId}): ${gitignoreResult.appendedLine}`);
+				if (gitignoreResult.alreadyCovered) {
+					continue;
 				}
+				if ("failed" in gitignoreResult) {
+					io.err(`${PRODUCT_NAME}: could not update .gitignore for ${toolId}: ${gitignoreResult.reason}`);
+					continue;
+				}
+				io.out(`${PRODUCT_NAME}: .gitignore updated (${toolId}): ${gitignoreResult.appendedLine}`);
 			}
 			return 0;
 		case "invariant-violated":

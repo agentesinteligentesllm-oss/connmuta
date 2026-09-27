@@ -22,13 +22,19 @@ import { join } from "node:path";
 /** Name of the file this module reads and appends to, directly under a project directory. */
 export const GITIGNORE_FILE_NAME = ".gitignore";
 
-/** What {@link ensureGitignored} decided. */
-export interface GitignoreCheckResult {
-	/** Whether `relativePath` was already covered by an existing `.gitignore` entry. */
-	readonly alreadyCovered: boolean;
-	/** The entry appended, when one was (absent when `alreadyCovered` is `true`). */
-	readonly appendedLine?: string;
-}
+/**
+ * What {@link ensureGitignored} decided: already covered, a new entry appended, or a read/write
+ * failure caught internally (native review `review-dab29630c76690a2`, R4-ensureGitignored-unguarded-
+ * throw-partial-bind — this call sits in `project-bind.ts`'s per-target loop, after the registry
+ * binding is already committed; an uncaught throw here would abort the loop mid-way, leaving later
+ * targets' tool configs unwritten with no disclosure to the caller. `.gitignore` coverage is a
+ * best-effort hygiene step, not the load-bearing write `editFile` performs for the same target, so a
+ * failure here is reported instead of propagated).
+ */
+export type GitignoreCheckResult =
+	| { readonly alreadyCovered: true }
+	| { readonly alreadyCovered: false; readonly appendedLine: string }
+	| { readonly alreadyCovered: false; readonly failed: true; readonly reason: string };
 
 /** Strips a line's own leading `/` and trailing `/` so it compares against a segment/segment-prefix. */
 function normalizeGitignoreLine(line: string): string {
@@ -80,7 +86,12 @@ export function isGitignoreCovered(gitignoreText: string, relativePath: string):
  */
 export function ensureGitignored(projectDir: string, relativePath: string): GitignoreCheckResult {
 	const gitignorePath = join(projectDir, GITIGNORE_FILE_NAME);
-	const currentText = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+	let currentText: string;
+	try {
+		currentText = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+	} catch (error) {
+		return { alreadyCovered: false, failed: true, reason: error instanceof Error ? error.message : String(error) };
+	}
 
 	if (isGitignoreCovered(currentText, relativePath)) {
 		return { alreadyCovered: true };
@@ -89,6 +100,10 @@ export function ensureGitignored(projectDir: string, relativePath: string): Giti
 	const appendedLine = `/${relativePath}`;
 	const needsLeadingNewline = currentText.length > 0 && !currentText.endsWith("\n");
 	const nextText = `${currentText}${needsLeadingNewline ? "\n" : ""}${appendedLine}\n`;
-	writeFileSync(gitignorePath, nextText, "utf8");
+	try {
+		writeFileSync(gitignorePath, nextText, "utf8");
+	} catch (error) {
+		return { alreadyCovered: false, failed: true, reason: error instanceof Error ? error.message : String(error) };
+	}
 	return { alreadyCovered: false, appendedLine };
 }
