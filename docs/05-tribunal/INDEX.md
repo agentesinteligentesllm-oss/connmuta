@@ -1202,6 +1202,66 @@ visible.
 
 ---
 
+## `bus-v2-f3-propose-audit-001` — F3 `sdd-propose` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 45) |
+| Subject | Audit `proposal.md` for `f3-web-panel-and-observability` (three new capabilities: `web-panel`, `roster-sync`, `version-observability`), formalizing the five decisions already locked in `bus-v2-f3-explore-decisions-001`. |
+| Authority | The Director, standing full autonomy for this session. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with 4 objections: (1) the shared Host/Origin/body-cap module was placed under `daemon/panel/*` while the proposal simultaneously claimed `daemon/ipc/server.ts` "stays untouched" — a real architectural contradiction; (2) roster-sync cited `registry/writer.ts`'s bare `replaceRegistryFile` (which never writes an audit row, per its own doc) instead of `installer/registry-commit.ts`'s one-transaction `commitRegistryChange`, opening an R6 crash window; (3) `src/cli/main.ts` was missing from Affected Areas despite needing new dispatch entries, and panel port/token discovery was unaddressed; (4) the Risks table omitted `test/security/daemon-bundle.test.ts`'s closed 7-file `node:fs` allow-list (PT-28), which a disk-reading panel module would fail. |
+| Round 2 | Kairo verified all 4 directly against the cited files (`writer.ts`, `registry-commit.ts`, `cli/main.ts`, `daemon-bundle.test.ts`) before accepting — all confirmed accurate. `proposal.md` corrected: shared module relocated to `daemon/transport/http-guards.ts` with `daemon/ipc/server.ts` marked Modified; roster-sync's Approach rewritten to use `commitRegistryChange` + a new `ROSTER_SYNCED` reason; `cli/main.ts` and `installer/registry-commit.ts` added to Affected Areas; the PT-28 risk added with an in-memory-asset mitigation. `CONSENSUS` sent round 2, all 4 objections accepted with evidence of the fix. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | `openspec/changes/f3-web-panel-and-observability/proposal.md` corrected and finalized as the baseline for spec/design. |
+
+---
+
+## `bus-v2-f3-spec-audit-001` — F3 `sdd-spec` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 45) |
+| Subject | Audit the three new full specs (`web-panel`, `roster-sync`, `version-observability` — 9 requirements, 19 scenarios after correction) built on the Alpha-corrected proposal. |
+| Authority | The Director, standing full autonomy for this session. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with 4 objections: (1) roster-sync's "remain unchanged indefinitely" scenario was unfalsifiable (ADR-12), and the spec lacked edge-case scenarios for an unbound project, an invalid/missing `conmuta.json`, and an operator declining confirmation; (2) web-panel's token requirement assumed an `Authorization` header even for the initial browser navigation (which cannot carry one) and its Origin requirement did not address the ordinary absence of an `Origin` header on a plain top-level `GET`; (3) the "no mutation route" scenario was a static route-table enumeration rather than an active HTTP probe, and the version-rendering scenario did not pin exactly where in the HTML the versions must appear; (4) all three specs lacked the `## Traceability` section every existing capability spec (`ipc-handshake`, `registry-authoring`, `daemon-lifecycle`) carries. |
+| Round 2 | Kairo verified all 4 (including a direct grep confirming the Traceability convention across three existing specs) before accepting. All three specs corrected: the heartbeat-tick-anchored falsifiable scenario plus 3 new edge-case scenarios added to roster-sync; a query-parameter token scenario and an absent-Origin-admitted scenario added to web-panel; the mutation scenario made an active HTTP probe; the version scenario pinned to the `<b>` header line, outside the blockquote; a `## Traceability` table added to all three. `CONSENSUS` sent round 2. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | `openspec/changes/f3-web-panel-and-observability/specs/{web-panel,roster-sync,version-observability}/spec.md` corrected and finalized. |
+
+---
+
+## `bus-v2-f3-design-audit-001` — F3 `sdd-design` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 45) |
+| Subject | Audit `design.md` — shared transport-guard extraction, panel discovery/token primitives, roster-sync's commit path, and the applicability-driven threat matrix. |
+| Authority | The Director, standing full autonomy for this session. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with 4 objections: (1) the sketched `GuardResult` type referenced `daemon/ipc/server.ts`'s `IpcResponse`, while `server.ts` would itself import `checkTransportGuards` from the same module — a real circular import; (2) marking the whole Threat Matrix `N/A` contradicted F2's own precedent (`archive/2026-09-27-f2-installer-and-doctor/design.md:275`, "Local process integration (`POST /doctor`)" marked Applicable) and ignored the panel's own local-process-integration boundary; (3) the Testing Strategy table omitted tests for `WIRE_VERSION`-vs-`PROTOCOL_SENTINEL` agreement, the exact `renderMessageHtml` placement, the heartbeat-tick non-auto-resolution, and the `conmuta panel` CLI, and its `node:fs` row's "extend the allow-list" wording risked the opposite of what the spec requires; (4) `bootstrap.ts`'s File Change row omitted the panel listener's shutdown/cleanup symmetry with the existing `ipcServer.close()`/`deleteRunFile` handling. |
+| Round 2 | Kairo verified all 4 directly (`ipc/server.ts`'s `IpcResponse` export, F2's archived design.md, `bootstrap.ts:300-325`) before accepting. `design.md` corrected: `http-guards.ts` now defines its own local `GuardRejection` shape with no import from `ipc/server.ts`; a "Local process integration (panel listener)" row added Applicable to the Threat Matrix, following F2's format; 4 Testing Strategy rows added and the `node:fs` row's wording fixed; the `bootstrap.ts` row now names the required shutdown symmetry. `CONSENSUS` sent round 2, alongside acceptance of Alpha's own answers to Kairo's 4 audit questions (single-token `PanelTokenStore` is correct for the read-only single-operator scope; no overlapping-tick hazard since the panel listener has no periodic work). |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | `openspec/changes/f3-web-panel-and-observability/design.md` corrected and finalized. |
+
+---
+
+## `bus-v2-f3-tasks-audit-001` — F3 `sdd-tasks` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 45) |
+| Subject | Audit `tasks.md` — 9 PR slices (stacked-to-main, auto-chain, ~2,850 authored lines forecast), the final SDD planning phase before `sdd-apply`. |
+| Authority | The Director, standing full autonomy for this session. |
+| Round 1 | Arena had a transient mid-session connectivity outage — several `bridge_send` calls returned `ETIMEDOUT` after 3 prior successful debates this same session; recovered on retry (disclosed, not silently absorbed; see `HANDOFF.md` §4). Once delivered, Alpha's `AUDIT` returned `APPROVE`, zero objections: strict-TDD ordering confirmed in every slice, the `daemon/ipc/server.ts`/`daemon/bootstrap.ts` own-slice isolation (PR-02/PR-05) confirmed correct, every spec scenario traced to a task, and PT-28's 7-file allow-list confirmed preserved (never extended) in PR-09. Alpha flagged PR-04's ~420-line estimate as worth re-slicing into PR-04a/PR-04b at apply time if the real diff exceeds 400 — an advisory, not a blocking objection. |
+| Round 2 | Not needed — a clean `AUDIT` with `APPROVE`/`objections: []` closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | `openspec/changes/f3-web-panel-and-observability/tasks.md` finalized. F3's SDD planning cycle (propose → spec → design → tasks) is complete; `sdd-apply` (PR-01 onward) is the next session's first job. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an

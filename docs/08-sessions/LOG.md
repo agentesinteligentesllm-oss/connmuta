@@ -4,6 +4,65 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 45 — F3 (`f3-web-panel-and-observability`) full SDD planning cycle: propose → spec → design → tasks
+
+- **Date**: 2026-09-27 (UTC).
+- **Authority**: the Director asked for `sdd-propose` to be started using F3's 5 already-locked
+  exploration decisions, with explicit full-session autonomy ("no quiero que me cuestiones
+  absolutamente nada... tienes toda mi autorización para que elijas tú"), and required Alpha to
+  rigorously audit every artifact produced.
+- **Arena verified live** with a real `bridge_send` before any planning work started (not `curl`,
+  per this project's own standing lesson) — confirmed reachable, and reachable again through 3
+  consecutive successful debates before a transient mid-session outage (see below).
+- **Tool defects hit and routed around, not silently absorbed**: native `sdd-propose`/`sdd-spec`/
+  `sdd-design`/`sdd-tasks` sub-agent dispatch was blocked all four times by the same
+  `PreToolUse:Agent` hook defect already documented for `sdd-explore` (session 44:
+  `"SDD child dispatch refused: parent-confirmed SDD preflight is missing, invalid, or
+  uncorroborated"`). This session additionally found the documented fallback's own fallback
+  (a `fork` agent) failing twice in a row — zero tool calls, a near-instant empty return, confirmed
+  by `openspec/changes/f3-web-panel-and-observability/proposal.md` genuinely not existing on disk
+  after each attempt — a second, distinct infra defect. All four phases were executed inline by
+  Kairo directly instead: read each phase's real skill files (`sdd-propose/SKILL.md`,
+  `sdd-spec/SKILL.md`, `sdd-design/SKILL.md`, `sdd-tasks/SKILL.md`, `sdd-phase-common.md`) and
+  followed them exactly (retrieval/persistence contracts, artifact templates, Engram save via the
+  `engram` CLI fallback since the MCP `mem_save` hit the recurring "multiple active runtime
+  sessions" error).
+- **`sdd-propose`** (`proposal.md`: three new capabilities — `web-panel`, `roster-sync`,
+  `version-observability`): Alpha's round-1 `AUDIT` in `bus-v2-f3-propose-audit-001` found
+  `APPROVE_WITH_CHANGES` with 4 real objections, each verified against the real source before
+  accepting — a shared-guard-module/`server.ts` location contradiction; roster-sync's original
+  `replaceRegistryFile`-only approach opening an R6 audit-atomicity crash window (fixed: reuse
+  `installer/registry-commit.ts`'s `commitRegistryChange` with a new `ROSTER_SYNCED` reason); a
+  missing `cli/main.ts` Affected Area and unaddressed panel port/token discovery; and a missing
+  PT-28 `node:fs`-bundle-allow-list risk. `CONSENSUS` round 2.
+- **`sdd-spec`** (3 new full specs, 9 requirements, 19 scenarios after correction): Alpha's round-1
+  `AUDIT` in `bus-v2-f3-spec-audit-001` found `APPROVE_WITH_CHANGES` with 4 objections — an
+  unfalsifiable roster-sync scenario (ADR-12) plus 3 missing edge cases (unbound project, invalid
+  `conmuta.json`, operator decline); a browser-token/absent-Origin gap in web-panel's transport
+  requirements; a static-enumeration mutation-refusal scenario needing to become an active HTTP
+  probe, plus an imprecise version-rendering assertion; and all three specs missing the
+  `## Traceability` section every existing capability spec carries (confirmed via direct grep
+  against `ipc-handshake`/`registry-authoring`/`daemon-lifecycle`). `CONSENSUS` round 2.
+- **`sdd-design`**: Alpha's round-1 `AUDIT` in `bus-v2-f3-design-audit-001` found
+  `APPROVE_WITH_CHANGES` with 4 objections — a real circular-import risk between the sketched
+  `daemon/transport/http-guards.ts` and `daemon/ipc/server.ts`'s `IpcResponse` type; an incorrect
+  blanket Threat-Matrix `N/A` disposition contradicting F2's own precedent (`archive/
+  2026-09-27-f2-installer-and-doctor/design.md:275`, "Local process integration" marked Applicable
+  for `POST /doctor`); 4 missing Testing Strategy rows plus misleading `node:fs`-allow-list wording;
+  and a missing panel-listener shutdown-lifecycle File Change. `CONSENSUS` round 2.
+- **`sdd-tasks`** (9 PR slices, stacked-to-main, auto-chain, ~2,850 authored lines forecast, Medium
+  400-line risk, PR-04 flagged at ~420 est. lines for possible apply-time re-slicing): Arena had a
+  transient mid-session connectivity outage during this debate — several `bridge_send` calls
+  returned `ETIMEDOUT` after 3 prior successful debates this same session; recovered on retry, not
+  silently absorbed. Alpha's `AUDIT` in `bus-v2-f3-tasks-audit-001` returned `APPROVE`, zero
+  objections, closing straight to `CONSENSUS` in round 1.
+- **Outcome**: F3's SDD planning cycle (propose → spec → design → tasks) is complete, every phase
+  Alpha-audited to `CONSENSUS`. `sdd-apply` (PR-01 onward) is the next session's first job.
+- **Documentation closed out this session**: `AGENTS.md` status paragraph, `docs/00-INDEX.md` (row
+  13 added, row 12 marked superseded), `docs/05-tribunal/INDEX.md` (4 new debate entries),
+  `openspec/changes/f3-web-panel-and-observability/state.yaml` (propose/spec/design/tasks marked
+  done with per-phase notes), this log entry, and `HANDOFF.md`.
+
 ## Session 44 — F2 status reconciliation (B-91/B-92); F3 (`f3-web-panel-and-observability`) exploration + 5 decisions
 
 - **Date**: 2026-09-27 (UTC).

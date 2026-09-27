@@ -31,15 +31,73 @@ phases:
   research:
     status: unselected
   propose:
-    status: pending
+    status: done
+    artifact: proposal.md
+    engram_topic: sdd/f3-web-panel-and-observability/proposal
+    completed_at: "2026-09-27"
+    note: >
+      Native sdd-propose sub-agent dispatch was blocked by the same PreToolUse:Agent hook
+      defect as explore (see explore's note above), and this session's fork delegation
+      ALSO failed twice in a row (0 tool calls, near-instant return — a new, distinct
+      infra defect, not the SDD hook). Executed inline by Kairo directly, reading
+      sdd-propose/SKILL.md and sdd-phase-common.md and following them exactly. Audited
+      by Alpha in bus-v2-f3-propose-audit-001 (round 1 AUDIT: APPROVE_WITH_CHANGES, 4
+      objections — a shared-module/server.ts location contradiction, an R6 atomicity gap
+      in roster-sync's original replaceRegistryFile-only approach, a missing cli/main.ts
+      Affected Area, and a missing PT-28 node:fs bundle risk; all 4 verified against the
+      real files and fixed; round 2 CONSENSUS).
   spec:
-    status: pending
+    status: done
+    artifact: specs/{web-panel,roster-sync,version-observability}/spec.md
+    engram_topic: sdd/f3-web-panel-and-observability/spec
+    completed_at: "2026-09-27"
+    note: >
+      Three new full specs (9 requirements, 19 scenarios) for the three New Capabilities
+      from proposal.md; no Modified Capabilities. Executed inline (same fork-delegation
+      defect as propose). Audited by Alpha in bus-v2-f3-spec-audit-001 (round 1 AUDIT:
+      APPROVE_WITH_CHANGES, 4 objections — an unfalsifiable roster-sync scenario plus
+      missing edge cases, a missing browser-token/Origin-absent nuance in web-panel, a
+      static-vs-active mutation-refusal scenario plus imprecise version-rendering
+      assertion, and a missing Traceability section in all three specs; all 4 verified
+      and fixed; round 2 CONSENSUS).
   design:
-    status: pending
+    status: done
+    artifact: design.md
+    engram_topic: sdd/f3-web-panel-and-observability/design
+    completed_at: "2026-09-27"
+    note: >
+      Executed inline (same fork-delegation defect). Threat Matrix template rows are N/A
+      (no shell/subprocess/VCS-PR-automation) but a locally-relevant "Local process
+      integration (panel listener)" row was added Applicable, following F2's own
+      precedent for POST /doctor. Audited by Alpha in bus-v2-f3-design-audit-001 (round 1
+      AUDIT: APPROVE_WITH_CHANGES, 4 objections — a real circular-import risk in the
+      GuardResult/IpcResponse interface sketch, an incorrect blanket Threat-Matrix N/A
+      disposition, 4 missing Testing Strategy rows plus a misleading node:fs allow-list
+      wording, and a missing panel-listener shutdown-lifecycle File Change; all 4
+      verified against real files including F2's archived design.md and fixed; round 2
+      CONSENSUS).
   tasks:
-    status: pending
+    status: done
+    artifact: tasks.md
+    engram_topic: sdd/f3-web-panel-and-observability/tasks
+    completed_at: "2026-09-27"
+    note: >
+      9 PR slices, stacked-to-main, auto-chain, ~2,850 authored lines forecast (Medium
+      400-line risk, no size:exception planned upfront; PR-04 flagged at ~420 est. lines
+      for possible apply-time re-slicing). Own-slice rule applied to daemon/ipc/server.ts
+      (PR-02) and daemon/bootstrap.ts (PR-05); cli/main.ts's two new dispatch entries are
+      each bundled with their own new CLI file's PR (PR-06, PR-07) rather than isolated,
+      a disclosed precedent read (closer to PR-17's daemon-stop.ts+main.ts shape than
+      F2's PR-13 bulk-dispatch isolation). Audited by Alpha in bus-v2-f3-tasks-audit-001
+      (Arena had a transient mid-session connectivity outage — several bridge_send
+      ETIMEDOUTs after 3 prior successful debates this session; recovered on retry).
+      Round 1 AUDIT: APPROVE, zero objections, closed straight to CONSENSUS.
   apply:
     status: pending
+    note: >
+      Deferred to a future session per this session's own scope (finish the SDD
+      planning cycle — propose through tasks — not implementation). PR-01 is the next
+      slice; see tasks.md.
   verify:
     status: pending
   archive:

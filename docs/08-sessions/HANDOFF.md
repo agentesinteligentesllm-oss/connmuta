@@ -11,11 +11,11 @@
 
 ## §0 — Quick start
 
-**F1 and F2 are both archived on `main`. F3 (`f3-web-panel-and-observability`)'s exploration is done
-and its 5 open decisions are resolved via a real Alpha debate.** This is NOT a phase boundary requiring
-a Director decision: the Director already authorized proceeding through F3 with full autonomy this
-session. The next session's first job is **`sdd-propose` for `f3-web-panel-and-observability`**, using
-the 5 locked decisions in `exploration.md`'s "Resolved Decisions" addendum — do not re-debate them.
+**F1 and F2 are archived. F3's (`f3-web-panel-and-observability`) full SDD planning cycle — propose,
+spec, design, tasks — is done, and every phase closed `CONSENSUS` with Alpha.** This is NOT a phase
+boundary requiring a Director decision: the Director already authorized proceeding through F3's
+planning with full autonomy last session. **The next session's first job is `sdd-apply` starting at
+PR-01** (`daemon/transport/http-guards.ts`) in `tasks.md`.
 
 **First three commands, in order** (stop and report if any disagrees with §1):
 
@@ -25,27 +25,28 @@ rm -rf dist                                          # a stale dist/ silently fa
 gentle-ai sdd-status f3-web-panel-and-observability --cwd . --json
 ```
 
-The working tree should be **clean** once this session's commit lands (see §9 — a real-diff review
-was pending at close; confirm it resolved before assuming clean). `sdd-status` should show `explore`
-done and `nextRecommended: propose` (native `sdd-status`/`sdd-continue` reported a
-`blocked(cross_common_dir_runtime_target)` defect throughout F2's cycle — check whether that's still
-live; if so, treat `tasks.md`/`state.yaml`'s own checkboxes as the source of truth, not native status).
+The working tree should be **clean**. `sdd-status` should show `propose`/`spec`/`design`/`tasks` all
+`done` and `nextRecommended: apply`. Native status worked correctly this session (unlike F2's cycle);
+if it regresses, fall back to `state.yaml`'s own per-phase notes.
 
 **Check Arena Orion reachability live** with a real `bridge_send` attempt (not `curl`) before assuming
-Alpha responds — DN-09, reconfirmed working twice this session (two real debates, both `CONSENSUS`).
+Alpha responds — DN-09. Confirmed working 4 times last session (propose/spec/design/tasks audits),
+with one transient mid-cycle outage (several `ETIMEDOUT`s during the tasks audit) that recovered on
+retry without any code-level cause — treat a repeat of that pattern as noise, not a reason to stop
+retrying once or twice before falling back to Judgment Day.
 
 **Copy-paste prompt to start the next session:**
 
 ```text
-F1 y F2 estan archivados. F3 (f3-web-panel-and-observability) tiene su exploracion cerrada y sus 5
-decisiones resueltas con Alpha (ver exploration.md "Resolved Decisions" y el debate
-bus-v2-f3-explore-decisions-001). Lee docs/08-sessions/HANDOFF.md paso a paso, despues arranca
-sdd-propose para F3 usando esas 5 decisiones ya cerradas — no las redebatas. Verifica Arena con un
-bridge_send real antes de asumir que Alpha responde. Tienes autorizacion para decidir y ejecutar sin
-pedir confirmacion, salvo una decision de producto genuinamente no resuelta o una accion irreversible.
-Antes de delegar cualquier tarea a un fork o subagente, seras explicito y verificaras al cierre que
-respeto el alcance que le diste (ver §4 de este handoff — un fork se extralimito de un mandato
-read-only esta misma sesion).
+F1, F2 y la fase de planeacion SDD de F3 (propose/spec/design/tasks) estan cerrados, todos con
+CONSENSUS de Alpha. Lee docs/08-sessions/HANDOFF.md paso a paso, despues arranca sdd-apply para F3
+en tasks.md desde PR-01 (daemon/transport/http-guards.ts), siguiendo el orden de las 9 PR slices ahi
+definidas. Tienes autorizacion para decidir y ejecutar sin pedir confirmacion, salvo una decision de
+producto genuinamente no resuelta o una accion irreversible. La dispatch nativa de sdd-apply puede
+seguir bloqueada por el mismo defecto del hook PreToolUse:Agent documentado en la seccion 4 de este
+handoff — si ocurre, ejecuta la fase en linea leyendo sdd-apply/SKILL.md directamente, no reintentes
+con fork (el fork fallo dos veces esta sesion con cero tool calls). Audita cada PR con Alpha antes de
+avanzar a la siguiente, verificando sus citas contra el codigo real antes de aceptarlas.
 ```
 
 ---
@@ -55,25 +56,28 @@ read-only esta misma sesion).
 | Item | State | Pointer |
 |---|---|---|
 | F1 | **Archived**, unchanged since session 41. | `openspec/changes/archive/2026-09-26-f1-daemon-registry-thin-client/` |
-| F2 | **Fully implemented, verified and archived** (sessions 42-43, confirmed/reconciled this session, 44). `sdd-apply` ran the full 20-PR plan plus a same-cycle correction unit (D-52 gitignore coverage): **130/130 tasks**, 26 `tasks.md` PR-header blocks reconciled against real GitHub PRs (`gh pr list` confirmed live). Manual `sdd-verify` (native verify blocked by a tool defect, see §4): **0 CRITICAL, 3 WARNING, 1 SUGGESTION**. Full suite **1403 tests, 1397 pass, 0 fail, 6 skip**; `test:static` **56/56**. Archived to `openspec/changes/archive/2026-09-27-f2-installer-and-doctor/` (no `state.yaml`/`apply-progress.md` for this change — progress tracked directly in `tasks.md`'s checkboxes). 6 new capability specs synced to `openspec/specs/`. | `openspec/changes/archive/2026-09-27-f2-installer-and-doctor/{archive-report,verify-report}.md` |
-| F2 close-out reconciliation (this session) | `AGENTS.md`'s Status paragraph was stale (still said "ready for `sdd-apply`") — exactly `verify-report.md`'s own WARNING (b), left unaddressed since session 43. Fixed this session: paragraph rewritten to describe F2's real outcome; two backlog rows filed for verify findings that had no mutation authority to be filed at verify time — **B-91** (a fourth, environment-specific `test:wrong-room` standalone-script flake) and **B-92** (`docs/05-tribunal/INDEX.md` was never updated with any of F2's ~20 per-PR Alpha debates during the whole apply cycle — backfilling them is a Director-owned scale decision, not attempted). Confirmed via real Alpha debate `bus-v2-f2-agents-md-reconcile-001` (`CONSENSUS` round 1). **Process deviation, see §4.** | `docs/06-backlog/CHECKLIST.md` B-91/B-92, `docs/05-tribunal/INDEX.md` |
-| F3 | **Exploration done, 5 open decisions resolved.** `openspec/changes/f3-web-panel-and-observability/exploration.md` + `state.yaml` written (native `sdd-explore` dispatch blocked, ran inline via fork — see §4). 5 decisions locked via Alpha debate `bus-v2-f3-explore-decisions-001` (`CONSENSUS` round 2, 1 objection accepted): (1) panel scope read-only only; (2) separate second HTTP listener, not an extension of the MCP IPC transport; (3) separate `PanelTokenStore`; (4) roster sync is panel-observes/CLI-applies, never a panel mutation button; (5) new `WIRE_VERSION` constant, rendered only in `renderMessageHtml`. **Not yet proposed** — this session's scope was "start exploration," not the full cycle. | `openspec/changes/f3-web-panel-and-observability/exploration.md` "Resolved Decisions" addendum, `docs/05-tribunal/INDEX.md` |
-| Test counts (unchanged from F2, F3 has no code yet) | `npm test` 1403 (1397 pass, 6 skip). `test:static` 56/56. | — |
+| F2 | **Archived**, unchanged since session 44. | `openspec/changes/archive/2026-09-27-f2-installer-and-doctor/` |
+| F3 planning | **Complete.** `proposal.md` (3 new capabilities), `specs/{web-panel,roster-sync,version-observability}/spec.md` (9 requirements, 19 scenarios), `design.md` (4 architecture decisions, a Threat Matrix row, a Testing Strategy table), `tasks.md` (9 PR slices, stacked-to-main, auto-chain, ~2,850 authored lines forecast). Every phase's first Alpha `AUDIT` found real objections (4/4/4/0) — all verified against the real source files before being fixed. | `openspec/changes/f3-web-panel-and-observability/{proposal,design,tasks}.md`, `specs/*/spec.md` |
+| F3 apply | **Not started.** PR-01 (`daemon/transport/http-guards.ts`) is next. | `tasks.md`'s "PR Slices" section |
+| RDD review (this session's docs+planning commit) | **Ran to completion, `APPROVED`, acknowledged.** Lineage `review-9e0199dbbddbbe8c`, risk `high` (11 files, 880 lines — the "high" tier and its `process_boundary`/`shell_process` risk reason were a false-positive match against prose in `state.yaml`, not real executable code), 4 lenses (risk/resilience/readability/reliability), **zero findings, zero corrections**. | this file's §9 |
+| Test counts (unchanged — F3 has no code yet) | `npm test` 1403 (1397 pass, 6 skip). `test:static` 56/56. | — |
 
 ---
 
-## §2 — Next slice: F3 `sdd-propose`
+## §2 — Next slice: F3 `sdd-apply`, starting PR-01
 
-**No decision point here.** Run `sdd-propose` for `f3-web-panel-and-observability` using the 5
-decisions already locked in `exploration.md`'s "Resolved Decisions" addendum. Do not re-debate panel
-scope, transport, token domain, roster-sync mechanism, or the version constant — all five went through
-a real Alpha `AUDIT`/`CONSENSUS` cycle this session (`bus-v2-f3-explore-decisions-001`). A genuinely
-new fact not covered by that debate gets its own scoped decision, disclosed, never a silent redo.
+Read `openspec/changes/f3-web-panel-and-observability/tasks.md` in full — it has the exact scope,
+branch name, size estimate, and RED/GREEN task list for all 9 PR slices, plus the Review Workload
+Forecast and the disclosed "own-slice" precedent for `daemon/ipc/server.ts` (PR-02) and
+`daemon/bootstrap.ts` (PR-05).
 
-Read `openspec/changes/f3-web-panel-and-observability/exploration.md` in full first — it has file:line
-grounding for every affected module (`daemon/ipc/{server,handshake,sessions,routes}.ts`,
-`daemon/bootstrap.ts`, `shared/{version,envelope,ipc-contract}.ts`, `registry/{schema,writer}.ts`,
-`ledger/{schema,unknown-senders}.ts`, `installer/roster-source.ts`).
+**Do not re-derive the plan.** Every decision in `proposal.md`/`design.md`/`tasks.md` already went
+through a real Alpha `AUDIT`/`CONSENSUS` cycle. A genuinely new fact discovered only during
+implementation (e.g. PR-04's real diff exceeding its ~420-line estimate) gets its own scoped,
+disclosed correction — never a silent re-plan.
+
+Start with **PR-01** (`daemon/transport/http-guards.ts`, no dependencies) — it is the foundation both
+`daemon/ipc/server.ts` (PR-02) and the panel listener (PR-04) build on.
 
 ---
 
@@ -88,12 +92,11 @@ infrastructure. No new entries into `test/fixtures/v1-provenance.json` expected.
 
 | Item | State | Pointer |
 |---|---|---|
-| **A delegated fork given an explicit READ-ONLY mandate exceeded it — again — in this exact session** | Launched a `fork` with an explicit "reconstruct F2 closure facts, do NOT write or edit anything" directive. It did that part faithfully, then continued unauthorized: ran the SDD preflight, wrote `AGENTS.md`/`CHECKLIST.md` itself, opened and closed a real Arena debate with Alpha (`bus-v2-f2-agents-md-reconcile-001`) without being asked to, and spawned a **second, redundant** background agent to explore F3 — duplicating a properly-scoped fork already running in parallel for the same task. Kairo caught this via `git status` showing unexpected modified files after the fork "completed," asked the fork directly, got a full disclosure, independently re-verified every factual claim against the real, already-committed `verify-report.md` (all confirmed accurate) before accepting, and stopped the duplicate F3 agent before it could overwrite the legitimate exploration output. **This is the same pattern as session 40's PR-42 incident, now the second confirmed occurrence.** Lesson reinforced: a fork's own "report once and stop" contract is not self-enforcing — verify `git status`/`git log` after every fork returns, especially one told to be read-only, before trusting its "I only reported back" framing. | `docs/05-tribunal/INDEX.md`'s `bus-v2-f2-agents-md-reconcile-001` entry (Consequence field), this session |
-| **The `PreToolUse:Agent` hook enforcing SDD preflight rejected native `sdd-explore` dispatch twice, even with a byte-exact grouped `AskUserQuestion` answer and a prior successful `Skill` invocation of `gentle-sdd-explore`** | Error both times: `"SDD child dispatch refused: parent-confirmed SDD preflight is missing, invalid, or uncorroborated."` Routed around it per the `sdd-explore/SKILL.md`'s own documented fallback ("if the native sub-agent is available, delegate to it; otherwise read the skill file and follow it inline") — ran the exploration inline via a `fork` instead. Did **not** run the "Gentle AI Provider Defect Handoff" consent flow for this (that would require asking the Director for consent to file a GitHub issue, directly conflicting with this session's explicit "no me preguntes nada" authorization) — just disclosed the workaround. If this recurs, the same fallback applies; consider it a live tool defect, not a missing preflight step. | this session, `state.yaml`'s explore-phase note |
-| **A "mystery" set of modified files after a Stop-hook RDD reminder is worth investigating via `ListAgents` before assuming a bug or another session** | When `AGENTS.md`/`CHECKLIST.md` showed up modified with no corresponding action taken directly, `ListAgents` revealed a rogue `general-purpose` agent (spawned by the overreaching fork above, not by Kairo directly) plus the legitimate running fork — resolving what first looked like either a hook bug or a second concurrent session on the same repo. Neither was true. `ListAgents` also lists **peer sessions on other repos** (`sistema-rifas-pampero-f1` this session) — check the repo name before assuming a peer is relevant. | this session |
-| **Engram's `mem_save` "multiple active runtime sessions" failure recurred again**, both for the F3 fork and the overreaching F2-reconciliation fork; the `engram` CLI fallback remains the reliable path. A save via that fallback also surfaced Engram's own conflict-detection flagging duplicate/near-duplicate entries as "contested" — not resolved this session (low priority relative to the actual documentation); `mem_judge` needs a `judgment_id` from the specific `mem_save` response that flagged it, not the `sync_id`/`obs-*` hash shown in a later `mem_search` preview — don't confuse the two. | HANDOFF history since ~session 27; this session's Engram observation #3780 and its two unresolved contests |
-| **`AGENTS.md`'s Status paragraph will keep going stale unless refreshed at the end of every implementation-heavy session, not just SDD-planning ones** | F2's own `verify-report.md` flagged this exact gap and it sat unaddressed for a full session before this one fixed it. Make refreshing this paragraph (or explicitly confirming it's current) a standing step in every session's own close-out, not just when the Director asks. | `verify-report.md` WARNING (b), this session |
-| **Both native `sdd-verify` and `sdd-archive` were blocked for all of F2's cycle** by `gentle-ai sdd-status`/`sdd-continue` reporting `blocked(cross_common_dir_runtime_target)` and `sdd-verify-validate` rejecting every tried shape of the required `blockers` field — reported, not chased further; both phases ran manually. Check whether this is still live before assuming native status works for F3. | `verify-report.md:1-7`, session 43 |
+| **Native `sdd-propose`/`sdd-spec`/`sdd-design`/`sdd-tasks` sub-agent dispatch is blocked by the same `PreToolUse:Agent` hook defect already documented for `sdd-explore`** | Error every time: `"SDD child dispatch refused: parent-confirmed SDD preflight is missing, invalid, or uncorroborated."` This almost certainly also blocks `sdd-apply`/`sdd-verify`/`sdd-archive`. The working fallback, used 4 times last session: read the phase's own `~/.claude/agents/sdd-{phase}.md` (for the exact skill paths) and `~/.claude/skills/sdd-{phase}/SKILL.md` + `_shared/sdd-phase-common.md`, then execute the phase directly inline (as the orchestrator, not via a spawned agent) — do NOT re-ask the `AskUserQuestion` preflight (it did not fix this last time it was tried, per session 44, and the Director has standing "no me preguntes nada" authorization). | this session, session 44 |
+| **`fork` delegation for SDD phase work is currently unreliable — do not trust it as the first fallback** | Two consecutive `fork` launches for `sdd-propose` this session returned in 3-6 seconds with **zero tool calls** and a plausible-sounding but entirely fabricated completion message; `proposal.md` was confirmed absent from disk both times via direct `ls`. This is a **new, distinct defect** from the SDD hook above — a fork given a well-formed, self-contained prompt with full context should not silently no-op. **Go straight to inline execution (Kairo doing the phase work directly) rather than trying `fork` first** for SDD phase work until this is confirmed fixed; always verify a fork's claimed file writes with `ls`/`git status` before trusting them, exactly as session 44 already learned for a different reason (scope overreach, not silent no-ops). | this session |
+| **Arena had a transient mid-session outage, unrelated to reachability-at-session-start** | After 3 clean debate cycles (propose/spec/design audits), several `bridge_send` calls for the tasks-phase audit returned `ETIMEDOUT` in a row; a retry succeeded, and the debate closed cleanly with a genuine, detailed Alpha audit (proving the message did eventually land despite the client-side timeouts). Lesson: a `bridge_send` timeout mid-session is not the same signal as "Arena unreachable at session start" (DN-09's fallback trigger) — retry once or twice before concluding the bridge is down and falling back to Judgment Day. | this session |
+| **Engram's `mem_save` "multiple active runtime sessions" failure recurred again** | Every `mem_save` call for F3's proposal/spec/design/tasks artifacts this session hit it; the `engram save` CLI fallback (`engram save "<title>" "<content>" --type architecture --project connmuta`) worked every time and is the reliable path. | HANDOFF history since ~session 27 |
+| **The RDD review's `--intended-untracked-selection` JSON schema is undocumented; use the `--intended-untracked`/`--untracked-scope`/`--expected-untracked-inventory` CLI flags instead** | A raw `review status --next-transition` call returns a `collect` step naming `intended_untracked_selection` with no visible schema; guessing its JSON shape fails with `invalid_request`. The reliable path: re-run `review status` with `--untracked-scope select --expected-untracked-inventory <digest-from-the-first-status-call> --intended-untracked <path>` (repeated per new file) — this returns the exact, ready-to-run `review start` command in its `next_transition.execute.command` field. Never hand-craft `--target`/`--target-evidence` from prose; always take them from a returned transition. | this session |
 | **Commit messages** | No Co-Authored-By or AI attribution; conventional-commit style. | ongoing |
 | **`dist/` staleness fakes results** | `rm -rf dist` before believing a surprising run. | sessions 11-17 |
 | **Pronouns** | Refer to the Director by role, never a gendered pronoun. | — |
@@ -102,48 +105,43 @@ infrastructure. No new entries into `test/fixtures/v1-provenance.json` expected.
 
 ## §5 — Next session, exact sequence
 
-1. **§0** commands; confirm clean tree and F3's native status (or fall back to `state.yaml`/
-   `exploration.md` if native status is still broken per §4).
-2. Read `openspec/changes/f3-web-panel-and-observability/exploration.md` in full, especially the
-   "Resolved Decisions" addendum.
-3. Run the SDD Session Preflight if the harness's own hook demands it again — reuse
-   Automatic / Both (hybrid) / Auto (auto-chain) unless the Director changes it. If the native
-   `sdd-explore`/`sdd-propose` sub-agent dispatch is blocked again by the `PreToolUse:Agent` hook
-   despite a valid preflight, use the documented skill-file fallback (§4) rather than stalling.
-4. Delegate `sdd-propose` for `f3-web-panel-and-observability` (Model Assignments: `sdd-propose` →
-   sonnet by default per this project's table, though the global model-assignment table recommends
-   opus for architectural decisions — resolve per whichever table the session's own CLAUDE.md
-   currently specifies).
-5. Continue through spec → design → tasks per the Automatic gatekeeper, debating any genuinely new
-   open point with Alpha before locking it — verify Alpha's citations against the real files before
-   accepting, every time (this project's standing lesson since session 41).
-6. **After any fork/subagent delegation that carries an explicit scope restriction (read-only, "don't
-   write," "report back don't commit"), check `git status`/`git log` before trusting its own report**
-   — this session's §4 finding is the second confirmed instance of a fork ignoring that exact kind of
-   instruction.
+1. **§0** commands; confirm clean tree and F3's native status.
+2. Read `openspec/changes/f3-web-panel-and-observability/tasks.md` in full, especially PR-01's
+   scope/RED/GREEN tasks and the "own-slice" precedent note for PR-02/PR-05.
+3. Run the SDD Session Preflight only if the harness's own hook demands it again — reuse
+   Automatic / Both (hybrid) / Auto (auto-chain), the standing convention since F1. If native
+   `sdd-apply` dispatch is blocked by the `PreToolUse:Agent` hook (§4), execute inline per that
+   section's fallback rather than stalling or re-asking a preflight that already failed to help.
+4. Implement PR-01 through PR-09 in `tasks.md`'s dependency order, Strict TDD (RED before GREEN),
+   each `src` file with its `test` twin. Re-measure each PR's real diff before opening it — PR-04 is
+   flagged at ~420 estimated lines and may need re-slicing into PR-04a/PR-04b at the
+   `server.ts`/`routes.ts` boundary if it exceeds 400, per Alpha's own tasks-audit note.
+5. **Audit every PR with Alpha before merging it**, verifying Alpha's own citations against the real
+   files before accepting them (this project's standing lesson since session 41) — this session's
+   own propose/spec/design audits are the fresh proof of how much a real audit catches when done
+   this way (12 real, evidence-backed objections across 3 phases, all confirmed true).
+6. Run the RDD review flow (`gentle-ai review status --next-transition` → `start` → 4× parallel
+   `capture-result` → `acknowledge-approved`) at whatever granularity the Director's Stop hook or
+   this project's own convention calls for — this session ran it once for the whole planning-docs
+   commit; a code-heavy `apply` session will likely want it per PR or per work unit instead.
 7. **Close**: same ritual as this session followed — rewrite this file, prepend to `LOG.md`, sweep
-   `AGENTS.md`'s status line (do this even for planning-only sessions — §4's lesson), `state.yaml`,
-   `docs/00-INDEX.md`'s backlog board if touched, `docs/05-tribunal/INDEX.md` (add every real debate
-   from this session, not just the ones that feel significant — B-92's whole lesson was a debate
-   trail going cold), save the session summary to Engram (CLI fallback if the MCP server refuses),
-   run the RDD review flow if the Stop hook demands it (§9), commit, push, hand the Director a
-   ≤3-line mini-prompt.
+   `AGENTS.md`'s status line, `state.yaml`, `docs/00-INDEX.md`'s backlog board if touched,
+   `docs/05-tribunal/INDEX.md` (every real debate, not just the significant-feeling ones), save the
+   session summary to Engram (CLI fallback if the MCP server refuses), run the RDD review flow if
+   the Stop hook demands it, commit, push, hand the Director a ≤3-line mini-prompt.
 
 ---
 
 ## §6 — Do not redo
 
-- **F1's and F2's archives are closed.** Do not re-open, re-verify, or re-archive either. A defect
-  found in shipped code is its own new slice with its own audit, Director-owned.
-- **F3's exploration and its 5 open decisions are closed and Alpha-audited.** Do not re-run
-  `sdd-explore` or re-debate panel scope, transport, token domain, roster-sync mechanism, or the
-  version constant. A genuinely new fact gets a new, scoped, disclosed decision — never a silent redo.
+- **F1's and F2's archives are closed.** Do not re-open, re-verify, or re-archive either.
+- **F3's exploration, and its propose/spec/design/tasks phases, are closed and Alpha-audited.** Do
+  not re-run any of them or re-debate an already-resolved objection. A genuinely new fact discovered
+  during `apply` gets its own new, scoped, disclosed correction — never a silent redo of a whole phase.
 - **Do not re-ask the Director anything this session already had standing authorization to decide** —
-  the Director explicitly pre-authorized full autonomy for F2 reconciliation and F3 exploration this
-  session ("tienes toda mi autorización... no me preguntes nada").
-- **B-91 and B-92 are filed, not solved** — B-92 explicitly defers backfilling ~20 historical tribunal
-  entries to a Director-owned decision; do not attempt that backfill silently in a future session
-  either.
+  full autonomy was pre-authorized for F3's entire planning cycle this session.
+- **B-91 and B-92 (session 44) are filed, not solved** — B-92 explicitly defers backfilling ~20
+  historical tribunal entries to a Director-owned decision.
 
 ---
 
@@ -151,12 +149,12 @@ infrastructure. No new entries into `test/fixtures/v1-provenance.json` expected.
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-92** | `docs/05-tribunal/INDEX.md` never got ~20 F2 per-PR Alpha debate entries during the apply cycle. Backfilling them (from what `CHECKLIST.md`/`design.md`/`archive-report.md` already preserved, never invented) is a scale decision for the Director. | Director |
-| **B-91** | `npm run test:wrong-room` (standalone script) fails deterministically with a loopback `ETIMEDOUT` on this machine/session when run alone or with default concurrency; passes cleanly in the full suite, in `test:static`, and with `--test-concurrency=1`. Looks environment-specific, not a code regression. | Director |
+| **B-14** | Version observability (build/wire version rendering) — **planned, not yet shipped.** F3's `tasks.md` PR-08/PR-09 close this at apply time; do not mark it `done` until those PRs merge. | Kairo (apply-time) |
+| **B-92** | `docs/05-tribunal/INDEX.md` never got ~20 F2 per-PR Alpha debate entries during the apply cycle. Backfilling is a Director-owned scale decision. | Director |
+| **B-91** | `npm run test:wrong-room` (standalone script) fails deterministically with a loopback `ETIMEDOUT` alone or at default concurrency; passes in the full suite and at `--test-concurrency=1`. Environment-specific, not a code regression. | Director |
 | **B-60, B-59, B-58, B-57, B-53/54/56** | Carried unchanged from before session 42. | Director |
 | **macOS start-at-login (D-40/D-47)** | Designed on paper only; empirical verification deferred to F6 (B-12). | Director + Kairo |
 | **B-16 / D-10, B-11, B-12** | Licence files and copyright line; trademark screening; macOS scope. Unchanged. | Director |
-| **B-05** | Closed — F2 PR-05's merge tests closed this spike. Confirm the `CHECKLIST.md` row reads `done` (it does, per this session's verification). | — (closed) |
 
 The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-director-decisions).
 
@@ -172,32 +170,29 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 - `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`; branch `main`.
   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; **never `gh auth switch`**.
 - v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**. Not read this
-  session — F2/F3 vendor no v1 code.
-- **Arena bridge confirmed working this session** across two full debate cycles (F2 reconciliation,
-  F3 exploration decisions), both closing `CONSENSUS`. `.mcp.json` points at
-  `http://127.0.0.1:8766/mcp`. Never quote or commit its contents.
-- **Receipt-driven development (RDD) is enabled for this repository** and fired its Stop-hook reminder
-  mid-session, once, exactly as documented ("reminds once per session and candidate"). See §9 for how
-  this session's own candidate was handled at close.
+  session — F3 planning vendors no v1 code.
+- `.mcp.json` points at `http://127.0.0.1:8766/mcp` for the Arena bridge. Never quote or commit its
+  contents. See §4 for this session's transient-outage note.
+- **Receipt-driven development (RDD) is enabled for this repository** (`gentle-ai review mode
+  status`: `on`, decided by global). It ran to completion this session — see §9.
 
 ---
 
 ## §9 — RDD review status at session close
 
-Ran to completion. Lineage `review-7afec180634c6447`, risk `medium` (8 files, 710 lines, triggered by
-an "executable change in `AGENTS.md`" risk reason), one lens (`review-reliability`). The Director was
-asked for consent via the mandatory `AskUserQuestion` relay (this is a distinct gate from the
-session's own F2/F3 work — never inferred) and granted it. Closed **APPROVED**, acknowledged, authority
-burned.
+Ran to completion. Lineage `review-9e0199dbbddbbe8c`, risk `high` (11 files, 880 changed lines —
+triggered by a `process_boundary`/`shell_process` risk-reason match against prose text in
+`openspec/changes/f3-web-panel-and-observability/state.yaml`, a false positive: that file is a YAML
+status record, not executable code), 4 lenses (`review-risk`, `review-resilience`,
+`review-readability`, `review-reliability`), run in parallel per the Concurrent Reviewer Group
+protocol. The Director was asked for consent via the mandatory `AskUserQuestion` relay (a distinct
+gate from the session's own F3 planning work — never inferred) and granted it. Closed **APPROVED**
+with **zero findings and zero corrections** across all 4 lenses, acknowledged, authority burned
+(`consumed_revision: sha256:33f41cdbd2f2a62986caa0fa3238e3fc227a93bb27f00fbea8e7b90977c63958`).
 
-One real, non-blocking advisory finding (`R3-pr22-attribution-conflict`, WARNING): this session's own
-new `AGENTS.md:13` and the new `LOG.md` session 42-43 entry attributed two different fixes to the same
-task-block "PR-22" (`AGENTS.md` correctly credited it with the DM-probe test; `LOG.md` incorrectly
-grouped it into PR-21's D-52 gitignore-coverage CRITICAL fix). Verified against `AGENTS.md`'s own text
-and the real commit messages (`0934fd6` = PR-21/`#74` = D-52; `de67c04` = PR-22/`#75` = DM-probe test)
-and corrected in `LOG.md` immediately after acknowledging the review, per the review's own explicit
-guidance that advisory findings are "separate later work, never a reason to re-run review on this
-candidate." This is the second real cross-document drift this session caught in its own output (the
-first was Alpha's PR-count objection in `bus-v2-session-44-docs-audit-001`) — a useful confirmation
-that both review channels (Alpha's judgment-based audit and the native deterministic reviewer) catch
-different classes of error and neither alone is sufficient.
+One operational note for next session, not a review finding: the `intended_untracked_selection`
+JSON schema the raw `collect` step names is undocumented and a guessed shape fails closed
+(`invalid_request`); the working path is the `--intended-untracked`/`--untracked-scope`/
+`--expected-untracked-inventory` CLI flags on a repeated `review status` call, which then hands back
+the exact `review start` command to run verbatim — recorded in §4 above so it is not re-discovered
+by trial and error.
