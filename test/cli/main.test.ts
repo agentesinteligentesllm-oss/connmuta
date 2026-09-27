@@ -188,6 +188,7 @@ test("the usage line names the one command this build wires, and only the forms 
   assert.match(text, /bot add/);
   assert.match(text, /group add/);
   assert.match(text, /project bind <path>/);
+  assert.match(text, /panel \[--home <dir>\]/);
   assert.match(text, /mcp --project <id>/);
   assert.equal(text.includes("[<path>"), false, "the usage text must not advertise an optional target");
   // `doctor` is deliberately deferred to Unit 8 (`src/doctor/main.ts` does not exist yet) — this pins
@@ -255,6 +256,57 @@ test("`daemon stop` invokes stopDaemon and returns its exit code", async () => {
   try {
     const captured = makeIo();
     const result = await runCli(["daemon", "stop", "--home", dir], captured.io);
+    assert.equal(result, 1);
+    assert.match(captured.err.join("\n"), /not running/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- panel subcommand dispatch ---
+
+test("`panel` checks the Node-floor gate before anything else, reporting EXIT_NODE_FLOOR on a below-floor Node", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(process, "version");
+  try {
+    Object.defineProperty(process, "version", { value: "v0.1.0", configurable: true });
+
+    const captured = makeIo();
+    const result = runCli(["panel"], captured.io);
+    assert.equal(result, EXIT_NODE_FLOOR, "expected a synchronous EXIT_NODE_FLOOR, not the async runPanelCommand dispatch");
+    assert.match(captured.err.join("\n"), /Node\.js/);
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(process, "version", originalDescriptor);
+    }
+  }
+});
+
+test("`panel` with an unknown option is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["panel", "--verbose"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown option '--verbose'/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`panel` with --home missing its argument is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["panel", "--home"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /--home requires a directory/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`panel` with extra positional arguments is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["panel", "unexpected-arg"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unexpected argument 'unexpected-arg'/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`panel` invokes runPanelCommand and returns its exit code", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-cli-panel-"));
+  try {
+    const captured = makeIo();
+    const result = await runCli(["panel", "--home", dir], captured.io);
     assert.equal(result, 1);
     assert.match(captured.err.join("\n"), /not running/i);
   } finally {

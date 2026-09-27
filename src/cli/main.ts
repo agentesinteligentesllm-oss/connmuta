@@ -48,6 +48,7 @@ const USAGE_LINES = [
 	`usage: ${PRODUCT_NAME} validate <path> | --stdin`,
 	`       ${PRODUCT_NAME} daemon start`,
 	`       ${PRODUCT_NAME} daemon stop [--home <dir>]`,
+	`       ${PRODUCT_NAME} panel [--home <dir>]`,
 	`       ${PRODUCT_NAME} setup`,
 	`       ${PRODUCT_NAME} bot add`,
 	`       ${PRODUCT_NAME} group add`,
@@ -57,6 +58,7 @@ const USAGE_LINES = [
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
 	`  daemon start  ensure the daemon is running, spawning it if needed`,
 	`  daemon stop   stop the running daemon after confirming identity (D-29)`,
+	`  panel         print the one-time web panel URL (F3)`,
 	`  setup         interactive first-run setup: home, registry scaffold, ledger, ACL, autostart`,
 	`  bot add       register a Telegram bot's token`,
 	`  group add     register a Telegram group id`,
@@ -354,6 +356,42 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 		return (async () => {
 			const { stopDaemon } = await import("./daemon-stop.js");
 			const result = await stopDaemon({ homeDir: explicitHome, io: { out: io.out, err: io.err } });
+			return result.exitCode;
+		})();
+	}
+
+	if (command === "panel") {
+		// Same Judgment Day gate-ordering convention as `mcp`/`migrate-v1`/`setup` below (session 35): the
+		// gate is this branch's literal first action for every verb introduced after PR-13's correction.
+		let belowNodeFloor = false;
+		enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+		if (belowNodeFloor) {
+			return EXIT_NODE_FLOOR;
+		}
+
+		let explicitHome: string | undefined;
+		for (let i = 0; i < rest.length; i++) {
+			const arg = rest[i];
+			if (arg === "--home") {
+				if (i + 1 >= rest.length || rest[i + 1].startsWith("--")) {
+					return usageError(io, "--home requires a directory");
+				}
+				explicitHome = rest[++i];
+			} else if (arg.startsWith("--home=")) {
+				explicitHome = arg.slice("--home=".length);
+				if (explicitHome.length === 0) {
+					return usageError(io, "--home requires a directory");
+				}
+			} else if (arg.startsWith("--")) {
+				return usageError(io, `unknown option '${arg}'`);
+			} else {
+				return usageError(io, `unexpected argument '${arg}'`);
+			}
+		}
+
+		return (async () => {
+			const { runPanelCommand } = await import("./panel.js");
+			const result = runPanelCommand({ homeDir: explicitHome, io: { out: io.out, err: io.err } });
 			return result.exitCode;
 		})();
 	}
