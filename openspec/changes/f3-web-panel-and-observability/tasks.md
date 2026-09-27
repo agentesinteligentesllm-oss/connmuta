@@ -183,18 +183,37 @@ not anticipate.
 ### Unit 5 — `daemon/bootstrap.ts` (own-slice)
 
 #### PR-05 — Mount the panel listener
-Branch `f3/05-bootstrap-panel` → `main`. Depends: PR-03, PR-04. Size: ≈130 lines (est.).
+Branch `f3/05-bootstrap-panel` → `main`. Depends: PR-03, PR-04a, PR-04b, PR-04c. Size: 103 authored lines
+(actual).
 Scope: `src/daemon/bootstrap.ts`, `test/daemon/bootstrap.test.ts`.
 Requirements: design's bootstrap File Change row — `startDaemon` creates the panel listener and
-`PanelTokenStore` alongside the existing IPC server; `stop()` and the startup `catch` block additionally
-call `panelServer.close()` and delete `run/panel.json`.
+`PanelTokenStore` alongside the existing IPC server; `stop()` calls `panelServer.close()` and deletes
+`run/panel.json`. **Correction to design's own citation**: design.md claims the startup `catch` block
+ALSO calls `deleteRunFile` for the existing `ipcServer` ("mirroring the existing
+`ipcServer.close()`/`deleteRunFile` handling at bootstrap.ts:300-325") — the real code at that range only
+calls `ipcServer.close()` in the catch block; `deleteRunFile` runs only in `stop()`. This PR mirrors the
+REAL precedent (parity with `ipcServer`, not the stale citation): the catch block closes `panelServer`
+only, accepting the same pre-existing, harmless asymmetry (an orphaned run file with a dead `pid`
+self-invalidates via `readPanelRunFile`'s own `isProcessAlive` check).
 Runtime harness: existing `bootstrap.test.ts` real-daemon-boot pattern.
 
-- [ ] 5.1 RED: extend `bootstrap.test.ts` — panel listener is bound after boot; `stop()` closes it and
-      deletes `run/panel.json`; a boot failure after the panel listener starts also cleans it up.
-- [ ] 5.2 GREEN: wire `createPanelServer`/`PanelTokenStore`/`writePanelRunFile` into `startDaemon`,
-      mirroring the existing `ipcServer`/`writeRunFile` composition; add the symmetric cleanup calls.
-- [ ] 5.3 Verify: `npm run build && node --test "dist/test/daemon/bootstrap.test.js"`.
+- [x] 5.1 RED: extend `bootstrap.test.ts` — panel listener is bound after boot, reachable with its own
+      token, on a distinct port from the IPC listener; `stop()` closes it and deletes `run/panel.json`;
+      a boot failure after the panel listener starts (injected via a `secretStore.kind` getter that
+      throws — first read while building `routesDeps`, well after the panel listener is up) closes the
+      panel listener too.
+- [x] 5.2 GREEN: wire `createPanelServer`/`PanelTokenStore`/`writePanelRunFile` into `startDaemon`,
+      mirroring the existing `ipcServer`/`writeRunFile` composition (simpler here: the panel's routes
+      need no per-boot secret, so the full handler map is built up front, no mutable-object indirection);
+      add the symmetric cleanup calls to `stop()` and the catch block. `DaemonInstance` gains `panelPort`
+      and `panelRunFile`, mirroring `port`/`runFile`.
+- [x] 5.3 Verify: `npm run build && node --test "dist/test/daemon/bootstrap.test.js"`.
+
+**Disclosed correction, outside this PR's stated scope line:** `test/security/daemon-bundle.test.ts`'s
+`node:fs` allow-list (PT-28) needed `daemon/panel/panel-run-file.js` added — predicted by Alpha's own
+PR-03 audit note ("once bootstrap.ts wires it in"). The `transport/*` reverse-import-graph check needed
+no change: PR-02's `http-guards` exemption (by imported-module name, not by importer) already covers
+`panel/server.ts`'s own `checkTransportGuards` import.
 
 ### Unit 6 — `conmuta panel` CLI verb
 

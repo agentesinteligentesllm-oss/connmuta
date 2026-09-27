@@ -102,6 +102,10 @@ test("daemon bundle: node:fs is confined to the allow-listed home-scoped modules
     "daemon/lifecycle/lock.js",
     "daemon/lifecycle/run-file.js",
     "daemon/log.js",
+    // F3 PR-05: bootstrap.ts wires the panel listener's own run-file sibling (F3 PR-03), the same kind
+    // of home-scoped read/write daemon.json's own writer performs — not a panel ASSET read (PT-28's
+    // own scope, HTML/CSS/JS never touching node:fs, is unaffected).
+    "daemon/panel/panel-run-file.js",
     "ledger/open.js",
     "registry/loader.js",
     "secret-store/file-fallback.js",

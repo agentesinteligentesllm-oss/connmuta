@@ -23,6 +23,10 @@ import { createIdentityHandler, PendingHandshakeStore } from "./ipc/handshake.js
 import { createDoctorHandler, type DoctorTelegramClient } from "./ipc/doctor.js";
 import { createSessionRoutes, type RoutesDeps } from "./ipc/routes.js";
 import { SessionStore } from "./ipc/sessions.js";
+import { createPanelServer, type PanelServerHandle } from "./panel/server.js";
+import { createPanelRoutes } from "./panel/routes.js";
+import { PanelTokenStore } from "./panel/token-store.js";
+import { deletePanelRunFile, writePanelRunFile, type PanelRunPayload } from "./panel/panel-run-file.js";
 
 /**
  * Options for daemon bootstrap dependency injection (design §15).
@@ -47,6 +51,8 @@ export interface DaemonInstance {
   readonly dirs: HomeDirs;
   readonly port: number;
   readonly runFile: DaemonRunPayload;
+  readonly panelPort: number;
+  readonly panelRunFile: PanelRunPayload;
   readonly ledger: LedgerOpenResult;
   readonly registry: RegistryLoader;
   readonly secretStore: SecretStore;
@@ -110,6 +116,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
   let ledger: LedgerOpenResult | undefined;
   let reconciler: BindingsReconciler | undefined;
   let ipcServer: IpcServerHandle | undefined;
+  let panelServer: PanelServerHandle | undefined;
 
   try {
     ledger = openLedger({ homeDir: dirs.homeDir, now: options?.now });
@@ -166,6 +173,26 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     const runFile = writeRunFile(dirs.runDir, assignedPort);
     const startedAt = options?.now ? options.now() : Date.now();
 
+    // The panel listener (F3 PR-05): its own second `node:http` server, its own `PanelTokenStore`
+    // (independent of the IPC secret above), its own `run/panel.json` sibling. Unlike the IPC server,
+    // its routes need no per-boot secret, so `createPanelRoutes` builds the full handler map up front
+    // — no mutable-object-filled-in-later workaround like `handlers` above.
+    const panelTokenStore = new PanelTokenStore();
+    panelServer = createPanelServer({
+      handlers: createPanelRoutes(
+        {
+          db: ledger.db,
+          registry,
+          daemon: { pid: process.pid, started_at: new Date(startedAt).toISOString() },
+          now: options?.now ? (): Date => new Date(options.now!()) : undefined,
+        },
+        panelTokenStore.token,
+      ),
+      tokenStore: panelTokenStore,
+    });
+    const { port: panelPort } = await panelServer.listen();
+    const panelRunFile = writePanelRunFile(dirs.runDir, panelPort, panelTokenStore.token);
+
     const handshakeStore = new PendingHandshakeStore(options?.now ?? Date.now);
     const sessionStore = new SessionStore(runFile.secret);
 
@@ -220,6 +247,8 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
         await reconciler!.stopAll();
         await ipcServer!.close();
         deleteRunFile(dirs.runDir, runFile.pid);
+        await panelServer!.close();
+        deletePanelRunFile(dirs.runDir, panelRunFile.pid);
         lock.release();
         try {
           ledger!.db.close();
@@ -301,6 +330,8 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
       dirs,
       port: assignedPort,
       runFile,
+      panelPort,
+      panelRunFile,
       ledger,
       registry,
       secretStore,
@@ -312,6 +343,9 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     }
     if (ipcServer) {
       await ipcServer.close().catch(() => {});
+    }
+    if (panelServer) {
+      await panelServer.close().catch(() => {});
     }
     if (ledger) {
       try {
