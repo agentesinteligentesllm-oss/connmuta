@@ -285,6 +285,18 @@ test("macOS: enableMacAutostart refuses to overwrite a foreign plist (different 
 	});
 });
 
+test("macOS: enableMacAutostart refuses to overwrite a plist with no parseable Label at all, matching disableMacAutostart's own protection", () => {
+	withScratchLaunchAgentsDir((dir) => {
+		const path = join(dir, `${AUTOSTART_LAUNCHD_LABEL}.plist`);
+		mkdirSync(dir, { recursive: true });
+		const labellessContent = "<?xml version=\"1.0\"?>\n<plist><dict><key>SomethingElse</key><string>x</string></dict></plist>\n";
+		writeFileSync(path, labellessContent, "utf8");
+
+		assert.throws(() => enableMacAutostart({ launchAgentsDir: dir }), /refusing to overwrite/);
+		assert.equal(readFileSync(path, "utf8"), labellessContent, "a file with no parseable Label must never be overwritten either");
+	});
+});
+
 test("macOS: disableMacAutostart removes only a plist whose Label matches ours", () => {
 	withScratchLaunchAgentsDir((dir) => {
 		const absent = disableMacAutostart({ launchAgentsDir: dir });

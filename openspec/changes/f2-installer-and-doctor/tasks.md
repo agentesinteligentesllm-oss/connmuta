@@ -214,8 +214,10 @@ Runtime harness: `installer/exec.test.ts` asserts argv shape only (no real subpr
 - [x] 8.6 Docs: THREAT-MODEL §5.5/§5.6 — pin the ACL and exec-allow-list rows to these test files.
 
 #### PR-09 — `autostart.ts`
-Branch `f2/09-autostart` → `main`. Depends: PR-08. Size: 543 lines, **disclosed PR-scoped exception**
-(143 lines over the 400 budget; design §10 estimated ≈250). Windows (Run-key via `exec.ts`'s `runReg`)
+Branch `f2/09-autostart` → `main`. Depends: PR-08. Size: 625 lines as of the final commit (543 at the
+original commit, +82 across two native-review fix rounds; `wc -l` on the two scoped files), **disclosed
+PR-scoped exception** (225 lines over the 400 budget; design §10 estimated ≈250). Windows (Run-key via
+`exec.ts`'s `runReg`)
 and macOS (launchd plist via a dedicated write-with-backup routine) share one outcome vocabulary and
 one platform-dispatching pair (`enableAutostart`/`disableAutostart`, the wizard's own single call
 site, PR-12) — a real further split would cut the file mid-dispatch, same class of exception as F1's

@@ -198,11 +198,14 @@ export function enableMacAutostart(options: MacAutostartOptions = {}): Autostart
 	}
 	const currentContent = readFileSync(path, "utf8");
 	const currentLabel = extractPlistLabel(currentContent);
-	if (currentLabel !== undefined && currentLabel !== AUTOSTART_LAUNCHD_LABEL) {
-		// A file already at our exact expected path with a different Label is not the routine
-		// "our own plist, content differs" case design's idempotence table describes (e.g. a node
-		// upgrade) — refuse rather than silently back up and overwrite something we may not own,
-		// the same protective stance disableMacAutostart already takes for a foreign Label.
+	if (currentLabel !== AUTOSTART_LAUNCHD_LABEL) {
+		// A file already at our exact expected path whose Label is not exactly ours — including one
+		// with no parseable Label at all — is not the routine "our own plist, content differs" case
+		// design's idempotence table describes (e.g. a node upgrade): refuse rather than silently
+		// back up and overwrite something we may not own. Matches disableMacAutostart's own exact-
+		// match rule exactly (a native review found the original `!== undefined` guard here treated a
+		// Label-less file as ours to overwrite, while disable already treated the identical file as
+		// foreign to protect — an asymmetry introduced by the first version of this same fix).
 		throw new Error(`installer/autostart.ts: refusing to overwrite a plist at ${path} whose Label is not ours (found: ${currentLabel})`);
 	}
 	if (currentContent === nextContent) {
