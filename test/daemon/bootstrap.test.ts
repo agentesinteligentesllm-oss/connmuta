@@ -776,10 +776,8 @@ test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/
     set: async () => {},
     delete: async () => {},
   };
-  let getUpdatesCalls = 0;
   const fakeClient: TelegramClient = {
     async getUpdates() {
-      getUpdatesCalls++;
       await new Promise((resolve) => setTimeout(resolve, 5));
       return [];
     },
@@ -821,7 +819,6 @@ test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/
     ],
   };
   writeFileSync(registryPath, JSON.stringify(registry));
-  const beforeTicksText = readFileSync(registryPath, "utf8");
 
   let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
   try {
@@ -832,24 +829,61 @@ test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/
       telegramClientFactory: async () => fakeClient,
     });
 
-    // Several heartbeat periods, so the reconcile-on-tick path (bootstrap.ts's `tick()`, which calls
-    // `reconciler.reconcile()` -> `registry.sync()`, a read-only hot reload) runs more than once.
-    await new Promise((resolve) => setTimeout(resolve, 90));
+    await new Promise((resolve) => setTimeout(resolve, 30));
 
-    // ADR-12's governing rule ("a documented guarantee must be pinned by a test that can fail"): without
-    // this, a daemon that failed to start its heartbeat/poller at all would still pass every assertion
-    // below, since an untouched registry.json looks identical to one no tick ever reached (RDD review
-    // review-21eb25a2eb6f76f7, R3-heartbeat-test-vacuous). Mirrors the sibling PR-40a test's own
-    // `getUpdatesCalls > 0` proof of real daemon activity.
-    assert.ok(getUpdatesCalls > 0, "poller must have started and called getUpdates() at least once during the window");
+    // RDD review review-1e4a4960dde90920's R3-heartbeat-proof-is-poller-not-tick: getUpdates() proves
+    // the poller is alive, not that the heartbeat's own reconcile-on-tick path ran (an unrelated,
+    // separately-scheduled loop) -- a daemon whose heartbeat timer never fired at all would still pass a
+    // getUpdates()-only proof. Real proof (mirrors the sibling PR-40a test's own technique, line ~488):
+    // add a second binding to the registry file directly, then wait for the *next* tick and confirm its
+    // own BINDING_CHANGED audit row appears. registry.sync() (called from every tick's reconcile()) is
+    // the only thing that can ever observe this file change, so that row can only exist if a tick
+    // actually reconciled after this point -- ADR-12's "a guarantee needs a test that can fail".
+    const registryWithSecondBinding: Registry = {
+      ...registry,
+      bots: [
+        ...registry.bots,
+        {
+          bot_id: 555222334,
+          username: "roster_drift_bot_2",
+          token_ref: { store: "keychain", account: "bot:555222334" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [...registry.groups, { group_id: -1009876543213, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [...registry.projects, { project_id: "prj-roster-drift-2", path: join(homeDir, "second") }],
+      bindings: [
+        ...registry.bindings,
+        {
+          project_id: "prj-roster-drift-2",
+          bot_id: 555222334,
+          group_id: -1009876543213,
+          agent_id: "@drift-agent-2",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@drift-agent-2", user_id: 555222334, username: "roster_drift_bot_2" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(registryPath, JSON.stringify(registryWithSecondBinding));
 
-    const afterTicksText = readFileSync(registryPath, "utf8");
-    assert.equal(afterTicksText, beforeTicksText, "no heartbeat tick may write registry.json at all");
+    await new Promise((resolve) => setTimeout(resolve, 60));
 
-    const afterTicksRegistry = JSON.parse(afterTicksText) as Registry;
-    assert.equal(afterTicksRegistry.bindings[0]?.roster_hash, ROSTER_HASH);
+    const auditRows = daemon.ledger.db
+      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED' AND project_id = ?")
+      .all("prj-roster-drift-2") as Record<string, unknown>[];
+    assert.equal(
+      auditRows.length,
+      1,
+      "a genuine heartbeat tick must have reconciled the newly-added binding after boot",
+    );
+
+    const afterTicksRegistry = JSON.parse(readFileSync(registryPath, "utf8")) as Registry;
+    const originalBinding = afterTicksRegistry.bindings.find((b) => b.project_id === "prj-roster-drift");
+    assert.equal(originalBinding?.roster_hash, ROSTER_HASH);
     assert.deepEqual(
-      afterTicksRegistry.bindings[0]?.roster_snapshot,
+      originalBinding?.roster_snapshot,
       registry.bindings[0]?.roster_snapshot,
       "roster_snapshot must survive every heartbeat tick unchanged: only a human sync-roster invocation may change it",
     );
