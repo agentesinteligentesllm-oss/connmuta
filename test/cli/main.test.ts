@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { runCli, type CliIo } from "../../src/cli/main.js";
+import { reportProjectBindOutcome, runCli, type CliIo } from "../../src/cli/main.js";
+import type { EditFileOutcome } from "../../src/installer/file-edit.js";
+import type { GitignoreCheckResult } from "../../src/installer/gitignore.js";
+import type { ToolId } from "../../src/installer/tool-targets.js";
+import type { ProjectBindOutcome } from "../../src/installer/wizards/project-bind.js";
 import {
   EXIT_MIGRATION_REFUSED,
   EXIT_NODE_FLOOR,
@@ -467,5 +471,41 @@ test("`project bind` with no path is a usage error and calls no wizard", async (
   const captured = makeIo();
   assert.equal(await runCli(["project", "bind"], captured.io), EXIT_USAGE);
   assert.match(captured.err.join("\n"), /unknown installer invocation \(missing-path\)/);
+});
+
+// `reportProjectBindOutcome`'s own "bound" reporting (D-52 gitignore lines) has no reachable path
+// through `runCli` above: driving a real `project bind` wizard closure to a "bound" outcome needs a
+// real ledger and a real registry, exactly what the comment above this section explains is out of
+// scope for this dispatcher-level file. Exercised directly instead, mirroring how `runCli`/`CliIo`
+// are already tested here as plain functions with a fake `CliIo`.
+test("reportProjectBindOutcome prints a .gitignore line for each newly-appended entry", () => {
+  const captured = makeIo();
+  const result: ProjectBindOutcome = {
+    outcome: "bound",
+    project_id: "prj-example",
+    toolConfigResults: new Map<ToolId, EditFileOutcome>([["claude-code", "created"]]),
+    gitignoreResults: new Map<ToolId, GitignoreCheckResult>([
+      ["claude-code", { alreadyCovered: false, appendedLine: "/.mcp.json" }],
+      ["cursor", { alreadyCovered: true }],
+    ]),
+    instructionFiles: { agentsMd: "created", claudeMd: "created" },
+  };
+
+  assert.equal(reportProjectBindOutcome(captured.io, result), 0);
+  assert.deepEqual(captured.out, ["project bound: prj-example", `${PRODUCT_NAME}: .gitignore updated (claude-code): /.mcp.json`]);
+});
+
+test("reportProjectBindOutcome prints nothing extra when every gitignore entry was already covered", () => {
+  const captured = makeIo();
+  const result: ProjectBindOutcome = {
+    outcome: "bound",
+    project_id: "prj-example",
+    toolConfigResults: new Map<ToolId, EditFileOutcome>([["claude-code", "noop"]]),
+    gitignoreResults: new Map<ToolId, GitignoreCheckResult>([["claude-code", { alreadyCovered: true }]]),
+    instructionFiles: { agentsMd: "noop", claudeMd: "noop" },
+  };
+
+  assert.equal(reportProjectBindOutcome(captured.io, result), 0);
+  assert.deepEqual(captured.out, ["project bound: prj-example"]);
 });
 

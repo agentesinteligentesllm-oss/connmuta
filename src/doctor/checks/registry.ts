@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { join } from "node:path";
 
 import type { FormatAdapter } from "../../installer/file-edit.js";
+import { GITIGNORE_FILE_NAME, isGitignoreCovered } from "../../installer/gitignore.js";
 import { jsoncAdapter } from "../../installer/formats/jsonc.js";
 import { tomlAdapter } from "../../installer/formats/toml.js";
 import type { LauncherEntry } from "../../installer/launcher.js";
@@ -28,8 +29,9 @@ import type { Finding } from "./system.js";
  * `parseRegistryText` (R1–R3 and R5 come free, since that function is the loader's own single source
  * of truth for them — this module never re-implements that logic), adds the referential-integrity
  * check B-28 asked for, R4 (a cross-file check `parseRegistryText` cannot do, since it never opens a
- * project's own `conmuta.json`), a token-shape report over each bound project's `conmuta.json`, and
- * the installer's own written tool configs (§7.2 shape, `.mcp.json` readers, Pi duplicates, D-43).
+ * project's own `conmuta.json`), a token-shape report over each bound project's `conmuta.json`, the
+ * installer's own written tool configs (§7.2 shape, `.mcp.json` readers, Pi duplicates, D-43), and a
+ * D-52 `.gitignore`-coverage warning for a bound project that is a git worktree (tasks.md PR-21).
  *
  * **A registry that fails to parse skips every other check.** There is no `Registry` object to walk
  * bindings/projects/bots/groups from once `parseRegistryText` refuses the document, so this tier
@@ -275,6 +277,44 @@ function checkToolConfigs(binding: RegistryBinding, projectPath: string): Findin
 	return findings;
 }
 
+/**
+ * D-52 doctor half (design.md §16 risk table): for a bound project that is a git worktree, warns on
+ * any existing tool-config file `.gitignore` does not cover.
+ *
+ * `.git` presence is checked with `existsSync` alone, never followed by `.isDirectory()`: a linked
+ * worktree or submodule's `.git` is a FILE (containing `gitdir: ...`), not a directory, and
+ * `.isDirectory()` would wrongly report `false` for that real case (Alpha's own review note in the
+ * Arena debate this design went through). This makes zero subprocess calls (`git` is never invoked,
+ * D-50's exec allow-list stays `{icacls.exe, reg.exe}` only) and never claims a file IS tracked by
+ * git — only that it is not covered by `.gitignore`, since actual git-index membership is never
+ * checked (disclosed divergence from D-52's own literal doctor-side wording, tasks.md PR-21).
+ */
+function checkGitignoreCoverage(binding: RegistryBinding, projectPath: string): Finding[] {
+	if (!existsSync(join(projectPath, ".git"))) {
+		return [];
+	}
+
+	const gitignorePath = join(projectPath, GITIGNORE_FILE_NAME);
+	const gitignoreText = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+
+	const findings: Finding[] = [];
+	for (const target of TOOL_CONFIG_TARGETS) {
+		if (!existsSync(resolveToolConfigPath(projectPath, target))) {
+			continue;
+		}
+		if (!isGitignoreCovered(gitignoreText, target.relativePath)) {
+			findings.push({
+				id: `gitignore-coverage-${binding.project_id}-${target.id}`,
+				status: "warn",
+				detail:
+					`project ${binding.project_id}: ${target.relativePath} is not covered by .gitignore in a git ` +
+					"repository; may be committed by an unrelated `git add`",
+			});
+		}
+	}
+	return findings;
+}
+
 /** Every finding for one binding: referential integrity, then (only if its project resolves) R4, the token-shape scan and tool configs. */
 function boundProjectFindings(registry: Registry, binding: RegistryBinding): Finding[] {
 	const findings: Finding[] = [checkReferentialIntegrity(registry, binding)];
@@ -302,6 +342,7 @@ function boundProjectFindings(registry: Registry, binding: RegistryBinding): Fin
 	}
 
 	findings.push(...checkToolConfigs(binding, project.path));
+	findings.push(...checkGitignoreCoverage(binding, project.path));
 	return findings;
 }
 

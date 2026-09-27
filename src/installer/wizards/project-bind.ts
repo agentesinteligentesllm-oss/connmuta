@@ -10,6 +10,7 @@ import { writeProjectFile, type ProjectFileDisagreement } from "../../shared/pro
 import { computeRosterHash } from "../../shared/roster-hash.js";
 import { MCP_SERVER_NAME } from "../constants.js";
 import { editFile, type EditFileOutcome, type FormatAdapter } from "../file-edit.js";
+import { ensureGitignored, type GitignoreCheckResult } from "../gitignore.js";
 import { jsoncAdapter } from "../formats/jsonc.js";
 import { tomlAdapter } from "../formats/toml.js";
 import { writeInstructionFiles, printTrustSteps, type InstructionFilesOutcome, type TrustStepIo } from "../instructions.js";
@@ -45,6 +46,7 @@ export type ProjectBindOutcome =
 			readonly outcome: "bound";
 			readonly project_id: string;
 			readonly toolConfigResults: ReadonlyMap<ToolId, EditFileOutcome>;
+			readonly gitignoreResults: ReadonlyMap<ToolId, GitignoreCheckResult>;
 			readonly instructionFiles: InstructionFilesOutcome;
 	  }
 	| { readonly outcome: "invariant-violated"; readonly invariant: RegistryInvariant }
@@ -249,7 +251,12 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 	const existingSharedMcpJsonEntry = readExistingMcpJsonEntry(options.targetDir);
 	const targets = resolveSelectedTargets(options.selectedToolIds, launcher, existingSharedMcpJsonEntry);
 	const toolConfigResults = new Map<ToolId, EditFileOutcome>();
+	const gitignoreResults = new Map<ToolId, GitignoreCheckResult>();
 	for (const target of targets) {
+		// `editFile` either returns (all three outcomes mean the file exists at this path now) or
+		// throws a `FileEditRefusal`, which is not caught here and propagates out of this whole
+		// function — the existing, pre-D-52 behavior this PR does not change. A gitignore check is
+		// therefore only ever reached for a target whose write genuinely succeeded.
 		const outcome = editFile({
 			path: resolveToolConfigPath(options.targetDir, target),
 			adapter: adapterFor(target.relativePath),
@@ -257,10 +264,11 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 			entry: target.buildEntry(launcher),
 		});
 		toolConfigResults.set(target.id, outcome);
+		gitignoreResults.set(target.id, ensureGitignored(options.targetDir, target.relativePath));
 	}
 
 	const instructionFiles = writeInstructionFiles(options.targetDir);
 	printTrustSteps([...options.selectedToolIds], options.trustStepIo);
 
-	return { outcome: "bound", project_id: projectId, toolConfigResults, instructionFiles };
+	return { outcome: "bound", project_id: projectId, toolConfigResults, gitignoreResults, instructionFiles };
 }
