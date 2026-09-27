@@ -161,13 +161,24 @@ Requirements: web-panel "Read-only surface, two screens only" (Home/Overview sce
 display) and "No runtime filesystem reads for panel assets" (all scenarios).
 Runtime harness: real `node:http` listener via `createPanelServer`, mirrors PR-04b's own pattern.
 
-- [ ] 4c.1 RED: `routes.test.ts` — Home screen renders daemon facts; Overview table renders bindings
+- [x] 4c.1 RED: `routes.test.ts` — Home screen renders daemon facts; Overview table renders bindings
       including a `roster_drift` condition (PR-04a) and the registry's own stored `roster_snapshot`
       (not a live structural diff — the daemon has no live roster to diff against; see PR-04a's
-      disclosure), with no mutation control rendered anywhere.
-- [ ] 4c.2 GREEN: implement the two route handlers as read-only registry/ledger queries; panel assets
-      (HTML/CSS/JS) as in-memory string constants, never `node:fs` reads.
-- [ ] 4c.3 Verify: `npm run build && node --test "dist/test/daemon/panel/routes.test.js"`.
+      disclosure), with no mutation control rendered anywhere; a hostile registry string cannot inject
+      markup (HTML-escaping — not spec-enumerated, but required by AGENTS.md's global security rule).
+- [x] 4c.2 GREEN: implement the two route handlers as read-only registry/ledger queries; panel assets
+      (HTML/CSS/JS) as in-memory string constants, never `node:fs` reads. Fields per OVERVIEW.md §10.2's
+      "Control panel"/"Overview table" rows (pid, uptime, last poll per bot, conditions per binding for
+      Home; bot/bot id/group/group id/project/roster/open-threads/needs-action/last-poll/conditions per
+      binding for Overview).
+- [x] 4c.3 Verify: `npm run build && node --test "dist/test/daemon/panel/routes.test.js"`.
+
+**Disclosed additions, outside this PR's stated scope line:** `src/daemon/serve/status.ts` gains
+`export` on three already-tested private helpers (`listThreadIds`, `readPollerEntry`,
+`computeUptimeSeconds`) — zero logic change — so this PR reuses them instead of writing a second copy of
+the same reads. 406 authored lines (387 new + 19 in `status.ts`) against a `size:exception` of the
+400-line budget: 6 lines over, from the disclosed `status.ts` export change the original estimate did
+not anticipate.
 
 ### Unit 5 — `daemon/bootstrap.ts` (own-slice)
 
