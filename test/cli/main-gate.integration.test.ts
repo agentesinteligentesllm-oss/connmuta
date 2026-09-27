@@ -65,10 +65,24 @@ const GATE_KILL_GRACE_MS = 2000;
  * `daemon start` case (the one gated subcommand whose successful, non-gated path is a persistent
  * process that never exits on its own) would hang this promise, and the whole test run, forever
  * instead of failing with a diagnosable error.
+ *
+ * **`HOME`/`USERPROFILE` are overridden to `cwd` itself** (native review `review-119b0f2cb358a3b9`,
+ * R3-node-floor-test-no-env-isolation, CRITICAL): without this, the spawned child inherits this test
+ * process's REAL environment, so `daemon/home.ts`'s `resolveHomeDir()` (via `node:os`'s `homedir()`)
+ * would resolve to the real developer/CI home directory in the exact regression scenario this test
+ * exists to catch — a below-floor Node reaching `setup`/`migrate-v1`/`daemon start` anyway could then
+ * write a real `registry.json`/ledger/secrets there, a side effect the scratch-dir emptiness assertion
+ * cannot see or prevent. Pointing `HOME`/`USERPROFILE` at the same scratch `cwd` this test already
+ * inspects means any such write, if the gate ever regressed, would land exactly where that assertion
+ * would catch it.
  */
 function runNode(args: readonly string[], cwd: string): Promise<SpawnResult> {
 	return new Promise((resolvePromise, reject) => {
-		const child = spawn(process.execPath, [...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+		const child = spawn(process.execPath, [...args], {
+			cwd,
+			stdio: ["ignore", "pipe", "pipe"],
+			env: { ...process.env, HOME: cwd, USERPROFILE: cwd },
+		});
 		let stdout = "";
 		let stderr = "";
 		let settled = false;

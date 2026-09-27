@@ -103,7 +103,15 @@ function sendRequest(options: { port: number; method: string; path: string; body
 		if (options.authorization !== undefined) {
 			headers["Authorization"] = options.authorization;
 		}
-		let responded = false;
+		// Correction (native review `review-119b0f2cb358a3b9`, R3-sendrequest-partial-response-hang /
+		// R4-sendrequest-post-response-timeout-hang, both CRITICAL): the previous round gated every
+		// reject on `!responded`, so a timeout firing AFTER headers arrived but before the body
+		// completed (`res` never emits "end") destroyed the request without ever settling the promise —
+		// the exact hang this timeout exists to eliminate, just in a narrower window. `settled` now
+		// covers both the pre- and post-headers cases uniformly, and `res` itself gets its own "error"
+		// listener, since destroying a request after its response has started can surface the error on
+		// `res`, not `req` (Node's http client does not guarantee which stream sees it).
+		let settled = false;
 		const req = http.request(
 			{
 				host: IPC_LOOPBACK_HOST,
@@ -114,19 +122,29 @@ function sendRequest(options: { port: number; method: string; path: string; body
 				timeout: REQUEST_TIMEOUT_MS,
 			},
 			(res) => {
-				responded = true;
 				const chunks: Buffer[] = [];
 				res.on("data", (chunk: Buffer) => chunks.push(chunk));
-				res.on("end", () => resolvePromise({ status: res.statusCode ?? 0, bodyText: Buffer.concat(chunks).toString("utf8") }));
+				res.on("end", () => {
+					if (settled) return;
+					settled = true;
+					resolvePromise({ status: res.statusCode ?? 0, bodyText: Buffer.concat(chunks).toString("utf8") });
+				});
+				res.on("error", (err) => {
+					if (settled) return;
+					settled = true;
+					reject(err);
+				});
 			},
 		);
 		// `timeout` above only sets socket inactivity detection — it emits "timeout" but does not itself
-		// abort the request; `destroy` does, which then fires the "error" handler below.
+		// abort the request; `destroy` does, which then fires an "error" event on `req` and/or `res`.
 		req.on("timeout", () => {
 			req.destroy(new Error(`sendRequest: ${options.method} ${options.path} did not respond within ${REQUEST_TIMEOUT_MS}ms`));
 		});
 		req.on("error", (err) => {
-			if (!responded) reject(err);
+			if (settled) return;
+			settled = true;
+			reject(err);
 		});
 		req.end(bodyBuffer);
 	});
