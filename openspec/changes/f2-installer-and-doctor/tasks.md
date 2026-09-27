@@ -303,16 +303,16 @@ Runtime harness: the static half runs `test/security/installer-bundle.js` predic
 - [x] 14.7 Docs: THREAT-MODEL §4 — pin PT-19 (macOS/POSIX half already pinned in F1; this PR adds the Windows-`icacls`-via-`doctor` read path, citing `test/doctor/checks/system.test.ts`).
 
 #### PR-15 — registry-tier checks
-Branch `f2/15-doctor-registry-tier` → `main`. Depends: PR-14. Size: ≈350 lines, no exception.
-Scope: `src/doctor/checks/registry.ts`, `test/doctor/checks/registry.test.ts`.
+Branch `f2/15-doctor-registry-tier` → `main`. Depends: PR-14. Size: ≈350 lines; **628 actual (src+test across `registry.ts`+`registry.test.ts`+the `offline.ts`/`offline.test.ts`/`main.test.ts` wiring below), disclosed exception.**
+Scope: `src/doctor/checks/registry.ts`, `test/doctor/checks/registry.test.ts`, plus wiring PR-14's own marked seam in `src/doctor/offline.ts` (closing Unit 8: `runOfflineDoctor` now calls both tiers), with the small resulting fixes to `test/doctor/offline.test.ts`/`test/doctor/main.test.ts` and `src/doctor/tsconfig.json` (a `../registry` reference).
 Requirements: `doctor › Registry tier checks bijective invariants and the token-shape scan` (both scenarios); underlies `tool-config-merge` surfaces via the ".mcp.json readers/Pi duplicates" finding.
 Runtime harness: unit test over `parseRegistryText` fixtures; zero network (folds into PR-14's offline closure/spy checks).
 
-- [ ] 15.1 RED: `test/doctor/checks/registry.test.ts` — R1–R4 re-run over `registry.json`; `forbidden_content` explained with the B-30 note (ordinary text such as `API_KEY=123` is refused by design, not a false positive); referential integrity (binding ids exist in `bots`/`groups`/`projects`, B-28); R4 checked per bound path; a token-shaped string in a reachable `conmuta.json` field is reported with the field named and the matched text never echoed.
-- [ ] 15.2 RED: same file — installer-written config entries checked against the §7.2 shape table; `.mcp.json` readers and Pi-duplicate detection (D-34/D-43) reported as findings, not silently ignored.
-- [ ] 15.3 GREEN: implement `doctor/checks/registry.ts`.
-- [ ] 15.4 Verify: `npm run build && node --test "dist/test/doctor/checks/registry.test.js"`.
-- [ ] 15.5 Docs: THREAT-MODEL §4 — pin PT-05's doctor half to this test file.
+- [x] 15.1 RED: `test/doctor/checks/registry.test.ts` — R1–R4 re-run over `registry.json`; `forbidden_content` explained with the B-30 note (ordinary text such as `API_KEY=123` is refused by design, not a false positive); referential integrity (binding ids exist in `bots`/`groups`/`projects`, B-28); R4 checked per bound path; a token-shaped string in a reachable `conmuta.json` field is reported with the field named and the matched text never echoed. **Implementation choice**: the field-level token-shape scan reuses `shared/project-file.ts`'s own `parseProjectFile` result (its `forbidden_content` problems already walk every string field, value-free by construction) rather than a second `findTokenShapes` pass, which would be unreachable dead code once a document has already passed that same walk.
+- [x] 15.2 RED: same file — installer-written config entries checked against the §7.2 shape table (by top-level key set, since the real `command`/`args` values depend on this machine's own paths, which doctor has no independent source of truth for); `.mcp.json` readers and Pi-duplicate detection (D-34/D-43) reported as findings, not silently ignored.
+- [x] 15.3 GREEN: implement `doctor/checks/registry.ts`. Also wired PR-14's own marked `offline.ts` seam (`runOfflineDoctor` now runs both tiers) — closing Unit 8. **Consistency fix found while wiring**: an absent `registry.json` (setup never run) is now a `"pass"` ("not yet created (run setup)") finding, matching `checks/system.ts`'s own established convention for the ledger/home directory in the identical situation, not an unconditional `"fail"` — the pre-existing `offline.test.ts`/`main.test.ts` assertions (written against the system tier alone, PR-14) were updated to reflect both tiers now running together.
+- [x] 15.4 Verify: `npm run build && node --test "dist/test/doctor/checks/registry.test.js"`, plus the now-passing `offline.test.js`/`main.test.js`. Full suite 1325/1325 (0 fail, 6 skip).
+- [x] 15.5 Docs: THREAT-MODEL §4 — pinned PT-05's doctor half to `test/doctor/checks/registry.test.ts`.
 
 ### Unit 9 — IPC contract + telegram (own slice, D-39/D-48)
 

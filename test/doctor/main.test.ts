@@ -40,7 +40,9 @@ test("runDoctorMain prints one line per finding through io.out", async () => {
 		const lines: string[] = [];
 		const result = await runDoctorMain({ homeDir, io: { out: (line) => lines.push(line) } });
 
-		assert.equal(lines.length, 8, "expected one printed line per system-tier finding");
+		// 8 system-tier findings (PR-14) + 1 registry-tier finding (PR-15: no registry.json in this
+		// fresh temp home, reported as a "not yet created" pass, not a fail).
+		assert.equal(lines.length, 9, "expected one printed line per system-tier and registry-tier finding");
 		for (const line of lines) {
 			assert.match(line, /^\[(pass|warn|fail)\] [a-z-]+: /);
 		}
