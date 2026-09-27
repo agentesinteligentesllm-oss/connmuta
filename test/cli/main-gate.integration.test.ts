@@ -50,6 +50,16 @@ interface SpawnResult {
 const GATE_SPAWN_TIMEOUT_MS = 5000;
 
 /**
+ * Bounds how long `runNode` waits for the OS to confirm the child actually exited after `SIGKILL`,
+ * once a {@link GATE_SPAWN_TIMEOUT_MS} timeout fires (native review `review-7a7a525a6a0f732d`,
+ * R4-sigkill-no-process-tree-wait, CRITICAL, found against this file's own first correction round).
+ * An immediate reject without waiting for `close` would race the caller's own `finally` cleanup
+ * (`rmSync(scratchDir, ...)`) against a still-alive process still holding that directory as its cwd —
+ * a real failure mode on Windows, where such a directory cannot be removed.
+ */
+const GATE_KILL_GRACE_MS = 2000;
+
+/**
  * Spawns a real `node` child process, collecting both streams and the exit code — bounded by
  * {@link GATE_SPAWN_TIMEOUT_MS}. Without this bound, a Node-floor-gate regression on the
  * `daemon start` case (the one gated subcommand whose successful, non-gated path is a persistent
@@ -66,14 +76,21 @@ function runNode(args: readonly string[], cwd: string): Promise<SpawnResult> {
 		const timeout = setTimeout(() => {
 			if (settled) return;
 			settled = true;
-			child.kill("SIGKILL");
-			reject(
-				new Error(
-					`runNode: child process did not exit within ${GATE_SPAWN_TIMEOUT_MS}ms (args: ${args.join(" ")}) — ` +
-						"if the Node-floor gate regressed for a persistent-process command like 'daemon start', this " +
-						"timeout is what turns that into a failed test instead of a hung one",
-				),
+			const timeoutError = new Error(
+				`runNode: child process did not exit within ${GATE_SPAWN_TIMEOUT_MS}ms (args: ${args.join(" ")}) — ` +
+					"if the Node-floor gate regressed for a persistent-process command like 'daemon start', this " +
+					"timeout is what turns that into a failed test instead of a hung one",
 			);
+			// Wait for the OS to confirm the direct child actually exited before rejecting, so the
+			// caller's own `finally` cleanup never races a still-alive process (see GATE_KILL_GRACE_MS).
+			// A bounded grace timer still rejects even if `close` never fires (SIGKILL not acknowledged).
+			let killGraceTimer: ReturnType<typeof setTimeout> | undefined;
+			child.once("close", () => {
+				if (killGraceTimer) clearTimeout(killGraceTimer);
+				reject(timeoutError);
+			});
+			child.kill("SIGKILL");
+			killGraceTimer = setTimeout(() => reject(timeoutError), GATE_KILL_GRACE_MS);
 		}, GATE_SPAWN_TIMEOUT_MS);
 
 		child.stdout?.on("data", (chunk: Buffer) => {

@@ -82,6 +82,16 @@ interface RawResponse {
 	bodyText: string;
 }
 
+/**
+ * Bounds every raw HTTP call this test makes against the real daemon-side harness (native review
+ * `review-7a7a525a6a0f732d`, R3-wrong-room-http-no-timeout / R4-no-request-timeout-hang, both
+ * CRITICAL). Without this, a routing bug or an unresolved promise in a real handler under test would
+ * hang `sendRequest` — and this whole test — indefinitely instead of failing with a diagnosable error,
+ * the identical failure class `test/cli/main-gate.integration.test.ts`'s own `GATE_SPAWN_TIMEOUT_MS`
+ * guards against for its own child-process calls.
+ */
+const REQUEST_TIMEOUT_MS = 5000;
+
 function sendRequest(options: { port: number; method: string; path: string; body?: string; authorization?: string }): Promise<RawResponse> {
 	return new Promise((resolvePromise, reject) => {
 		const bodyBuffer = options.body === undefined ? undefined : Buffer.from(options.body, "utf8");
@@ -94,11 +104,26 @@ function sendRequest(options: { port: number; method: string; path: string; body
 			headers["Authorization"] = options.authorization;
 		}
 		let responded = false;
-		const req = http.request({ host: IPC_LOOPBACK_HOST, port: options.port, method: options.method, path: options.path, headers }, (res) => {
-			responded = true;
-			const chunks: Buffer[] = [];
-			res.on("data", (chunk: Buffer) => chunks.push(chunk));
-			res.on("end", () => resolvePromise({ status: res.statusCode ?? 0, bodyText: Buffer.concat(chunks).toString("utf8") }));
+		const req = http.request(
+			{
+				host: IPC_LOOPBACK_HOST,
+				port: options.port,
+				method: options.method,
+				path: options.path,
+				headers,
+				timeout: REQUEST_TIMEOUT_MS,
+			},
+			(res) => {
+				responded = true;
+				const chunks: Buffer[] = [];
+				res.on("data", (chunk: Buffer) => chunks.push(chunk));
+				res.on("end", () => resolvePromise({ status: res.statusCode ?? 0, bodyText: Buffer.concat(chunks).toString("utf8") }));
+			},
+		);
+		// `timeout` above only sets socket inactivity detection — it emits "timeout" but does not itself
+		// abort the request; `destroy` does, which then fires the "error" handler below.
+		req.on("timeout", () => {
+			req.destroy(new Error(`sendRequest: ${options.method} ${options.path} did not respond within ${REQUEST_TIMEOUT_MS}ms`));
 		});
 		req.on("error", (err) => {
 			if (!responded) reject(err);
