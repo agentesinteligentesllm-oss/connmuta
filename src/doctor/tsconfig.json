@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../dist",
+    "tsBuildInfoFile": "../../dist/.tsbuildinfo/doctor.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "references": [
+    { "path": "../shared" },
+    { "path": "../ledger" },
+    { "path": "../secret-store" },
+    { "path": "../daemon" },
+    { "path": "../installer" }
+  ]
+}

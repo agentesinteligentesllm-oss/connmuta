@@ -17,6 +17,7 @@
     { "path": "src/secret-store" },
     { "path": "src/daemon" },
     { "path": "src/client" },
-    { "path": "src/migration" }
+    { "path": "src/migration" },
+    { "path": "src/doctor" }
   ]
 }
