@@ -22,10 +22,24 @@ import { icaclsExePath, REAL_EXEC_FILE, EXEC_FILE_OPTIONS, type ExecFileImpl } f
  * review findings R2-001/R2-002/R3-idempotency-count-fragile/R3-only-user-not-proved).
  */
 
-/** Runs `body` against a fresh scratch directory and removes it afterwards, even on failure. */
+/**
+ * Runs `body` against a fresh scratch directory and removes it afterwards, even on failure.
+ *
+ * Some CI Windows runners provision a scratch directory's parent with explicit (non-inherited)
+ * ACEs for `SYSTEM`/`Administrators`/the runner account, unlike a normal end-user profile where
+ * those grants come down through inheritance. `hardenHomeAcl`'s `/inheritance:r` step only strips
+ * *inherited* ACEs (`icacls` leaves explicit ones untouched by design), so a pre-seeded explicit
+ * ACE on the scratch directory itself would survive hardening and falsely fail the "exactly one
+ * ACE" assertions below on a real end-user machine. `/reset` re-derives the directory's ACL purely
+ * from its parent's inheritance chain before hardening runs, matching what a freshly created
+ * directory looks like everywhere else.
+ */
 function withScratchHome(body: (home: string) => void): void {
 	const home = mkdtempSync(join(tmpdir(), "conmuta-acl-"));
 	try {
+		if (process.platform === "win32") {
+			REAL_EXEC_FILE(icaclsExePath(), [home, "/reset"], EXEC_FILE_OPTIONS);
+		}
 		body(home);
 	} finally {
 		rmSync(home, { recursive: true, force: true });
