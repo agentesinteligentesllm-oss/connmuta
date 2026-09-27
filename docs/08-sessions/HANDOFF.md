@@ -200,4 +200,16 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 
 ## §9 — RDD review status at session close
 
-[Filled in at session close, after the documentation-close-out commit is staged — see §5 step 6.]
+Ran the selectorless STATUS → `review start` sequence against the documentation-close-out commit
+(`145388f`, 5 files, 396 changed lines, base `062e3a9`). The `review start` call returned the mandatory
+`gentle-ai.review-integration.consent/v3` envelope — risk `medium`, risk evidence `"this change is not
+purely passive documentation, so it gets one consolidated review"` plus `"an executable change in
+AGENTS.md"` (very likely a false-positive pattern match against prose/code-fence text in the huge status
+paragraph or a cited shell command, mirroring session 45's own `state.yaml` false-positive precedent —
+not independently confirmed this session). Relayed losslessly to the Director via the mandatory
+`AskUserQuestion` gate (never inferred). **The Director chose "Omitir esta vez" (decline)** — ran the
+exact returned decline invocation, confirmed `"consent": "declined_this_candidate"`. No review record
+was created for this candidate; delivery (commit, push) follows ordinary repository policy, which this
+session already had standing Director authorization for. Future medium/high-risk changes will ask again
+— this decline is candidate-scoped, not a change to the RDD switch itself (`gentle-ai review mode
+status` remains `on`, decided by global).
