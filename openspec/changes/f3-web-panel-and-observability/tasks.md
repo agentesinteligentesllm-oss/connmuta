@@ -110,9 +110,30 @@ where the token's byte length would live.
 
 ### Unit 4 — Panel HTTP surface
 
+#### PR-04a — Persist `roster_drift` as a standing condition (inserted, disclosed)
+Branch `f3/04a-roster-drift-condition` → `main`. Depends: none. Size: 71 authored lines (actual).
+Scope: `src/ledger/conditions-store.ts`, `src/daemon/ipc/routes.ts`, `test/ledger/conditions-store.test.ts`,
+`test/daemon/ipc/routes.test.ts` (extended). **Not in the original tasks.md plan** — discovered while
+starting PR-04: `shared/ipc-contract.ts`'s `ROSTER_DRIFT_CONDITION` was raised only transiently inside
+`POST /session`'s one response body (`routes.ts:414-416`) and never persisted anywhere; `roster_drift`
+was not a member of `conditions-store.ts`'s closed `ConditionName` union; nothing in the plan wrote it
+anywhere a passive `GET`-only panel could read it from. Debated with Alpha before any code was written
+(`bus-v2-f3-pr-04-plan-gap-001`, `CONSENSUS` round 1): add `roster_drift` as a 5th `ConditionName`
+(scope `project`, zero detail fields — the daemon only ever has a hash comparison, never the client's
+live roster array, so no structural diff is possible from the daemon's side), and extend the *same*
+already-computed comparison in `routes.ts` to call `raiseCondition`/`clearCondition`. The panel (PR-04c)
+reads this condition directly; "the diff" the web-panel spec's scenario names is the condition plus the
+registry's own stored `roster_snapshot` — a human wanting the actual live diff runs `conmuta project
+sync-roster` (PR-07), which reads the live file.
+- [x] 4a.1 RED/GREEN: add `"roster_drift"` to `ConditionName` and `CONDITION_CONTRACTS` (zero fields);
+      round-trip, daemon-scope-refusal, and zero-detail-contract tests in `conditions-store.test.ts`.
+- [x] 4a.2 RED/GREEN: `routes.ts`'s `POST /session` handler calls `raiseCondition` on mismatch,
+      `clearCondition` on match; regression tests in `routes.test.ts` for both paths.
+- [x] 4a.3 Verify: `npm run build && node --test "dist/test/ledger/conditions-store.test.js" "dist/test/daemon/ipc/routes.test.js"`.
+
 #### PR-04 — `daemon/panel/server.ts` + `daemon/panel/routes.ts`
-Branch `f3/04-panel-server-routes` → `main`. Depends: PR-01, PR-03. Size: ≈420 lines (est.; watch this
-one — re-slice at the server.ts/routes.ts boundary into 2 PRs if the real diff exceeds 400).
+Branch `f3/04-panel-server-routes` → `main`. Depends: PR-01, PR-03, PR-04a. Size: ≈420 lines (est.; watch
+this one — re-slice at the server.ts/routes.ts boundary into 2 PRs if the real diff exceeds 400).
 Scope: `src/daemon/panel/server.ts`, `src/daemon/panel/routes.ts`, `test/daemon/panel/server.test.ts`,
 `test/daemon/panel/routes.test.ts`.
 Requirements: web-panel "Read-only surface, two screens only" and "No runtime filesystem reads for

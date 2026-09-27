@@ -80,6 +80,7 @@ import type { EventEmitter } from "node:events";
 import type { DatabaseSync } from "node:sqlite";
 
 import { appendAuditRow } from "../../ledger/audit.js";
+import { clearCondition, raiseCondition } from "../../ledger/conditions-store.js";
 import { toolErrorPayload, type ToolErrorPayload } from "../../shared/error-payload.js";
 import {
 	HTTP_BAD_REQUEST,
@@ -413,6 +414,12 @@ function createOpenSessionHandler(
 		const conditions: string[] = [];
 		if (managed.binding.roster_hash !== parsed.roster_hash) {
 			conditions.push(ROSTER_DRIFT_CONDITION);
+			// F3 PR-04a: made a standing condition (was previously discarded after this one response) so
+			// the web panel — a passive GET-only surface with no session of its own — has a project-scoped
+			// row to read; see conditions-store.ts's own module doc for why it carries no detail.
+			raiseCondition(deps.db, { scope: parsed.project_id, name: "roster_drift", since: now().toISOString() });
+		} else {
+			clearCondition(deps.db, parsed.project_id, "roster_drift");
 		}
 
 		const clientId = generateId();

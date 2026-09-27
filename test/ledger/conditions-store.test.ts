@@ -78,12 +78,13 @@ function rowCount(db: DatabaseSync): number {
 	return (db.prepare("SELECT COUNT(*) AS n FROM conditions").get() as { n: number }).n;
 }
 
-/** The four names the daemon can raise today, with a valid detail for each — the contract's own fixtures. */
+/** The five names the daemon can raise today, with a valid detail for each — the contract's own fixtures. */
 const VALID_RAISES = [
 	{ scope: DAEMON_CONDITION_SCOPE, name: "ledger_quarantined", detail: { reason: "corruption" } },
 	{ scope: PROJECT_ID, name: "group_outage", detail: { last_error: "TELEGRAM_CONFLICT" } },
 	{ scope: PROJECT_ID, name: "state_quarantined", detail: { quarantined_path: "state.json.corrupt-1" } },
 	{ scope: PROJECT_ID, name: "open_thread_backlog", detail: { count: 51 } },
+	{ scope: PROJECT_ID, name: "roster_drift", detail: {} },
 ] as const;
 
 test("raising a condition creates one row, and the detail comes back as the record that went in", () => {
@@ -358,7 +359,7 @@ test("the store opens no transaction of its own, so it composes inside a caller'
 	});
 });
 
-test("all four names the daemon raises today round-trip, each under its own contract", () => {
+test("all five names the daemon raises today round-trip, each under its own contract", () => {
 	withLedger((db) => {
 		for (const raise of VALID_RAISES) {
 			raiseCondition(db, { scope: raise.scope, name: raise.name, since: NOW, detail: raise.detail });
@@ -366,5 +367,30 @@ test("all four names the daemon raises today round-trip, each under its own cont
 		assert.equal(rowCount(db), VALID_RAISES.length);
 		assert.equal(readCondition(db, DAEMON_CONDITION_SCOPE, "ledger_quarantined")?.detail?.reason, "corruption");
 		assert.equal(readCondition(db, PROJECT_ID, "state_quarantined")?.detail?.quarantined_path, "state.json.corrupt-1");
+	});
+});
+
+// F3 PR-04a: roster_drift (daemon/ipc/routes.ts's POST /session comparison made a standing condition)
+// is this store's first zero-field contract — parseDetail's `contract.fields.size > 0` branch (the
+// stored column is NULL and stays NULL) was written for exactly this shape but never exercised before.
+test("roster_drift raises and reads with no detail at all, and clears like any other condition", () => {
+	withLedger((db) => {
+		raiseCondition(db, { scope: PROJECT_ID, name: "roster_drift", since: NOW });
+		const read = readCondition(db, PROJECT_ID, "roster_drift");
+		assert.notEqual(read, undefined);
+		assert.equal(read?.since, NOW);
+		assert.equal(read?.detail, null);
+
+		assert.equal(clearCondition(db, PROJECT_ID, "roster_drift"), true);
+		assert.equal(readCondition(db, PROJECT_ID, "roster_drift"), undefined);
+	});
+});
+
+test("roster_drift is refused under the daemon scope (it is a project condition)", () => {
+	withLedger((db) => {
+		assert.throws(
+			() => raiseCondition(db, { scope: DAEMON_CONDITION_SCOPE, name: "roster_drift", since: NOW }),
+			(error: unknown) => error instanceof Error && error.message.includes("roster_drift") === true,
+		);
 	});
 });
