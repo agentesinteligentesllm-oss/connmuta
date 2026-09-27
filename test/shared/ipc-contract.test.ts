@@ -28,6 +28,9 @@ import {
   IPC_SESSION_HOST_MAX_CHARS,
   IPC_TRANSPORT_ERROR_CODES,
   IPC_UNSUPPORTED_MEDIA_TYPE,
+  doctorFindingSchema,
+  doctorRequestSchema,
+  doctorResponseSchema,
   identityRequestQuerySchema,
   identityResponseSchema,
   ipcErrorSchema,
@@ -60,12 +63,13 @@ test("PROJECT_ID_PATTERN accepts the fixture project id used below (sanity)", ()
   assert.match(VALID_PROJECT_ID, PROJECT_ID_PATTERN);
 });
 
-test("IPC_ROUTES lists exactly the seven fixed routes, and every one has a request and a response schema", () => {
+test("IPC_ROUTES lists exactly the eight fixed routes, and every one has a request and a response schema", () => {
   assert.deepEqual(
     [...IPC_ROUTES].sort(),
     [
       "DELETE /session",
       "GET /identity",
+      "POST /doctor",
       "POST /session",
       "POST /tools/fetch",
       "POST /tools/send",
@@ -267,4 +271,91 @@ test("session request refuses a project_id outside PROJECT_ID_PATTERN", () => {
 test("session response refuses a bearer longer than SESSION_TOKEN_BYTES", () => {
   const response = { client_id: "client-1", bearer: VALID_BEARER + "cc", binding: VALID_SESSION_BINDING, conditions: [] };
   assert.equal(sessionResponseSchema.safeParse(response).success, false);
+});
+
+/**
+ * `POST /doctor` (design §9.2 D-44). `project_id` is always optional at the schema level: `dm_probe:
+ * true` requires it (the probe targets one binding's roster), `dm_probe: false` permits it present
+ * (an online check scoped to one project) or absent (every bound project) — design §9.2 does not
+ * forbid the former, and the response's own `bindings` array already reports per-project results.
+ */
+const VALID_DOCTOR_REQUEST = {
+  server_nonce: VALID_NONCE,
+  hmac: VALID_DIGEST,
+  dm_probe: false,
+};
+
+test("doctor request accepts dm_probe: false with no project_id", () => {
+  assert.equal(doctorRequestSchema.safeParse(VALID_DOCTOR_REQUEST).success, true);
+});
+
+test("doctor request accepts dm_probe: false WITH a project_id present (scoped online check, disclosed permissive reading)", () => {
+  assert.equal(
+    doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, project_id: VALID_PROJECT_ID }).success,
+    true,
+  );
+});
+
+test("doctor request accepts dm_probe: true only when project_id is present", () => {
+  assert.equal(
+    doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, dm_probe: true, project_id: VALID_PROJECT_ID }).success,
+    true,
+  );
+  assert.equal(doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, dm_probe: true }).success, false, "dm_probe: true requires project_id");
+});
+
+test("doctor request refuses a project_id outside PROJECT_ID_PATTERN", () => {
+  assert.equal(
+    doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, project_id: "Not A Project!" }).success,
+    false,
+  );
+});
+
+test("doctor request requires nonce-shaped server_nonce and 64-char hmac, and is strict about extra keys", () => {
+  assert.equal(doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, server_nonce: VALID_NONCE.slice(1) }).success, false, "too short");
+  assert.equal(doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, hmac: "not-hex" }).success, false);
+  const { dm_probe: _omitted, ...withoutDmProbe } = VALID_DOCTOR_REQUEST;
+  assert.equal(doctorRequestSchema.safeParse(withoutDmProbe).success, false, "dm_probe is required, not optional");
+  assert.equal(doctorRequestSchema.safeParse({ ...VALID_DOCTOR_REQUEST, extra: "nope" }).success, false);
+});
+
+test("doctor finding requires one of the three-member status enum and is strict", () => {
+  const valid = { id: "bot-reachable", status: "pass", detail: "ok" };
+  assert.equal(doctorFindingSchema.safeParse(valid).success, true);
+  assert.equal(doctorFindingSchema.safeParse({ ...valid, status: "warn" }).success, true);
+  assert.equal(doctorFindingSchema.safeParse({ ...valid, status: "fail" }).success, true);
+  assert.equal(doctorFindingSchema.safeParse({ ...valid, status: "unknown" }).success, false);
+  assert.equal(doctorFindingSchema.safeParse({ ...valid, extra: 1 }).success, false);
+});
+
+test("doctor response round-trips multiple bindings each with multiple checks, and is strict", () => {
+  const valid = {
+    bindings: [
+      {
+        project_id: VALID_PROJECT_ID,
+        checks: [
+          { id: "bot-identity", status: "pass", detail: "bot id matches" },
+          { id: "group-reachable", status: "warn", detail: "not a supergroup" },
+        ],
+      },
+      {
+        project_id: "another-project",
+        checks: [{ id: "roster-membership", status: "fail", detail: "left the group" }],
+      },
+    ],
+  };
+  assert.equal(doctorResponseSchema.safeParse(valid).success, true);
+  assert.equal(doctorResponseSchema.safeParse({ ...valid, extra: 1 }).success, false);
+});
+
+test("doctor response refuses a check status outside the three-member enum", () => {
+  const invalid = {
+    bindings: [{ project_id: VALID_PROJECT_ID, checks: [{ id: "x", status: "ok", detail: "d" }] }],
+  };
+  assert.equal(doctorResponseSchema.safeParse(invalid).success, false);
+});
+
+test("doctor response refuses a binding project_id outside PROJECT_ID_PATTERN", () => {
+  const invalid = { bindings: [{ project_id: "Not A Project!", checks: [] }] };
+  assert.equal(doctorResponseSchema.safeParse(invalid).success, false);
 });

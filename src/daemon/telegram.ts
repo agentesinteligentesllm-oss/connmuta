@@ -21,6 +21,16 @@ export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
 }
+/**
+ * `getChatMember`'s result, minimal by design (PT-32, B-28): this codebase only needs `status` (to
+ * tell an administrator/creator from a member who left/was kicked, per doctor's D-44 online check)
+ * and `user`. The real Bot API `ChatMember` object also carries role-specific extra fields (e.g.
+ * `can_be_edited` for administrators); those are deliberately not modeled here.
+ */
+export interface TelegramChatMember {
+  status: "creator" | "administrator" | "member" | "restricted" | "left" | "kicked";
+  user: TelegramUser;
+}
 export interface GetUpdatesParams {
   offset?: number;
   limit?: number;
@@ -267,6 +277,10 @@ export class TelegramApiClient implements TelegramClient {
   }
   async getChat(chatId: number | string): Promise<TelegramChat> {
     return this.call<TelegramChat>("getChat", { chat_id: chatId }, requestTimeoutMs());
+  }
+  /** Not on the `TelegramClient` interface (D-48): only the online doctor check (design §9.2) needs it, so the room guard and rate recorder stay untouched. */
+  async getChatMember(chatId: number | string, userId: number): Promise<TelegramChatMember> {
+    return this.call<TelegramChatMember>("getChatMember", { chat_id: chatId, user_id: userId }, requestTimeoutMs());
   }
 
   private async call<T>(method: string, body: unknown, timeoutMs: number): Promise<T> {

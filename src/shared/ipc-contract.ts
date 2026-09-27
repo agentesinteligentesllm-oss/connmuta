@@ -7,10 +7,11 @@
  * Holds three things, and three things only:
  * 1. The daemon's own HTTP status names — design §3 row 120's five, plus this scaffolding's own
  *    transport-status additions, each disclosed where it is declared below.
- * 2. The fixed seven-route table (design §10 D-13) and, for every route, the zod schema its request
- *    and its success response must satisfy — shared between the daemon's route handlers (PR-30/31)
- *    and the thin client (PR-33/34), so both read one definition of each shape (design §10
- *    "Contract" row: "the daemon re-validates tool inputs … it never trusts the client").
+ * 2. The fixed route table (design §10 D-13; `POST /doctor` added by PR-16, design §9.2 D-44) and,
+ *    for every route, the zod schema its request and its success response must satisfy — shared
+ *    between the daemon's route handlers (PR-30/31) and the thin client (PR-33/34), so both read one
+ *    definition of each shape (design §10 "Contract" row: "the daemon re-validates tool inputs … it
+ *    never trusts the client").
  * 3. The closed set of transport-level refusal codes `daemon/ipc/server.ts` itself can raise, before
  *    any route handler runs.
  *
@@ -88,8 +89,8 @@ export const IPC_SESSION_HOST_MAX_CHARS = 64;
 // ---------------------------------------------------------------------------
 
 /**
- * The seven fixed IPC routes (design §10 D-13). `/panel/*` is F3 scope and is deliberately not a
- * member of this table.
+ * The eight fixed IPC routes (design §10 D-13; `POST /doctor` added by PR-16, design §9.2 D-44).
+ * `/panel/*` is F3 scope and is deliberately not a member of this table.
  */
 export const IPC_ROUTES = [
   "GET /identity",
@@ -99,9 +100,10 @@ export const IPC_ROUTES = [
   "POST /tools/fetch",
   "POST /tools/status",
   "POST /tools/thread",
+  "POST /doctor",
 ] as const;
 
-/** One of the seven fixed routes, as `"<METHOD> <path>"`. */
+/** One of the eight fixed routes, as `"<METHOD> <path>"`. */
 export type IpcRouteKey = (typeof IPC_ROUTES)[number];
 
 // ---------------------------------------------------------------------------
@@ -235,6 +237,69 @@ export const sessionCloseResponseSchema = z.strictObject({
 export const toolSuccessSchema = z.record(z.string(), z.unknown());
 
 // ---------------------------------------------------------------------------
+// POST /doctor
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /doctor`'s request body (design §9.2 D-44). `hmac = HMAC-SHA256(secret, "doctor:" +
+ * server_nonce)` — the `"doctor:"` label itself is `installer/constants.ts`'s `DOCTOR_PROOF_LABEL`,
+ * outside `shared/`, because computing and verifying the proof is `daemon/ipc/doctor.ts`'s job (a
+ * later PR), not this wire-contract module's; this schema only fixes the field shapes such a helper
+ * needs, mirroring `sessionRequestSchema`'s own `server_nonce`/`hmac` fields exactly.
+ *
+ * `project_id` is optional at the schema level either way: `dm_probe: true` requires it (the probe
+ * targets one binding's roster and cannot run without naming which one), while `dm_probe: false`
+ * permits it present (an online check scoped to that one project) or absent (every bound project) —
+ * design §9.2 does not forbid the scoped reading, and the response's own `bindings` array already
+ * reports results per project either way.
+ */
+const doctorRequestBaseSchema = z.strictObject({
+  server_nonce: nonceHexSchema,
+  hmac: hmacDigestSchema,
+  project_id: z.string().regex(PROJECT_ID_PATTERN).optional(),
+  dm_probe: z.boolean(),
+});
+
+type BaseDoctorRequest = z.infer<typeof doctorRequestBaseSchema>;
+
+/** `dm_probe: true` requires `project_id`; `dm_probe: false` leaves it optional (design §9.2). */
+function isProjectIdValidForDmProbe(input: BaseDoctorRequest): boolean {
+  return input.dm_probe ? input.project_id !== undefined : true;
+}
+
+/** Full `POST /doctor` request schema; the cross-field rule is layered via `.refine()`, mirroring `shared/tool-schemas.ts`'s `sendInputSchema` construction. */
+export const doctorRequestSchema = doctorRequestBaseSchema.refine(isProjectIdValidForDmProbe, {
+  message: "`project_id` is required when `dm_probe` is true",
+  path: ["project_id"],
+});
+
+export type DoctorRequest = z.infer<typeof doctorRequestSchema>;
+
+/** One `POST /doctor` check result (design §9.2): an id an agent can branch on, a three-state verdict, and a redacted human-readable detail. */
+export const doctorFindingSchema = z.strictObject({
+  id: z.string(),
+  status: z.enum(["pass", "warn", "fail"]),
+  detail: z.string(),
+});
+
+/**
+ * `POST /doctor`'s response (design §9.2): one entry per bound project, each carrying its own list
+ * of checks. Declared independently rather than importing `doctor/checks/system.ts`'s `Finding`
+ * type: that module lives outside `src/shared` and a `shared/` module may import only zod,
+ * `node:crypto` and other `shared/` modules (design §2.2 compile-unit boundary).
+ */
+export const doctorResponseSchema = z.strictObject({
+  bindings: z.array(
+    z.strictObject({
+      project_id: z.string().regex(PROJECT_ID_PATTERN),
+      checks: z.array(doctorFindingSchema),
+    }),
+  ),
+});
+
+export type DoctorResponse = z.infer<typeof doctorResponseSchema>;
+
+// ---------------------------------------------------------------------------
 // Error responses
 // ---------------------------------------------------------------------------
 
@@ -320,6 +385,7 @@ export const IPC_REQUEST_SCHEMAS = {
   "POST /tools/fetch": fetchInputSchema,
   "POST /tools/status": statusInputSchema,
   "POST /tools/thread": threadInputSchema,
+  "POST /doctor": doctorRequestSchema,
 } satisfies Record<IpcRouteKey, z.ZodType>;
 
 /** Every route's success-response schema, keyed by {@link IpcRouteKey}. See {@link toolSuccessSchema} for why the four tool routes share one opaque schema. */
@@ -331,6 +397,7 @@ export const IPC_RESPONSE_SCHEMAS = {
   "POST /tools/fetch": toolSuccessSchema,
   "POST /tools/status": toolSuccessSchema,
   "POST /tools/thread": toolSuccessSchema,
+  "POST /doctor": doctorResponseSchema,
 } satisfies Record<IpcRouteKey, z.ZodType>;
 
 /** Looks up one route's request schema — the same table PR-30/31's handlers and PR-33/34's client read. */
