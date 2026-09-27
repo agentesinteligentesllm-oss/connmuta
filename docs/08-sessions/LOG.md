@@ -4,6 +4,90 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 46 — F3 `sdd-apply` PR-01 through PR-05 (Units 1-5), 7 PRs merged
+
+- **Date**: 2026-09-27 (UTC).
+- **Authority**: the Director asked Kairo to arrange with the collaborator (Alpha) and take full
+  ownership of `sdd-apply` for F3, with explicit standing autonomy ("no quiero que me preguntes
+  absolutamente nada... tienes toda mi autorización") and one closing request: a ≤3-line miniprompt
+  for the next session, contingent on the documentation being unambiguous and free of redundant
+  instructions.
+- **PR-01** (`daemon/transport/http-guards.ts`): extracted the Host-DNS-rebinding check previously
+  inline in `ipc/server.ts:219-228` into `checkTransportGuards(req, {expectedHost, requireOrigin})`,
+  reusing `IPC_HOST_REJECTED`/`ipcTransportError` for the Host case and a new local
+  `TRANSPORT_ORIGIN_REJECTED` for the Origin case (deliberately NOT added to `shared/ipc-contract.ts`'s
+  closed `IPC_TRANSPORT_ERROR_CODES`, which that set's own doc scopes to `ipc/server.ts`'s own
+  refusals). Alpha `AUDIT` `APPROVE`, zero objections, `CONSENSUS` round 1 (`bus-v2-f3-pr-01-diff-audit-001`).
+  137 authored lines. Merged as PR #78.
+- **PR-02** (wire `ipc/server.ts` to `http-guards`): replaced the inline Host check with a
+  `checkTransportGuards` call, byte-identical output pinned by a new full-body `deepEqual` regression
+  test (not just `.code`). Disclosed, out-of-scope fix: `test/security/daemon-bundle.test.ts`'s
+  reverse-import-graph allow-list predated `http-guards.ts` and refused `ipc/server.ts`'s new import —
+  fixed by exempting the specific module name `http-guards` (not widening the allow-list itself). Alpha
+  `AUDIT` `APPROVE`, `CONSENSUS` round 1 (`bus-v2-f3-pr-02-diff-audit-001`). 43 authored lines. Merged
+  as PR #79.
+- **PR-03** (`daemon/panel/token-store.ts` + `panel-run-file.ts`): `PanelTokenStore` mirrors
+  `ipc/sessions.ts`'s constant-time comparison; `panel-run-file.ts` mirrors `lifecycle/run-file.ts`'s
+  shape with `token` in place of `secret`, taking the token as a caller-supplied parameter since
+  `PanelTokenStore` is the one place it is minted. Resolved `DATA-MODEL.md:291`'s open panel-token-
+  domain note. Alpha's audit added a forward note (PR-05 will need `panel-run-file.js` in the daemon
+  bundle's `node:fs` allow-list) — confirmed true two PRs later. `CONSENSUS` round 1
+  (`bus-v2-f3-pr-03-diff-audit-001`). 259 authored lines. Merged as PR #80.
+- **A real, plan-level gap surfaced before PR-04 code was written, debated rather than silently
+  patched.** The web-panel spec's "Roster drift is shown" scenario assumes the panel can read a live
+  `roster_drift` condition; in fact `shared/ipc-contract.ts`'s `ROSTER_DRIFT_CONDITION` was raised only
+  transiently inside `POST /session`'s one response body and never persisted, `roster_drift` was not a
+  member of `conditions-store.ts`'s closed `ConditionName` union, and no PR in the 9-slice plan
+  (including PR-07's roster-sync CLI) wrote it anywhere a passive `GET`-only panel could read it from —
+  nor can the daemon compute a real structural diff, since it only ever sees a hash comparison, never
+  the client's live roster array. Debated with Alpha (`bus-v2-f3-pr-04-plan-gap-001`) before any PR-04
+  code existed: resolution — add `roster_drift` as a 5th, zero-detail `ConditionName`; extend the SAME
+  already-computed `routes.ts` comparison to raise/clear it; the panel shows the condition plus the
+  registry's own stored `roster_snapshot`, not a live diff (a human wanting the real diff runs
+  `conmuta project sync-roster`). `CONSENSUS` round 1.
+- **PR-04a** (inserted, disclosed slice implementing the resolution above): `ledger/conditions-store.ts`
+  gains `roster_drift`; `daemon/ipc/routes.ts`'s existing comparison raises/clears it. Alpha `AUDIT`
+  `APPROVE`, `CONSENSUS` round 1 (`bus-v2-f3-pr-04a-diff-audit-001`). 71 authored lines. Merged as PR #81.
+- **PR-04 re-sliced at apply time into PR-04b/PR-04c**, confirming `tasks.md`'s own flagged risk: real
+  `server.ts` alone measured 356 lines against the ~420-combined estimate.
+  - **PR-04b** (`daemon/panel/server.ts`): the panel's own `node:http` listener, GET-only route
+    dispatch, `checkTransportGuards(requireOrigin: true)` + `PanelTokenStore` (header or query-param
+    token). `CONSENSUS` round 1 (`bus-v2-f3-pr-04b-diff-audit-001`). 356 authored lines. Merged as PR #82.
+  - **PR-04c** (`daemon/panel/routes.ts`): Home (pid/uptime/per-bot last-poll/conditions-per-binding)
+    and Overview (one row per binding: bot/group/project/roster/open-threads/needs_action/last-poll/
+    conditions) screens, per `OVERVIEW.md` §10.2's own field list. Every registry-derived string is
+    HTML-escaped (a global security rule, not a spec-enumerated scenario) — pinned by a dedicated
+    hostile-input test. Disclosed export-only change to `daemon/serve/status.ts` (3 already-tested
+    private helpers made public, zero logic change) to avoid a second copy of the same reads. `CONSENSUS`
+    round 1 (`bus-v2-f3-pr-04c-diff-audit-001`). Disclosed `size:exception`: 406 authored lines (6 over
+    the 400 budget). Merged as PR #83, closing Unit 4.
+- **PR-05** (mount the panel listener in `daemon/bootstrap.ts`): `startDaemon` builds the panel's full
+  handler map up front (no per-boot-secret dependency, unlike the IPC handlers' mutable-object
+  indirection); `stop()`/the startup catch block mirror `ipcServer`'s own REAL cleanup behavior — a
+  disclosed correction to `design.md`'s own citation, which claimed the catch block also deletes the
+  IPC run file (it does not; only `stop()` does). Fixed the daemon bundle's `node:fs` allow-list
+  (`panel-run-file.js`, predicted by PR-03's own Alpha note). `CONSENSUS` round 1
+  (`bus-v2-f3-pr-05-diff-audit-001`). 103 authored lines. Merged as PR #84, closing Units 4 and 5 — the
+  web panel is now reachable end-to-end within the running daemon.
+- **A research fork returned a non-answer instead of findings** (a new, distinct symptom of this
+  project's already-documented fork unreliability, HANDOFF §4: not empty/zero-tool-call this time, but
+  a real 48-second/6-tool-use run whose final message was an unrelated stray sentence). Abandoned in
+  favor of direct reads, per that same section's own established fallback, rather than re-trying
+  delegation.
+- **Every PR** ran the full suite and `test:static` before merge; two already-documented, pre-existing
+  flakes (B-39's `heartbeat: ticks at periodMs`, and `bootstrap.test.js`'s own known re-entrancy case)
+  each hit once across the session and cleared on immediate rerun — neither touched a file any PR this
+  session changed.
+- **Outcome**: F3's Units 1 through 5 (`shared transport guards`, `ipc/server.ts` wiring, `panel token
+  and discovery primitives`, `panel HTTP surface`, `daemon/bootstrap.ts`) are complete and merged. Units
+  6 through 9 (`conmuta panel` CLI verb, roster sync, version observability, static assertions +
+  documentation close-out) remain. `sdd-apply` continues at PR-06 next session.
+- **Documentation closed out this session**: `AGENTS.md` status paragraph, `docs/00-INDEX.md` (row 14
+  added, row 13 marked superseded), `docs/05-tribunal/INDEX.md` (9 new debate entries: 7 diff audits,
+  1 plan-gap debate, already covering PR-01 through PR-05), `openspec/changes/f3-web-panel-and-
+  observability/tasks.md` (every completed task checked off, 3 disclosed corrections/insertions
+  recorded in place), this log entry, and `HANDOFF.md`.
+
 ## Session 45 — F3 (`f3-web-panel-and-observability`) full SDD planning cycle: propose → spec → design → tasks
 
 - **Date**: 2026-09-27 (UTC).

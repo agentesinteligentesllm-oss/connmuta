@@ -1262,6 +1262,126 @@ visible.
 
 ---
 
+## `bus-v2-f3-pr-01-diff-audit-001` — F3 PR-01 diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff for PR-01 (`daemon/transport/http-guards.ts`, `checkTransportGuards`), extracting the Host-DNS-rebinding check previously inline in `daemon/ipc/server.ts:219-228` into a shared, parameterized module. |
+| Authority | The Director, standing full autonomy delegated to Kairo+Alpha debate for the whole `sdd-apply` cycle ("no quiero que me preguntes absolutamente nada... tienes toda mi autorización"). |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: the Host check reuses `IPC_HOST_REJECTED`/`ipcTransportError` from `shared/ipc-contract.ts` for byte-identical output; the new `TRANSPORT_ORIGIN_REJECTED` code is correctly kept local to `http-guards.ts` rather than added to the closed `IPC_TRANSPORT_ERROR_CODES` set, which that set's own doc scopes to codes raised by `ipc/server.ts` itself. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-01 merged as GitHub PR #78. 137 authored lines (69 src + 68 test), no exception. |
+
+---
+
+## `bus-v2-f3-pr-02-diff-audit-001` — F3 PR-02 diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff for PR-02 — wires `daemon/ipc/server.ts`'s `handleRequest` to `checkTransportGuards` (`requireOrigin: false`), byte-identical regression-tested. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: the refactor is behavior-preserving (new regression test asserts full body `deepEqual`, not just `code`); the disclosed, out-of-scope fix to `test/security/daemon-bundle.test.ts`'s reverse-import-graph allow-list (exempting `http-guards` by imported-module name, since that allow-list predated `http-guards.ts` and was scoped to the outbound Telegram-transport path only) is sound and does not weaken the assertion for any other `transport/*` file. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-02 merged as GitHub PR #79. 43 authored lines, no exception. |
+
+---
+
+## `bus-v2-f3-pr-03-diff-audit-001` — F3 PR-03 diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff for PR-03 — `PanelTokenStore` (single per-boot token, constant-time compare) and `panel-run-file.ts` (`run/panel.json` writer/reader/deleter, mirroring `lifecycle/run-file.ts`). |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: `PanelTokenStore` correctly mirrors `ipc/sessions.ts`'s constant-time comparison pattern; `panel-run-file.ts` correctly takes the token as a caller-supplied parameter rather than minting its own, since `PanelTokenStore` is the one place a panel token is ever created; the disclosed `PANEL_TOKEN_BYTES` constant addition satisfies the named-constant rule. Alpha added a forward-looking note for PR-05: the daemon bundle's `node:fs` allow-list will need `panel-run-file.js` once `bootstrap.ts` wires it in — confirmed true two PRs later. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-03 merged as GitHub PR #80. 259 authored lines, no exception. `DATA-MODEL.md:291`'s open panel-token-domain note resolved. |
+
+---
+
+## `bus-v2-f3-pr-04-plan-gap-001` — F3 PR-04 plan-level gap: `roster_drift` has no persistence
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | A real gap in the already-audited plan, surfaced before any PR-04 code was written: the web-panel spec's "Roster drift is shown" scenario assumes the panel can read a live `roster_drift` condition per binding, but `shared/ipc-contract.ts`'s `ROSTER_DRIFT_CONDITION` is raised only transiently inside `POST /session`'s one response body (`daemon/ipc/routes.ts:414-416`) and never persisted; `roster_drift` was not a member of `ledger/conditions-store.ts`'s closed `ConditionName` union; no PR in the 9-slice plan (including PR-07, roster-sync) wrote it anywhere a passive `GET`-only panel could read it from. A real structural diff is also unreachable from the daemon's side — it only ever sees a hash comparison, never the client's live roster array. |
+| Authority | The Director's standing full autonomy explicitly covers exactly this: "una decisión de producto genuinamente no resuelta" debated with Alpha before proceeding, per the project's own Kairo protocol. |
+| Round 1 | Kairo's `PROPOSAL` offered resolution (a) add `roster_drift` as a 5th `ConditionName` (scope `project`, zero detail fields); (b) extend the *same* already-computed `routes.ts` comparison to call `raiseCondition`/`clearCondition`, no new detection logic; (c) reinterpret "the diff" as the condition plus the registry's own stored `roster_snapshot`, not a live structural diff — a human wanting the real diff runs `conmuta project sync-roster` (PR-07). Alpha's `AUDIT` returned `APPROVE`, zero objections, closing straight to `CONSENSUS`. |
+| Round 2 | Not needed. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None — a genuinely new fact discovered during implementation, resolved via debate rather than silently re-planned, per this project's own standing convention. |
+| Consequence | Inserted a new, disclosed slice PR-04a (`bus-v2-f3-pr-04a-diff-audit-001`) ahead of the original PR-04, not in the ratified `tasks.md` at planning time. |
+
+---
+
+## `bus-v2-f3-pr-04a-diff-audit-001` — F3 PR-04a diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff implementing `bus-v2-f3-pr-04-plan-gap-001`'s resolution: `roster_drift` as a standing, project-scoped, zero-detail condition; `daemon/ipc/routes.ts`'s `POST /session` handler raises/clears it on the same existing comparison. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: the zero-field contract exercises `conditions-store.ts`'s `parseDetail` null-branch for the first time (previously written, never test-covered); the `raiseCondition`/`clearCondition` wiring reuses `deps.db`, already used elsewhere in the same file for `appendAuditRow`. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-04a merged as GitHub PR #81. 71 authored lines, no exception. |
+
+---
+
+## `bus-v2-f3-pr-04b-diff-audit-001` — F3 PR-04b diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff for PR-04b (`daemon/panel/server.ts`) — re-sliced at apply time from the original single PR-04 after `server.ts` alone measured 356 lines, confirming `tasks.md`'s own flagged risk that the ~420-line combined estimate would not fit one 400-line PR. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: the transport-guards-first-then-token-then-route pipeline ordering is sound; GET-only composite routing correctly maps any mutation or unknown path to one 404 branch; the disclosed reuse of `IPC_LOOPBACK_HOST`/`IPC_EPHEMERAL_PORT` and the `Connection: close`-always choice are both reasonable, minimal engineering decisions. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-04b merged as GitHub PR #82. 356 authored lines, no exception. Re-slicing protected the 400-line budget. |
+
+---
+
+## `bus-v2-f3-pr-04c-diff-audit-001` — F3 PR-04c diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff for PR-04c (`daemon/panel/routes.ts`) — Home and Overview screens, closing Unit 4. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: Home/Overview fields match `OVERVIEW.md` §10.2's own row specification; exporting `listThreadIds`/`readPollerEntry`/`computeUptimeSeconds` from `daemon/serve/status.ts` (zero logic change) avoids a second copy of the same reads; HTML-escaping every registry-derived string (a global security rule, not a spec-enumerated scenario) is verified by a dedicated hostile-input test; the structural "no `<form>`/no `method=\"post\"`" pin is a reasonable proxy for "no mutation control"; `roster_drift`'s row correctly shows the stored `roster_snapshot` rather than a live diff, per PR-04a's own disclosed resolution. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-04c merged as GitHub PR #83, closing Unit 4. Disclosed `size:exception`: 406 authored lines (387 new + 19 in `status.ts`) against the 400-line budget, 6 lines over. |
+
+---
+
+## `bus-v2-f3-pr-05-diff-audit-001` — F3 PR-05 diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 46) |
+| Subject | Audit the diff for PR-05 — mounts the panel listener in `daemon/bootstrap.ts`'s `startDaemon`, closing Unit 5. The web panel becomes reachable end-to-end within the running daemon. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: the panel's full handler map builds up front (no per-boot-secret dependency like the IPC handlers' mutable-object indirection); `stop()`/catch-block cleanup correctly mirrors `ipcServer`'s own REAL behavior rather than `design.md`'s stale citation (which claimed the catch block also calls `deleteRunFile` for `ipcServer` — it does not; only `stop()` does); the disclosed, Alpha-predicted (from PR-03's own audit note) fix to `daemon-bundle.test.ts`'s `node:fs` allow-list is correct; the new mid-boot-failure test's injection technique (a `secretStore.kind` getter that throws, first read well after the panel listener starts) needed no new test-only hook. Alpha additionally re-verified that a transient `ECONNRESET`/`ETIMEDOUT` hit mid-session was loopback TCP port exhaustion under Windows load (B-91's known pattern), not a real regression. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-05 merged as GitHub PR #84, closing Units 4 and 5. 103 authored lines, no exception. Next slice: PR-06 (`conmuta panel` CLI verb). |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an
