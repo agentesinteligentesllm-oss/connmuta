@@ -239,6 +239,22 @@ test("a request with the wrong port in Host is refused with 403 and never reache
   assert.equal(called, 0);
 });
 
+// F3 PR-02: the Host check now runs through the shared `checkTransportGuards` (daemon/transport/
+// http-guards.ts) instead of inline logic. This regression pins that the wire output is byte-identical
+// to what the pre-refactor inline check produced — status AND the full body, not just its `code`.
+test("a foreign Host's refusal body is byte-identical to the pre-refactor shape (F3 PR-02 regression)", async () => {
+  await withServer({}, async (port) => {
+    const res = await sendRequest({ port, method: "GET", path: "/identity?nonce=a", host: `127.0.0.1:${port + 1}` });
+    assert.equal(res.status, HTTP_FORBIDDEN);
+    const parsed = ipcErrorSchema.parse(JSON.parse(res.bodyText));
+    assert.deepEqual(parsed, {
+      code: IPC_HOST_REJECTED,
+      message: "Host header must name this daemon's own loopback address",
+      retryable: false,
+    });
+  });
+});
+
 test("a request with Host: localhost:<port> is refused with 403 and never reaches the handler", async () => {
   let called = 0;
   await withServer({ "GET /identity": () => (called += 1, { status: HTTP_OK, body: {} }) }, async (port) => {

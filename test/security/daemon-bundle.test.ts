@@ -229,11 +229,19 @@ test("daemon bundle: .sendMessage( call lines are confined to the three AS-IS tr
   // Reverse import graph: transport/* imported only by daemon/send/*, daemon/bindings.js, transport/*;
   // daemon/send/send-path.js imported only by daemon/ipc/routes.js. Checked against every file in the
   // closure's own source text (a relative specifier naming transport/ or send/send-path), not assumed.
+  //
+  // Disclosed F3 PR-02 exception: `transport/http-guards.js` (F3 PR-01, design's "Shared
+  // transport-guard module, parameterized Origin check" decision) is a generic HTTP guard, not part
+  // of the outbound Telegram-transport path this allow-list otherwise pins — `daemon/ipc/server.js`
+  // is its first caller here, and the panel listener (PR-04) will be its second. It is exempted from
+  // this specific allow-list by name rather than widening the list itself, which would also admit an
+  // unrelated future transport/* file the outbound-path restriction is meant to catch.
   for (const [path, source] of contents) {
-    const importsTransport = /from\s+["'][^"']*\/transport\/[^"']+["']/.test(source);
-    if (importsTransport) {
+    const transportImports = [...source.matchAll(/from\s+["'][^"']*\/transport\/([^"']+)\.js["']/g)].map((m) => m[1]);
+    for (const importedModule of transportImports) {
+      if (importedModule === "http-guards") continue;
       const allowed = path === "daemon/bindings.js" || path.startsWith("daemon/send/") || path.startsWith("daemon/transport/");
-      assert.ok(allowed, `${path} imports a transport/* module but is not daemon/bindings.js, daemon/send/* or daemon/transport/*`);
+      assert.ok(allowed, `${path} imports transport/${importedModule}.js but is not daemon/bindings.js, daemon/send/* or daemon/transport/*`);
     }
     const importsSendPath = /from\s+["'][^"']*\/send\/send-path\.js["']/.test(source);
     if (importsSendPath) {
