@@ -233,7 +233,12 @@ test("installer/doctor bundle: the real compiled instructions.js still carries t
 const NODE_HTTP_RE = /(?:require\(\s*["']node:http["']\s*\)|from\s+["']node:http["'])/;
 const NODE_HTTPS_RE = /(?:require\(\s*["']node:https["']\s*\)|from\s+["']node:https["'])/;
 const FETCH_CALL_RE = /(?<![\w$])fetch\s*\(/;
-const DAEMON_TELEGRAM_IMPORT_RE = /from\s+["'][^"']*daemon\/telegram\.js["']/;
+// Correction (native review `review-588821941bef5e65`, R2-daemon-telegram-regex-asymmetry, CRITICAL):
+// this sibling check only matched the ESM `from` form, unlike NODE_HTTP_RE/NODE_HTTPS_RE immediately
+// above, which both cover the CommonJS `require(...)` shape too — a real asymmetry in the same
+// zero-network guarantee, not just a style inconsistency.
+const DAEMON_TELEGRAM_IMPORT_RE =
+  /(?:require\(\s*["'][^"']*daemon\/telegram\.js["']\s*\)|from\s+["'][^"']*daemon\/telegram\.js["'])/;
 
 test("installer/doctor bundle: doctor/offline.js's own closure carries no network module (design.md §9.1's zero-network pin, code-level half)", () => {
   const contents = bundleContents(OFFLINE_ENTRY);
@@ -251,5 +256,6 @@ test("installer/doctor bundle: the offline-closure network predicates are non-va
   assert.equal(NODE_HTTPS_RE.test('import https from "node:https";'), true);
   assert.equal(FETCH_CALL_RE.test("await fetch(url);"), true);
   assert.equal(DAEMON_TELEGRAM_IMPORT_RE.test('import { TelegramApiClient } from "../daemon/telegram.js";'), true);
+  assert.equal(DAEMON_TELEGRAM_IMPORT_RE.test('const { TelegramApiClient } = require("../daemon/telegram.js");'), true);
   assert.equal(FETCH_CALL_RE.test("await prefetch(url);"), false, "prefetch( must never be mistaken for a real fetch( call");
 });

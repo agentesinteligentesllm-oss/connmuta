@@ -453,22 +453,35 @@ test("two real installs: N sends from two independently wizard-produced projects
 		assert.ok(!telegramA.sentMessages.some((m) => m.chat_id === GROUP_B_ID));
 		assert.ok(!telegramB.sentMessages.some((m) => m.chat_id === GROUP_A_ID));
 	} finally {
-		if (server) {
-			await server.close();
-		}
-		if (db) {
-			db.close();
-		}
-		rmSync(homeDir, { recursive: true, force: true });
-		rmSync(projectDirA, { recursive: true, force: true });
-		rmSync(projectDirB, { recursive: true, force: true });
-		rmSync(launchAgentsDir, { recursive: true, force: true });
-		if (process.platform === "win32") {
+		// Correction (native review `review-588821941bef5e65`, R4-cleanup-cascade-abort, CRITICAL): each
+		// step below releases an independent resource (the listening server, the ledger handle, four
+		// temp directories, one scratch registry key). Running them as unguarded sequential statements
+		// meant one throw (e.g. server.close() rejecting) would abort the whole block and skip every
+		// later step — every one of the six best-effort steps now gets its own guard, not just the
+		// registry delete this block already treated that way.
+		const cleanupSteps: readonly (() => void | Promise<void>)[] = [
+			async () => {
+				if (server) await server.close();
+			},
+			() => {
+				if (db) db.close();
+			},
+			() => rmSync(homeDir, { recursive: true, force: true }),
+			() => rmSync(projectDirA, { recursive: true, force: true }),
+			() => rmSync(projectDirB, { recursive: true, force: true }),
+			() => rmSync(launchAgentsDir, { recursive: true, force: true }),
+			() => {
+				// Never created (this run answered the checkbox false, and disableAutostart is a noop on
+				// an absent key), or already removed; the catch below absorbs either case.
+				if (process.platform === "win32") runReg(["delete", scratchRunKey, "/f"]);
+			},
+		];
+		for (const step of cleanupSteps) {
 			try {
-				runReg(["delete", scratchRunKey, "/f"]);
+				await step();
 			} catch {
-				// Never created (this run answered the checkbox false, and disableAutostart is a noop on an
-				// absent key), or already removed; nothing to clean up.
+				// Best-effort: a real assertion failure above must not also leak every remaining resource
+				// because cleanup itself aborted partway through.
 			}
 		}
 	}
