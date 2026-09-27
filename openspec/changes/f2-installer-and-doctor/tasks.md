@@ -386,11 +386,11 @@ Scope: `docs/02-architecture/OVERVIEW.md` (§10.1/§10.3 — Pi row, detection w
 Requirements: proposal.md deliverable 11.
 Runtime harness: N/A — documentation.
 
-- [ ] 20.1 Update OVERVIEW §10.1/§10.3: Pi as the 8th tool-config row (D-34); "detected tool" reworded to "tool the user selected" (D-33, no CONSTITUTION amendment needed per the locked reading).
-- [ ] 20.2 Update THREAT-MODEL §5.6: the exec allow-list is `{icacls.exe, reg.exe}`, both Windows-only, fixed argv (D-50 correction of the proposal's original "exec allowed only for icacls" wording); confirm §5.5's `icacls … (OI)(CI)F` command text matches D-49.
-- [ ] 20.3 Update DATA-MODEL.md: document the five new `audit_log.reason` values this change introduces, matching what PR-07/PR-17 actually emit.
-- [ ] 20.4 Close CHECKLIST.md B-05 (pointer: PR-05's `tool-config-merge.test.ts`) and B-17 (pointer: PR-01 through PR-19 collectively satisfy the installer/doctor scope); leave any other backlog row exactly as `pending Director decision`.
-- [ ] 20.5 Verify: `npm run build && npm test && npm run test:static && npm run test:wrong-room` (full suite green, confirming no PR above left a regression).
+- [x] 20.1 Updated OVERVIEW §10.1/§10.3: step 3 reworded from "IDE/tool detection by their config locations" to "tool selection by wizard checkbox (D-33...)"; the Assign-project row's "detects tools"/"each detected tool's" reworded to "a tool-selection checkbox (D-33...)"/"each selected tool's"; Pi added as the 8th project-level row in §10.3's table (D-34), with its `.mcp.json`/`.pi/mcp.json` dedup rule (D-43) noted inline.
+- [x] 20.2 Verified (no edit needed): THREAT-MODEL §5.5/§5.6 were already current — each prior PR updated its own cells as it landed (this change's own "Documentation per PR" convention). §5.5 already states the `(OI)(CI)` flags and cites D-49/B-56; §5.6 already states the exec allow-list is `{icacls.exe, reg.exe}` and cites D-50, PR-08 and PR-19 by name.
+- [x] 20.3 Updated DATA-MODEL.md's `audit_log.reason` cell: added the five F2 values, grepped against the real shipped source rather than assumed — `BOT_ADDED`/`GROUP_ADDED`/`PROJECT_BOUND` (live, `registry-commit.ts`'s `commitRegistryChange`) and `DOCTOR_PROBE` (live, `daemon/ipc/doctor.ts`) are actually emitted; `REGISTRY_CREATED` is declared in `registry-commit.ts`'s own `RegistryCommitReason` type but never emitted anywhere (`setup.ts`'s scaffold step deliberately writes no audit row, its own already-disclosed deviation) — documented as reserved, typed vocabulary rather than live, matching this same cell's own pre-existing convention for `ROUNDS_EXHAUSTED`.
+- [x] 20.4 Closed CHECKLIST.md B-05 (done, pointer: PR-05's `tool-config-merge.test.ts`) and B-17 (done, pointer: `bus-v2-landing-architecture-001` for the decision plus PR-01 through PR-19 collectively shipping it, `test/cli/main-gate.integration.test.ts` proving it end to end); every other backlog row left exactly as it was.
+- [x] 20.5 Verify: `npm run build && npm test && npm run test:static && npm run test:wrong-room`.
 
 ## Spec Coverage Check
 
