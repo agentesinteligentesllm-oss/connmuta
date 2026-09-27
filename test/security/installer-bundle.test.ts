@@ -175,9 +175,19 @@ test("installer/doctor bundle: child_process detection is non-vacuous (seeded ne
 // property or a destructuring binding actually takes in source — without matching the key merely
 // named inside a longer prose sentence (`instructions.ts`'s own disclosure line has no adjacent
 // brace/comma around the word at all).
-const TRUST_LEVEL_WRITE_RE = /(?:["']trust_level["']\s*:|\btrust_level\b\s*:|[{,]\s*trust_level\s*[,}])/;
+// Correction (native review `review-bbcdf0f3fe0c5328`, R3-write-shaped-regex-assignment-gap,
+// CRITICAL): the colon/shorthand forms above still missed a dot-access assignment
+// (`cfg.trust_level = ...`) and a bracket-access assignment (`cfg["trust_level"] = ...`) — neither has
+// a `{`/`,`/`:` adjacent to the key. The `\.trust_level\s*=(?!=)` / `\[["']trust_level["']\]\s*=(?!=)`
+// branches below close both, with a negative lookahead so `===`/`==` comparisons (a read, not a write)
+// don't false-positive. This is a regex-based heuristic, not an AST parse — it cannot enumerate every
+// possible JS write syntax with certainty, and is disclosed as such (docs/06-backlog/CHECKLIST.md
+// B-87) rather than chased indefinitely; it now covers every write shape found across five review
+// rounds on this exact check.
+const TRUST_LEVEL_WRITE_RE =
+	/(?:["']trust_level["']\s*:|\btrust_level\b\s*:|[{,]\s*trust_level\s*[,}]|\.trust_level\s*=(?!=)|\[\s*["']trust_level["']\s*\]\s*=(?!=))/;
 const ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE =
-	/(?:["']enableAllProjectMcpServers["']\s*:|\benableAllProjectMcpServers\b\s*:|[{,]\s*enableAllProjectMcpServers\s*[,}])/;
+	/(?:["']enableAllProjectMcpServers["']\s*:|\benableAllProjectMcpServers\b\s*:|[{,]\s*enableAllProjectMcpServers\s*[,}]|\.enableAllProjectMcpServers\s*=(?!=)|\[\s*["']enableAllProjectMcpServers["']\s*\]\s*=(?!=))/;
 // Correction (same review, R2-npx-invoke-regex-gap, CRITICAL): the original only matched a literal
 // trailing space inside the quotes (`"npx "`) or a bare `npx(` call — missing the realistic
 // `spawn("npx", [...])` argv[0] shape (no trailing space) and a template-literal invocation
@@ -208,6 +218,12 @@ test("installer/doctor bundle: the write-shaped checks are non-vacuous (seeded p
   assert.equal(TRUST_LEVEL_WRITE_RE.test("{ trust_level }"), true);
   assert.equal(TRUST_LEVEL_WRITE_RE.test("{ ...cfg, trust_level }"), true);
   assert.equal(ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test("{ enableAllProjectMcpServers }"), true);
+  // Dot-access and bracket-access assignment — the fifth-round gap.
+  assert.equal(TRUST_LEVEL_WRITE_RE.test("cfg.trust_level = true;"), true);
+  assert.equal(TRUST_LEVEL_WRITE_RE.test('cfg["trust_level"] = true;'), true);
+  assert.equal(ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test("cfg.enableAllProjectMcpServers = true;"), true);
+  // A read/comparison (===) of the same property must NOT be mistaken for a write.
+  assert.equal(TRUST_LEVEL_WRITE_RE.test("if (cfg.trust_level === undefined) {"), false);
 
   // The exact legitimate prose line this correction exists for (installer/instructions.ts) — must stay false.
   assert.equal(
