@@ -224,12 +224,12 @@ Scope: `src/cli/panel.ts`, `src/cli/main.ts` (dispatch + `USAGE_LINES`), `test/c
 Requirements: design's "print the one-time URL" flow, reading `run/panel.json`.
 Runtime harness: spawns the real CLI, mirrors `test/cli/daemon-stop.test.ts`.
 
-- [ ] 6.1 RED: `panel.test.ts` — prints `http://127.0.0.1:<port>/?token=<token>` when the daemon is
+- [x] 6.1 RED: `panel.test.ts` — prints `http://127.0.0.1:<port>/?token=<token>` when the daemon is
       running; a clear error when it is not.
-- [ ] 6.2 GREEN: implement `runPanelCommand`, reading `run/panel.json`.
-- [ ] 6.3 RED/GREEN: extend `main.test.ts`/`main.ts` with the `panel` dispatch entry and its
+- [x] 6.2 GREEN: implement `runPanelCommand`, reading `run/panel.json`.
+- [x] 6.3 RED/GREEN: extend `main.test.ts`/`main.ts` with the `panel` dispatch entry and its
       `USAGE_LINES` row.
-- [ ] 6.4 Verify: `npm run build && node --test "dist/test/cli/panel.test.js" "dist/test/cli/main.test.js"`.
+- [x] 6.4 Verify: `npm run build && node --test "dist/test/cli/panel.test.js" "dist/test/cli/main.test.js"`.
 
 ### Unit 7 — Roster sync
 
