@@ -297,8 +297,14 @@ function formatBackupTimestampMillis(date: Date): string {
  * Retries the rename up to {@link REGISTRY_REPLACE_ATTEMPTS} times: the same Windows rename-over
  * race `registry.json` faces (a concurrent reader holding the target open can transiently fail the
  * rename with `EPERM`/`EBUSY`) applies to any file this engine writes, not only the registry.
+ *
+ * Exported for `installer/gitignore.ts`'s own reuse (native review `review-01a2374400a854fc`,
+ * R4-gitignore-nonatomic-write): a plain `writeFileSync` over an existing `.gitignore` truncates it
+ * in place, so a crash or `ENOSPC` mid-write could corrupt whatever unrelated ignore rules were
+ * already there — the exact hazard this helper already exists to avoid for every other file this
+ * engine writes.
  */
-function writeViaTempAndRename(path: string, text: string): void {
+export function writeViaTempAndRename(path: string, text: string): void {
 	const tempPath = `${path}.tmp-${randomUUID()}`;
 	writeFileSync(tempPath, text, "utf8");
 	let lastError: unknown;

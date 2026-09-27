@@ -31,7 +31,7 @@ Chain strategy: stacked-to-main
 400-line budget risk: High
 ```
 
-- Total PR slices: 20 (design §17 planned 18; PR-08/PR-09 replace design row 8's single ~450-line slice, and PR-17/PR-18 replace design row 16's single ~450-line slice — both splits disclosed below, at the existing file/module boundary in each case, not an artificial cut).
+- Total PR slices: 20 planned (design §17 planned 18; PR-08/PR-09 replace design row 8's single ~450-line slice, and PR-17/PR-18 replace design row 16's single ~450-line slice — both splits disclosed below, at the existing file/module boundary in each case, not an artificial cut). **Re-measured, not assumed (this line had drifted stale exactly like several other counts this change caught in itself — B-58, B-87): apply-time re-slicing (PR-02→PR-02a/b; PR-06→PR-06a/b; PR-07→PR-07a/b/c; PR-09→PR-09..PR-13 renumbered forward one each) plus this same `sdd-verify` close-out sweep's own PR-21/PR-22 bring the real total to 26 `#### PR-` header blocks**, cross-checked directly by `grep -c` against this file, not by memory. 25 real GitHub PRs are merged as of this line (24 sequential `f2/NN-*` branches #48–#73 plus one disclosed non-sequential side-fix, `fix/acl-test-ci-flake` #62); PR-21/PR-22 will bring that to 27 once merged.
 - No `size:exception` slice is planned upfront — unlike F1, F2 vendors no whole v1 file AS-IS; every line here is new or edited code.
 - Largest planned slices: PR-11 (`roster-source.ts` + `bot-add.ts` + `group-add.ts` wizards, ≈400) and PR-14 (`doctor/{main,offline,report}.ts` + system-tier checks, ≈400) — both at the budget line exactly; `sdd-apply` should re-measure the real diff before opening either and re-slice at a file boundary if it exceeds 400, per F1's own repeated apply-time lesson (PR-01, PR-06, PR-08, PR-09, PR-22, PR-40 all grew past their estimate).
 - Given every individual PR here is a first-time estimate (no real F1-style v1 line count to anchor it against, since F2 is new code, not vendored), expect the same estimate-to-actual growth F1 saw (named-constant doc comments plus Strict TDD twins routinely added 30–60%). `auto-chain` already covers the response: re-slice at a file boundary rather than request an exception, unless the module is genuinely cohesive (F1's PR-05 precedent).
@@ -398,28 +398,58 @@ Every requirement in the 6 capability specs traces to at least one task above. N
 
 | Capability | Requirements | Scenarios | Covering PR(s) |
 |---|---|---|---|
-| installer-wizard | 7 | 17 | PR-09, PR-11, PR-12, PR-13 |
+| installer-wizard | 8 | 19 | PR-09, PR-11, PR-12, PR-13, PR-21 |
 | registry-authoring | 3 | 7 | PR-06, PR-07 |
 | tool-config-merge | 7 | 12 | PR-02, PR-03, PR-04, PR-05 |
-| doctor | 5 | 8 | PR-14, PR-15, PR-17, PR-18 |
+| doctor | 6 | 11 | PR-14, PR-15, PR-17, PR-18, PR-21 |
 | ipc-handshake (delta) | 1 | 4 | PR-16, PR-17, PR-18 |
 | secret-store (delta) | 2 | 5 | PR-07, PR-08, PR-11 |
-| **Total** | **25** | **53** | |
+| **Total** | **27** | **58** | |
 
 Threat-matrix rows marked Applicable in design.md (Subprocess spawn; Local process integration; Filesystem writes outside the home; Login persistence) each have an explicit RED task above (PR-02/PR-08/PR-09/PR-17) before their production task, per skill rule. Rows marked N/A in design (documentation-like paths, git repository selection, commit/push/PR commands) are correctly omitted — F2 has no git automation and classifies no file for execution.
+
+### Unit 13 — D-52 close-out: gitignore coverage + doctor warning
+
+**Found by this change's own `sdd-verify` pass, run immediately after PR-20 (Unit 12) closed F2's originally planned scope.** D-52 (`design.md:253`, Director-ratified, session 41, "locked"; design's own risk table at `design.md:260` marks it "Resolved... closed") shipped as pure documentation with zero code and zero disclosure across PR-01 through PR-20 — confirmed by exhaustive grep across `src/installer/` and `src/doctor/`. It never received a spec requirement at `sdd-spec` time and consequently never received a task at `sdd-tasks` time, so `sdd-apply` had nothing to implement it against — a gap in the SDD process itself, not a missed task. Closed at every layer here: two new spec requirements (`specs/installer-wizard/spec.md`, `specs/doctor/spec.md`), this task block, and the implementation.
+
+#### PR-21 — `installer/gitignore.ts` + project-bind wiring + doctor registry-tier warning
+Branch `f2/21-gitignore-doctor-warn` → `main`. Depends: PR-20. Size: ≈250 lines, disclosed-exception TBD at apply time (this project's own repeated lesson: every prior size estimate underestimated apply-time growth).
+Scope: `src/installer/gitignore.ts` (new), `src/installer/wizards/project-bind.ts` (edit — wire the new check into the tool-config loop, extend `ProjectBindOutcome`), `src/cli/main.ts` (edit — report appended gitignore entries), `src/doctor/checks/registry.ts` (edit — add the gitignore-coverage warning), plus test twins for all of the above. Bundled in the same commit (same `sdd-verify` pass, same close-out sweep, both cheap and unrelated to any other PR's own scope): `docs/02-architecture/OVERVIEW.md` §10.2's stale "Add group" roster-building claim, and `openspec/changes/f2-installer-and-doctor/specs/README.md`'s stale scenario-count total.
+Requirements: `installer-wizard › Written tool-config files are gitignored, never committed as-is` (both scenarios); `doctor › Registry tier warns on a tool-config file not covered by .gitignore` (all three scenarios).
+Runtime harness: unit tests over `gitignore.ts` with a real scratch directory (no fixture faking); `project-bind.test.ts` extended for the append/already-covered cases; `doctor/checks/registry.test.ts` extended for the warn/no-warn/no-`.git`-path cases.
+
+**Disclosed, Alpha-audited deliberate divergence from D-52's own literal doctor-side wording** ("detects... a config file that IS tracked by git", Arena debate `bus-v2-f2-pr-21-d52-design-001`, Alpha `APPROVE`/`CONSENSUS`, round 1): rather than invoking `git.exe` as a new subprocess — a real architectural expansion of D-50's exec allow-list (`{icacls.exe, reg.exe}`, both fixed `System32` binaries) and of doctor's own zero-subprocess-beyond-`icacls` posture, plus a new "git not installed" failure mode doctor's offline tier would then need to handle gracefully — the check verifies `.gitignore` coverage only, worded to describe exactly what was checked ("not covered by `.gitignore`", never "is tracked by git", since actual git-index membership is never verified).
+
+- [x] 21.1 RED: `test/installer/gitignore.test.ts` — a fresh `.gitignore`-less directory gets a new file with an anchored entry for a nested path (e.g. `.cursor/mcp.json`); an existing `.gitignore` missing a trailing newline gets one inserted before the new entry; a path already covered by an exact entry, a bare parent-directory entry, or a slash-normalized entry (`/.cursor/`, `.cursor`, `.cursor/`) is left untouched and reported as already-covered; a commented-out or negated (`!`) line is never treated as coverage.
+- [x] 21.2 GREEN: implement `src/installer/gitignore.ts`'s `ensureGitignored(projectDir, relativePath): {alreadyCovered: boolean, appendedLine?: string}` — plain-text line-based coverage check and append (always POSIX forward slashes, per Alpha's own review note), no `editFile`/JSON pipeline involved (`.gitignore` is not a structured document, so `file-edit.ts`'s entry-at-path model does not apply).
+- [x] 21.3 RED then GREEN: `test/installer/wizards/project-bind.test.ts` — after a successful `project bind` selecting one or more tools, each written/already-present tool-config path (`created`/`written`/`noop` from `editFile` all mean the file now exists) gets an `ensureGitignored` call; the returned `"bound"` outcome carries a new `gitignoreResults: ReadonlyMap<ToolId, GitignoreCheckResult>` field; `cli/main.ts`'s `reportProjectBindOutcome` prints one line per newly-appended entry (nothing printed when everything was already covered).
+- [x] 21.4 RED then GREEN: `test/doctor/checks/registry.test.ts` — extend the registry tier with a check that, for each bound project with a `.git` path (`existsSync` alone — never `.isDirectory()`, per Alpha's own worktree/submodule note: `.git` is a FILE containing `gitdir: ...` in a linked worktree or submodule), reports a `warn` finding naming any existing tool-config file not covered by `.gitignore` (reusing `gitignore.ts`'s own coverage-check logic, exported for this purpose); a project with no `.git` path, or a project whose configs are all covered, reports nothing.
+- [x] 21.5 Docs: `design.md` §15's D-52 row and §16's risk-table row get a corrected pointer to this PR (they currently read "Resolved... closed" for a decision that, until now, was never actually implemented); `docs/06-backlog/CHECKLIST.md` gets a new row disclosing the original gap and its resolution.
+- [x] 21.6 Verify: `npm run build && npm test && npm run test:static && npm run test:wrong-room`.
+
+#### PR-22 — Real two-binding DM-probe cross-project isolation test
+Branch `f2/22-dm-probe-cross-project-test` → `main`. Depends: PR-21. Size: ≈150 lines, test-only, no exception expected.
+Scope: `test/daemon/ipc/doctor.test.ts` (edit only — add a second real binding, no source change).
+Requirements: `doctor › DM probe is opt-in and confined to the binding being validated` › `Opted-in DM probe never crosses project boundaries` (already-ratified scenario, already implemented since PR-17 — this PR adds the missing test proving it, closing a coverage gap this change's own `sdd-verify` pass found in an already-shipped guarantee).
+Runtime harness: extends the existing `test/daemon/ipc/doctor.test.ts` harness with a real second `ManagedBinding` (mirroring `test/security/two-install-wrong-room.test.ts`'s own two-binding pattern) and a second fake room guard.
+
+- [ ] 22.1 RED then GREEN: register two real bindings (project A, project B) each with its own `roomGuard`/fake Telegram client; run an opted-in DM probe scoped to project A; assert project B's fake client's `sentMessages` stays empty and project A's own roster peers each receive exactly one probe message — proving the cross-project confinement design already guarantees structurally (a singleton target per probe, `dmProbePeers` filtering only the validated binding's own roster) is also proven by a real test, not merely implied by the schema.
+- [ ] 22.2 Verify: `npm run build && npm test`.
 
 ## Success Criteria Checklist
 
 Mirrors `proposal.md` "Success criteria" verbatim, with the closing PR(s) for each item.
 
-- [ ] ADR-0031 installer tests green: no `npx` in any written entry (PR-04, PR-05); fake Node < 24 exits with the download link and zero filesystem writes and zero git calls (PR-13, PR-19).
-- [ ] One merge test per format (8 surfaces) with realistic fixtures; pre-existing entries, non-MCP keys and comments survive byte-for-byte; a conflicting same-named entry is refused with a diff; a backup exists (PR-05).
-- [ ] `doctor` offline tiers make zero network calls, test fails if any occurs (PR-14).
-- [ ] PT-05 doctor half and PT-32 green (PR-15, PR-17).
-- [ ] Wrong-room test green after installing into two projects (PR-19).
-- [ ] Installer bundle static assertions green and non-vacuous (PR-19).
-- [ ] B-05 closed in CHECKLIST with a pointer to the merge tests; every `src` file has a test twin; `npm test` and `npm run build` pass (PR-05, PR-20; `test/twins.test.ts` enforces the twin rule cumulatively across every PR above).
-- [ ] Start-at-login (D-40) writes the Windows Run key / macOS LaunchAgent plist only when opted in, is idempotent on re-run, and is fully removed when unchecked; no service, Task Scheduler, or pm2 entry is ever created (PR-09, PR-12).
+- [x] ADR-0031 installer tests green: no `npx` in any written entry (PR-04, PR-05); fake Node < 24 exits with the download link and zero filesystem writes and zero git calls (PR-13, PR-19).
+- [x] One merge test per format (8 surfaces) with realistic fixtures; pre-existing entries, non-MCP keys and comments survive byte-for-byte; a conflicting same-named entry is refused with a diff; a backup exists (PR-05).
+- [x] `doctor` offline tiers make zero network calls, test fails if any occurs (PR-14).
+- [x] PT-05 doctor half and PT-32 green (PR-15, PR-17).
+- [x] Wrong-room test green after installing into two projects (PR-19).
+- [x] Installer bundle static assertions green and non-vacuous (PR-19).
+- [x] B-05 closed in CHECKLIST with a pointer to the merge tests; every `src` file has a test twin; `npm test` and `npm run build` pass (PR-05, PR-20; `test/twins.test.ts` enforces the twin rule cumulatively across every PR above).
+- [x] Start-at-login (D-40) writes the Windows Run key / macOS LaunchAgent plist only when opted in, is idempotent on re-run, and is fully removed when unchecked; no service, Task Scheduler, or pm2 entry is ever created (PR-09, PR-12).
+
+All 8 items independently re-verified by this change's own `sdd-verify` pass (session 43, after PR-20 closed Unit 12) before being checked off here — none were checked off at the time each closing PR merged, a bookkeeping gap now closed rather than a functional one.
 
 ## Design-Disclosed Risks Carried Into Apply
 

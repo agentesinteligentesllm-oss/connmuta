@@ -122,6 +122,32 @@ verify `conmuta.json` (identifiers only) and the registry binding.
 
 Traces: OVERVIEW §10.2 "Assign project"; DATA-MODEL.md §2.5 R1-R4; CONSTITUTION.md §2 inv. 1
 
+### Requirement: Written tool-config files are gitignored, never committed as-is
+
+For each tool-config path `project bind` writes or leaves in place (`created`, `written`, or `noop`
+from the edit engine — all three mean the file exists at that path), the installer MUST check the
+target project's `.gitignore` for coverage of that path (an exact match or a covering parent
+directory entry) and, when not already covered, MUST append an anchored ignore entry and report
+what it added. Absolute node/script launcher paths are machine-specific (§7.1); a committed tool
+config breaks for a teammate on a different machine or Node install (D-52).
+
+#### Scenario: A newly written tool-config path with no matching .gitignore rule is covered
+
+- GIVEN a target project directory with no `.gitignore`, or one that does not cover the tool-config
+  path about to be written
+- WHEN `project bind` writes that tool's config entry
+- THEN `.gitignore` is created or appended with an entry covering the exact path, and the outcome
+  reports the entry that was added
+
+#### Scenario: An already-covered path is left untouched
+
+- GIVEN a target project's `.gitignore` already covers the tool-config path (an exact entry or a
+  covering parent-directory entry)
+- WHEN `project bind` writes that tool's config entry
+- THEN `.gitignore` is not modified, and the outcome reports no entry was added for that tool
+
+Traces: design.md D-52 (§16 risk table, "Absolute paths in project configs are machine-specific")
+
 ### Requirement: Instruction files are written once and trust steps are printed, never bypassed
 
 `project bind` MUST write `AGENTS.md` (bus protocol for agents, at most 200 lines) and `CLAUDE.md`
@@ -185,5 +211,6 @@ Traces: D-40; OVERVIEW §7.1 (D3); design.md:298
 | OVERVIEW §10.1 step 2 | Home directory and empty registry scaffold |
 | D-37 | bot add records a bot without ever exposing its token |
 | DATA-MODEL.md §2.5 R1-R4 | group add refuses an already-bound group_id; project bind enforces bijective invariants |
+| design.md D-52 | Written tool-config files are gitignored, never committed as-is |
 | THREAT-MODEL.md §5.6 | Instruction files written once; trust steps printed, never bypassed |
 | D-40; OVERVIEW §7.1 | Start-at-login is opt-in, idempotent, and fully removable |

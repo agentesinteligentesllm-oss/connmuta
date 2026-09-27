@@ -58,6 +58,41 @@ silently accepting a document that would fail those checks at daemon load time.
 
 Traces: OVERVIEW §10.4; DATA-MODEL.md §2.5 R1-R5; PT-05 (doctor half); B-30 (R5 tension surfaced here)
 
+### Requirement: Registry tier warns on a tool-config file not covered by .gitignore
+
+For each bound project whose directory is a git worktree (a `.git` path exists there, file or
+directory — the latter for a linked worktree/submodule), the registry tier MUST check every
+existing tool-config path against that project's `.gitignore` and report a `warn` finding, naming
+the path, for any file not covered by an exact or covering-parent entry. This check MUST make no
+subprocess call (`git` is never invoked — D-50's exec allow-list stays `{icacls.exe, reg.exe}`
+only) and MUST NOT claim the file IS tracked by git, since that was never verified; the finding
+wording states only what was checked (git-repo presence plus `.gitignore` coverage).
+
+#### Scenario: An uncovered tool-config file in a git repository is flagged
+
+- GIVEN a bound project with a `.git` path and a tool-config file whose path no `.gitignore` entry
+  covers
+- WHEN the registry tier runs
+- THEN it reports a `warn` finding naming that file, without invoking `git` and without claiming
+  the file is actually tracked
+
+#### Scenario: A covered tool-config file is not flagged
+
+- GIVEN a bound project with a `.git` path and a tool-config file already covered by `.gitignore`
+- WHEN the registry tier runs
+- THEN no finding is reported for that file
+
+#### Scenario: A project with no .git path is never checked
+
+- GIVEN a bound project directory with no `.git` file or directory
+- WHEN the registry tier runs
+- THEN no gitignore-coverage finding is reported for any tool-config file in that project
+
+Traces: design.md D-52 (§16 risk table, doctor half — this requirement's actual scope is narrower
+than that entry's literal wording, disclosed above and in `registry.ts`'s own doc comment: only
+`.gitignore` coverage is checked, never real git-index membership); D-50 (exec allow-list stays
+`{icacls.exe, reg.exe}` — no new subprocess dependency)
+
 ### Requirement: Online tier runs inside the daemon and checks live Telegram state
 
 The online tier MUST run inside the daemon (it needs the token) and, per bound binding, MUST
@@ -108,6 +143,7 @@ Traces: OVERVIEW §10.4; v1 `src/doctor.ts:132-137` (the v1 defect being correct
 | proposal.md success criteria | Offline tiers make zero network calls |
 | OVERVIEW §10.4 | Offline/system tier; registry tier; online tier |
 | PT-05 (doctor half) | Registry tier token-shape scan |
+| design.md D-52; D-50 | Registry tier warns on a tool-config file not covered by .gitignore |
 | PT-32; THREAT-MODEL.md T21 | Online tier membership/admin check |
 | B-28 | Online tier membership-check ownership |
 | B-30 | Registry tier R5 tension surfaced here |

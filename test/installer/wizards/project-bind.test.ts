@@ -196,6 +196,54 @@ test("a selected tool's config entry and the instruction files are written for a
 	});
 });
 
+test("a successful bind with no existing .gitignore appends a new anchored entry per written tool", async () => {
+	await withProjectBindFixture(async ({ db, registryPath, targetDir }) => {
+		const outcome = await runProjectBind({
+			db,
+			registryPath,
+			targetDir,
+			botId: BOT_ID,
+			groupId: GROUP_ID,
+			agentId: AGENT_ID,
+			roster: ROSTER,
+			selectedToolIds: new Set(["claude-code"]),
+			now: () => NOW,
+		});
+
+		assert.equal(outcome.outcome, "bound");
+		if (outcome.outcome !== "bound") return;
+		assert.deepEqual(outcome.gitignoreResults.get("claude-code"), { alreadyCovered: false, appendedLine: "/.mcp.json" });
+
+		const gitignoreText = readFileSync(join(targetDir, ".gitignore"), "utf8");
+		assert.equal(gitignoreText, "/.mcp.json\n");
+	});
+});
+
+test("a successful bind whose target's .gitignore already covers the tool's path leaves it untouched", async () => {
+	await withProjectBindFixture(async ({ db, registryPath, targetDir }) => {
+		const gitignorePath = join(targetDir, ".gitignore");
+		const gitignoreBefore = "/.mcp.json\n";
+		writeFileSync(gitignorePath, gitignoreBefore, "utf8");
+
+		const outcome = await runProjectBind({
+			db,
+			registryPath,
+			targetDir,
+			botId: BOT_ID,
+			groupId: GROUP_ID,
+			agentId: AGENT_ID,
+			roster: ROSTER,
+			selectedToolIds: new Set(["claude-code"]),
+			now: () => NOW,
+		});
+
+		assert.equal(outcome.outcome, "bound");
+		if (outcome.outcome !== "bound") return;
+		assert.deepEqual(outcome.gitignoreResults.get("claude-code"), { alreadyCovered: true });
+		assert.equal(readFileSync(gitignorePath, "utf8"), gitignoreBefore, ".gitignore must be byte-identical, untouched");
+	});
+});
+
 test(
 	"resolveProjectId's suffix search terminates and yields a distinct id when a max-length slug is already taken (native review correction, R2-001/R3-project-id-suffix-infinite-loop)",
 	async () => {

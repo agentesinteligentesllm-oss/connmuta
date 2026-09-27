@@ -44,13 +44,13 @@ Change: `f2-installer-and-doctor`. Four new capabilities, two modified. Sources:
 
 | Capability | Type | Requirements | Scenarios |
 |---|---|---|---|
-| installer-wizard | New | 7 | 17 |
+| installer-wizard | New | 8 | 19 |
 | registry-authoring | New | 3 | 7 |
 | tool-config-merge | New | 7 | 12 |
-| doctor | New | 5 | 8 |
-| ipc-handshake | Delta (ADDED) | 1 | 3 |
+| doctor | New | 6 | 11 |
+| ipc-handshake | Delta (ADDED) | 1 | 4 |
 | secret-store | Delta (1 ADDED, 1 MODIFIED) | 2 | 5 |
-| **Total** | | **25** | **52** |
+| **Total** | | **27** | **58** |
 
 ## Invariants touched (CONSTITUTION.md §2, repeated here for reviewer convenience)
 
