@@ -81,7 +81,7 @@ export const DAEMON_CONDITION_SCOPE = "daemon";
  * the detail record has a shape, and a fifth name is a code change with a reader — not a row this store
  * accepts and nothing ever shows. Refusing an unknown name is what keeps the store and its readers in step.
  */
-export type ConditionName = "ledger_quarantined" | "group_outage" | "state_quarantined" | "open_thread_backlog";
+export type ConditionName = "ledger_quarantined" | "group_outage" | "state_quarantined" | "open_thread_backlog" | "roster_drift";
 
 /** A member of a condition's `detail` record: an id, a count, or a classification code. */
 export type ConditionDetailValue = string | number;
@@ -124,6 +124,12 @@ interface ConditionContract {
  * `shared/tool-output.ts`'s `Conditions` members, whose required fields are `{ since, last_error }`,
  * `{ at, quarantined_path }` and `{ count, since }` respectively — the store holds the extra members and
  * `since` supplies the two timestamp members (`at` for the F2 case, `since` for the other two).
+ * `roster_drift` (F3 PR-04a) is `daemon/ipc/routes.ts`'s existing per-`POST /session` comparison
+ * (`shared/ipc-contract.ts`'s `ROSTER_DRIFT_CONDITION`) made a standing condition instead of a
+ * discard-after-one-response signal, so the web panel (a passive `GET`-only surface with no session
+ * of its own) has something to read; it declares no detail members — `since` alone is the whole fact
+ * a passive reader needs, and `routes.ts` already holds the two roster hashes being compared, which
+ * this store's own "codes and ids" contract would refuse as a multi-value detail anyway.
  *
  * A `Map` rather than an object literal, and a `Map` for each contract's members too, because an object
  * literal answers for every member of `Object.prototype`: `raiseCondition(db, …, name: "constructor")`
@@ -136,6 +142,7 @@ const CONDITION_CONTRACTS: ReadonlyMap<ConditionName, ConditionContract> = new M
 	["group_outage", { scope: "project", fields: new Map([["last_error", "string"]]) }],
 	["state_quarantined", { scope: "project", fields: new Map([["quarantined_path", "string"]]) }],
 	["open_thread_backlog", { scope: "project", fields: new Map([["count", "number"]]) }],
+	["roster_drift", { scope: "project", fields: new Map() }],
 ]);
 
 /**

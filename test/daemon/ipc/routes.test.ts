@@ -39,6 +39,7 @@ import {
 	type RoutesDeps,
 } from "../../../src/daemon/ipc/routes.js";
 import { openLedger } from "../../../src/ledger/open.js";
+import { raiseCondition, readCondition } from "../../../src/ledger/conditions-store.js";
 import { BindingsReconciler } from "../../../src/daemon/bindings.js";
 import { createRegistryLoader } from "../../../src/registry/loader.js";
 import { GroupMigratedError, RateLimitedError } from "../../../src/daemon/telegram.js";
@@ -399,6 +400,30 @@ test("roster hash mismatch raises a condition, not a failure: session is minted,
 		assert.equal(status, HTTP_OK, `a roster_hash mismatch must still mint a session: ${JSON.stringify(parsed)}`);
 		const response = sessionResponseSchema.parse(parsed);
 		assert.ok(response.conditions.includes(ROSTER_DRIFT_CONDITION));
+	});
+});
+
+// F3 PR-04a: the same comparison now also persists roster_drift as a standing condition (the passive
+// web panel's own read source), instead of only reporting it in this one response body.
+test("roster hash mismatch also persists roster_drift as a standing project condition", async () => {
+	await withHarness(async (h) => {
+		const body = validSessionRequestBody(h, { roster_hash: `sha256:${"0".repeat(64)}` });
+		await postSession(h, body);
+
+		const row = readCondition(h.db, PROJECT_ID, "roster_drift");
+		assert.notEqual(row, undefined, "roster_drift must be a standing row after a mismatched session mint");
+	});
+});
+
+test("a matching roster_hash clears a previously persisted roster_drift condition", async () => {
+	await withHarness(async (h) => {
+		raiseCondition(h.db, { scope: PROJECT_ID, name: "roster_drift", since: new Date().toISOString() });
+
+		const body = validSessionRequestBody(h, { roster_hash: ROSTER_HASH });
+		const { status } = await postSession(h, body);
+		assert.equal(status, HTTP_OK);
+
+		assert.equal(readCondition(h.db, PROJECT_ID, "roster_drift"), undefined);
 	});
 });
 
