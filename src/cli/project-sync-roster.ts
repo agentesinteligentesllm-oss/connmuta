@@ -130,6 +130,14 @@ export async function runSyncRosterCommand(options: RunSyncRosterOptions): Promi
 		return { exitCode: EXIT_UNBOUND_PROJECT, message: "unbound project" };
 	}
 
+	if (parsedFile.file.project_id !== project.project_id) {
+		io.err(
+			`${PRODUCT_NAME}: ${projectFilePath}'s project_id ('${parsedFile.file.project_id}') does not match ` +
+				`the project bound at this path ('${project.project_id}')`,
+		);
+		return { exitCode: EXIT_VALIDATION_FAILED, message: "project_id mismatch" };
+	}
+
 	const nextRoster = parsedFile.file.roster;
 	const nextRosterHash = computeRosterHash(nextRoster);
 	if (nextRosterHash === binding.roster_hash) {

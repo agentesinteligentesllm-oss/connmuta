@@ -776,8 +776,10 @@ test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/
     set: async () => {},
     delete: async () => {},
   };
+  let getUpdatesCalls = 0;
   const fakeClient: TelegramClient = {
     async getUpdates() {
+      getUpdatesCalls++;
       await new Promise((resolve) => setTimeout(resolve, 5));
       return [];
     },
@@ -833,6 +835,13 @@ test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/
     // Several heartbeat periods, so the reconcile-on-tick path (bootstrap.ts's `tick()`, which calls
     // `reconciler.reconcile()` -> `registry.sync()`, a read-only hot reload) runs more than once.
     await new Promise((resolve) => setTimeout(resolve, 90));
+
+    // ADR-12's governing rule ("a documented guarantee must be pinned by a test that can fail"): without
+    // this, a daemon that failed to start its heartbeat/poller at all would still pass every assertion
+    // below, since an untouched registry.json looks identical to one no tick ever reached (RDD review
+    // review-21eb25a2eb6f76f7, R3-heartbeat-test-vacuous). Mirrors the sibling PR-40a test's own
+    // `getUpdatesCalls > 0` proof of real daemon activity.
+    assert.ok(getUpdatesCalls > 0, "poller must have started and called getUpdates() at least once during the window");
 
     const afterTicksText = readFileSync(registryPath, "utf8");
     assert.equal(afterTicksText, beforeTicksText, "no heartbeat tick may write registry.json at all");

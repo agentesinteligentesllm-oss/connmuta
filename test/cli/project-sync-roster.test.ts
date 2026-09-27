@@ -87,7 +87,7 @@ function driftedRoster(): unknown {
 
 /**
  * A temp home with a real ledger open on it, a seeded `registry.json` whose one project's `path` is
- * `targetDir`, and a temp project directory holding `conmuta.json` (unless `omitProjectFile` is set).
+ * `targetDir`, and a temp project directory holding `conmuta.json` (unless `conmutaJsonText` is `null`).
  */
 async function withSyncRosterFixture(
 	options: { readonly conmutaJsonText?: string | null },
@@ -215,6 +215,36 @@ test("a suspended-only binding at this path is treated as unbound (no active bin
 
 		assert.equal(result.exitCode, EXIT_UNBOUND_PROJECT);
 		assert.equal(auditRowCount(db), 0);
+	});
+});
+
+test("a conmuta.json whose project_id does not match the binding at this path is refused with no write (RDD review-21eb25a2eb6f76f7, R3-project-id-not-cross-checked)", async () => {
+	await withSyncRosterFixture({ conmutaJsonText: null }, async ({ db, registryPath, targetDir }) => {
+		writeFileSync(
+			join(targetDir, "conmuta.json"),
+			JSON.stringify({
+				schema_version: PROJECT_FILE_SCHEMA_VERSION,
+				project_id: "prj-foreign",
+				group_id: -1001234567890,
+				roster: driftedRoster(),
+			}),
+			"utf8",
+		);
+		const before = readFileSync(registryPath, "utf8");
+		const captured = makeIo();
+
+		const result = await runSyncRosterCommand({
+			db,
+			registryPath,
+			targetDir,
+			prompter: confirmPrompter(CANCEL),
+			io: captured.io,
+		});
+
+		assert.equal(result.exitCode, EXIT_VALIDATION_FAILED);
+		assert.equal(readFileSync(registryPath, "utf8"), before, "a project_id mismatch must make no write");
+		assert.equal(auditRowCount(db), 0);
+		assert.match(captured.err.join("\n"), /project_id/i);
 	});
 });
 
