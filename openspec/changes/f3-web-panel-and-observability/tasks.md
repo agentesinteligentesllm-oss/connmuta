@@ -54,12 +54,12 @@ local `GuardRejection` shape (no import from `daemon/ipc/server.ts`, avoids the 
 audit caught).
 Runtime harness: N/A — pure function, no live socket needed.
 
-- [ ] 1.1 RED: `test/daemon/transport/http-guards.test.ts` — foreign Host refused, foreign Origin
+- [x] 1.1 RED: `test/daemon/transport/http-guards.test.ts` — foreign Host refused, foreign Origin
       refused (Origin present + mismatched), absent Origin admitted when `requireOrigin: true`,
       Origin ignored entirely when `requireOrigin: false`.
-- [ ] 1.2 GREEN: implement `checkTransportGuards` extracting the Host-check logic currently inline in
+- [x] 1.2 GREEN: implement `checkTransportGuards` extracting the Host-check logic currently inline in
       `daemon/ipc/server.ts:219-228`, parameterized by `requireOrigin`.
-- [ ] 1.3 Verify: `npm run build && node --test "dist/test/daemon/transport/http-guards.test.js"`.
+- [x] 1.3 Verify: `npm run build && node --test "dist/test/daemon/transport/http-guards.test.js"`.
 
 ### Unit 2 — `daemon/ipc/server.ts` (own-slice)
 
