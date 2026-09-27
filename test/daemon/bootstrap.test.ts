@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
 import { LockHeldError, readLockFile } from "../../src/daemon/lifecycle/lock.js";
 import { readRunFile } from "../../src/daemon/lifecycle/run-file.js";
+import { computeDoctorProof } from "../../src/daemon/ipc/doctor.js";
 import type { SecretStore } from "../../src/secret-store/types.js";
 import type { TelegramClient } from "../../src/daemon/telegram.js";
 import type { Registry } from "../../src/registry/schema.js";
@@ -236,6 +237,139 @@ test("bootstrap: mounts GET /identity and POST /session on the real IPC server (
   } finally {
     // A dangling, un-`unref`'d listening server would otherwise hang the whole test process on an
     // assertion failure above (RED) — stop unconditionally, regardless of what threw.
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: mounts POST /doctor on the real IPC server, authenticated end-to-end (PR-18)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  // Not typed `: TelegramClient` directly (unlike the other fakes in this file) so `getChatMember` can
+  // sit alongside the interface's own methods without an excess-property error — `doctorClientFor`
+  // (bootstrap.ts) needs it, `BindingsReconciler`'s `TelegramClient`-typed callers simply ignore it.
+  async function fakeDoctorClientFactory() {
+    return {
+      async getUpdates() {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return [];
+      },
+      async sendMessage(params: { chat_id: number | string; text: string }) {
+        return { message_id: 1, chat: { id: Number(params.chat_id), type: "group" }, date: 1, text: params.text };
+      },
+      async getMe() {
+        return { id: 444333222, is_bot: true, username: "doctor_bot" };
+      },
+      async getChat(chatId: number | string) {
+        return { id: Number(chatId), type: "supergroup" };
+      },
+      async getChatMember() {
+        return { status: "member" as const };
+      },
+    };
+  }
+
+  const registry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [
+      {
+        bot_id: 444333222,
+        username: "doctor_bot",
+        token_ref: { store: "keychain", account: "bot:444333222" },
+        added_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+    groups: [{ group_id: -1004443332221, added_at: "2026-09-01T00:00:00.000Z" }],
+    projects: [{ project_id: "prj-doctor", path: homeDir }],
+    bindings: [
+      {
+        project_id: "prj-doctor",
+        bot_id: 444333222,
+        group_id: -1004443332221,
+        agent_id: "@doctor-agent",
+        status: "active",
+        roster_snapshot: [{ agent_id: "@doctor-agent", user_id: 444333222, username: "doctor_bot" }],
+        roster_hash: ROSTER_HASH,
+        bound_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registry));
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      telegramClientFactory: fakeDoctorClientFactory,
+    });
+
+    const run = readRunFile(daemon.dirs.runDir);
+    assert.ok(run !== null);
+    const secret = run.secret;
+
+    async function fetchServerNonce(): Promise<string> {
+      const identityResponse = await fetch(ipcUrl(daemon!.port, `/identity?nonce=${NONCE_HEX}`));
+      const identityBody = (await identityResponse.json()) as { server_nonce: string };
+      return identityBody.server_nonce;
+    }
+
+    // 401: an invalid hmac is refused before any registry lookup (doctor.ts's auth-before-registry
+    // order, the opposite of POST /session's own ordering).
+    const badNonce = await fetchServerNonce();
+    const unauthorizedResponse = await fetch(ipcUrl(daemon.port, "/doctor"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ server_nonce: badNonce, hmac: HMAC_HEX, dm_probe: false }),
+    });
+    assert.equal(unauthorizedResponse.status, 401);
+
+    // 404: a validly-authenticated request naming an unbound project_id is refused, not silently
+    // treated as "no results" or run unscoped.
+    const unboundNonce = await fetchServerNonce();
+    const unboundProof = computeDoctorProof(secret, unboundNonce);
+    const unboundResponse = await fetch(ipcUrl(daemon.port, "/doctor"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        server_nonce: unboundNonce,
+        hmac: unboundProof,
+        project_id: "prj-unbound",
+        dm_probe: false,
+      }),
+    });
+    assert.equal(unboundResponse.status, 404);
+    const unboundBody = (await unboundResponse.json()) as { code?: string };
+    assert.equal(unboundBody.code, "DOCTOR_UNBOUND_PROJECT");
+
+    // 200: a validly-authenticated request naming the real bound project_id runs the online checks
+    // through the injected `doctorClientFor`.
+    const boundNonce = await fetchServerNonce();
+    const boundProof = computeDoctorProof(secret, boundNonce);
+    const boundResponse = await fetch(ipcUrl(daemon.port, "/doctor"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        server_nonce: boundNonce,
+        hmac: boundProof,
+        project_id: "prj-doctor",
+        dm_probe: false,
+      }),
+    });
+    assert.equal(boundResponse.status, 200);
+    const boundBody = (await boundResponse.json()) as {
+      bindings: { project_id: string; checks: { id: string; status: string }[] }[];
+    };
+    assert.equal(boundBody.bindings.length, 1);
+    assert.equal(boundBody.bindings[0].project_id, "prj-doctor");
+    assert.ok(boundBody.bindings[0].checks.some((c) => c.id === "bot-identity" && c.status === "pass"));
+  } finally {
     await daemon?.stop().catch(() => {});
     cleanupTempHome(homeDir);
   }

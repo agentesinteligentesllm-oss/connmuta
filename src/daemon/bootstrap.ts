@@ -20,6 +20,7 @@ import { TelegramApiClient, type TelegramClient } from "./telegram.js";
 import { createIpcServer, type IpcHandler, type IpcServerHandle } from "./ipc/server.js";
 import type { IpcRouteKey } from "../shared/ipc-contract.js";
 import { createIdentityHandler, PendingHandshakeStore } from "./ipc/handshake.js";
+import { createDoctorHandler, type DoctorTelegramClient } from "./ipc/doctor.js";
 import { createSessionRoutes, type RoutesDeps } from "./ipc/routes.js";
 import { SessionStore } from "./ipc/sessions.js";
 
@@ -133,6 +134,27 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
       return new TelegramApiClient(token);
     };
 
+    /**
+     * `POST /doctor`'s Telegram client resolver (design §9.2 D-44, D-48). The non-override branch
+     * mirrors `buildTelegramClient`'s own resolution (secret store lookup -> `TelegramApiClient`),
+     * typed to return `DoctorTelegramClient` since `getChatMember` sits on the `TelegramApiClient`
+     * class only, one level below the narrower `TelegramClient` interface `buildTelegramClient`
+     * returns (D-48) — no cast needed there, `new TelegramApiClient(token)` structurally satisfies
+     * both. The `telegramClientFactory` override branch is test-only; a test exercising the doctor
+     * route must supply a fake implementing `getChatMember` too.
+     */
+    const doctorClientFor = async (botId: number): Promise<DoctorTelegramClient> => {
+      if (options?.telegramClientFactory) {
+        const client = await options.telegramClientFactory({ bot_id: botId } as RegistryBot);
+        return client as unknown as DoctorTelegramClient;
+      }
+      const token = await secretStore.get(String(botId));
+      if (token === null) {
+        throw new Error(`No token found in the secret store for bot ${botId}`);
+      }
+      return new TelegramApiClient(token);
+    };
+
     const handlers: Partial<Record<IpcRouteKey, IpcHandler>> = {};
     ipcServer = createIpcServer({
       handlers,
@@ -172,6 +194,14 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
 
     handlers["GET /identity"] = createIdentityHandler({ secret: runFile.secret, store: handshakeStore });
     Object.assign(handlers, createSessionRoutes(routesDeps));
+    handlers["POST /doctor"] = createDoctorHandler({
+      secret: runFile.secret,
+      store: handshakeStore,
+      bindings: reconciler,
+      doctorClientFor,
+      db: ledger.db,
+      now: options?.now ? (): Date => new Date(options.now!()) : undefined,
+    });
 
     // Initial reconciliation (design §7.1's "reconcile bindings" step, before RUNNING). A failure here
     // must not abort the whole boot sequence — the daemon still comes up reachable, and the next

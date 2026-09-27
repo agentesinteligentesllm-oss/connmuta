@@ -206,8 +206,14 @@ test("daemon bundle: .sendMessage( call lines are confined to the three AS-IS tr
   // is wired BELOW `RoomGuardClient` in `bindings.ts`'s `buildTransport` (module doc: "inserted at the
   // BOTTOM of the transport stack, underneath RoomGuardClient"), so its own `this.client.sendMessage(...)`
   // forwarding call never bypasses the room guard — the guard still runs first on every real send.
+  // `daemon/ipc/doctor.js`'s DM probe (F2 PR-17, `bus-v2-f2-pr-17-dm-probe-design-001`) is a fifth: it
+  // calls `managed.roomGuard.sendMessage(...)` directly, once per roster peer, bypassing `Transport`
+  // entirely so a probe never fans out through the group-first `DualWriteTransport.send` path — but the
+  // call target is the SAME `RoomGuardClient` instance `bindings.ts` already builds, so `assertTarget`
+  // still runs first on every probe send exactly as it does for the three AS-IS transports.
   // Disclosed here rather than silently narrowing the assertion to match design.md's stale list.
   assert.deepEqual(withCalls, [
+    "daemon/ipc/doctor.js",
     "daemon/send/rate.js",
     "daemon/transport/direct.js",
     "daemon/transport/group.js",
