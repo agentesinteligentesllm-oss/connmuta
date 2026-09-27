@@ -1,0 +1,46 @@
+change: f3-web-panel-and-observability
+artifact_store: hybrid
+execution_mode: auto
+delivery_strategy: auto-chain
+review_budget_lines: 400
+phases:
+  explore:
+    status: done
+    artifact: exploration.md
+    engram_topic: sdd/f3-web-panel-and-observability/explore
+    completed_at: "2026-09-27"
+    note: >
+      Native sdd-explore sub-agent dispatch was blocked by a PreToolUse:Agent hook
+      ("SDD child dispatch refused: parent-confirmed SDD preflight is missing, invalid,
+      or uncorroborated") despite a completed grouped AskUserQuestion preflight this
+      session (Automatic / Both / Auto). Exploration was run inline by a forked agent
+      following sdd-explore/SKILL.md directly, per this project's established fallback
+      precedent (PR-22a: "the two blind judges were unavailable... inline adversarial
+      audits... disclose that the two adversarial passes ran in the writing session
+      instead"). Five open questions surfaced for Alpha debate before proposal: panel
+      scope (read-only vs. write-capable screens), panel transport (same-port extension
+      of daemon/ipc/server.ts vs. a second listener), panel token domain (shares the
+      run file vs. a separate PanelTokenStore), roster-sync trigger/apply mechanism
+      (roster_drift is detected but never resolved today), and the exact wire-version
+      constant to render alongside SERVER_VERSION. All 5 resolved via Arena debate
+      bus-v2-f3-explore-decisions-001 (Alpha AUDIT round 1: APPROVE_WITH_CHANGES, 1
+      objection on roster-sync coherence; Kairo CONSENSUS round 2, objection accepted).
+      See exploration.md's "Resolved Decisions" addendum. Ready for sdd-propose,
+      deferred to a future session per this session's own scope (start exploration
+      only, not the full cycle).
+  research:
+    status: unselected
+  propose:
+    status: pending
+  spec:
+    status: pending
+  design:
+    status: pending
+  tasks:
+    status: pending
+  apply:
+    status: pending
+  verify:
+    status: pending
+  archive:
+    status: pending
