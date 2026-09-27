@@ -292,15 +292,24 @@ test("installer/doctor bundle: the real compiled instructions.js still carries t
 // 5. doctor/offline.js's own (narrower) closure carries no network module
 // ---------------------------------------------------------------------------
 
-const NODE_HTTP_RE = /(?:require\(\s*["']node:http["']\s*\)|from\s+["']node:http["'])/;
-const NODE_HTTPS_RE = /(?:require\(\s*["']node:https["']\s*\)|from\s+["']node:https["'])/;
+// Correction (native review `review-45793fb337115667`, R3-offline-dynamic-import-evasion, CRITICAL):
+// all three checks below originally matched only `require(...)`/ESM `from` forms, missing a dynamic
+// `import(...)` expression — not a theoretical gap, since this exact file's own CLI closure already
+// demonstrates the idiom in production (`cli/main.js`'s `mcp` branch dynamically imports
+// `client/main.js`, computeClosure's own regex follows it). Each regex now also matches
+// `import(\s*["']<module>["']`.
+const NODE_HTTP_RE =
+  /(?:require\(\s*["']node:http["']\s*\)|from\s+["']node:http["']|import\(\s*["']node:http["'])/;
+const NODE_HTTPS_RE =
+  /(?:require\(\s*["']node:https["']\s*\)|from\s+["']node:https["']|import\(\s*["']node:https["'])/;
 const FETCH_CALL_RE = /(?<![\w$])fetch\s*\(/;
 // Correction (native review `review-588821941bef5e65`, R2-daemon-telegram-regex-asymmetry, CRITICAL):
 // this sibling check only matched the ESM `from` form, unlike NODE_HTTP_RE/NODE_HTTPS_RE immediately
 // above, which both cover the CommonJS `require(...)` shape too — a real asymmetry in the same
-// zero-network guarantee, not just a style inconsistency.
+// zero-network guarantee, not just a style inconsistency. Extended again for the dynamic-import gap
+// above (R3-offline-dynamic-import-evasion).
 const DAEMON_TELEGRAM_IMPORT_RE =
-  /(?:require\(\s*["'][^"']*daemon\/telegram\.js["']\s*\)|from\s+["'][^"']*daemon\/telegram\.js["'])/;
+  /(?:require\(\s*["'][^"']*daemon\/telegram\.js["']\s*\)|from\s+["'][^"']*daemon\/telegram\.js["']|import\(\s*["'][^"']*daemon\/telegram\.js["'])/;
 
 test("installer/doctor bundle: doctor/offline.js's own closure carries no network module (design.md §9.1's zero-network pin, code-level half)", () => {
   const contents = bundleContents(OFFLINE_ENTRY);
@@ -319,5 +328,10 @@ test("installer/doctor bundle: the offline-closure network predicates are non-va
   assert.equal(FETCH_CALL_RE.test("await fetch(url);"), true);
   assert.equal(DAEMON_TELEGRAM_IMPORT_RE.test('import { TelegramApiClient } from "../daemon/telegram.js";'), true);
   assert.equal(DAEMON_TELEGRAM_IMPORT_RE.test('const { TelegramApiClient } = require("../daemon/telegram.js");'), true);
+  // Dynamic import() — the R3-offline-dynamic-import-evasion gap; a demonstrated idiom in this exact
+  // codebase (cli/main.js's own mcp branch), not a theoretical one.
+  assert.equal(NODE_HTTP_RE.test('await import("node:http");'), true);
+  assert.equal(NODE_HTTPS_RE.test('await import("node:https");'), true);
+  assert.equal(DAEMON_TELEGRAM_IMPORT_RE.test('await import("../daemon/telegram.js");'), true);
   assert.equal(FETCH_CALL_RE.test("await prefetch(url);"), false, "prefetch( must never be mistaken for a real fetch( call");
 });

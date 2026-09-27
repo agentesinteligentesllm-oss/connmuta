@@ -92,6 +92,27 @@ interface RawResponse {
  */
 const REQUEST_TIMEOUT_MS = 5000;
 
+/**
+ * Bounds a cleanup-time wait without ever rejecting (native review `review-45793fb337115667`,
+ * R4-unbounded-server-close-cleanup, CRITICAL): `server.close()` waits for the real `createIpcServer`
+ * listener to drain every open connection, and this test just drove 8 real request/response round
+ * trips over it. Cleanup is best-effort by design (each step already runs inside its own try/catch),
+ * so this resolves `undefined` on timeout rather than rejecting, letting the remaining cleanup steps
+ * proceed either way.
+ *
+ * **Empirically confirmed, not just a hypothetical safety net**: lowering this constant to 200ms
+ * locally dropped the whole file's own run time from ~5.3s to ~0.47s — `server.close()` genuinely
+ * does not resolve promptly here, on this machine, despite `daemon/ipc/server.ts`'s own `close()`
+ * already calling `closeAllConnections()` before `httpServer.close()`. Root cause not chased further
+ * here (out of this correction's scope — see docs/06-backlog/CHECKLIST.md B-88), since this timeout
+ * already delivers the property the finding asked for (bounded cleanup, no hang).
+ */
+const CLEANUP_WAIT_TIMEOUT_MS = 5000;
+
+function withCleanupTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+	return Promise.race([promise, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
+}
+
 function sendRequest(options: { port: number; method: string; path: string; body?: string; authorization?: string }): Promise<RawResponse> {
 	return new Promise((resolvePromise, reject) => {
 		const bodyBuffer = options.body === undefined ? undefined : Buffer.from(options.body, "utf8");
@@ -461,7 +482,7 @@ test("two real installs: N sends from two independently wizard-produced projects
 		// registry delete this block already treated that way.
 		const cleanupSteps: readonly (() => void | Promise<void>)[] = [
 			async () => {
-				if (server) await server.close();
+				if (server) await withCleanupTimeout(server.close(), CLEANUP_WAIT_TIMEOUT_MS);
 			},
 			() => {
 				if (db) db.close();
