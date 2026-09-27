@@ -269,7 +269,7 @@ The bearer credential is derived from the same per-boot secret; whether it is th
 
 1. **Node ≥ 24** — the first check, before touching disk or git; explicit error with the download link; records the node executable path actually used (nvm/fnm aware). Reason: `node:sqlite` is unflagged and warning-free only from Node 24 (bundle: research[packaging-runtime]).
 2. Home directory `~/.conmuta/` and an empty registry; ledger opens (WAL).
-3. IDE/tool detection by their config locations.
+3. Tool selection by wizard checkbox (D-33, F2 spec: no auto-detection — "detected tool" below and in CONSTITUTION §3 layer 3 is read as "tool the user selected", a stricter opt-in that needed no CONSTITUTION amendment).
 4. Bots, groups, project binding through the wizards (§10.2).
 5. Per-tool project config entries: **merge, never overwrite; opt-in per tool**; `AGENTS.md` (bus protocol for agents, ≤ 200 lines) plus `CLAUDE.md` = `@AGENTS.md`; per-tool one-time trust steps printed, never bypassed (Claude Code project-server approval, Codex `trust_level`, Gemini and Copilot CLI folder trust, VS Code trust dialog — bundle: research[mcp-config-surfaces]).
 6. `doctor` (§10.4).
@@ -284,7 +284,7 @@ The screens are the tribunal-proposed installer/panel flow (D2 "guided by the in
 | **Control panel** | `conmuta panel` (opens the browser on `127.0.0.1:<port>` with the per-boot token); `conmuta status` for the text form | Home | Daemon pid, uptime, last poll per bot, conditions per binding, links to the other views | Ledger, registry | Nothing | F3 |
 | **Add bot** | `conmuta bot add` | Bots → Add | Asks for the token once (masked), calls `getMe`, stores the token in the secret store under `bot:<bot_id>`, records `{bot_id, username, token_ref}`; shows the BotFather checklist (Bot-to-Bot Communication Mode ON, Group Privacy OFF — v1 onboarding doctrine, bundle: maps[ops-lessons]; AND/OR semantics for non-admin bots pending spike B-07) | Telegram `getMe` | Secret store, `registry.bots` | F2 |
 | **Add group** | `conmuta group add` | Groups → Add | Records the numeric supergroup id (must be negative, v1 `src/config.ts:176-179`) and a display title; builds the roster from the pending unknown senders list or manual entry; refuses a `group_id` already bound | Registry, pending senders | `registry.groups` | F2 |
-| **Assign project** | `conmuta project bind <path>` | Projects → Assign | Selects one bot + one group + my `agent_id`; enforces the bijective invariants; writes `conmuta.json` if absent (identifiers only) or verifies it; detects tools; merges the id-only stdio entry into each detected tool's project config (opt-in per tool); writes `AGENTS.md` and `CLAUDE.md`; prints the trust steps | Registry, project folder | `registry.projects`, `registry.bindings`, `conmuta.json`, tool configs, `AGENTS.md`, `CLAUDE.md` | F2 |
+| **Assign project** | `conmuta project bind <path>` | Projects → Assign | Selects one bot + one group + my `agent_id`; enforces the bijective invariants; writes `conmuta.json` if absent (identifiers only) or verifies it; a tool-selection checkbox (D-33, no auto-detection); merges the id-only stdio entry into each selected tool's project config (opt-in per tool); writes `AGENTS.md` and `CLAUDE.md`; prints the trust steps | Registry, project folder | `registry.projects`, `registry.bindings`, `conmuta.json`, tool configs, `AGENTS.md`, `CLAUDE.md` | F2 |
 | **Overview table** | `conmuta list` | Overview | One row per binding: bot, bot id, group, group id, project (folder), collaborators (roster), totals — open threads, `needs_action`, last poll, daemon conditions | Registry + ledger | Nothing | F3 |
 
 ### 10.3 Per-tool MCP config surfaces (D5)
@@ -300,6 +300,7 @@ The generated entry is the same everywhere: a stdio server launching `conmuta mc
 | OpenCode | `opencode.json` | `mcp` (`type: "local"`, `command` array) | **Project file only — never global** (global config overlays every project) |
 | Codex CLI | `.codex/config.toml` | `[mcp_servers.<name>]` | Trusted projects only (`trust_level = "trusted"` in the user config, with consent) |
 | Antigravity | `.agents/mcp_config.json` | `mcpServers` | Global path needs re-checking before hard-coding (open question in the research) |
+| Pi | `.pi/mcp.json` | `mcpServers` | The 8th project-level surface (D-34, F2 spec). `pi-mcp-adapter` loads `.mcp.json` then `.pi/mcp.json` and merges server maps by name, so Pi's own row is skipped as redundant whenever Claude Code is also selected in the same run or `.mcp.json` already holds an identical entry (D-43) — Pi never causes a `.mcp.json` write of its own, since that file also configures Claude Code, Copilot CLI and the VS Code Agent Host |
 | Windsurf, Cline, JetBrains AI Assistant | none (global-only) | — | Best-effort: one global entry that works only if the tool spawns the server with the workspace as cwd; the client still refuses when unbound |
 
 The instruction file is written once as `AGENTS.md` (read natively by 13 of 15 surveyed tools) with `CLAUDE.md` = `@AGENTS.md` for Claude Code; the installer does not create `.cursorrules` (Zed's first-match rule would shadow `AGENTS.md`).
