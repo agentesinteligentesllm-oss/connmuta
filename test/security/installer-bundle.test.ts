@@ -210,6 +210,19 @@ test("installer/doctor bundle: child_process detection is non-vacuous (seeded ne
 // disclosed as an accepted limitation (docs/06-backlog/CHECKLIST.md B-87), the same class of
 // forward-compatibility gap this project already accepted for B-52 rather than an open-ended pursuit
 // of AST-level completeness in what is, by design, a fast static smoke test.
+//
+// **Deliberate false-positive, not a bug (native review `review-ce9c4e5975013bd9`, R2-002, CRITICAL,
+// disclosed rather than "fixed" by weakening the check).** The `[{,]\s*<key>\s*[,}]` branch's
+// "shorthand write" text (`{ trust_level }`) is byte-identical to an ES2015 destructuring *read*
+// (`const { trust_level } = cfg;`) — a regex cannot tell these apart without full AST parsing (there
+// is no such read anywhere in `src/` today, confirmed by direct grep; this is a documented risk for
+// FUTURE code, not a present false positive). This check deliberately fails safe: for a security
+// invariant this narrow ("never write trust_level"), over-detecting an ambiguous shape and forcing a
+// human to look is the right trade-off against silently missing a real write, the exact CRITICAL gap
+// this same branch was added to close. If a legitimate future read of an existing `trust_level` value
+// is ever needed, prefer dot-notation (`cfg.trust_level`) over destructuring for that one property —
+// `TRUST_LEVEL_WRITE_RE`'s dot-assignment branch only matches an actual `=`, so a bare read expression
+// already passes cleanly — rather than loosening this check.
 const TRUST_LEVEL_WRITE_RE =
 	/(?:["']trust_level["']\s*:|\btrust_level\b\s*:|[{,]\s*trust_level\s*[,}]|\.trust_level\s*=(?!=)|\[\s*["']trust_level["']\s*\]\s*=(?!=)|Object\.defineProperty(?:s)?\s*\([^,]+,\s*["']trust_level["'])/;
 const ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE =
@@ -240,7 +253,8 @@ test("installer/doctor bundle: the write-shaped checks are non-vacuous (seeded p
   assert.equal(NPX_INVOKE_RE.test("npx(args)"), true);
   // A template-literal invocation — the other gap R2/R3 found.
   assert.equal(NPX_INVOKE_RE.test("spawn(`npx ${pkg}`)"), true);
-  // ES2015 object-shorthand / destructuring writes — no colon at all, the other half of R3's gap.
+  // ES2015 object-shorthand write — no colon at all, the other half of R3's gap. Byte-identical to a
+  // destructuring READ of the same shape; see R2-002's disclosed fail-safe-by-design note above.
   assert.equal(TRUST_LEVEL_WRITE_RE.test("{ trust_level }"), true);
   assert.equal(TRUST_LEVEL_WRITE_RE.test("{ ...cfg, trust_level }"), true);
   assert.equal(ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test("{ enableAllProjectMcpServers }"), true);
