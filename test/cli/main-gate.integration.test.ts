@@ -41,20 +41,59 @@ interface SpawnResult {
 	readonly stderr: string;
 }
 
-/** Spawns a real `node` child process, collecting both streams and the exit code. */
+/**
+ * Bounds how long `runNode` waits for the child to close on its own (native review
+ * `review-1be8b7288fa0197f`, R4-node-floor-gate-spawn-no-timeout, CRITICAL). Comfortably above every
+ * observed real gate-refusal time (~35-100ms) but far below a CI job timeout, so a genuine regression
+ * still fails fast rather than hanging.
+ */
+const GATE_SPAWN_TIMEOUT_MS = 5000;
+
+/**
+ * Spawns a real `node` child process, collecting both streams and the exit code — bounded by
+ * {@link GATE_SPAWN_TIMEOUT_MS}. Without this bound, a Node-floor-gate regression on the
+ * `daemon start` case (the one gated subcommand whose successful, non-gated path is a persistent
+ * process that never exits on its own) would hang this promise, and the whole test run, forever
+ * instead of failing with a diagnosable error.
+ */
 function runNode(args: readonly string[], cwd: string): Promise<SpawnResult> {
 	return new Promise((resolvePromise, reject) => {
 		const child = spawn(process.execPath, [...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
 		let stdout = "";
 		let stderr = "";
+		let settled = false;
+
+		const timeout = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			child.kill("SIGKILL");
+			reject(
+				new Error(
+					`runNode: child process did not exit within ${GATE_SPAWN_TIMEOUT_MS}ms (args: ${args.join(" ")}) — ` +
+						"if the Node-floor gate regressed for a persistent-process command like 'daemon start', this " +
+						"timeout is what turns that into a failed test instead of a hung one",
+				),
+			);
+		}, GATE_SPAWN_TIMEOUT_MS);
+
 		child.stdout?.on("data", (chunk: Buffer) => {
 			stdout += chunk.toString("utf8");
 		});
 		child.stderr?.on("data", (chunk: Buffer) => {
 			stderr += chunk.toString("utf8");
 		});
-		child.on("error", reject);
-		child.on("close", (code) => resolvePromise({ exitCode: code, stdout, stderr }));
+		child.on("error", (err) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			reject(err);
+		});
+		child.on("close", (code) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			resolvePromise({ exitCode: code, stdout, stderr });
+		});
 	});
 }
 

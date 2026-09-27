@@ -168,9 +168,23 @@ test("installer/doctor bundle: child_process detection is non-vacuous (seeded ne
 // 4. trust_level / enableAllProjectMcpServers / npx — write-shaped, not substring (Correction B)
 // ---------------------------------------------------------------------------
 
-const TRUST_LEVEL_WRITE_RE = /(?:["']trust_level["']|\btrust_level\b)\s*:/;
-const ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE = /(?:["']enableAllProjectMcpServers["']|\benableAllProjectMcpServers\b)\s*:/;
-const NPX_INVOKE_RE = /"npx "|'npx '|\bnpx\(/;
+// Correction (native review `review-1be8b7288fa0197f`, R3-write-shaped-regex-blind-spot, CRITICAL):
+// the original colon-only forms missed two real write shapes — an ES2015 object-shorthand property
+// (`{ trust_level }`, `{ ...cfg, trust_level }`) has no colon at all. The `[{,]\s*<key>\s*[,}]`
+// branch below matches a bare key delimited by a brace/comma on both sides — the shape a shorthand
+// property or a destructuring binding actually takes in source — without matching the key merely
+// named inside a longer prose sentence (`instructions.ts`'s own disclosure line has no adjacent
+// brace/comma around the word at all).
+const TRUST_LEVEL_WRITE_RE = /(?:["']trust_level["']\s*:|\btrust_level\b\s*:|[{,]\s*trust_level\s*[,}])/;
+const ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE =
+	/(?:["']enableAllProjectMcpServers["']\s*:|\benableAllProjectMcpServers\b\s*:|[{,]\s*enableAllProjectMcpServers\s*[,}])/;
+// Correction (same review, R2-npx-invoke-regex-gap, CRITICAL): the original only matched a literal
+// trailing space inside the quotes (`"npx "`) or a bare `npx(` call — missing the realistic
+// `spawn("npx", [...])` argv[0] shape (no trailing space) and a template-literal invocation
+// (`` `npx ${pkg}` ``). Matches `npx` opened by a quote/backtick and closed by a quote, whitespace, or
+// end of string — `` `npx` `` immediately re-closed by another backtick (launcher.ts's own disclosure
+// prose) still does not match, since a backtick is not one of the accepted closing characters.
+const NPX_INVOKE_RE = /["'`]npx(?=["'\s]|$)|\bnpx\(/;
 
 test("installer/doctor bundle: trust_level/enableAllProjectMcpServers/npx never appear as a write-shaped literal in the CLI closure", () => {
   const contents = cliBundleContents();
@@ -185,8 +199,15 @@ test("installer/doctor bundle: the write-shaped checks are non-vacuous (seeded p
   assert.equal(TRUST_LEVEL_WRITE_RE.test('"trust_level": true'), true);
   assert.equal(TRUST_LEVEL_WRITE_RE.test('trust_level: "full"'), true);
   assert.equal(ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test('"enableAllProjectMcpServers": true'), true);
-  assert.equal(NPX_INVOKE_RE.test('spawn("npx ", ["create-thing"])'), true);
+  // The realistic argv[0] shape (no artificial trailing space) — the exact gap R2/R3 found.
+  assert.equal(NPX_INVOKE_RE.test('spawn("npx", ["create-thing"])'), true);
   assert.equal(NPX_INVOKE_RE.test("npx(args)"), true);
+  // A template-literal invocation — the other gap R2/R3 found.
+  assert.equal(NPX_INVOKE_RE.test("spawn(`npx ${pkg}`)"), true);
+  // ES2015 object-shorthand / destructuring writes — no colon at all, the other half of R3's gap.
+  assert.equal(TRUST_LEVEL_WRITE_RE.test("{ trust_level }"), true);
+  assert.equal(TRUST_LEVEL_WRITE_RE.test("{ ...cfg, trust_level }"), true);
+  assert.equal(ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test("{ enableAllProjectMcpServers }"), true);
 
   // The exact legitimate prose line this correction exists for (installer/instructions.ts) — must stay false.
   assert.equal(
