@@ -70,10 +70,17 @@ Requirements: no behavior change for existing MCP clients — this PR only repla
 `checkTransportGuards(req, {expectedHost, requireOrigin: false})`.
 Runtime harness: existing `ipc/server.test.ts` real-listener pattern.
 
-- [ ] 2.1 RED: extend `ipc/server.test.ts` with a regression case pinning that the existing Host-check
+- [x] 2.1 RED: extend `ipc/server.test.ts` with a regression case pinning that the existing Host-check
       behavior is byte-identical after the refactor (same status/body on a foreign Host).
-- [ ] 2.2 GREEN: replace `handleRequest`'s inline Host check with a `checkTransportGuards` call.
-- [ ] 2.3 Verify: `npm run build && node --test "dist/test/daemon/ipc/server.test.js"`.
+- [x] 2.2 GREEN: replace `handleRequest`'s inline Host check with a `checkTransportGuards` call.
+- [x] 2.3 Verify: `npm run build && node --test "dist/test/daemon/ipc/server.test.js"`.
+
+**Disclosed correction, outside this PR's stated scope line:** `test/security/daemon-bundle.test.ts`'s
+reverse-import-graph assertion (design §14) allow-listed `transport/*` importers as only
+`daemon/bindings.js`/`daemon/send/*`/`daemon/transport/*` — written before `http-guards.ts` existed,
+when everything under `transport/` was outbound-Telegram-specific. `daemon/ipc/server.ts` importing
+the new shared guard broke that assertion; fixed by exempting `http-guards.js` by name (not widening
+the allow-list itself), disclosed in the file's own test comment.
 
 ### Unit 3 — Panel token and discovery primitives
 

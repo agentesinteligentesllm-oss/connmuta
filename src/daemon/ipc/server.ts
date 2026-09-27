@@ -41,13 +41,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { IPC_EPHEMERAL_PORT, IPC_MAX_BODY_BYTES } from "../../shared/constants.js";
 import {
   HTTP_BAD_REQUEST,
-  HTTP_FORBIDDEN,
   HTTP_INTERNAL_SERVER_ERROR,
   HTTP_NOT_FOUND,
   HTTP_PAYLOAD_TOO_LARGE,
   HTTP_UNSUPPORTED_MEDIA_TYPE,
   IPC_BAD_REQUEST,
-  IPC_HOST_REJECTED,
   IPC_INTERNAL_ERROR,
   IPC_LOOPBACK_HOST,
   IPC_PAYLOAD_TOO_LARGE,
@@ -57,6 +55,7 @@ import {
   ipcTransportError,
   type IpcRouteKey,
 } from "../../shared/ipc-contract.js";
+import { checkTransportGuards } from "../transport/http-guards.js";
 
 /** One parsed, transport-validated request handed to a route handler. */
 export interface IpcRequest {
@@ -217,13 +216,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, deps: Ip
   req.on("error", () => {});
 
   const expectedHost = `${IPC_LOOPBACK_HOST}:${boundPort}`;
-  if (req.headers.host !== expectedHost) {
-    respondJsonAndClose(
-      res,
-      req,
-      HTTP_FORBIDDEN,
-      ipcTransportError(IPC_HOST_REJECTED, "Host header must name this daemon's own loopback address"),
-    );
+  const guardResult = checkTransportGuards(req, { expectedHost, requireOrigin: false });
+  if (!guardResult.ok) {
+    respondJsonAndClose(res, req, guardResult.rejection.status, guardResult.rejection.body);
     return;
   }
 
