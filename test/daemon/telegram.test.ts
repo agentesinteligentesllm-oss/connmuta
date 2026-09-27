@@ -13,6 +13,7 @@ import {
   TelegramProtocolError,
   requestTimeoutMs,
 } from "../../src/daemon/telegram.js";
+import type { TelegramChatMember } from "../../src/daemon/telegram.js";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -125,6 +126,47 @@ test("TelegramApiClient.getMe and getChat format request shape correctly", async
   assert.equal(calls[0].body, "{}");
   assert.equal(calls[1].url, "https://api.telegram.org/bottest-token/getChat");
   assert.equal(calls[1].body, JSON.stringify({ chat_id: 888 }));
+});
+
+test("TelegramApiClient.getChatMember formats request shape correctly", async () => {
+  let capturedUrl = "";
+  let capturedInit: RequestInit | undefined;
+  const client = mockClient(
+    200,
+    { ok: true, result: { status: "administrator", user: { id: 555, is_bot: false, username: "roster_bot" } } },
+    (u, i) => {
+      capturedUrl = u;
+      capturedInit = i;
+    },
+  );
+
+  const member: TelegramChatMember = await client.getChatMember(888, 555);
+  assert.equal(capturedUrl, "https://api.telegram.org/bottest-token/getChatMember");
+  assert.equal(capturedInit?.method, "POST");
+  assert.deepEqual(capturedInit?.headers, { "content-type": "application/json" });
+  assert.equal(capturedInit?.body, JSON.stringify({ chat_id: 888, user_id: 555 }));
+  assert.ok(capturedInit?.signal instanceof AbortSignal);
+  assert.equal(member.status, "administrator");
+  assert.equal(member.user.id, 555);
+});
+
+test("TelegramApiClient.getChatMember maps a network failure to TelegramNetworkError with token redaction (PT-08)", async () => {
+  const rawToken = `1234567:${"A".repeat(35)}`;
+  const client = new TelegramApiClient(rawToken, {
+    fetchImpl: async (url) => {
+      throw new TypeError(`connect ECONNREFUSED ${url}`);
+    },
+  });
+  await assert.rejects(
+    () => client.getChatMember(888, 555),
+    (err: unknown) => {
+      assert.ok(err instanceof TelegramNetworkError);
+      assert.ok(err.message.includes("getChatMember"));
+      assert.ok(!err.message.includes(rawToken));
+      assert.ok(err.message.includes("<redacted>"));
+      return true;
+    },
+  );
 });
 
 test("TelegramApiClient maps network error to TelegramNetworkError", async () => {
