@@ -6,13 +6,22 @@
 // and a pre-commit hook reads that silence as "clean" (PT-05). `test/cli/main.test.ts` pins the
 // emitted line so this can fail instead of regressing.
 import { readFileSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import type { DatabaseSync } from "node:sqlite";
 
 import { EXIT_NODE_FLOOR, EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
 import { SERVER_VERSION } from "../shared/version.js";
 import { enforceNodeFloor } from "../daemon/node-floor.js";
 import { validateText } from "./validate.js";
+import type { InstallerCliDeps, InstallerCliOutcome } from "../installer/cli.js";
+import type { Prompter } from "../installer/prompter.js";
+import type { ToolId } from "../installer/tool-targets.js";
+import type { SetupOutcome } from "../installer/wizards/setup.js";
+import type { BotAddOutcome } from "../installer/wizards/bot-add.js";
+import type { GroupAddOutcome } from "../installer/wizards/group-add.js";
+import type { ProjectBindOutcome } from "../installer/wizards/project-bind.js";
+import type { ProjectRosterEntry } from "../shared/project-file.js";
 
 /**
  * The process surface the dispatcher needs, injected rather than reached for.
@@ -37,11 +46,21 @@ export interface CliIo {
  */
 const USAGE_LINES = [
 	`usage: ${PRODUCT_NAME} validate <path> | --stdin`,
+	`       ${PRODUCT_NAME} daemon start`,
 	`       ${PRODUCT_NAME} daemon stop [--home <dir>]`,
+	`       ${PRODUCT_NAME} setup`,
+	`       ${PRODUCT_NAME} bot add`,
+	`       ${PRODUCT_NAME} group add`,
+	`       ${PRODUCT_NAME} project bind <path>`,
 	`       ${PRODUCT_NAME} mcp --project <id>`,
 	`       ${PRODUCT_NAME} migrate-v1 [--v1-home <dir>] [--project-id <slug>] [--project-path <abs dir>] [--token-stdin] [--dry-run]`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
+	`  daemon start  ensure the daemon is running, spawning it if needed`,
 	`  daemon stop   stop the running daemon after confirming identity (D-29)`,
+	`  setup         interactive first-run setup: home, registry scaffold, ledger, ACL, autostart`,
+	`  bot add       register a Telegram bot's token`,
+	`  group add     register a Telegram group id`,
+	`  project bind  bind a project directory to a bot, group and roster`,
 	`  mcp           start the MCP server for an IDE host (ADR-0029)`,
 	`  migrate-v1    one-shot v1-to-v2 migration (D-24); non-interactive, refuses on any precondition failure`,
 ];
@@ -56,6 +75,198 @@ function usageError(io: CliIo, reason?: string): number {
 	}
 	io.err(`${PRODUCT_NAME} ${SERVER_VERSION}`);
 	return EXIT_USAGE;
+}
+
+/**
+ * Thrown by one of the installer dependency closures below for a failure `installer/cli.ts`'s own
+ * outcome unions have no member for — a refused ledger open (`ledger-access.ts`'s `"version_mismatch"`
+ * has no home in {@link BotAddOutcome}/{@link GroupAddOutcome}/{@link ProjectBindOutcome}), a cancelled
+ * interactive prompt, or input that does not parse. Caught once around the `runInstallerCli` call
+ * below, so it becomes a reported CLI failure instead of an uncaught crash.
+ */
+class InstallerDependencyFailure extends Error {}
+
+/** Opens the installer's ledger view once per invocation, or throws {@link InstallerDependencyFailure}. */
+async function openInstallerLedgerOrFail(homeDir: string): Promise<{ readonly db: DatabaseSync; readonly registryPath: string }> {
+	const { openInstallerLedger } = await import("../installer/ledger-access.js");
+	const result = openInstallerLedger({ homeDir });
+	if (result.status === "refused") {
+		throw new InstallerDependencyFailure(
+			`ledger refused (${result.reason}) at ${result.path}: found schema version ${result.foundVersion}`,
+		);
+	}
+	return { db: result.db, registryPath: join(homeDir, "registry.json") };
+}
+
+/**
+ * Collects `group add`'s own interactive inputs. Neither `groupId` nor `title` is prompted for
+ * anywhere upstream — `group-add.ts`'s own module doc discloses this as deferred to "a later
+ * CLI-wiring slice", which is this one. Throws {@link InstallerDependencyFailure} on a cancelled prompt
+ * or an id that does not parse as a negative integer (Telegram's own supergroup convention): neither
+ * is a member {@link GroupAddOutcome} carries.
+ */
+async function collectGroupAddInputs(prompter: Prompter): Promise<{ readonly groupId: number; readonly title?: string }> {
+	const idAnswer = await prompter.text({ message: "Telegram group id (negative number, e.g. -1001234567890):" });
+	if (prompter.isCancel(idAnswer)) {
+		throw new InstallerDependencyFailure("group add cancelled");
+	}
+	const groupId = Number(idAnswer);
+	if (!Number.isInteger(groupId) || groupId >= 0) {
+		throw new InstallerDependencyFailure(`invalid group id '${idAnswer as string}': expected a negative integer`);
+	}
+
+	const titleAnswer = await prompter.text({ message: "Display title (optional):", defaultValue: "" });
+	if (prompter.isCancel(titleAnswer)) {
+		throw new InstallerDependencyFailure("group add cancelled");
+	}
+	const title = titleAnswer as string;
+	return { groupId, title: title.length > 0 ? title : undefined };
+}
+
+/**
+ * Collects `project bind`'s own interactive inputs: a bot/group selection read off the current
+ * registry, an `agent_id`, and the tool-config multiselect. None of these are prompted for anywhere
+ * upstream either (`project-bind.ts`'s own module doc: "interactive selection and roster composition
+ * are deferred"), so this is that later CLI-wiring slice.
+ *
+ * **Disclosed simplification** (see this PR's own report): building a full multi-human roster
+ * composer (`roster-source.ts`'s `composeRoster`) is out of scope for this wiring layer. The one typed
+ * `agent_id` becomes this project's sole roster entry, pointed at the selected bot's own identity —
+ * correct for a fresh project with one human operator, and the common case this installer targets.
+ */
+async function collectProjectBindInputs(
+	prompter: Prompter,
+	registryPath: string,
+): Promise<{
+	readonly botId: number;
+	readonly groupId: number;
+	readonly agentId: string;
+	readonly roster: readonly ProjectRosterEntry[];
+	readonly selectedToolIds: ReadonlySet<ToolId>;
+}> {
+	const { parseRegistryText } = await import("../registry/loader.js");
+	const { TOOL_CONFIG_TARGETS } = await import("../installer/tool-targets.js");
+
+	const parsed = parseRegistryText(readFileSync(registryPath, "utf8"));
+	if (!parsed.ok) {
+		throw new InstallerDependencyFailure("registry.json is not currently valid; fix it before project bind");
+	}
+	const { registry } = parsed;
+
+	const botAnswer = await prompter.select({
+		message: "Select the bot to bind:",
+		options: registry.bots.map((bot) => ({ value: bot.bot_id, label: `${bot.username || bot.bot_id} (${bot.bot_id})` })),
+	});
+	if (prompter.isCancel(botAnswer)) {
+		throw new InstallerDependencyFailure("project bind cancelled");
+	}
+
+	const groupAnswer = await prompter.select({
+		message: "Select the group to bind:",
+		options: registry.groups.map((group) => ({ value: group.group_id, label: `${group.title ?? group.group_id} (${group.group_id})` })),
+	});
+	if (prompter.isCancel(groupAnswer)) {
+		throw new InstallerDependencyFailure("project bind cancelled");
+	}
+
+	const agentIdAnswer = await prompter.text({ message: "Agent id for this project's roster (e.g. @alice-agent):" });
+	if (prompter.isCancel(agentIdAnswer)) {
+		throw new InstallerDependencyFailure("project bind cancelled");
+	}
+
+	const toolAnswer = await prompter.multiselect({
+		message: "Select which host tool configs to write:",
+		options: TOOL_CONFIG_TARGETS.map((target) => ({ value: target.id, label: target.label })),
+	});
+	if (prompter.isCancel(toolAnswer)) {
+		throw new InstallerDependencyFailure("project bind cancelled");
+	}
+
+	const botId = botAnswer as number;
+	const agentId = agentIdAnswer as string;
+	const selectedBot = registry.bots.find((bot) => bot.bot_id === botId);
+	const roster: readonly ProjectRosterEntry[] = [{ agent_id: agentId, user_id: botId, username: selectedBot?.username ?? "" }];
+
+	return {
+		botId,
+		groupId: groupAnswer as number,
+		agentId,
+		roster,
+		selectedToolIds: new Set(toolAnswer as ToolId[]),
+	};
+}
+
+/** Maps one {@link InstallerCliOutcome} to an exit code, reporting which sub-outcome occurred rather than swallowing it. */
+function reportInstallerOutcome(io: CliIo, outcome: InstallerCliOutcome): number {
+	switch (outcome.outcome) {
+		case "refused":
+			return usageError(io, `unknown installer invocation (${outcome.reason})`);
+		case "setup":
+			return reportSetupOutcome(io, outcome.result);
+		case "bot-add":
+			return reportBotAddOutcome(io, outcome.result);
+		case "group-add":
+			return reportGroupAddOutcome(io, outcome.result);
+		case "project-bind":
+			return reportProjectBindOutcome(io, outcome.result);
+	}
+}
+
+function reportSetupOutcome(io: CliIo, result: SetupOutcome): number {
+	if (result.outcome === "ledger-refused") {
+		io.err(`${PRODUCT_NAME}: ledger refused (${result.reason}) at ${result.path}: found schema version ${result.foundVersion}`);
+		return 1;
+	}
+	io.out(`setup completed (registry ${result.registryScaffolded ? "created" : "already present"}, autostart: ${result.autostart})`);
+	return 0;
+}
+
+function reportBotAddOutcome(io: CliIo, result: BotAddOutcome): number {
+	switch (result.outcome) {
+		case "added":
+			io.out(`bot added: ${result.username} (${result.bot_id})`);
+			return 0;
+		case "cancelled":
+			io.err(`${PRODUCT_NAME}: bot add cancelled`);
+			return 1;
+		case "getMe-failed":
+			io.err(`${PRODUCT_NAME}: ${result.message}`);
+			return 1;
+		case "registry-commit-failed":
+			io.err(`${PRODUCT_NAME}: registry commit failed (${result.detail.outcome})`);
+			return 1;
+	}
+}
+
+function reportGroupAddOutcome(io: CliIo, result: GroupAddOutcome): number {
+	switch (result.outcome) {
+		case "added":
+			io.out(`group added: ${result.group_id}`);
+			return 0;
+		case "group-already-bound":
+			io.err(`${PRODUCT_NAME}: that group already has an active binding`);
+			return 1;
+		case "registry-commit-failed":
+			io.err(`${PRODUCT_NAME}: registry commit failed (${result.detail.outcome})`);
+			return 1;
+	}
+}
+
+function reportProjectBindOutcome(io: CliIo, result: ProjectBindOutcome): number {
+	switch (result.outcome) {
+		case "bound":
+			io.out(`project bound: ${result.project_id}`);
+			return 0;
+		case "invariant-violated":
+			io.err(`${PRODUCT_NAME}: binding refused (${result.invariant})`);
+			return 1;
+		case "project-file-refused":
+			io.err(`${PRODUCT_NAME}: conmuta.json write refused (${result.disagreements.length} disagreement(s))`);
+			return 1;
+		case "registry-commit-failed":
+			io.err(`${PRODUCT_NAME}: registry commit failed (${result.detail.outcome})`);
+			return 1;
+	}
 }
 
 /**
@@ -80,8 +291,34 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 		if (subcommand === undefined) {
 			return usageError(io);
 		}
-		if (subcommand !== "stop") {
+		if (subcommand !== "stop" && subcommand !== "start") {
 			return usageError(io, `unknown daemon subcommand '${subcommand}'`);
+		}
+
+		if (subcommand === "start") {
+			// Same Judgment Day correction as `mcp`/`migrate-v1` below: the gate is this branch's literal
+			// first action. Disclosed choice (PR-13): `daemon stop` predates this gate requirement and is
+			// left as-is here — retrofitting it is outside this PR's own scope (D-39/D-48).
+			let belowNodeFloor = false;
+			enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+			if (belowNodeFloor) {
+				return EXIT_NODE_FLOOR;
+			}
+			if (subArgs.length > 0) {
+				return usageError(io, `unexpected argument '${subArgs[0]}'`);
+			}
+
+			return (async () => {
+				const { ensureDaemonRunning } = await import("../client/run-state.js");
+				try {
+					const payload = await ensureDaemonRunning();
+					io.out(`daemon running (pid ${payload.pid})`);
+					return 0;
+				} catch (err) {
+					io.err(err instanceof Error ? err.message : String(err));
+					return 1;
+				}
+			})();
 		}
 
 		let explicitHome: string | undefined;
@@ -233,7 +470,68 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 		})();
 	}
 
-	// Only `validate`, `daemon stop`, `mcp` and `migrate-v1` are wired in this CLI slice. Any other
+	// `setup | bot add | group add | project bind <path>` dispatch through the installer's own verb
+	// parser (`installer/cli.ts`'s `runInstallerCli`), which this branch hands real, closed-over
+	// dependencies (a real `Prompter`, an opened ledger connection, the registry path). `doctor` is the
+	// fifth verb tasks.md's own PR-13 task text names, but it is deliberately left unwired here:
+	// `src/doctor/main.ts` does not exist yet (Unit 8, a later PR) — see the "Only ..." comment below.
+	if (command === "setup" || command === "bot" || command === "group" || command === "project") {
+		// Same Judgment Day correction as `mcp`/`migrate-v1`: the gate is this branch's literal first
+		// action, before this dispatcher even looks at `rest` — `installer/cli.ts` does its own verb/argv
+		// parsing once this branch calls it, so there is no separate flag-parsing step of this file's own
+		// to gate ahead of.
+		let belowNodeFloor = false;
+		enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+		if (belowNodeFloor) {
+			return EXIT_NODE_FLOOR;
+		}
+
+		return (async () => {
+			const { resolveHomeDir } = await import("../daemon/home.js");
+			const { createPrompter } = await import("../installer/prompter.js");
+			const { runInstallerCli } = await import("../installer/cli.js");
+			const { runSetup } = await import("../installer/wizards/setup.js");
+
+			const homeDir = resolveHomeDir();
+			const prompter = createPrompter();
+
+			const deps: InstallerCliDeps = {
+				setup: () => runSetup({ homeDir, prompter }),
+				botAdd: async () => {
+					const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
+					const { runBotAdd } = await import("../installer/wizards/bot-add.js");
+					return runBotAdd({ db, registryPath, homeDir, prompter });
+				},
+				groupAdd: async () => {
+					const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
+					const { groupId, title } = await collectGroupAddInputs(prompter);
+					const { runGroupAdd } = await import("../installer/wizards/group-add.js");
+					return runGroupAdd({ db, registryPath, groupId, title });
+				},
+				projectBind: async (targetDir) => {
+					const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
+					const inputs = await collectProjectBindInputs(prompter, registryPath);
+					const { runProjectBind } = await import("../installer/wizards/project-bind.js");
+					return runProjectBind({ db, registryPath, targetDir, ...inputs });
+				},
+			};
+
+			try {
+				const outcome = await runInstallerCli(argv, deps);
+				return reportInstallerOutcome(io, outcome);
+			} catch (err) {
+				if (err instanceof InstallerDependencyFailure) {
+					io.err(`${PRODUCT_NAME}: ${err.message}`);
+					return 1;
+				}
+				throw err;
+			}
+		})();
+	}
+
+	// `validate`, `daemon start`/`stop`, `setup`, `bot add`, `group add`, `project bind`, `mcp` and
+	// `migrate-v1` are wired in this CLI slice. `doctor` is deliberately NOT wired: `doctor/main.ts`
+	// does not exist yet (Unit 8, a later PR — see tasks.md's own PR-13 scope note). Any other
 	// subcommand is named so a caller that tries one gets a usage error instead of a stub that
 	// pretends to work.
 	if (command !== "validate") {

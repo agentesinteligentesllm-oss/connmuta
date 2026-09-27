@@ -178,18 +178,51 @@ test("the usage line names the one command this build wires, and only the forms 
   // (`conmuta validate [<path> | --stdin]`), but this build refuses a bare invocation on purpose, so
   // advertising an optional target would promise a form that exits 2 (JD-A-002, disclosed).
   assert.match(text, /validate <path> \| --stdin/);
+  assert.match(text, /daemon start/);
   assert.match(text, /daemon stop \[--home <dir>\]/);
+  assert.match(text, /setup/);
+  assert.match(text, /bot add/);
+  assert.match(text, /group add/);
+  assert.match(text, /project bind <path>/);
   assert.match(text, /mcp --project <id>/);
   assert.equal(text.includes("[<path>"), false, "the usage text must not advertise an optional target");
+  // `doctor` is deliberately deferred to Unit 8 (`src/doctor/main.ts` does not exist yet) — this pins
+  // the disclosure that it is not silently wired alongside `setup`/`bot`/`group`/`project`.
+  assert.equal(text.includes("doctor"), false, "the usage text must not advertise the unwired 'doctor' verb");
 });
 
-// --- daemon stop subcommand dispatch ---
+// --- daemon start/stop subcommand dispatch ---
 
 test("`daemon` with an unknown subcommand is a usage error", async () => {
   const captured = makeIo();
-  assert.equal(await runCli(["daemon", "start"], captured.io), EXIT_USAGE);
-  assert.match(captured.err.join("\n"), /unknown daemon subcommand 'start'/);
+  assert.equal(await runCli(["daemon", "restart"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown daemon subcommand 'restart'/);
   assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`daemon start` with an unexpected argument is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["daemon", "start", "unexpected-arg"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unexpected argument 'unexpected-arg'/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+// Same Judgment Day gate-ordering idiom as the `mcp`/`migrate-v1` tests below: a scoped, `finally`-
+// restored override of `process.version`, the one built-in this dispatcher has no injection seam for.
+test("`daemon start` checks the Node-floor gate before anything else, reporting EXIT_NODE_FLOOR on a below-floor Node", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(process, "version");
+  try {
+    Object.defineProperty(process, "version", { value: "v0.1.0", configurable: true });
+
+    const captured = makeIo();
+    const result = runCli(["daemon", "start"], captured.io);
+    assert.equal(result, EXIT_NODE_FLOOR, "expected a synchronous EXIT_NODE_FLOOR, not the async ensureDaemonRunning dispatch");
+    assert.match(captured.err.join("\n"), /Node\.js/);
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(process, "version", originalDescriptor);
+    }
+  }
 });
 
 test("`daemon stop` with an unknown option is a usage error", async () => {
@@ -372,5 +405,67 @@ test("`migrate-v1` checks the Node-floor gate before parsing its flags, reportin
       Object.defineProperty(process, "version", originalDescriptor);
     }
   }
+});
+
+// --- setup / bot add / group add / project bind dispatch ---
+//
+// These four verbs dispatch through `installer/cli.ts`'s own `runInstallerCli`, which this
+// dispatcher hands a real `Prompter` and a real, opened ledger connection (`installer/ledger-access.ts`).
+// Neither is fakeable at this level without an injection seam this file does not have (the same
+// situation `mcp`/`migrate-v1` are already in above), and unlike those two, none of `setup`/`bot add`/
+// `group add`/`project bind` has a fast, side-effect-free *refusal* path reachable before a real
+// prompt or a real ledger write — `bot add` alone would create `~/.conmuta` on the machine running
+// this suite. So, deliberately, no test here drives a real wizard closure to completion; each of
+// `bot`/`group`/`project`'s own *malformed*-invocation cases below is chosen because
+// `installer/cli.ts`'s own strict conditional chain refuses them before calling any closure at all
+// (pinned separately by `test/installer/cli.test.ts`), and each wizard's own real behavior is already
+// covered by its own test file (`test/installer/wizards/*.test.ts`) — the same division of labor
+// `mcp`'s test already draws around `runMcpClient`'s internals.
+
+test("`setup`/`bot`/`group`/`project` each check the Node-floor gate before anything else, reporting EXIT_NODE_FLOOR on a below-floor Node", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(process, "version");
+  try {
+    Object.defineProperty(process, "version", { value: "v0.1.0", configurable: true });
+
+    for (const argv of [["setup"], ["bot"], ["group"], ["project"]]) {
+      const captured = makeIo();
+      const result = runCli(argv, captured.io);
+      assert.equal(
+        result,
+        EXIT_NODE_FLOOR,
+        `expected a synchronous EXIT_NODE_FLOOR for ${JSON.stringify(argv)}, not the async installer dispatch`,
+      );
+      assert.match(captured.err.join("\n"), /Node\.js/);
+    }
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(process, "version", originalDescriptor);
+    }
+  }
+});
+
+test("`bot` with an unknown sub-verb is a usage error and calls no wizard", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["bot", "remove"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown installer invocation \(unknown-verb\)/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`group` with an unknown sub-verb is a usage error and calls no wizard", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["group", "remove"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown installer invocation \(unknown-verb\)/);
+});
+
+test("`setup` with an unexpected extra argument is a usage error and calls no wizard", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["setup", "extra"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown installer invocation \(unknown-verb\)/);
+});
+
+test("`project bind` with no path is a usage error and calls no wizard", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["project", "bind"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown installer invocation \(missing-path\)/);
 });
 
