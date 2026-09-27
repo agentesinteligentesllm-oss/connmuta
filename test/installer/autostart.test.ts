@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PRODUCT_NAME } from "../../src/shared/constants.js";
-import { AUTOSTART_LAUNCHD_LABEL, AUTOSTART_RUN_KEY, AUTOSTART_VALUE_NAME } from "../../src/installer/constants.js";
+import { AUTOSTART_LAUNCHD_LABEL, AUTOSTART_RUN_KEY, AUTOSTART_VALUE_NAME, BACKUP_SUFFIX_PREFIX } from "../../src/installer/constants.js";
 import { CLI_ENTRY } from "../../src/installer/launcher.js";
 import { runReg, type ExecFileImpl } from "../../src/installer/exec.js";
 import {
@@ -139,6 +139,21 @@ test(
 );
 
 test(
+	"Windows: a reg.exe spawn failure (missing binary) rethrows instead of being treated as \"value absent\"",
+	{ skip: process.platform !== "win32" },
+	() => {
+		const spawnFailure: ExecFileImpl = () => {
+			const error = new Error("spawn reg.exe ENOENT") as NodeJS.ErrnoException;
+			error.code = "ENOENT";
+			throw error;
+		};
+
+		assert.throws(() => enableWindowsAutostart({ execImpl: spawnFailure }), /ENOENT/);
+		assert.throws(() => disableWindowsAutostart({ execImpl: spawnFailure }), /ENOENT/);
+	},
+);
+
+test(
 	"Windows: real reg.exe round trip against a scratch key — idempotent write, then removal leaves a foreign value untouched",
 	{ skip: process.platform !== "win32" },
 	() => {
@@ -254,7 +269,19 @@ test("macOS: enableMacAutostart rewrites with a backup when existing content und
 		assert.equal(outcome, "written");
 		const entries = readdirSync(dir);
 		assert.equal(entries.length, 2, "expected the rewritten plist plus exactly one backup");
-		assert.ok(entries.some((name) => name.includes(".bak-pre-")), "expected a pre-edit backup sibling");
+		assert.ok(entries.some((name) => name.includes(BACKUP_SUFFIX_PREFIX)), "expected a pre-edit backup sibling");
+	});
+});
+
+test("macOS: enableMacAutostart refuses to overwrite a foreign plist (different Label) at our own path", () => {
+	withScratchLaunchAgentsDir((dir) => {
+		const path = join(dir, `${AUTOSTART_LAUNCHD_LABEL}.plist`);
+		mkdirSync(dir, { recursive: true });
+		const foreignContent = buildLaunchdPlist("/foreign/node", "/foreign/entry").replace(AUTOSTART_LAUNCHD_LABEL, "io.someoneelse.daemon");
+		writeFileSync(path, foreignContent, "utf8");
+
+		assert.throws(() => enableMacAutostart({ launchAgentsDir: dir }), /refusing to overwrite/);
+		assert.equal(readFileSync(path, "utf8"), foreignContent, "a foreign Label must never be overwritten, not even with a backup");
 	});
 });
 
@@ -291,23 +318,36 @@ test("macOS: disableMacAutostart leaves a foreign plist (different Label) at our
 // Platform dispatch
 // ---------------------------------------------------------------------------------------------
 
-test("enableAutostart/disableAutostart delegate to the current platform's implementation without touching real locations", () => {
-	withScratchLaunchAgentsDir((dir) => {
-		const scratchRunKey = `HKCU\\Software\\${PRODUCT_NAME}-test-${randomUUID()}`;
-		try {
-			const enabled = enableAutostart({ runKey: scratchRunKey, launchAgentsDir: dir });
-			assert.ok(enabled === "created" || enabled === "noop" || enabled === "written");
+test(
+	"enableAutostart/disableAutostart delegate to the current platform's implementation without touching real locations",
+	{ skip: process.platform !== "win32" && process.platform !== "darwin" },
+	() => {
+		withScratchLaunchAgentsDir((dir) => {
+			const scratchRunKey = `HKCU\\Software\\${PRODUCT_NAME}-test-${randomUUID()}`;
+			try {
+				const enabled = enableAutostart({ runKey: scratchRunKey, launchAgentsDir: dir });
+				assert.equal(enabled, "created", "the scratch target must be genuinely absent beforehand");
+				if (process.platform === "win32") {
+					const queried = runReg(["query", scratchRunKey, "/v", AUTOSTART_VALUE_NAME]);
+					assert.match(queried, new RegExp(AUTOSTART_VALUE_NAME), "expected the scratch Run-key value to have been created");
+				} else {
+					assert.equal(existsSync(join(dir, `${AUTOSTART_LAUNCHD_LABEL}.plist`)), true, "expected the scratch plist to have been created");
+				}
 
-			const disabled = disableAutostart({ runKey: scratchRunKey, launchAgentsDir: dir });
-			assert.ok(disabled === "removed" || disabled === "noop");
-		} finally {
-			if (process.platform === "win32") {
-				try {
-					runReg(["delete", scratchRunKey, "/f"]);
-				} catch {
-					// Key was never created; nothing to clean up.
+				const disabled = disableAutostart({ runKey: scratchRunKey, launchAgentsDir: dir });
+				assert.equal(disabled, "removed");
+				if (process.platform === "darwin") {
+					assert.equal(existsSync(join(dir, `${AUTOSTART_LAUNCHD_LABEL}.plist`)), false, "expected the scratch plist to have been removed");
+				}
+			} finally {
+				if (process.platform === "win32") {
+					try {
+						runReg(["delete", scratchRunKey, "/f"]);
+					} catch {
+						// Key was never created, or already removed by the test itself; nothing to clean up.
+					}
 				}
 			}
-		}
-	});
-});
+		});
+	},
+);

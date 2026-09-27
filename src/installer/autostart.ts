@@ -66,15 +66,34 @@ function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Whether `error` means `reg.exe` itself never ran (missing binary, spawn failure) rather than ran and exited non-zero. */
+function isSpawnFailure(error: unknown): boolean {
+	return typeof error === "object" && error !== null && "code" in error && typeof (error as { code?: unknown }).code === "string";
+}
+
 /**
  * Reads back `valueName`'s current `REG_SZ` data under `runKey` via `reg query`, or `undefined` when
- * the key or value does not exist (`reg.exe` exits non-zero, which `execFileSync` throws on).
+ * the key or value does not exist.
+ *
+ * A spawn failure (`reg.exe` itself could not run at all — missing binary, `EACCES` on the binary)
+ * rethrows: that is a real infrastructure failure, never "value absent". `reg.exe` running and exiting
+ * non-zero is treated as "absent" — its documented behavior for `query` on a missing key/value.
+ *
+ * Residual limitation, disclosed rather than silently accepted: `reg.exe` gives the same generic
+ * non-zero exit for a genuinely missing value and for a real query failure against an existing one
+ * (e.g. an ACL that denies read access); there is no distinct, locale-independent exit code or output
+ * signal to tell them apart, so a real failure of that second kind is still reported as "absent" here.
+ * Not expected in practice for {@link AUTOSTART_RUN_KEY}: `HKCU\...` is always readable by the current
+ * user who owns it (see B-71).
  */
 function queryWindowsRunValue(runKey: string, valueName: string, execImpl: ExecFileImpl | undefined): string | undefined {
 	let output: string;
 	try {
 		output = runReg(["query", runKey, "/v", valueName], execImpl);
-	} catch {
+	} catch (error) {
+		if (isSpawnFailure(error)) {
+			throw error;
+		}
 		return undefined;
 	}
 	const pattern = new RegExp(`^[ \\t]*${escapeRegExp(valueName)}[ \\t]+REG_SZ[ \\t]+(.*)$`, "m");
@@ -178,6 +197,14 @@ export function enableMacAutostart(options: MacAutostartOptions = {}): Autostart
 		return "created";
 	}
 	const currentContent = readFileSync(path, "utf8");
+	const currentLabel = extractPlistLabel(currentContent);
+	if (currentLabel !== undefined && currentLabel !== AUTOSTART_LAUNCHD_LABEL) {
+		// A file already at our exact expected path with a different Label is not the routine
+		// "our own plist, content differs" case design's idempotence table describes (e.g. a node
+		// upgrade) — refuse rather than silently back up and overwrite something we may not own,
+		// the same protective stance disableMacAutostart already takes for a foreign Label.
+		throw new Error(`installer/autostart.ts: refusing to overwrite a plist at ${path} whose Label is not ours (found: ${currentLabel})`);
+	}
 	if (currentContent === nextContent) {
 		return "noop";
 	}

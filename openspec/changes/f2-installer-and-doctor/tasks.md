@@ -226,7 +226,7 @@ Runtime harness: a `reg.exe` round trip against a **scratch** key `HKCU\Software
 
 - [x] 9.1 RED: `test/installer/autostart.test.ts` — Windows: opt-in write creates exactly one `AUTOSTART_VALUE_NAME` Run-key value and no service/Task Scheduler entry; re-running with the box checked leaves exactly one value (idempotent, `reg query` first); unchecking on a re-run removes only that value name, leaving a foreign value untouched.
 - [x] 9.2 RED: same file — macOS: opt-in write creates exactly one plist at `~/Library/LaunchAgents/<AUTOSTART_LAUNCHD_LABEL>.plist` with `RunAtLoad: true` and no `KeepAlive`; idempotent re-run with identical content is a no-op; unchecking removes only a plist whose `Label` matches ours.
-- [x] 9.3 GREEN: implement `installer/autostart.ts` (Windows via `installer/exec.ts`'s `reg.exe` site; macOS via the edit engine's markdown-style template-and-backup path, XML-escaped paths).
+- [x] 9.3 GREEN: implement `installer/autostart.ts` (Windows via `installer/exec.ts`'s `reg.exe` site; macOS via a dedicated write-with-backup routine, XML-escaped paths — not `installer/file-edit.ts`'s generic `FormatAdapter` pipeline, whose same-named-entry conflict refusal is the opposite of the unconditional rewrite-with-backup design §10 requires for a plist this product fully owns).
 - [x] 9.4 Verify: `npm run build && node --test "dist/test/installer/autostart.test.js"` (Windows leg on CI; macOS assertions run everywhere since they are pure byte/template checks).
 - [ ] 9.5 Docs: THREAT-MODEL §4 — add the "Login persistence" boundary row pointing at this test file (design §"Threat matrix").
 
