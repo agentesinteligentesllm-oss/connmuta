@@ -81,6 +81,8 @@ const PROJECT_ID_MAX_LENGTH = 41;
 const PROJECT_ID_MIN_LENGTH = 3;
 /** Fallback slug when a directory's basename yields nothing `PROJECT_ID_PATTERN` accepts. */
 const PROJECT_ID_FALLBACK = "project";
+/** Bounds {@link resolveProjectId}'s suffix search; a real collision run this long is not realistic. */
+const PROJECT_ID_SUFFIX_ATTEMPTS = 1000;
 
 /**
  * Slugifies `name` into a `PROJECT_ID_PATTERN`-shaped candidate: lowercased, non-`[a-z0-9-]` runs
@@ -110,6 +112,14 @@ interface ProjectIdResolution {
  * Resolves `targetDir`'s `project_id`: reuses an existing `RegistryProject` entry for the exact same
  * `path` (idempotent re-run), or derives a fresh slug from the basename, disambiguated with a numeric
  * suffix against any `project_id` already taken by a *different* path.
+ *
+ * **Correction (native review `review-796e150183e289f6`, R2-001 / R3-project-id-suffix-infinite-loop,
+ * both CRITICAL).** The suffix loop used to build `${base}-${suffix}` first and truncate to
+ * {@link PROJECT_ID_MAX_LENGTH} afterward. When `base` was already exactly at that length, every
+ * truncated candidate collapsed back to `base` itself — already `taken` by definition, since that is
+ * why the loop started — so the unbounded `for (;;)` never terminated: `project bind` would hang.
+ * Reserving the suffix's own width *before* truncating the base guarantees each candidate actually
+ * differs from `base`, and the loop is now bounded by {@link PROJECT_ID_SUFFIX_ATTEMPTS} regardless.
  */
 function resolveProjectId(targetDir: string, existingProjects: readonly RegistryProject[]): ProjectIdResolution {
 	const existing = existingProjects.find((project) => project.path === targetDir);
@@ -122,12 +132,14 @@ function resolveProjectId(targetDir: string, existingProjects: readonly Registry
 	if (!taken.has(base)) {
 		return { projectId: base, isNewProject: true };
 	}
-	for (let suffix = 2; ; suffix++) {
-		const candidate = `${base}-${suffix}`.slice(0, PROJECT_ID_MAX_LENGTH);
+	for (let suffix = 2; suffix < 2 + PROJECT_ID_SUFFIX_ATTEMPTS; suffix++) {
+		const suffixText = `-${suffix}`;
+		const candidate = `${base.slice(0, PROJECT_ID_MAX_LENGTH - suffixText.length)}${suffixText}`;
 		if (!taken.has(candidate)) {
 			return { projectId: candidate, isNewProject: true };
 		}
 	}
+	throw new Error(`installer/wizards/project-bind.ts: could not derive a free project_id from "${base}" after ${PROJECT_ID_SUFFIX_ATTEMPTS} attempts`);
 }
 
 /** Reads the entry already installed at `mcpServers.<MCP_SERVER_NAME>` in the target's `.mcp.json`, for the D-43 Pi dedup rule. */

@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import { openLedger } from "../../../src/ledger/open.js";
@@ -10,7 +10,7 @@ import { MCP_SERVER_NAME } from "../../../src/installer/constants.js";
 import { runProjectBind } from "../../../src/installer/wizards/project-bind.js";
 import { parseRegistryDocument, type Registry } from "../../../src/registry/schema.js";
 import { serializeRegistry } from "../../../src/registry/writer.js";
-import { PROJECT_FILE_SCHEMA_VERSION, REGISTRY_VERSION } from "../../../src/shared/constants.js";
+import { PROJECT_FILE_SCHEMA_VERSION, PROJECT_ID_PATTERN, REGISTRY_VERSION } from "../../../src/shared/constants.js";
 import type { ProjectRosterEntry } from "../../../src/shared/project-file.js";
 import { computeRosterHash } from "../../../src/shared/roster-hash.js";
 import { validRegistryDocument } from "../../registry/fixtures.js";
@@ -195,3 +195,45 @@ test("a selected tool's config entry and the instruction files are written for a
 		assert.ok(claudeMd.includes("@AGENTS.md"));
 	});
 });
+
+test(
+	"resolveProjectId's suffix search terminates and yields a distinct id when a max-length slug is already taken (native review correction, R2-001/R3-project-id-suffix-infinite-loop)",
+	async () => {
+		await withProjectBindFixture(async ({ db, registryPath, targetDir }) => {
+			// PROJECT_ID_PATTERN's own 41-char maximum (shared/constants.ts): before the fix, every
+			// `${base}-${suffix}` candidate truncated back to this exact, already-taken 41-char base,
+			// so the disambiguation loop never terminated.
+			const maxLengthSlug = "x".repeat(41);
+			const collidingTargetDir = join(dirname(targetDir), maxLengthSlug);
+			mkdirSync(collidingTargetDir);
+
+			const seeded = parseRegistryDocument({
+				registry_version: REGISTRY_VERSION,
+				bots: [],
+				groups: [],
+				projects: [{ project_id: maxLengthSlug, path: "C:\\some\\other\\already-registered-project" }],
+				bindings: [],
+			});
+			assert.equal(seeded.ok, true, "fixture must itself be valid");
+			if (!seeded.ok) return;
+			writeFileSync(registryPath, serializeRegistry(seeded.registry), "utf8");
+
+			const outcome = await runProjectBind({
+				db,
+				registryPath,
+				targetDir: collidingTargetDir,
+				botId: BOT_ID,
+				groupId: GROUP_ID,
+				agentId: AGENT_ID,
+				roster: ROSTER,
+				selectedToolIds: new Set(),
+				now: () => NOW,
+			});
+
+			assert.equal(outcome.outcome, "bound");
+			if (outcome.outcome !== "bound") return;
+			assert.notEqual(outcome.project_id, maxLengthSlug, "the disambiguated id must differ from the already-taken base");
+			assert.match(outcome.project_id, PROJECT_ID_PATTERN);
+		});
+	},
+);
