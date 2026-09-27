@@ -164,7 +164,8 @@ export interface StatusToolOutput {
 	daemon_conditions: StatusDaemonConditions;
 }
 
-function listThreadIds(db: DatabaseSync, projectId: string): string[] {
+/** Every thread id this project holds, in no particular order. Exported for `daemon/panel/routes.ts` (F3 PR-04c), a second read-only consumer that needs the same listing with no per-client tiering. */
+export function listThreadIds(db: DatabaseSync, projectId: string): string[] {
 	const rows = db.prepare("SELECT thread_id FROM threads WHERE project_id = ?").all(projectId) as unknown as {
 		thread_id: string;
 	}[];
@@ -186,8 +187,12 @@ function readBindingCheckpoint(db: DatabaseSync, projectId: string): BindingChec
 	return { at: row.last_checkpoint_at, by: row.last_checkpoint_by };
 }
 
-/** The binding bot's own `offsets` row, scoped by `bot_id` so a session never learns another bot's poll state. */
-function readPollerEntry(db: DatabaseSync, botId: number): StatusPollerEntry | null {
+/**
+ * The binding bot's own `offsets` row, scoped by `bot_id` so a session never learns another bot's poll
+ * state. Exported for `daemon/panel/routes.ts` (F3 PR-04c) — the Home screen's "last poll per bot" row
+ * (OVERVIEW.md §10.2) reads this for every registered bot, not just one session's own.
+ */
+export function readPollerEntry(db: DatabaseSync, botId: number): StatusPollerEntry | null {
 	const row = db
 		.prepare(
 			`SELECT bot_id, next_update_id, last_poll_started_at, last_poll_ok_at, last_error_code, retry_after_until
@@ -218,8 +223,12 @@ function computeRetentionWarning(poller: StatusPollerEntry | null, nowDate: Date
 	return undefined;
 }
 
-/** Whole seconds elapsed since `startedAt`, never negative — a clock skew or a future stamp reports `0`. */
-function computeUptimeSeconds(startedAt: string, nowDate: Date): number {
+/**
+ * Whole seconds elapsed since `startedAt`, never negative — a clock skew or a future stamp reports `0`.
+ * Exported for `daemon/panel/routes.ts` (F3 PR-04c)'s Home screen, which reports the same daemon
+ * uptime fact `status` already computes.
+ */
+export function computeUptimeSeconds(startedAt: string, nowDate: Date): number {
 	const elapsedMs = nowDate.getTime() - new Date(startedAt).getTime();
 	return Math.max(Math.floor(elapsedMs / MS_PER_SECOND), 0);
 }
