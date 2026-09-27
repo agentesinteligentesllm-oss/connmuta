@@ -201,7 +201,7 @@ What this does **not** defend: a process running as the same OS user, which can 
 
 ### 5.5 Windows ACL and the secret store (T09)
 
-Node's `fs.chmod` on Windows changes only the read-only bit (research:T09), so "0600" is meaningless there. The rule is: keychain first; when the fallback file is needed, the **installer / doctor** applies `icacls <path> /inheritance:r /grant:r <user>:F` to the daemon home once, and files the daemon creates later (identity file, ledger, fallback token file) inherit that DACL. This keeps the daemon bundle free of `child_process` (PT-28) — the daemon never runs `icacls` itself. Doctor re-verifies the ACL on every run (PT-19). To be confirmed by B-08 / B-15.
+Node's `fs.chmod` on Windows changes only the read-only bit (research:T09), so "0600" is meaningless there. The rule is: keychain first; when the fallback file is needed, the **installer / doctor** applies `icacls <home> /inheritance:r /grant:r "<user>:(OI)(CI)F"` to the daemon home once, and files the daemon creates later (identity file, ledger, fallback token file) inherit that DACL. **The `(OI)(CI)` flags are required** (D-49, `test/installer/acl.test.ts`): the command as this row previously read it omitted them, and without inheritable ACEs the files the daemon creates later would not inherit the grant; that gap is closed here, not merely disclosed (B-56). This keeps the daemon bundle free of `child_process` (PT-28) — the daemon never runs `icacls` itself; the one exec call site is `installer/exec.ts` (D-50), pinned by `test/installer/exec.test.ts`'s argv-shape assertions, with the grant-and-idempotent-re-run guarantee pinned by `test/installer/acl.test.ts`'s real scratch-directory round trip. Doctor re-verifies the ACL on every run (PT-19). To be confirmed by B-08 / B-15.
 
 ### 5.6 Inherited static assertions, re-scoped for two bundles (T17)
 
@@ -219,7 +219,7 @@ v1 asserts over the **built** bundle, not the source (v1:test/security.test.ts:7
 | `sendMessage` confined to transport and indented (:94-101, :246-268) | forbidden entirely (the client never talks to Telegram) | confined to transport modules, reachable only from an IPC request handler |
 | non-vacuous scan (:270-273) | kept | kept |
 
-The installer / doctor CLI is a third bundle: it may spawn `icacls` and read tool config files, so it is excluded from the exec assertion but included in the settings-path and `deleteMessage` assertions. Exact module allow-lists are finalised in the F1 SDD spec.
+The installer / doctor CLI is a third bundle: it may spawn `icacls.exe` and `reg.exe` (D-50 — `reg.exe` because Node has no registry API, needed for D-40's start-at-login write) and read tool config files, so it is excluded from the exec assertion but included in the settings-path and `deleteMessage` assertions. Both targets are resolved by absolute path under `SystemRoot\System32`, `shell: false`, literal argv — the allow-list itself is pinned by `test/installer/exec.test.ts` (F2, PR-08); the full multi-clause bundle scan across this third bundle's closure is `test/security/installer-bundle.test.ts` (F2, PR-19), which finalises the exact module allow-lists.
 
 ### 5.7 Fail-open anchors without a wire change (T07)
 

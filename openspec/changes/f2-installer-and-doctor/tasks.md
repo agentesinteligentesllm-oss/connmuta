@@ -206,12 +206,12 @@ Scope: `src/installer/exec.ts`, `src/installer/acl.ts`, `test/installer/exec.tes
 Requirements: `secret-store › Fallback file and daemon home are ACL'd` (idempotent re-run scenario). Threat matrix: Subprocess spawn (Applicable; the `icacls`/`reg` half).
 Runtime harness: `installer/exec.test.ts` asserts argv shape only (no real subprocess); `acl.test.ts`'s Windows path runs a real scratch-directory `icacls` round trip in CI.
 
-- [ ] 8.1 RED: `test/installer/exec.test.ts` — the only `child_process` call site in the tree; `execFile` targets are `icacls.exe`/`reg.exe` under `SystemRoot\System32` by absolute path, `shell: false`, literal argv (no string-built command).
-- [ ] 8.2 GREEN: implement `installer/exec.ts` (the sole exec allow-list module, D-50).
-- [ ] 8.3 RED: `test/installer/acl.test.ts` — `icacls <home> /inheritance:r /grant:r "<user>:(OI)(CI)F"` (D-49, `(OI)(CI)` required); grantee list contains only the current user; POSIX mode `0600`; re-running on an already-ACL'd path succeeds without duplicating or widening the grant (idempotent).
-- [ ] 8.4 GREEN: implement `installer/acl.ts` (Windows `icacls`, POSIX `chmod`).
-- [ ] 8.5 Verify: `npm run build && node --test "dist/test/installer/exec.test.js" "dist/test/installer/acl.test.js"`.
-- [ ] 8.6 Docs: THREAT-MODEL §5.5/§5.6 — pin the ACL and exec-allow-list rows to these test files.
+- [x] 8.1 RED: `test/installer/exec.test.ts` — the only `child_process` call site in the tree; `execFile` targets are `icacls.exe`/`reg.exe` under `SystemRoot\System32` by absolute path, `shell: false`, literal argv (no string-built command).
+- [x] 8.2 GREEN: implement `installer/exec.ts` (the sole exec allow-list module, D-50).
+- [x] 8.3 RED: `test/installer/acl.test.ts` — `icacls <home> /inheritance:r /grant:r "<user>:(OI)(CI)F"` (D-49, `(OI)(CI)` required); grantee list contains only the current user; POSIX mode `0700` (a **directory** mode — `0600` would remove the execute bit a directory needs to be traversable at all, a functional bug rather than a cosmetic deviation from this line's original literal text); re-running on an already-ACL'd path succeeds without duplicating or widening the grant (idempotent, proved by parsing `icacls`'s own ACE lines rather than substring-matching its raw output).
+- [x] 8.4 GREEN: implement `installer/acl.ts` (Windows `icacls`, POSIX `chmod`).
+- [x] 8.5 Verify: `npm run build && node --test "dist/test/installer/exec.test.js" "dist/test/installer/acl.test.js"`.
+- [x] 8.6 Docs: THREAT-MODEL §5.5/§5.6 — pin the ACL and exec-allow-list rows to these test files.
 
 #### PR-09 — `autostart.ts`
 Branch `f2/09-autostart` → `main`. Depends: PR-08. Size: ≈250 lines, no exception.
