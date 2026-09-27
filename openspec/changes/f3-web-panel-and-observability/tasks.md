@@ -131,25 +131,43 @@ sync-roster` (PR-07), which reads the live file.
       `clearCondition` on match; regression tests in `routes.test.ts` for both paths.
 - [x] 4a.3 Verify: `npm run build && node --test "dist/test/ledger/conditions-store.test.js" "dist/test/daemon/ipc/routes.test.js"`.
 
-#### PR-04 — `daemon/panel/server.ts` + `daemon/panel/routes.ts`
-Branch `f3/04-panel-server-routes` → `main`. Depends: PR-01, PR-03, PR-04a. Size: ≈420 lines (est.; watch
-this one — re-slice at the server.ts/routes.ts boundary into 2 PRs if the real diff exceeds 400).
-Scope: `src/daemon/panel/server.ts`, `src/daemon/panel/routes.ts`, `test/daemon/panel/server.test.ts`,
-`test/daemon/panel/routes.test.ts`.
-Requirements: web-panel "Read-only surface, two screens only" and "No runtime filesystem reads for
-panel assets" (all scenarios).
+**Re-sliced at apply time** (real `server.ts` alone measured 356 lines, confirming the tasks.md-flagged
+risk that the combined ≈420 estimate would not fit one 400-line PR): PR-04b (`server.ts`) and PR-04c
+(`routes.ts`), mirroring F1's own PR-06/PR-08/PR-09 re-slicing precedent.
+
+#### PR-04b — `daemon/panel/server.ts`
+Branch `f3/04b-panel-server` → `main`. Depends: PR-01, PR-03. Size: 356 authored lines (actual: 168 src +
+188 test).
+Scope: `src/daemon/panel/server.ts`, `test/daemon/panel/server.test.ts`.
+Requirements: web-panel "Loopback-only, per-boot-token transport" and "Origin and Host validation" (all
+scenarios); the mutation-refusal half of "Read-only surface, two screens only".
 Runtime harness: real `node:http` listener over loopback, mirrors `daemon/ipc/server.test.ts`.
 
-- [ ] 4.1 RED: `server.test.ts` — binds `127.0.0.1` only; token via header AND query param; missing/
-      invalid token refused; mutation-shaped request (`POST /panel/api/sync-roster`, any non-GET)
-      answers 404/405 with zero side effects.
-- [ ] 4.2 GREEN: implement `createPanelServer`, reusing `checkTransportGuards` with
-      `requireOrigin: true` and `PanelTokenStore`.
-- [ ] 4.3 RED: `routes.test.ts` — Home screen renders daemon facts; Overview table renders bindings
-      including a `roster_drift` condition and its diff, with no mutation control rendered anywhere.
-- [ ] 4.4 GREEN: implement the two route handlers as read-only registry/ledger queries; panel assets
+- [x] 4b.1 RED: `server.test.ts` — binds `127.0.0.1` only; token via header AND query param; missing/
+      invalid token refused; foreign Host/Origin refused; absent/matching Origin admitted;
+      mutation-shaped request (`POST`, any non-GET, or an unknown path) answers 404/405 with zero
+      side effects; a throwing handler answers 500 without crashing the listener.
+- [x] 4b.2 GREEN: implement `createPanelServer`, reusing `checkTransportGuards` with
+      `requireOrigin: true` and `PanelTokenStore`. Route dispatch is GET-only, mirroring
+      `ipc/server.ts`'s own `"<METHOD> <pathname>"` key; every response (success or refusal) closes the
+      connection (`Connection: close`) since panel traffic is low-volume, human-driven browsing with no
+      keep-alive use case — simpler than draining a GET body no browser sends.
+- [x] 4b.3 Verify: `npm run build && node --test "dist/test/daemon/panel/server.test.js"`.
+
+#### PR-04c — `daemon/panel/routes.ts`
+Branch `f3/04c-panel-routes` → `main`. Depends: PR-04b. Size: TBD (implemented next).
+Scope: `src/daemon/panel/routes.ts`, `test/daemon/panel/routes.test.ts`.
+Requirements: web-panel "Read-only surface, two screens only" (Home/Overview scenarios, roster-drift
+display) and "No runtime filesystem reads for panel assets" (all scenarios).
+Runtime harness: real `node:http` listener via `createPanelServer`, mirrors PR-04b's own pattern.
+
+- [ ] 4c.1 RED: `routes.test.ts` — Home screen renders daemon facts; Overview table renders bindings
+      including a `roster_drift` condition (PR-04a) and the registry's own stored `roster_snapshot`
+      (not a live structural diff — the daemon has no live roster to diff against; see PR-04a's
+      disclosure), with no mutation control rendered anywhere.
+- [ ] 4c.2 GREEN: implement the two route handlers as read-only registry/ledger queries; panel assets
       (HTML/CSS/JS) as in-memory string constants, never `node:fs` reads.
-- [ ] 4.5 Verify: `npm run build && node --test "dist/test/daemon/panel/server.test.js" "dist/test/daemon/panel/routes.test.js"`.
+- [ ] 4c.3 Verify: `npm run build && node --test "dist/test/daemon/panel/routes.test.js"`.
 
 ### Unit 5 — `daemon/bootstrap.ts` (own-slice)
 
