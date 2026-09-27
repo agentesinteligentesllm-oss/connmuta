@@ -6,9 +6,12 @@
     "tsBuildInfoFile": "../../dist/.tsbuildinfo/doctor.tsbuildinfo"
   },
   "include": ["**/*.ts"],
+  // `../registry` is added in PR-15: `checks/registry.ts` calls `registry/loader.ts`'s `parseRegistryText`
+  // and reads `registry/schema.ts`'s types directly, and TS project references are not transitive.
   "references": [
     { "path": "../shared" },
     { "path": "../ledger" },
+    { "path": "../registry" },
     { "path": "../secret-store" },
     { "path": "../daemon" },
     { "path": "../installer" }

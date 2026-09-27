@@ -77,13 +77,25 @@ test("runOfflineDoctor makes zero network calls and never reads the stored token
 	}
 });
 
-test("runOfflineDoctor returns the same findings as running the system tier alone", () => {
+test("runOfflineDoctor returns the system tier's findings followed by the registry tier's, in that fixed order", () => {
 	withTempHome((homeDir) => {
 		const findings = runOfflineDoctor({ homeDir });
 		const ids = findings.map((f) => f.id);
 		assert.deepEqual(
 			ids,
-			["node-floor", "launcher-paths", "home-writable", "ledger", "daemon-lock", "spawn-lock", "home-acl", "secrets-acl"],
+			[
+				"node-floor",
+				"launcher-paths",
+				"home-writable",
+				"ledger",
+				"daemon-lock",
+				"spawn-lock",
+				"home-acl",
+				"secrets-acl",
+				// No registry.json exists in this fresh temp home, so the registry tier reports exactly
+				// one parse-level finding (PR-15's own `checks/registry.ts`) and nothing further.
+				"registry-parse-unreadable",
+			],
 		);
 	});
 });
