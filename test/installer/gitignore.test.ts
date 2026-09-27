@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -122,6 +122,18 @@ test("a commented-out or negated line never counts as coverage", () => {
 
 		assert.deepEqual(result, { alreadyCovered: false, appendedLine: "/.cursor/mcp.json" });
 		assert.equal(readFileSync(join(projectDir, ".gitignore"), "utf8"), `${before}/.cursor/mcp.json\n`);
+	});
+});
+
+test("the write goes through a temp file plus rename, leaving no stray .tmp- sibling behind (R4-gitignore-nonatomic-write)", () => {
+	withTempProjectDir((projectDir) => {
+		writeFileSync(join(projectDir, ".gitignore"), "node_modules/\n", "utf8");
+
+		ensureGitignored(projectDir, ".cursor/mcp.json");
+
+		const entries = readdirSync(projectDir);
+		assert.deepEqual(entries, [".gitignore"]);
+		assert.equal(readFileSync(join(projectDir, ".gitignore"), "utf8"), "node_modules/\n/.cursor/mcp.json\n");
 	});
 });
 

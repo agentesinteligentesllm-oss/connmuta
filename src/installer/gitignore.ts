@@ -1,5 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { writeViaTempAndRename } from "./file-edit.js";
 
 /**
  * D-52 close-out: keeps a written tool-config path out of the project's git index
@@ -83,6 +85,15 @@ export function isGitignoreCovered(gitignoreText: string, relativePath: string):
  * in the tree). When the existing file has content that does not already end in a newline, a newline
  * is inserted before the new entry so it never concatenates onto the end of the last existing line
  * (the exact edge case Alpha's design review flagged).
+ *
+ * The write itself goes through {@link writeViaTempAndRename} (native review `review-01a2374400a854fc`,
+ * R4-gitignore-nonatomic-write), not a direct `writeFileSync` over the existing file: a crash or
+ * `ENOSPC` mid-write could otherwise truncate `.gitignore`, destroying whatever unrelated ignore
+ * rules were already protecting the project. A read-modify-write race between two *separate*
+ * `project bind` invocations against the same `projectDir` is not closed by this alone — disclosed
+ * as B-90, since R2 (`project-bind.ts`) already refuses a second successful bind against an
+ * already-bound `project_id`, making that window effectively unreachable in practice for this
+ * single-user local CLI installer.
  */
 export function ensureGitignored(projectDir: string, relativePath: string): GitignoreCheckResult {
 	const gitignorePath = join(projectDir, GITIGNORE_FILE_NAME);
@@ -101,7 +112,7 @@ export function ensureGitignored(projectDir: string, relativePath: string): Giti
 	const needsLeadingNewline = currentText.length > 0 && !currentText.endsWith("\n");
 	const nextText = `${currentText}${needsLeadingNewline ? "\n" : ""}${appendedLine}\n`;
 	try {
-		writeFileSync(gitignorePath, nextText, "utf8");
+		writeViaTempAndRename(gitignorePath, nextText);
 	} catch (error) {
 		return { alreadyCovered: false, failed: true, reason: error instanceof Error ? error.message : String(error) };
 	}

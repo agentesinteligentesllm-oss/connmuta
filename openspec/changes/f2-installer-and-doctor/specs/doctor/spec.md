@@ -88,8 +88,10 @@ wording states only what was checked (git-repo presence plus `.gitignore` covera
 - WHEN the registry tier runs
 - THEN no gitignore-coverage finding is reported for any tool-config file in that project
 
-Traces: design.md D-52 (§16 risk table, doctor half: "warns if a written config is tracked by git
-anyway"); D-50 (exec allow-list stays `{icacls.exe, reg.exe}` — no new subprocess dependency)
+Traces: design.md D-52 (§16 risk table, doctor half — this requirement's actual scope is narrower
+than that entry's literal wording, disclosed above and in `registry.ts`'s own doc comment: only
+`.gitignore` coverage is checked, never real git-index membership); D-50 (exec allow-list stays
+`{icacls.exe, reg.exe}` — no new subprocess dependency)
 
 ### Requirement: Online tier runs inside the daemon and checks live Telegram state
 
