@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
@@ -757,6 +757,95 @@ test("bootstrap: retention sweep runs when due during heartbeat tick", async () 
 
     await daemon.stop();
   } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+// PR-07 (roster-sync spec.md, D-07): `roster_drift` is resolved only by a human running
+// `conmuta project sync-roster`, never by a timer. This proves the negative directly against the
+// daemon's own heartbeat loop, mirroring the PR-40a reconciliation test's harness above: a real
+// `startDaemon` with a fast `heartbeatPeriodMs`, a fake secret store and a fake `TelegramClient` so no
+// real network call is made, several ticks elapse, and `registry.json`'s stored `roster_snapshot`/
+// `roster_hash` must still equal what this test seeded — this module never even imports
+// `cli/project-sync-roster.ts`, so no invocation of it is reachable from the heartbeat path at all.
+test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/roster_hash stay unchanged (PR-07, D-07)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+  const fakeClient: TelegramClient = {
+    async getUpdates() {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return [];
+    },
+    async sendMessage(params) {
+      return { message_id: 1, chat: { id: Number(params.chat_id), type: "group" }, date: 1, text: params.text };
+    },
+    async getMe() {
+      return { id: 555222333, is_bot: true, username: "roster_drift_bot" };
+    },
+    async getChat() {
+      return { id: -1009876543212, type: "group" };
+    },
+  };
+
+  const registryPath = join(homeDir, "registry.json");
+  const registry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [
+      {
+        bot_id: 555222333,
+        username: "roster_drift_bot",
+        token_ref: { store: "keychain", account: "bot:555222333" },
+        added_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+    groups: [{ group_id: -1009876543212, added_at: "2026-09-01T00:00:00.000Z" }],
+    projects: [{ project_id: "prj-roster-drift", path: homeDir }],
+    bindings: [
+      {
+        project_id: "prj-roster-drift",
+        bot_id: 555222333,
+        group_id: -1009876543212,
+        agent_id: "@drift-agent",
+        status: "active",
+        roster_snapshot: [{ agent_id: "@drift-agent", user_id: 555222333, username: "roster_drift_bot" }],
+        roster_hash: ROSTER_HASH,
+        bound_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+  };
+  writeFileSync(registryPath, JSON.stringify(registry));
+  const beforeTicksText = readFileSync(registryPath, "utf8");
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 15,
+      telegramClientFactory: async () => fakeClient,
+    });
+
+    // Several heartbeat periods, so the reconcile-on-tick path (bootstrap.ts's `tick()`, which calls
+    // `reconciler.reconcile()` -> `registry.sync()`, a read-only hot reload) runs more than once.
+    await new Promise((resolve) => setTimeout(resolve, 90));
+
+    const afterTicksText = readFileSync(registryPath, "utf8");
+    assert.equal(afterTicksText, beforeTicksText, "no heartbeat tick may write registry.json at all");
+
+    const afterTicksRegistry = JSON.parse(afterTicksText) as Registry;
+    assert.equal(afterTicksRegistry.bindings[0]?.roster_hash, ROSTER_HASH);
+    assert.deepEqual(
+      afterTicksRegistry.bindings[0]?.roster_snapshot,
+      registry.bindings[0]?.roster_snapshot,
+      "roster_snapshot must survive every heartbeat tick unchanged: only a human sync-roster invocation may change it",
+    );
+  } finally {
+    await daemon?.stop().catch(() => {});
     cleanupTempHome(homeDir);
   }
 });

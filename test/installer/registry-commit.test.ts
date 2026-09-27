@@ -201,6 +201,46 @@ test("a failure after the rename but before commit rolls back the audit row and 
 	});
 });
 
+test("a ROSTER_SYNCED write commits exactly one audit row inside the same transaction as the rename", () => {
+	withCommitFixture(({ db, registryPath }) => {
+		const outcome = commitRegistryChange({
+			db,
+			registryPath,
+			mutate: withOneMoreProject,
+			audit: commitAudit({ reason: "ROSTER_SYNCED", project_id: "prj-second", bot_id: 100000002 }),
+		});
+
+		assert.deepEqual(outcome, { outcome: "committed" });
+
+		const rows = db.prepare("SELECT * FROM audit_log").all() as Record<string, unknown>[];
+		assert.equal(rows.length, 1, "exactly one audit row");
+		assert.equal(rows[0]?.["reason"], "ROSTER_SYNCED");
+		assert.equal(rows[0]?.["project_id"], "prj-second");
+
+		const written = readFileSync(registryPath, "utf8");
+		assert.equal(written, serializeRegistry(withOneMoreProject(validRegistry())));
+	});
+});
+
+test("a ROSTER_SYNCED commit that fails after the rename but before commit rolls back the audit row and restores registry.json", () => {
+	withCommitFixture(({ db, registryPath, originalText }) => {
+		const outcome = commitRegistryChange({
+			db,
+			registryPath,
+			mutate: withOneMoreProject,
+			audit: commitAudit({ reason: "ROSTER_SYNCED" }),
+			io: realIo(() => {
+				throw new Error("simulated commit-time I/O failure, after a successful rename");
+			}),
+		});
+
+		assert.equal(outcome.outcome, "commit-failed");
+		assert.equal(db.prepare("SELECT COUNT(*) AS n FROM audit_log").get()?.["n"], 0, "the audit row must be rolled back");
+		assert.equal(readFileSync(registryPath, "utf8"), originalText, "registry.json must be restored to what this call started with");
+		assert.equal(db.isTransaction, false, "no transaction is left open after the rollback");
+	});
+});
+
 test("two concurrent commits serialize on the BEGIN IMMEDIATE lock", () => {
 	withCommitFixture(({ db, ledgerPath, registryPath }) => {
 		// No `busy_timeout` on this second connection: a locked database refuses immediately instead of
