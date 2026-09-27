@@ -93,15 +93,20 @@ Requirements: web-panel "Loopback-only, per-boot-token transport" (single token,
 compare, query-param acceptance).
 Runtime harness: N/A — in-memory store and file I/O, no live socket.
 
-- [ ] 3.1 RED: `token-store.test.ts` — valid token accepted, invalid/missing rejected, constant-time
+- [x] 3.1 RED: `token-store.test.ts` — valid token accepted, invalid/missing rejected, constant-time
       comparison (mirrors `sessions.ts`'s own test pattern).
-- [ ] 3.2 GREEN: implement `PanelTokenStore` (single `randomBytes` token per boot).
-- [ ] 3.3 RED: `panel-run-file.test.ts` — write/read/delete `run/panel.json`, `0o600` mode, mirrors
+- [x] 3.2 GREEN: implement `PanelTokenStore` (single `randomBytes` token per boot).
+- [x] 3.3 RED: `panel-run-file.test.ts` — write/read/delete `run/panel.json`, `0o600` mode, mirrors
       `lifecycle/run-file.ts`'s own test shape.
-- [ ] 3.4 GREEN: implement `writePanelRunFile`/`readPanelRunFile`/`deletePanelRunFile`.
-- [ ] 3.5 Update DATA-MODEL.md `:291` — panel token is a separate `run/panel.json`, not the daemon's
+- [x] 3.4 GREEN: implement `writePanelRunFile`/`readPanelRunFile`/`deletePanelRunFile`.
+- [x] 3.5 Update DATA-MODEL.md `:291` — panel token is a separate `run/panel.json`, not the daemon's
       `run/daemon.json` secret.
-- [ ] 3.6 Verify: `npm run build && node --test "dist/test/daemon/panel/token-store.test.js" "dist/test/daemon/panel/panel-run-file.test.js"`.
+- [x] 3.6 Verify: `npm run build && node --test "dist/test/daemon/panel/token-store.test.js" "dist/test/daemon/panel/panel-run-file.test.js"`.
+
+**Disclosed addition, outside this PR's stated scope line:** `src/shared/constants.ts` gains one new
+named constant, `PANEL_TOKEN_BYTES = 32`, mirroring `RUN_SECRET_BYTES`/`SESSION_TOKEN_BYTES` — required
+by AGENTS.md's named-constant rule and not listed in the PR's own Scope line, which predates deciding
+where the token's byte length would live.
 
 ### Unit 4 — Panel HTTP surface
 

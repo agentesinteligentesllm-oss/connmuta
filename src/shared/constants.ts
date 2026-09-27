@@ -247,6 +247,9 @@ export const IPC_NONCE_BYTES = 32;
 /** Bytes of randomness in an IPC session token — HMAC-SHA256 output length (RFC 2104 §3). */
 export const SESSION_TOKEN_BYTES = 32;
 
+/** Bytes of randomness in the panel's single per-boot access token — same length as {@link RUN_SECRET_BYTES}. */
+export const PANEL_TOKEN_BYTES = 32;
+
 /**
  * Seconds a pending handshake nonce stays valid.
  *
