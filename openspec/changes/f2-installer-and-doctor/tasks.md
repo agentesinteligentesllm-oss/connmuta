@@ -433,8 +433,8 @@ Scope: `test/daemon/ipc/doctor.test.ts` (edit only — add a second real binding
 Requirements: `doctor › DM probe is opt-in and confined to the binding being validated` › `Opted-in DM probe never crosses project boundaries` (already-ratified scenario, already implemented since PR-17 — this PR adds the missing test proving it, closing a coverage gap this change's own `sdd-verify` pass found in an already-shipped guarantee).
 Runtime harness: extends the existing `test/daemon/ipc/doctor.test.ts` harness with a real second `ManagedBinding` (mirroring `test/security/two-install-wrong-room.test.ts`'s own two-binding pattern) and a second fake room guard.
 
-- [ ] 22.1 RED then GREEN: register two real bindings (project A, project B) each with its own `roomGuard`/fake Telegram client; run an opted-in DM probe scoped to project A; assert project B's fake client's `sentMessages` stays empty and project A's own roster peers each receive exactly one probe message — proving the cross-project confinement design already guarantees structurally (a singleton target per probe, `dmProbePeers` filtering only the validated binding's own roster) is also proven by a real test, not merely implied by the schema.
-- [ ] 22.2 Verify: `npm run build && npm test`.
+- [x] 22.1 RED then GREEN: register two real bindings (project A, project B) each with its own `roomGuard`/fake Telegram client; run an opted-in DM probe scoped to project A; assert project B's fake client's `sentMessages` stays empty and project A's own roster peers each receive exactly one probe message — proving the cross-project confinement design already guarantees structurally (a singleton target per probe, `dmProbePeers` filtering only the validated binding's own roster) is also proven by a real test, not merely implied by the schema.
+- [x] 22.2 Verify: `npm run build && npm test`.
 
 ## Success Criteria Checklist
 

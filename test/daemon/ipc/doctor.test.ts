@@ -536,6 +536,49 @@ test("dm probe failure reports a fail finding and a 'rejected' DOCTOR_PROBE audi
 	});
 });
 
+test("an opted-in DM probe scoped to one project never touches a second bound project's room guard (PR-22, spec `doctor › Opted-in DM probe never crosses project boundaries`)", async () => {
+	await withHarness(async (h) => {
+		const roomGuardA = new FakeRoomGuard();
+		h.bindings.set(managedBindingFixture({}, roomGuardA));
+
+		const roomGuardB = new FakeRoomGuard();
+		const daveEntry: ProjectRosterEntry = { agent_id: "@dave-agent", user_id: 100000004, username: "dave_example_bot" };
+		const carolSelfEntry: ProjectRosterEntry = { agent_id: "@carol-agent", user_id: 100000003, username: "carol_example_bot" };
+		h.bindings.set(
+			managedBindingFixture(
+				{
+					project_id: "prj-second",
+					bot_id: 100000003,
+					group_id: -1001234567891,
+					agent_id: "@carol-agent",
+					roster_snapshot: [carolSelfEntry, daveEntry],
+				},
+				roomGuardB,
+			),
+		);
+
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+		const nonce = h.store.issue()!;
+		const handler = createDoctorHandler(h.buildDeps(client));
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: true,
+			}),
+		);
+		assert.equal(res.status, HTTP_OK);
+		const body = doctorResponseSchema.parse(res.body);
+		assert.equal(body.bindings.length, 1, "only the requested project's binding is checked at all");
+		assert.equal(body.bindings[0]!.project_id, PROJECT_ID);
+
+		assert.equal(roomGuardA.calls.length, 1, "project A's own roster peer receives exactly one probe message");
+		assert.equal(roomGuardA.calls[0]!.chat_id, "@bob_example_bot");
+		assert.equal(roomGuardB.calls.length, 0, "project B's room guard must never be invoked by a probe scoped to project A");
+	});
+});
+
 test("a binding with no room guard wired fails the dm-probe finding defensively, without throwing", async () => {
 	await withHarness(async (h) => {
 		h.bindings.set(managedBindingFixture()); // no roomGuard passed
