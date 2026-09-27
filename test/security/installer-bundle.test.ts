@@ -60,6 +60,15 @@ const OFFLINE_ENTRY = join(DIST_SRC_DIR, "doctor/offline.js");
 /** Real count at authoring time is 65; this floor catches a silent closure collapse (PR-40a's own lesson). */
 const MIN_CLI_BUNDLE_FILES = 40;
 
+/**
+ * Real count at authoring time is 30; same purpose as {@link MIN_CLI_BUNDLE_FILES}. Correction (native
+ * review `review-7b513a6e81487b13`, R2-doctor-closure-floor-asymmetry, CRITICAL): the doctor closure's
+ * own non-vacuity test originally checked only `size > 0` plus five named sentinels, unlike its CLI
+ * sibling — a silent collapse down to exactly those five files would have passed undetected, quietly
+ * weakening every other assertion in this file that scans whatever `doctorBundleContents()` returns.
+ */
+const MIN_DOCTOR_BUNDLE_FILES = 20;
+
 function bundleContents(entry: string): Map<string, string> {
   const contents = new Map<string, string>();
   for (const file of computeClosure(entry)) {
@@ -103,7 +112,10 @@ test("installer/doctor bundle: the CLI closure is non-vacuous and reaches the ex
 
 test("installer/doctor bundle: the DOCTOR closure is non-vacuous and reaches every offline module", () => {
   const contents = doctorBundleContents();
-  assert.ok(contents.size > 0, "expected the doctor closure to be non-empty");
+  assert.ok(
+    contents.size >= MIN_DOCTOR_BUNDLE_FILES,
+    `doctor closure has only ${contents.size} files, expected at least ${MIN_DOCTOR_BUNDLE_FILES} — the closure walker may have silently truncated`,
+  );
   for (const sentinel of ["doctor/main.js", "doctor/offline.js", "doctor/checks/system.js", "doctor/checks/registry.js", "doctor/report.js"]) {
     assert.ok(contents.has(sentinel), `expected ${sentinel} in the doctor closure`);
   }
@@ -180,14 +192,28 @@ test("installer/doctor bundle: child_process detection is non-vacuous (seeded ne
 // (`cfg.trust_level = ...`) and a bracket-access assignment (`cfg["trust_level"] = ...`) — neither has
 // a `{`/`,`/`:` adjacent to the key. The `\.trust_level\s*=(?!=)` / `\[["']trust_level["']\]\s*=(?!=)`
 // branches below close both, with a negative lookahead so `===`/`==` comparisons (a read, not a write)
-// don't false-positive. This is a regex-based heuristic, not an AST parse — it cannot enumerate every
-// possible JS write syntax with certainty, and is disclosed as such (docs/06-backlog/CHECKLIST.md
-// B-87) rather than chased indefinitely; it now covers every write shape found across five review
-// rounds on this exact check.
+// don't false-positive.
+// Correction (native review `review-7b513a6e81487b13`, R3-defineproperty-write-gap, CRITICAL): none of
+// the five prior alternatives match a reflection-style write — `Object.defineProperty(cfg,
+// "trust_level", { value: true })` has its quoted key followed by a comma, not a colon/brace, so every
+// existing branch fails by construction. Notable because `defineProperty` is already an idiom this
+// very codebase uses elsewhere (`test/cli/main-gate.integration.test.ts`'s own Node-version-override
+// preload), so this was a demonstrated gap, not a purely theoretical one.
+//
+// **Disclosed limit, not chased further**: this is a regex-based heuristic, not an AST parse or a
+// data-flow analysis. It cannot enumerate every possible way JavaScript can write a property (further
+// reflection forms exist — `Reflect.set`, `Object.assign`, a `Proxy` `set` trap, a computed member
+// expression whose key only resolves to `"trust_level"` at runtime — and could in principle keep
+// surfacing one new round at a time). Six review rounds have now closed every concretely demonstrated
+// gap in this exact check (colon, ES2015 shorthand, dot-assignment, bracket-assignment, template-
+// literal npx, defineProperty); the residual risk of an as-yet-undemonstrated reflection form is
+// disclosed as an accepted limitation (docs/06-backlog/CHECKLIST.md B-87), the same class of
+// forward-compatibility gap this project already accepted for B-52 rather than an open-ended pursuit
+// of AST-level completeness in what is, by design, a fast static smoke test.
 const TRUST_LEVEL_WRITE_RE =
-	/(?:["']trust_level["']\s*:|\btrust_level\b\s*:|[{,]\s*trust_level\s*[,}]|\.trust_level\s*=(?!=)|\[\s*["']trust_level["']\s*\]\s*=(?!=))/;
+	/(?:["']trust_level["']\s*:|\btrust_level\b\s*:|[{,]\s*trust_level\s*[,}]|\.trust_level\s*=(?!=)|\[\s*["']trust_level["']\s*\]\s*=(?!=)|Object\.defineProperty(?:s)?\s*\([^,]+,\s*["']trust_level["'])/;
 const ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE =
-	/(?:["']enableAllProjectMcpServers["']\s*:|\benableAllProjectMcpServers\b\s*:|[{,]\s*enableAllProjectMcpServers\s*[,}]|\.enableAllProjectMcpServers\s*=(?!=)|\[\s*["']enableAllProjectMcpServers["']\s*\]\s*=(?!=))/;
+	/(?:["']enableAllProjectMcpServers["']\s*:|\benableAllProjectMcpServers\b\s*:|[{,]\s*enableAllProjectMcpServers\s*[,}]|\.enableAllProjectMcpServers\s*=(?!=)|\[\s*["']enableAllProjectMcpServers["']\s*\]\s*=(?!=)|Object\.defineProperty(?:s)?\s*\([^,]+,\s*["']enableAllProjectMcpServers["'])/;
 // Correction (same review, R2-npx-invoke-regex-gap, CRITICAL): the original only matched a literal
 // trailing space inside the quotes (`"npx "`) or a bare `npx(` call — missing the realistic
 // `spawn("npx", [...])` argv[0] shape (no trailing space) and a template-literal invocation
@@ -221,6 +247,12 @@ test("installer/doctor bundle: the write-shaped checks are non-vacuous (seeded p
   // Dot-access and bracket-access assignment — the fifth-round gap.
   assert.equal(TRUST_LEVEL_WRITE_RE.test("cfg.trust_level = true;"), true);
   assert.equal(TRUST_LEVEL_WRITE_RE.test('cfg["trust_level"] = true;'), true);
+  // Object.defineProperty — the sixth-round gap; the key is followed by a comma, not a colon/brace.
+  assert.equal(TRUST_LEVEL_WRITE_RE.test('Object.defineProperty(cfg, "trust_level", { value: true });'), true);
+  assert.equal(
+    ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test('Object.defineProperty(cfg, "enableAllProjectMcpServers", { value: true });'),
+    true,
+  );
   assert.equal(ENABLE_ALL_PROJECT_MCP_SERVERS_WRITE_RE.test("cfg.enableAllProjectMcpServers = true;"), true);
   // A read/comparison (===) of the same property must NOT be mistaken for a write.
   assert.equal(TRUST_LEVEL_WRITE_RE.test("if (cfg.trust_level === undefined) {"), false);
