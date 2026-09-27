@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
 import { LockHeldError, readLockFile } from "../../src/daemon/lifecycle/lock.js";
 import { readRunFile } from "../../src/daemon/lifecycle/run-file.js";
+import { readPanelRunFile } from "../../src/daemon/panel/panel-run-file.js";
 import { computeDoctorProof } from "../../src/daemon/ipc/doctor.js";
 import type { SecretStore } from "../../src/secret-store/types.js";
 import type { TelegramClient } from "../../src/daemon/telegram.js";
@@ -59,6 +60,17 @@ test("bootstrap: full boot sequence and clean shutdown", async () => {
     assert.ok(daemon.port > 0);
     assert.ok(run.secret.length > 0);
 
+    // Verify the panel listener is bound and its run file written (F3 PR-05)
+    const panelRun = readPanelRunFile(daemon.dirs.runDir);
+    assert.ok(panelRun !== null);
+    assert.equal(panelRun.pid, process.pid);
+    assert.equal(panelRun.port, daemon.panelPort);
+    assert.ok(daemon.panelPort > 0);
+    assert.notEqual(daemon.panelPort, daemon.port, "the panel and IPC listeners must bind distinct ports");
+    assert.ok(panelRun.token.length > 0);
+    const panelRes = await fetch(ipcUrl(daemon.panelPort, `/?token=${panelRun.token}`));
+    assert.equal(panelRes.status, 200, "the panel Home screen must be reachable with its own token");
+
     // Verify ledger opened
     assert.equal(daemon.ledger.status, "opened");
     assert.ok(daemon.ledger.schemaVersion >= 1);
@@ -74,6 +86,9 @@ test("bootstrap: full boot sequence and clean shutdown", async () => {
 
     // Run file deleted
     assert.equal(readRunFile(daemon.dirs.runDir), null);
+
+    // Panel run file deleted too (F3 PR-05)
+    assert.equal(readPanelRunFile(daemon.dirs.runDir), null);
 
     // Lock released
     const lockAfterStop = readLockFile(join(daemon.dirs.runDir, "daemon.lock"));
@@ -651,6 +666,56 @@ test("bootstrap: stop() closes the real IPC server — a subsequent request is r
     await assert.rejects(
       () => fetch(ipcUrl(port, `/identity?nonce=${NONCE_HEX}`)),
       "a request after stop() must be refused (connection closed), not answered",
+    );
+  } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: stop() closes the real panel server — a subsequent request is refused (F3 PR-05)", async () => {
+  const homeDir = createTempHome();
+
+  try {
+    const daemon = await startDaemon({ homeDir });
+    const panelRun = readPanelRunFile(daemon.dirs.runDir);
+    assert.ok(panelRun !== null);
+    const { port, token } = panelRun;
+
+    await daemon.stop();
+
+    await assert.rejects(
+      () => fetch(ipcUrl(port, `/?token=${token}`)),
+      "a panel request after stop() must be refused (connection closed), not answered",
+    );
+  } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: a boot failure after the panel listener starts closes the panel listener (F3 PR-05)", async () => {
+  const homeDir = createTempHome();
+  const runDir = join(homeDir, "run");
+  // `secretStore.kind` is first read while building `routesDeps`, well after the panel listener has
+  // already bound and written its run file — an injected throw there simulates a failure late in boot
+  // without needing any new test-only hook.
+  const throwingStore: SecretStore = {
+    get kind(): SecretStore["kind"] {
+      throw new Error("boom-after-panel-start");
+    },
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  try {
+    await assert.rejects(() => startDaemon({ homeDir, secretStore: throwingStore }), /boom-after-panel-start/);
+
+    const panelRun = readPanelRunFile(runDir);
+    assert.ok(panelRun !== null, "setup: the panel run file must have been written before the injected failure");
+
+    await assert.rejects(
+      () => fetch(ipcUrl(panelRun.port, `/?token=${panelRun.token}`)),
+      "the panel listener must be closed after a mid-boot failure, not left orphaned",
     );
   } finally {
     cleanupTempHome(homeDir);
