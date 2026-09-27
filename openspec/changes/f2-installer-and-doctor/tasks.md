@@ -351,12 +351,12 @@ Runtime harness: `daemon/ipc/doctor.test.ts` runs the route handler directly aga
 #### PR-18 — `daemon/bootstrap.ts` wiring
 Branch `f2/18-bootstrap-doctor-wiring` → `main`. Depends: PR-17. Size: ≈170 lines, no exception. **Own slice per D-39/D-48 — no new-capability code in this PR beyond the wiring itself.**
 Scope: `src/daemon/bootstrap.ts` (edit only), its existing test twin (edit only).
-Requirements: `doctor › Online tier runs inside the daemon...` (the boot-wired integration half); `ipc-handshake › Online doctor route is scoped to the session's own bound project`.
+Requirements: `doctor › Online tier runs inside the daemon...` (the boot-wired integration half); `ipc-handshake › Online doctor route refuses an unbound project_id` + `› Online doctor route checks every active binding when no project_id is given` (D-44's no-bearer model — the original citation named a session-scoped scenario that never existed in the shipped design; corrected via Arena debate `bus-v2-f2-pr-18-spec-design-conflict-001`, Alpha `CONSENSUS`, round 1).
 Runtime harness: `test/daemon/bootstrap.test.ts` boots a real `startDaemon` with a fake Telegram client factory and exercises `POST /doctor` end-to-end through the real IPC server.
 
-- [ ] 18.1 RED: `test/daemon/bootstrap.test.ts` — `startDaemon` mounts `daemon/ipc/doctor.ts`'s route with an injected `doctorClientFor(bot_id)` (secret store + `TelegramApiClient`); a session frozen to `project_id: "prj-a"` requesting a doctor check on a different project's binding is refused rather than running checks against it.
-- [ ] 18.2 GREEN: edit `daemon/bootstrap.ts` — wire `doctorClientFor` and mount the doctor route alongside the existing identity/session routes; no change to `poller`/`BindingsReconciler` behavior.
-- [ ] 18.3 Verify: `npm run build && node --test "dist/test/daemon/bootstrap.test.js"`, then the full `npm test` (confirm zero regression in the existing boot sequence PR-40a of F1 established).
+- [x] 18.1 RED: `test/daemon/bootstrap.test.ts` — `startDaemon` mounts `daemon/ipc/doctor.ts`'s route with an injected `doctorClientFor(bot_id)` (secret store + `TelegramApiClient`) alongside the existing identity/session routes; a real end-to-end `POST /doctor` returns 200 for a validly-authenticated request (valid nonce + `doctor:` HMAC proof) naming a bound `project_id`, 401 for an invalid/missing nonce or HMAC, and 404 (`DOCTOR_UNBOUND_PROJECT`) for a `project_id` naming no active binding.
+- [x] 18.2 GREEN: edit `daemon/bootstrap.ts` — wire `doctorClientFor` (reuses `buildTelegramClient`'s own token-resolution shape, typed to `DoctorTelegramClient` since `getChatMember` sits one level below the `TelegramClient` interface, D-48) and mount `POST /doctor` alongside the existing identity/session routes; no change to `poller`/`BindingsReconciler` behavior.
+- [x] 18.3 Verify: `npm run build && node --test "dist/test/daemon/bootstrap.test.js"` — 12/12 pass. Full `npm test`: 1362/1362 (1356 pass, 6 skip, 0 real fail; the one apparent failure, `heartbeat: ticks at periodMs`, is B-39's pre-existing timing flake, confirmed green in isolation immediately after). One disclosed correction beyond `bootstrap.ts`/its own test twin: `test/security/daemon-bundle.test.ts`'s `.sendMessage(` call-site allow-list needed `daemon/ipc/doctor.js` added as a fifth legitimate site (the DM probe calls `managed.roomGuard.sendMessage(...)` directly, already Alpha-audited in PR-17 — `bus-v2-f2-pr-17-dm-probe-design-001` — but PR-17 itself never touched this F1-owned static-assertion test, so the assertion still only knew about the pre-existing four).
 
 ### Unit 11 — Static assertions + integration (D-31 closure, ADR-0031)
 
@@ -396,9 +396,9 @@ Every requirement in the 6 capability specs traces to at least one task above. N
 | registry-authoring | 3 | 7 | PR-06, PR-07 |
 | tool-config-merge | 7 | 12 | PR-02, PR-03, PR-04, PR-05 |
 | doctor | 5 | 8 | PR-14, PR-15, PR-17, PR-18 |
-| ipc-handshake (delta) | 1 | 3 | PR-16, PR-17, PR-18 |
+| ipc-handshake (delta) | 1 | 4 | PR-16, PR-17, PR-18 |
 | secret-store (delta) | 2 | 5 | PR-07, PR-08, PR-11 |
-| **Total** | **25** | **52** | |
+| **Total** | **25** | **53** | |
 
 Threat-matrix rows marked Applicable in design.md (Subprocess spawn; Local process integration; Filesystem writes outside the home; Login persistence) each have an explicit RED task above (PR-02/PR-08/PR-09/PR-17) before their production task, per skill rule. Rows marked N/A in design (documentation-like paths, git repository selection, commit/push/PR commands) are correctly omitted — F2 has no git automation and classifies no file for execution.
 
