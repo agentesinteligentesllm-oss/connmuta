@@ -310,6 +310,30 @@ test("a project with no .git path reports no gitignore-coverage finding at all",
 	});
 });
 
+test("a .gitignore that cannot be read (e.g. a directory in its place) reports its own warn finding instead of throwing", () => {
+	withTempHome((homeDir) => {
+		withTempProject((projectDir) => {
+			writeRegistry(homeDir, registryDocumentFor(projectDir));
+			const intended: IntendedProjectBinding = { project_id: "prj-example", group_id: -1001234567890, roster: ALICE_ROSTER };
+			writeFileSync(join(projectDir, PROJECT_FILE_NAME), serializeProjectFile(intended), "utf8");
+			writeMcpJson(projectDir, ".mcp.json", { command: "node", args: ["x"] });
+			mkdirSync(join(projectDir, ".git"));
+			mkdirSync(join(projectDir, ".gitignore"));
+
+			const findings = runRegistryChecks({ homeDir });
+			const finding = findingOf(findings, "gitignore-unreadable-prj-example");
+			assert.equal(finding.status, "warn");
+			assert.equal(
+				findings.some((f) => f.id.startsWith("gitignore-coverage-")),
+				false,
+			);
+			// The r4-project fail finding for this same binding is still present: a .gitignore read
+			// failure does not abort the rest of boundProjectFindings for its own binding either.
+			assert.ok(findings.some((f) => f.id === "r4-project-prj-example"));
+		});
+	});
+});
+
 test("a file-shaped .git (linked worktree/submodule) is still detected via existsSync, not isDirectory", () => {
 	withTempHome((homeDir) => {
 		withTempProject((projectDir) => {

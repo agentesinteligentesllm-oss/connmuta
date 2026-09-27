@@ -295,7 +295,23 @@ function checkGitignoreCoverage(binding: RegistryBinding, projectPath: string): 
 	}
 
 	const gitignorePath = join(projectPath, GITIGNORE_FILE_NAME);
-	const gitignoreText = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+	let gitignoreText: string;
+	try {
+		gitignoreText = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+	} catch {
+		// Guarded exactly like readToolConfigEntry's own read (line ~208): a TOCTOU removal, EACCES, or
+		// EISDIR between existsSync and readFileSync reports its own finding instead of throwing out of
+		// boundProjectFindings, which has no per-check isolation and would abort every other binding's
+		// findings too (native review review-c10bb9a7ff2cbc5e, R3/R4 — the same unguarded-read class
+		// already disclosed for a sibling read in this file, backlog B-83 item 1).
+		return [
+			{
+				id: `gitignore-unreadable-${binding.project_id}`,
+				status: "warn",
+				detail: `project ${binding.project_id}: .gitignore exists but could not be read; gitignore coverage was not checked`,
+			},
+		];
+	}
 
 	const findings: Finding[] = [];
 	for (const target of TOOL_CONFIG_TARGETS) {
