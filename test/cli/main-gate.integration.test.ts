@@ -173,7 +173,18 @@ for (const args of GATED_SUBCOMMANDS) {
 			assert.ok(result.stderr.includes("https://nodejs.org/"));
 			assert.deepEqual(readdirSync(scratchDir), [], "the gate must refuse before any filesystem write");
 		} finally {
-			rmSync(scratchDir, { recursive: true, force: true });
+			// Correction (native review `review-f59ee7b3eaaad38b`, R4-main-gate-unguarded-cleanup-rmsync,
+			// CRITICAL): if runNode's own SIGKILL grace timer expired without the child ever emitting
+			// "close" (a live risk this file's own two prior correction rounds targeted), the child could
+			// still be alive holding scratchDir as its cwd on Windows — rmSync's `force: true` only
+			// suppresses a missing-path error, not EBUSY/EPERM from a still-open cwd. An unguarded throw
+			// here would replace the original diagnosable runNode timeout with a filesystem error and
+			// skip cleanupPreload() entirely, leaking the preload temp directory too.
+			try {
+				rmSync(scratchDir, { recursive: true, force: true });
+			} catch {
+				// Best-effort; see comment above.
+			}
 			cleanupPreload();
 		}
 	});
