@@ -240,11 +240,11 @@ Scope: `src/installer/prompter.ts`, `src/installer/instructions.ts`, `test/insta
 Requirements: `installer-wizard › Instruction files are written once and trust steps are printed, never bypassed`; underlies `bot add`'s masked-prompt requirement (D-37).
 Runtime harness: unit tests with a scripted fake `Prompter` (no real `@clack/prompts` TTY interaction under test).
 
-- [ ] 10.1 RED: `test/installer/prompter.test.ts` — the `Prompter` port's `password()` masks input and refuses a non-TTY stdin; `text`/`select`/`multiselect`/`confirm`/`isCancel` are exposed through the port, not called directly from wizard code.
-- [ ] 10.2 GREEN: implement `installer/prompter.ts` (the `@clack/prompts` adapter behind the `Prompter` port).
-- [ ] 10.3 RED: `test/installer/instructions.test.ts` — the `AGENTS.md` template is at most `AGENTS_MD_MAX_LINES` lines; trust-step text is printed per selected tool and no auto-trust setting is ever written.
-- [ ] 10.4 GREEN: implement `installer/instructions.ts` (the `AGENTS.md` template + trust-step text; delegates the actual file write to PR-03's `formats/markdown.ts`).
-- [ ] 10.5 Verify: `npm run build && node --test "dist/test/installer/prompter.test.js" "dist/test/installer/instructions.test.js"`.
+- [x] 10.1 RED: `test/installer/prompter.test.ts` — the `Prompter` port's `password()` masks input and refuses a non-TTY stdin; `text`/`select`/`multiselect`/`confirm`/`isCancel` are exposed through the port, not called directly from wizard code.
+- [x] 10.2 GREEN: implement `installer/prompter.ts` (the `@clack/prompts` adapter behind the `Prompter` port).
+- [x] 10.3 RED: `test/installer/instructions.test.ts` — the `AGENTS.md` template is at most `AGENTS_MD_MAX_LINES` lines; trust-step text is printed per selected tool and no auto-trust setting is ever written.
+- [x] 10.4 GREEN: implement `installer/instructions.ts` (the `AGENTS.md` template + trust-step text; delegates the actual file write to PR-03's `formats/markdown.ts`).
+- [x] 10.5 Verify: `npm run build && node --test "dist/test/installer/prompter.test.js" "dist/test/installer/instructions.test.js"`. **309 authored lines (95+86 src, 85+43 test), no exception.** Trust-step text covers only the 4 tools OVERVIEW.md:274 documents (`claude-code`/`codex-cli`/`gemini-cli`/`vscode`); `cursor`/`opencode`/`antigravity`/`pi` have no documented one-time trust step and are disclosed as omitted, not invented.
 
 #### PR-11 — `roster-source.ts` + `bot-add.ts` + `group-add.ts` wizards
 Branch `f2/11-bot-group-wizards` → `main`. Depends: PR-10. Size: ≈400 lines, no exception (at the budget line; re-measure at apply time).
