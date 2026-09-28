@@ -119,6 +119,26 @@ test("daemon bundle: node:fs is confined to the allow-listed home-scoped modules
   }
 });
 
+/**
+ * F3 PR-09 (spec web-panel "Panel module carries no node:fs reference", PT-28). A dedicated,
+ * discoverable test rather than relying on the closed 7-file allow-list above as an incidental
+ * proof: that list already implies this (`server.js`/`routes.js` are absent from it), but this
+ * names the exact requirement and would fail on its own if either panel-asset module ever grew a
+ * node:fs reference, even if the allow-list test above were changed for an unrelated reason.
+ *
+ * `daemon/panel/panel-run-file.js` is deliberately excluded — it is the panel's run-discovery
+ * sibling (F3 PR-03, already allow-listed above), not an HTML/CSS/JS-serving module; the
+ * allow-list's own comment already disclosed this distinction.
+ */
+test("daemon bundle: the panel's HTML/CSS/JS-serving modules carry no node:fs reference (F3 PR-09, PT-28)", () => {
+  const contents = daemonBundleContents();
+  for (const path of ["daemon/panel/server.js", "daemon/panel/routes.js"]) {
+    const source = contents.get(path);
+    assert.ok(source !== undefined, `expected ${path} in the daemon bundle closure`);
+    assert.equal(hasFsModuleReference(source), false, `${path} serves panel HTML/CSS/JS and must not reference node:fs`);
+  }
+});
+
 test("daemon bundle: node:sqlite is confined to ledger/*.js", () => {
   const contents = daemonBundleContents();
   const matches = [...contents.entries()].filter(([, source]) => NODE_SQLITE_RE.test(source)).map(([p]) => p).sort();
