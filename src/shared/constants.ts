@@ -215,15 +215,15 @@ export const DEBATE_MARKER_PREFIX = "[ARENA-LIGHT:";
 
 /**
  * Group rate-budget hits (posts counted against {@link GROUP_MESSAGES_PER_MINUTE}) that one
- * Arena-light debate round is charged.
+ * journaled Arena-light debate turn is charged.
  *
- * A round is always exactly one physical send: PROPOSAL, CONSENSUS and ESCALATE are one send each,
- * and design.md's coalescing rule (Data Flow: "one send = one budget hit") merges a round's AUDIT
- * and COUNTER into a single REPLY, so the round is never charged twice for its two journaled turns
- * (proposal.md Success Criteria: "Group rate budget per round is a named constant, asserted by
- * behaviour"). Declared here per task 1.5; `send-path.ts` (PR-5, task 3.4) is what asserts this by
- * behaviour — this constant has no call site yet in this Phase-1 slice, a deferred wiring, not a
- * missing one.
+ * Every turn (PROPOSAL/AUDIT/COUNTER/CONSENSUS/ESCALATE) is exactly one physical send — the
+ * daemon never retries, queues, or merges two turns into one REPLY (a coalescing scheme was
+ * proposed and found unbuildable: AUDIT/COUNTER are different roles, `thread.to`/`thread.from`,
+ * so no single caller could ever compose both, `bus-v2-f5-pr-04-coalescing-contradiction-001`).
+ * proposal.md's Success Criteria requires this as a named constant asserted by behaviour;
+ * `send-path.ts` (PR-5) is what asserts it — this constant has no call site yet in this Phase-1
+ * slice, a deferred wiring, not a missing one.
  */
 export const ARENA_LIGHT_MESSAGES_PER_ROUND = 1;
 

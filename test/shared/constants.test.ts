@@ -85,9 +85,9 @@ test("DEBATE_MARKER_PREFIX matches design.md Decision (b)'s one-line delimiter f
   assert.equal(DEBATE_MARKER_PREFIX, "[ARENA-LIGHT:");
 });
 
-test("ARENA_LIGHT_MESSAGES_PER_ROUND is declared alongside GROUP_MESSAGES_PER_MINUTE for the coalesced-send rate budget (proposal.md Success Criteria)", () => {
-  // Deferred wiring (task 3.4, PR-5): `send-path.ts` is what asserts this by behaviour once the
-  // coalesced AUDIT+COUNTER send exists. This Phase-1 slice pins only the declared value.
+test("ARENA_LIGHT_MESSAGES_PER_ROUND is declared alongside GROUP_MESSAGES_PER_MINUTE for the per-turn rate budget (proposal.md Success Criteria)", () => {
+  // Deferred wiring (task 3.4, PR-5): `send-path.ts` is what asserts this by behaviour once a
+  // debate turn's own send is wired to the rate check. This Phase-1 slice pins only the value.
   assert.equal(ARENA_LIGHT_MESSAGES_PER_ROUND, 1);
   assert.equal(typeof GROUP_MESSAGES_PER_MINUTE, "number");
 });

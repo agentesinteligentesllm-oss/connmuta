@@ -78,17 +78,18 @@ CONSENSUS (`RESOLVED[context-shared]`) MUST be sent only by the addressee (`thre
 - THEN CONSENSUS's only effects are the send and one journal row; the ESCALATE attempt is
   refused `NOT_ORIGINATOR`
 
-### Requirement: The coalesced debate REPLY is exactly one silent send
+### Requirement: Every debate REPLY is silent; PROPOSAL/CONSENSUS/ESCALATE notify
 
-When AUDIT and COUNTER are both due in one round, they MUST compose into one REPLY, two
-delimited sections, counted once against rate budget; `disable_notification` MUST be true for
-any debate REPLY — PROPOSAL/CONSENSUS/ESCALATE stay notifying.
+`disable_notification` MUST be true for every AUDIT/COUNTER-marked REPLY —
+PROPOSAL/CONSENSUS/ESCALATE stay notifying (lifecycle boundaries, `send-path.ts:160-172`). AUDIT
+and COUNTER are never composed into one send: different roles (`thread.to`/`thread.from`), so no
+single sender ever owes both.
 
-#### Scenario: One silent send, other turns notify
+#### Scenario: Debate REPLYs are silent, other turns notify
 
-- GIVEN both AUDIT and COUNTER are owed in one round, and a separate PROPOSAL
-- WHEN sent
-- THEN one REPLY carries both sections, sent silently, counted once; the PROPOSAL notifies
+- GIVEN an AUDIT, a COUNTER, and a separate PROPOSAL
+- WHEN each is sent
+- THEN the AUDIT and the COUNTER are each sent silently, one send apiece; the PROPOSAL notifies
 
 ### Requirement: Every debate turn is durably journaled
 
@@ -106,5 +107,5 @@ restart.
 | Source | Requirement |
 |---|---|
 | WORK-PLAN:99-110; D7; PT-23 | Wire/verdict; round cap; scope; pointer-only |
-| ADR-13; T22/PT-33 | Closures; coalesced REPLY |
+| ADR-13; T22/PT-33 | Closures; silent debate REPLY |
 | DATA-MODEL §3.7 | Journal |

@@ -38,7 +38,7 @@ Chain strategy: stacked-to-main
 
 - [x] 2.1 RED `test/shared/debate-marker.test.ts`: encode/decode round-trip each `DebateTurnKind`; wire-mapping scenario (PROPOSAL/CONSENSUS envelope+marker).
 - [x] 2.2 RED same file: `containsInlinePatchShape` true for literal diff, false for pointer-only refs.
-- [x] 2.3 GREEN `src/shared/debate-marker.ts`: types, `encodeDebateTurn`, `encodeCoalescedReply` (two delimited sections, one line), `decodeDebateBody`, `containsInlinePatchShape`.
+- [x] 2.3 GREEN `src/shared/debate-marker.ts`: types, `encodeDebateTurn`, `decodeDebateBody`, `containsInlinePatchShape` (`encodeCoalescedReply` removed post-merge — coalescing found unbuildable, `bus-v2-f5-pr-04-coalescing-contradiction-001`).
 - [x] 2.4 RED `test/ledger/debate-journal.test.ts`: `appendDebateTurn`/`readDebateJournal` round-trip, scoped to `(project_id, debate_id)`; `readMaxCounterRound` restart-durable.
 - [x] 2.5 GREEN `src/ledger/debate-journal.ts`: writer/reader, mirrors `src/ledger/conditions-store.ts` (read-only) shape (no own transaction).
 
@@ -46,8 +46,8 @@ Chain strategy: stacked-to-main
 
 - [x] 3.1 RED `test/daemon/send/validate.test.ts`: cap boundary (round 2/3 COUNTER ok, next `ROUNDS_EXHAUSTED`, unjournaled); non-participant/wrong-role (`NOT_ORIGINATOR`/`NOT_ADDRESSEE`); inline-patch rejected; ordering before secret backstop.
 - [x] 3.2 GREEN `src/daemon/send/validate.ts`: `checkDebateTurn` stage (no-op unless decodes) between loop-prevention and secret backstop; `ROUNDS_EXHAUSTED` added to `SendErrorCode`; `debateTurns?` on `ValidatedSend`.
-- [ ] 3.3 RED `test/daemon/send/send-path.test.ts`: coalesced AUDIT+COUNTER = one silent send, one rate hit; ordinary REPLY still notifies; CONSENSUS/ESCALATE side-effect-free besides send+journal row.
-- [ ] 3.4 GREEN `src/daemon/send/send-path.ts`: extend `SILENT_TYPES` check for decoded debate REPLY; call `appendDebateTurn` (1-2 rows, shared `eid`) inside the existing `withTransaction` block.
+- [ ] 3.3 RED `test/daemon/send/send-path.test.ts`: each debate REPLY (AUDIT or COUNTER) is silent, one rate hit, no composition; ordinary REPLY still notifies; CONSENSUS/ESCALATE side-effect-free besides send+journal row.
+- [ ] 3.4 GREEN `src/daemon/send/send-path.ts`: extend `SILENT_TYPES` check for decoded debate REPLY; call `appendDebateTurn` (one row per send) inside the existing `withTransaction` block.
 
 ## Phase 4: Testing
 
