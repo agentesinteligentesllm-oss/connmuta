@@ -23,6 +23,11 @@ import {
   PROJECT_FILE_NAME,
   HOME_DIR_NAME,
   TOOL_PREFIX,
+  LEDGER_SCHEMA_VERSION,
+  ARENA_LIGHT_MAX_ROUNDS,
+  DEBATE_MARKER_PREFIX,
+  ARENA_LIGHT_MESSAGES_PER_ROUND,
+  GROUP_MESSAGES_PER_MINUTE,
 } from "../../src/shared/constants.js";
 
 test("PROTOCOL_SENTINEL pins the emitted wire sentinel to AGENTBUS/2 (W1)", () => {
@@ -64,4 +69,25 @@ test("derived constants are derived from their bases, never restated", () => {
   assert.equal(SPAWN_LOCK_STALE_SECONDS, SPAWN_WAIT_SECONDS + DAEMON_LOCK_STALE_SECONDS);
   assert.equal(AUDIT_RETENTION_DAYS, RESOLVED_THREAD_RETENTION_DAYS * 3);
   assert.equal(POLL_ERROR_BACKOFF_SECONDS, MAX_LONGPOLL_SECONDS / 10);
+});
+
+// --- F5: Arena-light 2-party debates (Phase 1: Foundation) ---
+
+test("LEDGER_SCHEMA_VERSION is bumped to 2 by the debate_journal migration (ledger spec 'Forward migration adds debate_journal at schema version 2')", () => {
+  assert.equal(LEDGER_SCHEMA_VERSION, 2);
+});
+
+test("ARENA_LIGHT_MAX_ROUNDS caps an Arena-light debate at 3 COUNTER rounds (T13, GOVERNANCE.md's tribunal round-cap precedent)", () => {
+  assert.equal(ARENA_LIGHT_MAX_ROUNDS, 3);
+});
+
+test("DEBATE_MARKER_PREFIX matches design.md Decision (b)'s one-line delimiter format", () => {
+  assert.equal(DEBATE_MARKER_PREFIX, "[ARENA-LIGHT:");
+});
+
+test("ARENA_LIGHT_MESSAGES_PER_ROUND is declared alongside GROUP_MESSAGES_PER_MINUTE for the coalesced-send rate budget (proposal.md Success Criteria)", () => {
+  // Deferred wiring (task 3.4, PR-5): `send-path.ts` is what asserts this by behaviour once the
+  // coalesced AUDIT+COUNTER send exists. This Phase-1 slice pins only the declared value.
+  assert.equal(ARENA_LIGHT_MESSAGES_PER_ROUND, 1);
+  assert.equal(typeof GROUP_MESSAGES_PER_MINUTE, "number");
 });

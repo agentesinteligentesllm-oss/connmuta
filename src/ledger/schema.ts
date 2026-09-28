@@ -115,3 +115,37 @@ CREATE TABLE conditions (
   scope TEXT NOT NULL, name TEXT NOT NULL, since TEXT NOT NULL, detail TEXT,
   PRIMARY KEY (scope, name)) STRICT;    -- scope = project_id or 'daemon'; detail = codes/ids only
 `;
+
+/**
+ * The version-2 addition to the ledger's schema: `debate_journal`, Arena-light's side journal
+ * (F5; DATA-MODEL.md §3.7, "Arena-light side journal (D7, F5)").
+ *
+ * Debate metadata cannot ride the wire — an envelope field the decoder does not recognise is
+ * stripped (v1 `src/envelope.ts:115`) — so the daemon journals it here instead, from the body
+ * markers `shared/debate-marker.ts` recognises. Applied only through `ledger/migrations.ts`'s
+ * version-2 step (design.md Architecture Decisions (a): "Append `{ to: 2, up }` to
+ * `LEDGER_MIGRATIONS`; new `DEBATE_JOURNAL_DDL` (v1 DDL untouched)"), never appended to
+ * {@link LEDGER_SCHEMA_DDL} — a schema change is the next migration, never an edit to a shipped
+ * one, the same rule that DDL's own doc comment states above.
+ *
+ * `STRICT` and no `IF NOT EXISTS` mirror the v1 table conventions, for the same reasons: a wrong
+ * storage class is a refusal instead of a silent conversion, and a second application is an error
+ * rather than a silent no-op — both properties the forward-only migration path depends on.
+ *
+ * Columns, in DATA-MODEL.md §3.7's own order: `id` (rowid alias); `project_id`/`debate_id` (a
+ * debate never crosses bindings; `debate_id` = the `PROPOSAL` thread's `thread_id`); `round`
+ * (daemon-enforced cap `ARENA_LIGHT_MAX_ROUNDS`); `turn` (the body-marker subtype, CHECK-closed to
+ * the five `DebateTurnKind` values); `verdict` (nullable — its closed token set is fixed by F5 in
+ * TypeScript rather than a second DDL CHECK, the same "open string, not a DB-level closed enum"
+ * choice `audit_log.reason`'s own doc above states, for a value this table only stores and never
+ * branches on); `eid`/`from_agent_id`/`to_agent_id` (always known at journal time); `refs` (a JSON
+ * array of pointer-only payloads — commit, PR, path, memory id — never an inline diff, D7);
+ * `basis_at_close` (nullable, set only on `CONSENSUS`/`ESCALATE`); `at` (ISO timestamp).
+ */
+export const DEBATE_JOURNAL_DDL = `CREATE TABLE debate_journal (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL, debate_id TEXT NOT NULL,
+  round INTEGER NOT NULL,
+  turn TEXT NOT NULL CHECK (turn IN ('PROPOSAL','AUDIT','COUNTER','CONSENSUS','ESCALATE')),
+  verdict TEXT, eid TEXT NOT NULL, from_agent_id TEXT NOT NULL, to_agent_id TEXT NOT NULL,
+  refs TEXT NOT NULL, basis_at_close TEXT, at TEXT NOT NULL) STRICT;
+`;

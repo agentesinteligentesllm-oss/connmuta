@@ -13,7 +13,7 @@ import {
 	runPendingMigrations,
 	type LedgerMigration,
 } from "../../src/ledger/migrations.js";
-import { LEDGER_SCHEMA_DDL } from "../../src/ledger/schema.js";
+import { DEBATE_JOURNAL_DDL, LEDGER_SCHEMA_DDL } from "../../src/ledger/schema.js";
 import { DEFERRED_CALLBACK_MESSAGE } from "../../src/ledger/transaction.js";
 import { LEDGER_SCHEMA_VERSION } from "../../src/shared/constants.js";
 
@@ -94,8 +94,11 @@ test("the first migration applies LEDGER_SCHEMA_DDL itself — the schema object
 		const reference = new DatabaseSync(":memory:");
 		try {
 			reference.exec(LEDGER_SCHEMA_DDL);
-			assert.equal(runPendingMigrations(db, 0), LEDGER_SCHEMA_VERSION);
-			assert.equal(readLedgerSchemaVersion(db), LEDGER_SCHEMA_VERSION);
+			// Scoped to the version-1 step alone (F5's version-2 step now shares this default path, so
+			// running the whole thing would also create `debate_journal`, which this reference never gets).
+			const versionOneOnly = LEDGER_MIGRATIONS.filter((migration) => migration.to <= 1);
+			assert.equal(runPendingMigrations(db, 0, versionOneOnly), 1);
+			assert.equal(readLedgerSchemaVersion(db), 1);
 			// Equality against the DDL applied directly, so this pins "migration 1 is that text" rather
 			// than re-listing the inventory `test/ledger/schema.test.ts` already owns.
 			assert.deepEqual(schemaObjects(db), schemaObjects(reference));
@@ -250,9 +253,10 @@ test("the stamp is written inside the step's own transaction, so a step that com
 
 test("a later step records its own version, not the first one's", () => {
 	withDatabase((db) => {
-		// Two steps that both succeed, which the shipped path (one step, and `LEDGER_SCHEMA_VERSION` = 1) cannot
-		// express: the value of the stamp above version 1 is otherwise unpinned, and a stamp that always wrote
-		// `1` would leave the next open believing step 2 still had to run.
+		// Two steps that both succeed, using injected probe tables rather than the real DDL so this
+		// scenario stays independent of what `debate_journal` actually contains: the value of the stamp
+		// above version 1 is otherwise unpinned, and a stamp that always wrote `1` would leave the next
+		// open believing step 2 still had to run.
 		const twoSuccessfulSteps: LedgerMigration[] = [
 			{ to: 1, up: (handle) => { handle.exec(PROBE_DDL); } },
 			{ to: 2, up: (handle) => { handle.exec(PROBE_DDL_TWO); } },
@@ -296,5 +300,50 @@ test("a version this build has no forward-only path from is refused, never skipp
 
 		assert.equal(readLedgerSchemaVersion(db), 0);
 		assert.deepEqual(schemaObjects(db), [], "a refused path must leave no schema behind");
+	});
+});
+
+// --- F5: the version-2 step, `debate_journal` (ledger spec "Forward migration adds `debate_journal`
+// at schema version 2"; design.md Testing Strategy: "throw-safety already generic; add real-step case") ---
+
+test("a version-1 ledger auto-migrates to version 2 at open: debate_journal exists and PRAGMA user_version reads 2", () => {
+	withDatabase((db) => {
+		// Simulates an existing v1 ledger: only the version-1 step has been applied, as an earlier boot
+		// would have already committed — the shipped path itself, not an injected one.
+		const versionOneOnly = LEDGER_MIGRATIONS.filter((migration) => migration.to <= 1);
+		assert.equal(runPendingMigrations(db, 0, versionOneOnly), 1);
+		assert.ok(!hasTable(db, "debate_journal"), "the version-2 table must not exist yet at version 1");
+
+		assert.equal(runPendingMigrations(db, 1), 2);
+		assert.equal(readLedgerSchemaVersion(db), 2);
+		assert.ok(hasTable(db, "debate_journal"));
+	});
+});
+
+test("a version-2 step that throws partway through leaves no partial debate_journal schema, and user_version stays 1", () => {
+	withDatabase((db) => {
+		const versionOneOnly = LEDGER_MIGRATIONS.filter((migration) => migration.to <= 1);
+		assert.equal(runPendingMigrations(db, 0, versionOneOnly), 1);
+
+		// The real-step case design.md's Testing Strategy calls for: the throw-safety mechanism is
+		// already pinned generically above (PROBE_DDL); this uses the actual DEBATE_JOURNAL_DDL text so a
+		// defect specific to that statement's own rollback is not left uncovered.
+		const failingVersionTwo: LedgerMigration[] = [
+			...versionOneOnly,
+			{
+				to: 2,
+				up: (handle) => {
+					handle.exec(DEBATE_JOURNAL_DDL);
+					throw new Error("simulated failure partway through the version-2 step");
+				},
+			},
+		];
+
+		assert.throws(
+			() => runPendingMigrations(db, 1, failingVersionTwo),
+			/simulated failure partway through the version-2 step/,
+		);
+		assert.equal(readLedgerSchemaVersion(db), 1, "the version must not move past the failed version-2 step");
+		assert.ok(!hasTable(db, "debate_journal"), "no partial debate_journal schema may survive the rollback");
 	});
 });
