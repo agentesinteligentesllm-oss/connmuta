@@ -8,6 +8,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { openLedger } from "../../../src/ledger/open.js";
 import { writeThreadRecord } from "../../../src/ledger/threads.js";
+import { appendDebateTurn } from "../../../src/ledger/debate-journal.js";
 import type { ThreadRecord } from "../../../src/shared/thread-record.js";
 import {
 	ABANDON_BASIS_VALUE,
@@ -16,7 +17,8 @@ import {
 	normalizeBody,
 	type Envelope,
 } from "../../../src/shared/envelope.js";
-import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../../src/shared/constants.js";
+import { encodeDebateTurn, type DebateTurnMarker } from "../../../src/shared/debate-marker.js";
+import { ARENA_LIGHT_MAX_ROUNDS, MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../../src/shared/constants.js";
 import type { SecretRule } from "../../../src/shared/secrets.js";
 import type { SendToolInput } from "../../../src/shared/tool-schemas.js";
 import type { BindingConfig } from "../../../src/daemon/binding-config.js";
@@ -739,5 +741,163 @@ test("stage 4: REQUEST resolves to exactly the single `to`", async () => {
 	await withLedger(async (db) => {
 		const result = validateSend(requestInput({ to: ALICE_AGENT_ID }), sampleDeps(db));
 		assert.deepEqual(result.recipients, [ALICE_AGENT_ID]);
+	});
+});
+
+// --- Stage 2.5: Arena-light debate-turn stage (F5, D7; design.md Decision (c)) ---
+//
+// `debate_id` is the debate thread's own `thread_id` (spec "Participation and scope reuse existing
+// invariants"); every fixture below reuses the same `threadId` it wrote via `writeThread` as both the
+// REPLY's `thread` and `journalCounterRounds`'s `debateId`, exactly as `send-path.ts` (PR-5) will.
+
+/** Journals `count` already-accepted COUNTER rows (rounds 1..count) for one debate, seeding `readMaxCounterRound`. */
+function journalCounterRounds(db: DatabaseSync, projectId: string, debateId: string, count: number): void {
+	for (let round = 1; round <= count; round += 1) {
+		appendDebateTurn(db, {
+			project_id: projectId,
+			debate_id: debateId,
+			round,
+			turn: "COUNTER",
+			verdict: null,
+			eid: hexId(2000 + round),
+			from_agent_id: ALICE_AGENT_ID,
+			to_agent_id: BOB_AGENT_ID,
+			refs: [],
+			basis_at_close: null,
+			at: NOW,
+		});
+	}
+}
+
+const COUNTER_MARKER: DebateTurnMarker = { turn: "COUNTER", text: "a counter-proposal", refs: ["commit-abc123"] };
+const AUDIT_MARKER: DebateTurnMarker = { turn: "AUDIT", verdict: "APPROVE_WITH_CHANGES", text: "an audit verdict", refs: ["pr-42"] };
+
+test("stage 2.5: a COUNTER at round 2 of 3 is accepted and carried through as debateTurns", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(200);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		journalCounterRounds(db, PROJECT_ID, threadId, 2);
+
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: encodeDebateTurn(COUNTER_MARKER) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) });
+
+		const result = validateSend(input, deps);
+		assert.deepEqual(result.debateTurns, [COUNTER_MARKER]);
+	});
+});
+
+test("Spec scenario: a COUNTER past the round cap is refused ROUNDS_EXHAUSTED and journals nothing", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(201);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		journalCounterRounds(db, PROJECT_ID, threadId, ARENA_LIGHT_MAX_ROUNDS);
+		const before = totalChanges(db);
+
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: encodeDebateTurn(COUNTER_MARKER) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) });
+
+		assert.throws(() => validateSend(input, deps), isSendToolError("ROUNDS_EXHAUSTED"));
+		assert.equal(totalChanges(db), before, "a refused COUNTER must not journal anything — journaling on acceptance is send-path.ts's job");
+	});
+});
+
+test("stage 2.5: the round cap is scoped to (project_id, debate_id) — the same debate id under another project does not count toward it", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(202);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		journalCounterRounds(db, OTHER_PROJECT_ID, threadId, ARENA_LIGHT_MAX_ROUNDS);
+
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: encodeDebateTurn(COUNTER_MARKER) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) });
+
+		const result = validateSend(input, deps);
+		assert.deepEqual(result.debateTurns, [COUNTER_MARKER]);
+	});
+});
+
+test("Spec scenario: a COUNTER from the thread's addressee (not its originator) is NOT_ORIGINATOR", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(203);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+
+		const input = replyInput({ thread: threadId, to: ALICE_AGENT_ID, body: encodeDebateTurn(COUNTER_MARKER) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: BOB_AGENT_ID }) }); // BOB is thread.to, not thread.from
+
+		assert.throws(() => validateSend(input, deps), isSendToolError("NOT_ORIGINATOR"));
+	});
+});
+
+test("Spec scenario: an AUDIT from the thread's originator (not its addressee) is NOT_ADDRESSEE", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(204);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: encodeDebateTurn(AUDIT_MARKER) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) }); // ALICE is thread.from, not thread.to
+
+		assert.throws(() => validateSend(input, deps), isSendToolError("NOT_ADDRESSEE"));
+	});
+});
+
+test("stage 2.5: an AUDIT from the thread's addressee never checks the round cap, even when COUNTER is already exhausted", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(205);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		journalCounterRounds(db, PROJECT_ID, threadId, ARENA_LIGHT_MAX_ROUNDS);
+
+		const input = replyInput({ thread: threadId, to: ALICE_AGENT_ID, body: encodeDebateTurn(AUDIT_MARKER) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: BOB_AGENT_ID }) }); // BOB is thread.to, the addressee
+
+		const result = validateSend(input, deps);
+		assert.deepEqual(result.debateTurns, [AUDIT_MARKER]);
+	});
+});
+
+test("Spec scenario: a COUNTER whose text carries a literal diff shape is INLINE_PATCH_REJECTED, pointer-only refs are not", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(206);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+
+		const patchMarker: DebateTurnMarker = { turn: "COUNTER", text: "apply this: diff --git a/x b/x", refs: [] };
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: encodeDebateTurn(patchMarker) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) });
+
+		assert.throws(() => validateSend(input, deps), isSendToolError("INLINE_PATCH_REJECTED"));
+	});
+});
+
+test("stage 2.5: a non-debate REPLY is a no-op for this stage — debateTurns is undefined", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(207);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: "just an ordinary reply, no marker here" });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) });
+
+		const result = validateSend(input, deps);
+		assert.equal(result.debateTurns, undefined);
+	});
+});
+
+// --- Stage order: checkDebateTurn sits between loop prevention and the secret backstop ---
+
+test("stage order: loop prevention runs before the Arena-light debate-turn stage", async () => {
+	await withLedger(async (db) => {
+		const input = replyInput({ thread: hexId(208), to: ALICE_AGENT_ID, body: encodeDebateTurn(COUNTER_MARKER) });
+		assert.throws(() => validateSend(input, sampleDeps(db)), isSendToolError("UNKNOWN_THREAD"));
+	});
+});
+
+test("Spec scenario: the (cap+1)-th COUNTER is refused before the secret backstop runs — ROUNDS_EXHAUSTED wins over a secret-shaped body", async () => {
+	await withLedger(async (db) => {
+		const threadId = hexId(209);
+		writeThread(db, PROJECT_ID, threadId, { from: ALICE_AGENT_ID, to: BOB_AGENT_ID, to_user_id: BOB_USER_ID });
+		journalCounterRounds(db, PROJECT_ID, threadId, ARENA_LIGHT_MAX_ROUNDS);
+
+		const secretShapedCounter: DebateTurnMarker = { turn: "COUNTER", text: `see token ${FIXTURE_BOT_TOKEN}`, refs: [] };
+		const input = replyInput({ thread: threadId, to: BOB_AGENT_ID, body: encodeDebateTurn(secretShapedCounter) });
+		const deps = sampleDeps(db, { config: sampleConfig({ agent_id: ALICE_AGENT_ID }) });
+
+		assert.throws(() => validateSend(input, deps), isSendToolError("ROUNDS_EXHAUSTED"));
 	});
 });

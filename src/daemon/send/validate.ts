@@ -31,7 +31,13 @@
  * `headroom_chars` now subtracts `VERSION_STAMP_SUFFIX.length` (F3 PR-08, version-observability):
  * once `renderMessageHtml` renders a build/wire version stamp into the delivered message, that fixed
  * overhead counts toward Telegram's real ceiling too, so a headroom figure that ignored it overstated
- * the real safety margin by exactly the stamp's length (RDD review review-49f5f64f1398a087).
+ * the real safety margin by exactly the stamp's length (RDD review review-49f5f64f1398a087); (13)
+ * `checkDebateTurn` added between loop prevention and the secret backstop (F5, Arena-light 2-party
+ * debates, D7, design.md Decision (c)): a no-op unless `body` decodes as a debate marker
+ * (`shared/debate-marker.ts`), it enforces the COUNTER/AUDIT role split by reusing `NOT_ORIGINATOR`/
+ * `NOT_ADDRESSEE` (ADR-13's own vocabulary) and the `ARENA_LIGHT_MAX_ROUNDS` round cap
+ * (`ROUNDS_EXHAUSTED`, new); an inline patch shape is refused `INLINE_PATCH_REJECTED` (new). This
+ * stage never journals — journaling an accepted turn is `send-path.ts`'s job (PR-5).
  *
  * ---
  *
@@ -41,8 +47,9 @@
  * **A pure function over the ledger — no network call, no ledger write.** `validateSend` has no
  * transport dependency at all: the only things it imports from `../transport/types.js` are the two
  * outcome TYPES `SendToolOutput` re-exposes for its caller's convenience, never a transport value. The
- * one ledger access it makes is a single read, `readThreadRecord`, in stage 2; nothing here calls
- * `writeThreadRecord` or any other mutating statement. Minting `eid`/`thread`, building the envelope,
+ * ledger accesses it makes are single reads — `readThreadRecord` in stage 2, and `readMaxCounterRound`
+ * in stage 2.5 for an Arena-light COUNTER turn (F5) — nothing here calls `writeThreadRecord`,
+ * `appendDebateTurn`, or any other mutating statement. Minting `eid`/`thread`, building the envelope,
  * stamping `to_user_id` from the roster, and sending are PR-27's job (`daemon/send/send-path.ts`), not this
  * module's.
  *
@@ -63,7 +70,8 @@ import { randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import { readThreadRecord } from "../../ledger/threads.js";
-import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../shared/constants.js";
+import { readMaxCounterRound } from "../../ledger/debate-journal.js";
+import { ARENA_LIGHT_MAX_ROUNDS, MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../shared/constants.js";
 import {
 	ABANDON_BASIS_VALUE,
 	VERSION_STAMP_SUFFIX,
@@ -72,6 +80,7 @@ import {
 	normalizeBody,
 	type Envelope,
 } from "../../shared/envelope.js";
+import { containsInlinePatchShape, decodeDebateBody, type DebateTurnMarker } from "../../shared/debate-marker.js";
 import { checkForSecrets } from "../../shared/secrets.js";
 import type { ThreadRecord } from "../../shared/thread-record.js";
 import { sendInputSchema, type SendToolInput } from "../../shared/tool-schemas.js";
@@ -129,6 +138,10 @@ export type SendErrorCode =
 	| "UNKNOWN_RECIPIENT"
 	| "WRONG_ROOM"
 	| "RATE_LIMITED"
+	/** F5 (Arena-light): a debate turn's `text` carries the shape of a literal diff/patch instead of a pointer-only ref (D7, spec "Debate bodies are pointer-only, never inline patches"). */
+	| "INLINE_PATCH_REJECTED"
+	/** F5 (Arena-light): a COUNTER would exceed `ARENA_LIGHT_MAX_ROUNDS` for this debate — refused before any journal write (design.md Decision (c)). */
+	| "ROUNDS_EXHAUSTED"
 	| "TRANSPORT_ERROR";
 
 /**
@@ -304,6 +317,77 @@ function checkLoopPrevention(
 }
 
 /**
+ * Stage 2.5 — Arena-light debate-turn stage (F5, D7; design.md Decision (c)), inserted between loop
+ * prevention and the secret backstop. A no-op unless `body` decodes as one or more debate markers
+ * (`shared/debate-marker.ts`'s `decodeDebateBody`) — an ordinary send's body never carries the
+ * `[ARENA-LIGHT:...]` prefix, so this stage costs one failed regex scan and returns `undefined` for
+ * every non-debate send.
+ *
+ * For every decoded marker, in this order:
+ * 1. Role check — reuses loop prevention's own codes rather than inventing new ones (ADR-13): a
+ *    COUNTER is refused `NOT_ORIGINATOR` unless the caller is `thread.from`; an AUDIT is refused
+ *    `NOT_ADDRESSEE` unless the caller is `thread.to`. A third party never reaches this stage at all —
+ *    `checkLoopPrevention`'s REPLY branch already refused it `NOT_PARTICIPANT`.
+ * 2. Pointer-only check — `containsInlinePatchShape(marker.text)` refuses a literal diff/patch with
+ *    `INLINE_PATCH_REJECTED` (spec "Debate bodies are pointer-only, never inline patches").
+ * 3. Round-cap check — only when at least one marker is a COUNTER: `readMaxCounterRound(...) + 1 >
+ *    ARENA_LIGHT_MAX_ROUNDS` refuses `ROUNDS_EXHAUSTED`. AUDIT never advances or checks this count
+ *    (design.md "Round counting": "Increment on AUDIT too" was rejected).
+ *
+ * This stage never journals, on refusal or on success — journaling an accepted turn is
+ * `send-path.ts`'s job (PR-5), so a refusal here can never be a half-written turn.
+ */
+function checkDebateTurn(
+	body: string,
+	thread: ThreadRecord | undefined,
+	debateId: string | undefined,
+	db: DatabaseSync,
+	project_id: string,
+	callerAgentId: string,
+): readonly DebateTurnMarker[] | undefined {
+	const markers = decodeDebateBody(body);
+	if (markers === undefined) {
+		return undefined;
+	}
+
+	for (const marker of markers) {
+		if (marker.turn === "COUNTER" && thread?.from !== callerAgentId) {
+			throw new SendToolError(
+				"NOT_ORIGINATOR",
+				`Debate "${debateId}" was opened by "${thread?.from}" — only its originator may send a COUNTER, not "${callerAgentId}".`,
+			);
+		}
+		if (marker.turn === "AUDIT" && thread?.to !== callerAgentId) {
+			throw new SendToolError(
+				"NOT_ADDRESSEE",
+				`Debate "${debateId}" is addressed to "${thread?.to}" — only its addressee may send an AUDIT, not "${callerAgentId}".`,
+			);
+		}
+	}
+
+	for (const marker of markers) {
+		if (containsInlinePatchShape(marker.text)) {
+			throw new SendToolError(
+				"INLINE_PATCH_REJECTED",
+				`Debate "${debateId}" turn text carries the shape of a literal diff/patch — refs must be pointer-only (commit, PR, path, memory id), never an inline patch.`,
+			);
+		}
+	}
+
+	if (markers.some((marker) => marker.turn === "COUNTER")) {
+		const nextRound = readMaxCounterRound(db, project_id, debateId!) + 1;
+		if (nextRound > ARENA_LIGHT_MAX_ROUNDS) {
+			throw new SendToolError(
+				"ROUNDS_EXHAUSTED",
+				`Debate "${debateId}" is already at its ${ARENA_LIGHT_MAX_ROUNDS}-round cap — no further COUNTER is accepted until it closes with CONSENSUS or ESCALATE.`,
+			);
+		}
+	}
+
+	return markers;
+}
+
+/**
  * Stage 3 — secret-pattern backstop (ADR-06 L6), run once before either channel is touched.
  *
  * Scans EVERY caller-authored field that reaches the wire, not just `body` (ADR-12): `approval_ref` is
@@ -358,25 +442,33 @@ export interface ValidatedSend {
 	readonly existingThread: ThreadRecord | undefined;
 	/** Every logical agent id this send must reach. */
 	readonly recipients: readonly string[];
+	/**
+	 * Decoded Arena-light debate markers, if `body` carried any (F5); `undefined` for an ordinary send.
+	 * Consumed by `send-path.ts` (PR-5) for silence and journaling, without re-decoding `body`.
+	 */
+	readonly debateTurns?: readonly DebateTurnMarker[];
 }
 
 /**
- * Runs the four validation stages, in the spec's order (`send-path` spec, "Validation pipeline and
+ * Runs the five validation stages, in the spec's order (`send-path` spec, "Validation pipeline and
  * secret backstop run before any network call"): schema validation and normalization; loop prevention;
- * the secret backstop; recipient/roster resolution. See the module doc for what it deliberately does
- * NOT do — no network call, no ledger write, no envelope built.
+ * the Arena-light debate-turn stage (F5 — round cap, role check, pointer-only, no-op unless `body`
+ * decodes as a debate marker); the secret backstop; recipient/roster resolution. See the module doc
+ * for what it deliberately does NOT do — no network call, no ledger write, no envelope built.
  */
 export function validateSend(input: SendToolInput, deps: SendValidationDeps): ValidatedSend {
 	const validated = validateInput(input, MAX_BODY_CHARS);
 
 	const existingThread = checkLoopPrevention(validated, deps.db, deps.project_id, deps.config.agent_id);
 
+	const debateTurns = checkDebateTurn(validated.body, existingThread, validated.thread, deps.db, deps.project_id, deps.config.agent_id);
+
 	checkSecretBackstop(validated, deps.config.secret_markers);
 
 	const recipients = resolveRecipients(validated, deps.config);
 	checkRecipientsKnown(recipients, deps.config);
 
-	return { input: validated, existingThread, recipients };
+	return { input: validated, existingThread, recipients, debateTurns };
 }
 
 /**
