@@ -101,7 +101,7 @@ flowchart LR
 | Field | Content |
 |---|---|
 | Goal | Two-party debates over the bus without touching the wire. |
-| Deliverables | Body-marker subtypes: PROPOSAL = `REQUEST[marker]`; AUDIT/COUNTER = `REPLY[marker + verdict token]`; CONSENSUS = `RESOLVED[existing basis]`; ESCALATE = `RESOLVED[basis abandoned] + marker`; daemon-enforced round cap; pointer-only payloads within the 1,921-char effective ceiling ([ADR-0023](../03-adr/0023-wire-ceiling-reported.md)); side journal in the ledger; `disable_notification` on debate turns; AUDIT+COUNTER coalesced to respect 20 msg/min/group. |
+| Deliverables | Body-marker subtypes: PROPOSAL = `REQUEST[marker]`; AUDIT/COUNTER = `REPLY[marker + verdict token]`; CONSENSUS = `RESOLVED[existing basis]`; ESCALATE = `RESOLVED[basis abandoned] + marker`; daemon-enforced round cap; pointer-only payloads within the 1,921-char effective ceiling ([ADR-0023](../03-adr/0023-wire-ceiling-reported.md)); side journal in the ledger; `disable_notification` on debate turns; each turn is its own physical send, never coalesced (a body-coalescing design was found structurally unbuildable during implementation — AUDIT/COUNTER are different roles and no single caller can ever owe both — and was dropped; see `bus-v2-f5-pr-04-coalescing-contradiction-001`). |
 | Dependencies | F1 (journal table, cursors). |
 | Validation | Round cap rejects the N+1th COUNTER with a counted reason; a debate never crosses bindings; CONSENSUS is a message — a test asserts no filesystem or process effect from any debate envelope; group rate budget per round is a named constant asserted by behaviour. |
 | SDD change | `f5-arena-light-two-party` (proposed) |

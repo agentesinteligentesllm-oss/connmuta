@@ -1,5 +1,10 @@
 # Proposal: Arena-light 2-party debates over the existing wire
 
+**Correction during implementation**: "coalesce AUDIT+COUNTER" below was found unbuildable (AUDIT
+is addressee-only, COUNTER originator-only — two agents, one body) and dropped
+(`bus-v2-f5-pr-04-coalescing-contradiction-001`). Each turn ships as its own silenced send;
+affected lines struck through, not rewritten.
+
 ## Intent
 
 Enable PROPOSAL -> AUDIT/COUNTER -> CONSENSUS/ESCALATE debates between two agents (WORK-PLAN F5,
@@ -19,7 +24,8 @@ pipeline.
   `LEDGER_SCHEMA_VERSION` bump.
 - Marker-aware silence (`DEBATE_MARKER_PREFIX`), silent only for AUDIT/COUNTER
   (`send-path.ts:160-172`).
-- AUDIT+COUNTER coalesced into one REPLY, two delimited sections, one send.
+- ~~AUDIT+COUNTER coalesced into one REPLY, two delimited sections, one send.~~ (dropped, see
+  correction note above — each turn is its own send)
 - CONSENSUS -> basis `context-shared`; ESCALATE -> `RESOLVED[abandoned]` from `thread.from`
   (ADR-13).
 - Pointer-only enforcement: inline diff/patch bodies rejected, no PATCH auto-apply (D7, T13).
@@ -45,7 +51,7 @@ pipeline.
 ## Approach
 
 A pure `shared/` marker module; `ledger/debate-journal.ts`; a `validate.ts` stage reusing
-`SendToolError`; a coalescing composer upstream of `rate.ts`. Admission unaffected.
+`SendToolError`. Admission unaffected.
 
 ## Affected Areas
 
@@ -82,6 +88,6 @@ exists yet.
 - [ ] Inline non-pointer patch/diff body rejected (PT-23 c3, D7).
 - [ ] A debate never crosses bindings.
 - [ ] CONSENSUS is message-only, no filesystem/process effect.
-- [ ] AUDIT+COUNTER coalesce into one send.
+- ~~[ ] AUDIT+COUNTER coalesce into one send.~~ (dropped, see correction note above)
 - [ ] `disable_notification` true only for AUDIT/COUNTER.
 - [ ] Group rate budget per round is a named constant, asserted by behaviour.
