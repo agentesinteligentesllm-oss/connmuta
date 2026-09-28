@@ -313,8 +313,28 @@ export const MAX_PENDING_HANDSHAKES = 64;
  * of the boot until a bearer is revoked (`DELETE /session`, still `daemon/ipc/routes.ts`'s job, PR-31)
  * or the daemon restarts. This is a coarse memory-growth ceiling, not a self-healing one — sharpened in
  * `JD-A-001`'s round-1 re-judgment (`apply-progress.md` §PR-30).
+ *
+ * F4 (`f4-claude-channels-adapter`, D10) adds a second consumer of this same ceiling: arming the
+ * Claude Code channel adapter costs a Claude Code session 2 slots instead of 1 (one thin-client
+ * session, one adapter session) — no value change here, since the adapter issues its own
+ * `DELETE /session` on shutdown to release its slot (see "Session budget" in design.md).
  */
 export const MAX_ACTIVE_SESSIONS = MAX_PENDING_HANDSHAKES;
+
+// --- F4: Claude Code channels adapter (design.md "Interfaces / Contracts") ---
+
+/** Rows one doorbell scan examines. Equal to MAX_BATCH so a doorbell read never does more work than one
+ *  fetch batch; the value changes only how many pages a backlog takes, never coverage (after_seq paging). */
+export const DOORBELL_SCAN_DEPTH = MAX_BATCH;
+export const CHANNEL_SERVER_NAME = `${PRODUCT_NAME}-channel`;          // also the bin name
+/** DATA-MODEL §3.5 host label; <= IPC_SESSION_HOST_MAX_CHARS (pinned). */
+export const CHANNEL_HOST_LABEL = "claude-code-channel";
+/** Adapter pause after any failed tick; equals POLL_ERROR_BACKOFF_SECONDS — the daemon's own transient-fault pacing. */
+export const CHANNEL_RETRY_BACKOFF_SECONDS = POLL_ERROR_BACKOFF_SECONDS;
+/** Distinct values one meta list names (v1 notify.ts:10); `count` always carries the true total. */
+export const CHANNEL_META_LIST_LIMIT = 4;
+/** Bound on the shutdown DELETE /session: one local round trip, = REQUEST_OVERHEAD_SECONDS. */
+export const CHANNEL_SHUTDOWN_TIMEOUT_MS = REQUEST_OVERHEAD_SECONDS * 1000;
 
 /**
  * Maximum bytes accepted in one IPC request body.

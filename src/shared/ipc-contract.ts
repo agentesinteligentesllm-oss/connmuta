@@ -25,8 +25,8 @@
 
 import { z } from "zod";
 
-import { IPC_NONCE_BYTES, PROJECT_ID_PATTERN, SESSION_TOKEN_BYTES } from "./constants.js";
-import { AGENT_ID_PATTERN } from "./envelope.js";
+import { DOORBELL_SCAN_DEPTH, IPC_NONCE_BYTES, PROJECT_ID_PATTERN, SESSION_TOKEN_BYTES } from "./constants.js";
+import { AGENT_ID_PATTERN, ENVELOPE_TYPES, THREAD_PATTERN } from "./envelope.js";
 import { ROSTER_HASH_PREFIX } from "./roster-hash.js";
 import { fetchInputSchema, sendInputSchema, statusInputSchema, threadInputSchema } from "./tool-schemas.js";
 
@@ -89,7 +89,9 @@ export const IPC_SESSION_HOST_MAX_CHARS = 64;
 // ---------------------------------------------------------------------------
 
 /**
- * The eight fixed IPC routes (design §10 D-13; `POST /doctor` added by PR-16, design §9.2 D-44).
+ * The ten fixed IPC routes (design §10 D-13; `POST /doctor` added by PR-16, design §9.2 D-44;
+ * `POST /channel/doorbell` and `POST /channel/cursor` added by F4, design "Architecture Decisions" D1
+ * — a distinct `/channel/*` path family, deliberately outside the `/tools/*` MCP tool surface).
  * `/panel/*` is F3 scope and is deliberately not a member of this table.
  */
 export const IPC_ROUTES = [
@@ -101,9 +103,11 @@ export const IPC_ROUTES = [
   "POST /tools/status",
   "POST /tools/thread",
   "POST /doctor",
+  "POST /channel/doorbell",
+  "POST /channel/cursor",
 ] as const;
 
-/** One of the eight fixed routes, as `"<METHOD> <path>"`. */
+/** One of the ten fixed routes, as `"<METHOD> <path>"`. */
 export type IpcRouteKey = (typeof IPC_ROUTES)[number];
 
 // ---------------------------------------------------------------------------
@@ -300,6 +304,48 @@ export const doctorResponseSchema = z.strictObject({
 export type DoctorResponse = z.infer<typeof doctorResponseSchema>;
 
 // ---------------------------------------------------------------------------
+// POST /channel/doorbell, POST /channel/cursor
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /channel/doorbell`'s request body (design "Interfaces / Contracts"). `timeout_s` is clamped
+ * by `effectiveWaitSeconds`, the same long-poll substrate `POST /tools/fetch` uses (D4) — this schema
+ * only bounds the field's own shape, not the effective wait.
+ */
+export const doorbellRequestSchema = z.strictObject({
+  after_seq: z.number().int().nonnegative(),
+  timeout_s: z.number().int().nonnegative().optional(),   // clamped by effectiveWaitSeconds
+});
+
+/**
+ * `POST /channel/doorbell`'s response: a closed-key-set summary, never a fetch shape (spec "Doorbell
+ * response is a closed-key-set summary, not a fetch shape"). `saturated` is the D3 scan-depth-clamp
+ * signal — true means at least one row past `covered_through_seq` exists that this scan did not
+ * examine. The `.refine()` is the co-emptiness rule: `count === 0` implies every list is empty.
+ */
+export const doorbellResponseSchema = z.strictObject({
+  count: z.number().int().nonnegative().max(DOORBELL_SCAN_DEPTH),
+  senders: z.array(z.string().regex(AGENT_ID_PATTERN)).max(DOORBELL_SCAN_DEPTH),
+  types: z.array(z.enum(ENVELOPE_TYPES)),
+  threads: z.array(z.string().regex(THREAD_PATTERN)).max(DOORBELL_SCAN_DEPTH),
+  covered_through_seq: z.number().int().nonnegative(),
+  saturated: z.boolean(),
+}).refine((r) => r.count > 0 || (r.senders.length + r.types.length + r.threads.length === 0));
+
+/**
+ * `POST /channel/cursor`'s request body (D2: a second route, not an operation on the doorbell route,
+ * so the read stays structurally write-free — the doorbell handler module imports no ledger write
+ * function). An absent `commit_seq` means "ensure the row exists and read it" (D8); a present one is
+ * the caller's requested advance.
+ */
+export const channelCursorRequestSchema = z.strictObject({
+  commit_seq: z.number().int().nonnegative().optional(),  // absent = ensure + read
+});
+
+/** `POST /channel/cursor`'s response: the caller's stored `inbox_seq` after the request is applied. */
+export const channelCursorResponseSchema = z.strictObject({ inbox_seq: z.number().int().nonnegative() });
+
+// ---------------------------------------------------------------------------
 // Error responses
 // ---------------------------------------------------------------------------
 
@@ -386,6 +432,8 @@ export const IPC_REQUEST_SCHEMAS = {
   "POST /tools/status": statusInputSchema,
   "POST /tools/thread": threadInputSchema,
   "POST /doctor": doctorRequestSchema,
+  "POST /channel/doorbell": doorbellRequestSchema,
+  "POST /channel/cursor": channelCursorRequestSchema,
 } satisfies Record<IpcRouteKey, z.ZodType>;
 
 /** Every route's success-response schema, keyed by {@link IpcRouteKey}. See {@link toolSuccessSchema} for why the four tool routes share one opaque schema. */
@@ -398,6 +446,8 @@ export const IPC_RESPONSE_SCHEMAS = {
   "POST /tools/status": toolSuccessSchema,
   "POST /tools/thread": toolSuccessSchema,
   "POST /doctor": doctorResponseSchema,
+  "POST /channel/doorbell": doorbellResponseSchema,
+  "POST /channel/cursor": channelCursorResponseSchema,
 } satisfies Record<IpcRouteKey, z.ZodType>;
 
 /** Looks up one route's request schema — the same table PR-30/31's handlers and PR-33/34's client read. */

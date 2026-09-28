@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import { MAX_BODY_CHARS, PROTOCOL_SENTINEL, TELEGRAM_MAX_TEXT_CHARS } from "../../src/shared/constants.js";
 import {
   ABANDON_BASIS_VALUE,
+  ENVELOPE_TYPES,
   RESOLVED_BASIS_VALUES,
   RESOLVED_LOW_RISK_BASIS,
   decodeEnvelope,
@@ -750,4 +751,32 @@ test("an abandoned RESOLVED needs no approval_ref, and is rejected if one is sup
     false,
     "approval_ref remains bound to human-approved alone"
   );
+});
+
+// --- ENVELOPE_TYPES: the closed type set as a named export (F4 PR-01) ---
+//
+// Exported so `shared/ipc-contract.ts`'s doorbell response schema can enumerate exactly these values
+// (design.md "Interfaces / Contracts", `doorbellResponseSchema.types`) without redeclaring them.
+
+test("ENVELOPE_TYPES is exported as const and lists exactly the five envelope types, in schema order", () => {
+  assert.deepEqual([...ENVELOPE_TYPES], ["BROADCAST", "REQUEST", "REPLY", "ACK", "RESOLVED"]);
+});
+
+test("every ENVELOPE_TYPES member is accepted by envelopeSchema as a well-formed envelope's type", () => {
+  const validByType: Record<(typeof ENVELOPE_TYPES)[number], () => Record<string, unknown>> = {
+    BROADCAST: validBroadcastEnvelope,
+    REQUEST: validRequestEnvelope,
+    REPLY: validReplyEnvelope,
+    ACK: validAckEnvelope,
+    RESOLVED: validResolvedEnvelope,
+  };
+  for (const type of ENVELOPE_TYPES) {
+    const result = envelopeSchema.safeParse(validByType[type]());
+    assert.equal(result.success, true, `${type} must be accepted`);
+  }
+});
+
+test("a type outside ENVELOPE_TYPES is rejected by envelopeSchema", () => {
+  const result = envelopeSchema.safeParse(validRequestEnvelope({ type: "NOT_A_TYPE" }));
+  assert.equal(result.success, false);
 });
