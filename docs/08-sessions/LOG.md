@@ -84,6 +84,12 @@
 - Backlog rows filed: **B-93** (F3 PR-06's 6 RDD advisory findings, none fixed per the review
   contract's own rule), **B-94** (F3 PR-07's 10 remaining RDD findings across two passes). **B-14
   closed**, shipped in PR-08.
+- **Director-requested audit of this session's own close-out documentation** (`bus-v2-session-47-handoff-audit-001`,
+  `CONSENSUS`/`APPROVE`, checking `HANDOFF.md` specifically for factual accuracy and completeness, not
+  re-litigating the 6 PR-level debates above): approved, zero objections — but one informational aside
+  inside Alpha's own approval (a claim about `gentle-ai sdd-status --json`'s live output) was itself
+  independently re-checked and found wrong, disclosed rather than silently trusted. `HANDOFF.md`'s own
+  content needed no correction; only the disclosure was added.
 
 ## Session 46 — F3 `sdd-apply` PR-01 through PR-05 (Units 1-5), 7 PRs merged
 

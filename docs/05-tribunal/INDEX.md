@@ -1472,6 +1472,21 @@ visible.
 
 ---
 
+## `bus-v2-session-47-handoff-audit-001` — Session 47 close-out documentation audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | Director-requested audit of session 47's close-out documentation commit (`1ef791a`), specifically checking `docs/08-sessions/HANDOFF.md` for factual accuracy, completeness and freedom from ambiguity — not re-litigating any of the 6 already-closed PR-level debates from this session. |
+| Authority | Explicit Director instruction this session, distinct from the standing `sdd-apply` autonomy: "Quiero que tu colaborador lo pueda auditar para que no haya confusiones ni ambigüedades." |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections, confirming every commit hash, PR number, debate id, RDD lineage id and finding count cited in `HANDOFF.md` against repository history, and confirming the handoff's completeness against the session's own real learnings. **One informational aside in Alpha's own audit body was independently re-checked and found factually wrong**: Alpha stated `gentle-ai sdd-status --json` reports `nextRecommended: "archive"` with both `verify` and `archive` "ready" — re-run live by Kairo immediately after receiving the audit, the real output is `nextRecommended: "verify"`, `dependencies.verify: "ready"`, `dependencies.archive: "blocked"` (archive depends on verify completing first, the normal SDD chain). `HANDOFF.md`'s own content was never wrong — it already correctly named `verify` as the next step before this aside was received — so this did not require a correction to the approved document, only this disclosure. Extends this project's own "verify a collaborator's citations and conclusions separately, always" lesson (session 41) to asides offered unprompted alongside an otherwise-correct approval, not just to citations the approval itself depends on. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`; the caught error was in an aside, not in an objection or in the approved content itself, so no correction round was owed. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | `HANDOFF.md` stands as written, no edit needed. This disclosure is the only change this debate caused. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an
