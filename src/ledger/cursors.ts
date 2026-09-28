@@ -214,6 +214,35 @@ export function advanceClientCursor(db: DatabaseSync, client_id: string, advance
 		throw new Error(CLIENT_CURSOR_UNKNOWN_MESSAGE);
 	}
 }
+
+/**
+ * Commits a session's position monotonically and stamps its `last_seen_at`, returning the stored `inbox_seq`
+ * (F4 design D8, the separate cursor-commit step behind `POST /channel/cursor`).
+ *
+ * One statement, `MAX(inbox_seq, ?)`, so a lower or repeated `seq` leaves the position where it is — and still
+ * stamps `last_seen_at`, because the caller was heard from either way. Refuses a `client_id` the ledger does
+ * not hold, exactly as {@link advanceClientCursor} does; the returned value is read back rather than assumed,
+ * since a lower `seq` means the stored position is not the one that was passed.
+ */
+export function commitClientCursor(db: DatabaseSync, client_id: string, seq: number, last_seen_at: string): number {
+	const result = db
+		.prepare("UPDATE client_cursors SET inbox_seq = MAX(inbox_seq, ?), last_seen_at = ? WHERE client_id = ?")
+		.run(seq, last_seen_at, client_id);
+	if (result.changes === 0) {
+		throw new Error(CLIENT_CURSOR_UNKNOWN_MESSAGE);
+	}
+	const row = db.prepare("SELECT inbox_seq FROM client_cursors WHERE client_id = ?").get(client_id) as { inbox_seq: number };
+	return row.inbox_seq;
+}
+
+/** The newest `updates.seq` of one project, or `0` when it has none — the ceiling a cursor commit may not pass. */
+export function readMaxInboxSeq(db: DatabaseSync, project_id: string): number {
+	const row = db.prepare("SELECT COALESCE(MAX(seq), 0) AS seq FROM updates WHERE project_id = ?").get(project_id) as {
+		seq: number;
+	};
+	return row.seq;
+}
+
 /**
  * The threads this session has already been shown — the set `shared/protocol-select.ts` takes to decide
  * what `body_omitted` applies to.
