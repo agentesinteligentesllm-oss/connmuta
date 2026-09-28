@@ -81,6 +81,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { appendAuditRow } from "../../ledger/audit.js";
 import { clearCondition, raiseCondition } from "../../ledger/conditions-store.js";
+import { commitClientCursor, ensureClientCursor, readMaxInboxSeq } from "../../ledger/cursors.js";
 import { toolErrorPayload, type ToolErrorPayload } from "../../shared/error-payload.js";
 import {
 	HTTP_BAD_REQUEST,
@@ -91,6 +92,7 @@ import {
 	HTTP_TOO_MANY_REQUESTS,
 	HTTP_UNAUTHORIZED,
 	IPC_BAD_REQUEST,
+	channelCursorRequestSchema,
 	doorbellRequestSchema,
 	ipcTransportError,
 	sessionRequestSchema,
@@ -140,6 +142,9 @@ export const SESSION_UNAUTHORIZED = "SESSION_UNAUTHORIZED";
 
 /** The condition `POST /session` raises in its response when the client's forwarded `roster_hash` disagrees with the resolved binding's stored one (D-07). Never auto-resolved; the session is still minted. */
 export const ROSTER_DRIFT_CONDITION = "roster_drift";
+
+/** `POST /channel/cursor` refused: `commit_seq` is past the newest `updates.seq` of the session's project (F4 design D8). Daemon-local, not retryable: the same request can never succeed until rows exist. */
+export const CURSOR_COMMIT_OUT_OF_RANGE = "CURSOR_COMMIT_OUT_OF_RANGE";
 
 /** Fallback tool-error code for a failure with no recognizable tool-level `.code` of its own — never expected in correct operation; see {@link toolErrorHttpStatus}. */
 const UNCLASSIFIED_TOOL_ERROR_CODE = "TOOL_ERROR";
@@ -658,11 +663,61 @@ function createDoorbellHandler(deps: RoutesDeps, sessions: Map<string, FrozenSes
 }
 
 // ---------------------------------------------------------------------------
+// POST /channel/cursor (F4)
+// ---------------------------------------------------------------------------
+
+/**
+ * The adapter's separate cursor-commit step (D2, D8). `ensureClientCursor` runs FIRST — even for a commit that is
+ * then refused — so the caller's row always exists after any authenticated, well-formed call; `commit_seq` absent
+ * means "ensure and read", with no write at all.
+ */
+function createCursorHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessionRecord>, now: () => Date): IpcHandler {
+	return (request: IpcRequest): IpcResponse => {
+		const auth = authenticateSessionForTool(deps, sessions, request, now);
+		if (!auth.ok) {
+			return auth.response;
+		}
+
+		const parsedInput = channelCursorRequestSchema.safeParse(request.body);
+		if (!parsedInput.success) {
+			return { status: HTTP_BAD_REQUEST, body: ipcTransportError(IPC_BAD_REQUEST, "invalid POST /channel/cursor body") };
+		}
+
+		const { session } = auth;
+		const stamp = now().toISOString();
+		const cursor = ensureClientCursor(deps.db, {
+			client_id: session.client_id,
+			project_id: session.project_id,
+			host: session.host,
+			pid: session.pid,
+			started_at: session.started_at,
+			now: stamp,
+		});
+
+		const commitSeq = parsedInput.data.commit_seq;
+		if (commitSeq === undefined) {
+			return { status: HTTP_OK, body: { inbox_seq: cursor.inbox_seq } };
+		}
+
+		// No transaction spans this check and the commit: `MAX(updates.seq)` only ever grows, so a commit that
+		// passed the check cannot become out of range, and node:sqlite calls are synchronous within one handler tick.
+		if (commitSeq > readMaxInboxSeq(deps.db, session.project_id)) {
+			return {
+				status: HTTP_BAD_REQUEST,
+				body: ipcError(CURSOR_COMMIT_OUT_OF_RANGE, "commit_seq is past the newest update this project has stored"),
+			};
+		}
+
+		return { status: HTTP_OK, body: { inbox_seq: commitClientCursor(deps.db, session.client_id, commitSeq, stamp) } };
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Factory (decision 9)
 // ---------------------------------------------------------------------------
 
 /**
- * Builds all seven session/tool/channel routes at once, closing over one shared frozen-session map and the two
+ * Builds all eight session/tool/channel routes at once, closing over one shared frozen-session map and the two
  * daemon-lifetime singletons `POST /tools/send` needs (decision 8 — this is the first PR to actually
  * construct either): preferred over six separate per-route factories threading a shared mutable map
  * between them.
@@ -682,5 +737,6 @@ export function createSessionRoutes(deps: RoutesDeps): Partial<Record<IpcRouteKe
 		"POST /tools/status": createStatusHandler(deps, sessions, now),
 		"POST /tools/thread": createThreadHandler(deps, sessions, now),
 		"POST /channel/doorbell": createDoorbellHandler(deps, sessions, now),
+		"POST /channel/cursor": createCursorHandler(deps, sessions, now),
 	};
 }

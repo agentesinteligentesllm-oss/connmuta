@@ -10,9 +10,11 @@ import {
 	advanceClientCursor,
 	CLIENT_CURSOR_INSTANT_INVALID_MESSAGE,
 	CLIENT_CURSOR_UNKNOWN_MESSAGE,
+	commitClientCursor,
 	ensureClientCursor,
 	markThreadsSurfaced,
 	readClientCursor,
+	readMaxInboxSeq,
 	readSurfacedThreads,
 	type ClientSessionInput,
 } from "../../src/ledger/cursors.js";
@@ -365,5 +367,77 @@ test("surfaced state dies with its session, because the row cascades", () => {
 		// The retention sweep (PR-13) deletes stale cursors and relies on this: a deleted session must not
 		// leave its surfaced set behind to be read by a future session that reuses the id.
 		assert.equal(count.n, 0);
+	});
+});
+
+/** A later instant than {@link NOW}, so a stamp that moved is distinguishable from one that did not. */
+const LATER = "2026-01-10T13:00:00.000Z";
+
+test("commitClientCursor moves inbox_seq forward, stamps last_seen_at, and returns the stored position", () => {
+	withLedger((db) => {
+		ensureClientCursor(db, session("client-a"));
+
+		const stored = commitClientCursor(db, "client-a", 5, LATER);
+
+		assert.equal(stored, 5);
+		const row = readClientCursor(db, "client-a");
+		assert.equal(row?.inbox_seq, 5);
+		assert.equal(row?.last_seen_at, LATER);
+	});
+});
+
+test("commitClientCursor is monotone: a lower seq leaves inbox_seq alone but still stamps last_seen_at", () => {
+	withLedger((db) => {
+		ensureClientCursor(db, session("client-a"));
+		commitClientCursor(db, "client-a", 5, NOW);
+
+		const stored = commitClientCursor(db, "client-a", 2, LATER);
+
+		assert.equal(stored, 5, "the stored position never moves backwards");
+		assert.equal(readClientCursor(db, "client-a")?.last_seen_at, LATER, "the heartbeat stamp still lands");
+	});
+});
+
+test("commitClientCursor is idempotent: repeating the same seq is a no-op on inbox_seq", () => {
+	withLedger((db) => {
+		ensureClientCursor(db, session("client-a"));
+		commitClientCursor(db, "client-a", 4, NOW);
+
+		assert.equal(commitClientCursor(db, "client-a", 4, LATER), 4);
+		assert.equal(readClientCursor(db, "client-a")?.inbox_seq, 4);
+	});
+});
+
+test("commitClientCursor touches only its own session and leaves the digest alone", () => {
+	withLedger((db) => {
+		ensureClientCursor(db, session("client-a"));
+		ensureClientCursor(db, session("client-b"));
+		advanceClientCursor(db, "client-a", { inbox_seq: 1, last_seen_at: NOW, last_surfaced_digest: "digest-a" });
+
+		commitClientCursor(db, "client-a", 9, LATER);
+
+		assert.equal(readClientCursor(db, "client-b")?.inbox_seq, 0);
+		assert.equal(readClientCursor(db, "client-a")?.last_surfaced_digest, "digest-a");
+	});
+});
+
+test("commitClientCursor refuses a client_id with no row, by name, rather than discarding the commit", () => {
+	withLedger((db) => {
+		assert.throws(() => commitClientCursor(db, "client-unknown", 3, NOW), new Error(CLIENT_CURSOR_UNKNOWN_MESSAGE));
+	});
+});
+
+test("readMaxInboxSeq is zero for a project with no updates rows", () => {
+	withLedger((db) => {
+		assert.equal(readMaxInboxSeq(db, PROJECT_ID), 0);
+	});
+});
+
+test("readMaxInboxSeq is the newest updates.seq of that project", () => {
+	withLedger((db) => {
+		seedSpanningUpdates(db);
+
+		assert.equal(readMaxInboxSeq(db, PROJECT_ID), 5);
+		assert.equal(readMaxInboxSeq(db, "project-other"), 0, "another project's rows are not counted");
 	});
 });

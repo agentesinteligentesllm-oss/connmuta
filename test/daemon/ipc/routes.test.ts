@@ -18,6 +18,7 @@ import {
 	HTTP_UNAUTHORIZED,
 	IPC_BAD_REQUEST,
 	IPC_LOOPBACK_HOST,
+	channelCursorResponseSchema,
 	doorbellResponseSchema,
 	ipcErrorSchema,
 	sessionCloseResponseSchema,
@@ -29,6 +30,7 @@ import { SessionStore } from "../../../src/daemon/ipc/sessions.js";
 import {
 	BINDING_CHANGED,
 	BINDING_MISMATCH,
+	CURSOR_COMMIT_OUT_OF_RANGE,
 	HANDSHAKE_NONCE_INVALID,
 	ROSTER_DRIFT_CONDITION,
 	SESSION_MINT_REFUSED,
@@ -861,5 +863,148 @@ test("route-level schema validation refuses a malformed /channel/doorbell body w
 			assert.equal(res.status, HTTP_BAD_REQUEST, res.bodyText);
 			assert.equal(JSON.parse(res.bodyText).code, IPC_BAD_REQUEST);
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// POST /channel/cursor (F4 PR-04)
+// ---------------------------------------------------------------------------
+
+function cursorRows(db: DatabaseSync): Record<string, unknown>[] {
+	return db.prepare("SELECT * FROM client_cursors ORDER BY client_id").all() as Record<string, unknown>[];
+}
+
+function postCursor(h: Harness, bearer: string | undefined, body: unknown): Promise<RawResponse> {
+	return sendRequest({
+		port: h.port,
+		method: "POST",
+		path: "/channel/cursor",
+		body: JSON.stringify(body),
+		authorization: bearer === undefined ? undefined : `Bearer ${bearer}`,
+	});
+}
+
+test("POST /channel/cursor with no commit_seq ensures the row, returns its current inbox_seq, and writes nothing else", async () => {
+	await withHarness(async (h) => {
+		const { bearer, response } = await openValidSession(h);
+		seedPeerRows(h.db, 3);
+		assert.deepEqual(cursorRows(h.db), [], "setup: no cursor row before the first call");
+
+		const first = await postCursor(h, bearer, {});
+		assert.equal(first.status, HTTP_OK, first.bodyText);
+		// Every seeded row is older than the catch-up window, so the fresh row starts at the newest of them.
+		assert.equal(channelCursorResponseSchema.parse(JSON.parse(first.bodyText)).inbox_seq, 3);
+		const rows = cursorRows(h.db);
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0]?.client_id, response.client_id);
+		assert.equal(rows[0]?.host, "claude-code");
+
+		const second = await postCursor(h, bearer, {});
+		assert.equal(second.status, HTTP_OK);
+		assert.deepEqual(cursorRows(h.db), rows, "a repeated read changes no column, last_seen_at included");
+	});
+});
+
+test("POST /channel/cursor commits at or below the project's newest seq and returns the stored inbox_seq", async () => {
+	await withHarness(async (h) => {
+		const { bearer, response } = await openValidSession(h);
+		seedPeerRows(h.db, 3);
+		await postCursor(h, bearer, {});
+		h.db.prepare("UPDATE client_cursors SET inbox_seq = 0 WHERE client_id = ?").run(response.client_id);
+
+		const advanced = await postCursor(h, bearer, { commit_seq: 2 });
+		assert.equal(advanced.status, HTTP_OK, advanced.bodyText);
+		assert.equal(channelCursorResponseSchema.parse(JSON.parse(advanced.bodyText)).inbox_seq, 2);
+
+		const atTail = await postCursor(h, bearer, { commit_seq: 3 });
+		assert.equal(channelCursorResponseSchema.parse(JSON.parse(atTail.bodyText)).inbox_seq, 3);
+
+		const lower = await postCursor(h, bearer, { commit_seq: 1 });
+		assert.equal(lower.status, HTTP_OK);
+		assert.equal(channelCursorResponseSchema.parse(JSON.parse(lower.bodyText)).inbox_seq, 3, "a lower commit never moves the cursor back");
+		assert.equal(cursorRows(h.db)[0]?.inbox_seq, 3);
+	});
+});
+
+test("POST /channel/cursor refuses a commit past the project's newest seq with CURSOR_COMMIT_OUT_OF_RANGE (400) and leaves an existing row byte-identical", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		seedPeerRows(h.db, 3);
+		await postCursor(h, bearer, {});
+		const before = cursorRows(h.db);
+
+		const res = await postCursor(h, bearer, { commit_seq: 4 });
+		assert.equal(res.status, HTTP_BAD_REQUEST, res.bodyText);
+		const error = ipcErrorSchema.parse(JSON.parse(res.bodyText));
+		assert.equal(error.code, CURSOR_COMMIT_OUT_OF_RANGE);
+		assert.equal(error.retryable, false);
+		assert.deepEqual(cursorRows(h.db), before, "a refused commit writes nothing");
+	});
+});
+
+test("POST /channel/cursor runs ensure before the range check: a refused commit from a session with no row still creates the row at the catch-up window", async () => {
+	await withHarness(async (h) => {
+		const { bearer, response } = await openValidSession(h);
+		seedPeerRows(h.db, 3);
+		assert.deepEqual(cursorRows(h.db), []);
+
+		const res = await postCursor(h, bearer, { commit_seq: 99 });
+		assert.equal(res.status, HTTP_BAD_REQUEST, res.bodyText);
+		assert.equal(JSON.parse(res.bodyText).code, CURSOR_COMMIT_OUT_OF_RANGE);
+		const rows = cursorRows(h.db);
+		assert.equal(rows.length, 1, "D8's ensure-first order: the row exists even though the commit was refused");
+		assert.equal(rows[0]?.client_id, response.client_id);
+		assert.equal(rows[0]?.inbox_seq, 3, "at the catch-up window, not at the refused value");
+	});
+});
+
+test("POST /channel/cursor on a project with no rows treats any positive commit_seq as out of range and commit 0 as in range", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+
+		const past = await postCursor(h, bearer, { commit_seq: 1 });
+		assert.equal(past.status, HTTP_BAD_REQUEST);
+		const zero = await postCursor(h, bearer, { commit_seq: 0 });
+		assert.equal(zero.status, HTTP_OK, zero.bodyText);
+		assert.equal(channelCursorResponseSchema.parse(JSON.parse(zero.bodyText)).inbox_seq, 0);
+	});
+});
+
+test("POST /channel/cursor refuses a missing or unknown bearer exactly as the /tools/* routes do (401, no cursor row)", async () => {
+	await withHarness(async (h) => {
+		const toolRefusal = await sendRequest({ port: h.port, method: "POST", path: "/tools/status", body: "{}" });
+
+		const missing = await postCursor(h, undefined, {});
+		const garbage = await postCursor(h, "not-a-real-bearer", { commit_seq: 0 });
+
+		for (const refused of [missing, garbage]) {
+			assert.equal(refused.status, HTTP_UNAUTHORIZED);
+			assert.equal(refused.bodyText, toolRefusal.bodyText, "the refusal body is identical to a tool route's");
+		}
+		assert.deepEqual(cursorRows(h.db), [], "an unauthenticated call creates no cursor row");
+	});
+});
+
+test("POST /channel/cursor refuses a drifted live binding with BINDING_CHANGED (409), like the /tools/* routes", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		await h.reload(baseRegistryDocument({ group_id: -1009999999 }));
+
+		const res = await postCursor(h, bearer, {});
+		assert.equal(res.status, HTTP_CONFLICT);
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, BINDING_CHANGED);
+		assert.deepEqual(cursorRows(h.db), []);
+	});
+});
+
+test("route-level schema validation refuses a malformed /channel/cursor body with IPC_BAD_REQUEST", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		for (const body of [{ commit_seq: -1 }, { commit_seq: 1.5 }, { commit_seq: "3" }, { commit_seq: 0, extra: true }]) {
+			const res = await postCursor(h, bearer, body);
+			assert.equal(res.status, HTTP_BAD_REQUEST, res.bodyText);
+			assert.equal(JSON.parse(res.bodyText).code, IPC_BAD_REQUEST);
+		}
+		assert.deepEqual(cursorRows(h.db), [], "a malformed body is refused before ensure");
 	});
 });
