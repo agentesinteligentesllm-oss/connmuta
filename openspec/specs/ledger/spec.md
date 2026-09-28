@@ -6,7 +6,7 @@ The `node:sqlite` (WAL) schema, `PRAGMA user_version` migrations, corruption qua
 and the audit-log content rules that keep the store durable and token/body-free (Invariant 2,
 Invariant 3, Invariant 5).
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Schema-version migrations and quarantine on corruption or a future version
 
@@ -107,6 +107,30 @@ run inside the daemon on this schedule, never on a client call.
 
 Traces: DATA-MODEL.md §7; design.md:96-114 (§3 named constants); CONSTITUTION.md §5
 
+### Requirement: Forward migration adds `debate_journal` at schema version 2
+
+The ledger's migration path MUST include a version-2 step (`LEDGER_SCHEMA_VERSION` 1 -> 2) that
+creates `debate_journal` per DATA-MODEL.md §3.7, applied inside the same forward-only,
+one-transaction-per-step discipline as the version-1 step; a version-1 ledger MUST migrate to
+version 2 automatically at open, and `debate_journal` rows MUST be durable across a daemon
+restart.
+
+#### Scenario: A version-1 ledger migrates to version 2 at open
+
+- GIVEN a ledger file stamped at schema version 1
+- WHEN the daemon opens it
+- THEN the version-2 step runs inside one transaction, `debate_journal` exists, and
+  `PRAGMA user_version` reads 2
+
+#### Scenario: A failed version-2 step leaves the ledger at version 1
+
+- GIVEN the version-2 migration step throws partway through
+- WHEN the daemon opens the ledger
+- THEN no partial `debate_journal` schema is committed and `PRAGMA user_version` still reads 1
+
+Traces: DATA-MODEL.md §3.7; migrations.ts forward-only / one-transaction-per-step contract;
+proposal.md "F1's first schema change since the initial DDL"
+
 ## Traceability
 
 | Source | Requirement / Scenario |
@@ -116,3 +140,5 @@ Traces: DATA-MODEL.md §7; design.md:96-114 (§3 named constants); CONSTITUTION.
 | ADR-0030 row "No token in the registry or the ledger" | No token in any ledger table; Audit log token scan |
 | DATA-MODEL.md §7 named constants | Retention is a named constant -> Hourly sweep removes rows |
 | D-21 (design.md:559) | Schema-version migrations and quarantine -> WAL + PRAGMA synchronous = FULL |
+| DATA-MODEL.md §3.7 (D7, F5) | Forward migration adds debate_journal at schema version 2 |
+| migrations.ts (forward-only, one-transaction-per-step) | A failed version-2 step leaves the ledger at version 1 |
