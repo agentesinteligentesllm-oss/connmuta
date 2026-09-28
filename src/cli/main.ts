@@ -6,7 +6,7 @@
 // and a pre-commit hook reads that silence as "clean" (PT-05). `test/cli/main.test.ts` pins the
 // emitted line so this can fail instead of regressing.
 import { readFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { DatabaseSync } from "node:sqlite";
 
@@ -53,6 +53,7 @@ const USAGE_LINES = [
 	`       ${PRODUCT_NAME} bot add`,
 	`       ${PRODUCT_NAME} group add`,
 	`       ${PRODUCT_NAME} project bind <path>`,
+	`       ${PRODUCT_NAME} project sync-roster [path] [--home <dir>]`,
 	`       ${PRODUCT_NAME} mcp --project <id>`,
 	`       ${PRODUCT_NAME} migrate-v1 [--v1-home <dir>] [--project-id <slug>] [--project-path <abs dir>] [--token-stdin] [--dry-run]`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
@@ -63,6 +64,7 @@ const USAGE_LINES = [
 	`  bot add       register a Telegram bot's token`,
 	`  group add     register a Telegram group id`,
 	`  project bind  bind a project directory to a bot, group and roster`,
+	`  project sync-roster  re-sync a project's roster after a confirmed conmuta.json change (roster-sync)`,
 	`  mcp           start the MCP server for an IDE host (ADR-0029)`,
 	`  migrate-v1    one-shot v1-to-v2 migration (D-24); non-interactive, refuses on any precondition failure`,
 ];
@@ -393,6 +395,69 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 			const { runPanelCommand } = await import("./panel.js");
 			const result = runPanelCommand({ homeDir: explicitHome, io: { out: io.out, err: io.err } });
 			return result.exitCode;
+		})();
+	}
+
+	if (command === "project" && rest[0] === "sync-roster") {
+		// Same Judgment Day gate-ordering convention as `panel`/`mcp`/`migrate-v1`/`setup`: the gate is
+		// this branch's literal first action. This is its own direct branch rather than a sub-verb of
+		// `installer/cli.ts`'s own verb parser (which only knows `project bind`): that dispatcher is an
+		// already-merged, multi-purpose file this PR's own scope (tasks.md PR-07) does not list, and its
+		// `InstallerCliOutcome` union would need a new member reported through a new switch arm there —
+		// invasive for a capability this PR alone authors. Mirrors `panel`'s own direct-branch shape.
+		let belowNodeFloor = false;
+		enforceNodeFloor({ stderr: io.err, exit: () => { belowNodeFloor = true; } });
+		if (belowNodeFloor) {
+			return EXIT_NODE_FLOOR;
+		}
+
+		let explicitHome: string | undefined;
+		let targetDir: string | undefined;
+		const subArgs = rest.slice(1);
+		for (let i = 0; i < subArgs.length; i++) {
+			const arg = subArgs[i];
+			if (arg === "--home") {
+				if (i + 1 >= subArgs.length || subArgs[i + 1].startsWith("--")) {
+					return usageError(io, "--home requires a directory");
+				}
+				explicitHome = subArgs[++i];
+			} else if (arg.startsWith("--home=")) {
+				explicitHome = arg.slice("--home=".length);
+				if (explicitHome.length === 0) {
+					return usageError(io, "--home requires a directory");
+				}
+			} else if (arg.startsWith("--")) {
+				return usageError(io, `unknown option '${arg}'`);
+			} else if (targetDir === undefined) {
+				targetDir = arg;
+			} else {
+				return usageError(io, `unexpected argument '${arg}'`);
+			}
+		}
+
+		return (async () => {
+			const { resolveHomeDir } = await import("../daemon/home.js");
+			const { createPrompter } = await import("../installer/prompter.js");
+			const homeDir = resolveHomeDir(explicitHome);
+			const resolvedTargetDir = resolve(targetDir ?? process.cwd());
+			try {
+				const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
+				const { runSyncRosterCommand } = await import("./project-sync-roster.js");
+				const result = await runSyncRosterCommand({
+					db,
+					registryPath,
+					targetDir: resolvedTargetDir,
+					prompter: createPrompter(),
+					io: { out: io.out, err: io.err },
+				});
+				return result.exitCode;
+			} catch (err) {
+				if (err instanceof InstallerDependencyFailure) {
+					io.err(`${PRODUCT_NAME}: ${err.message}`);
+					return 1;
+				}
+				throw err;
+			}
 		})();
 	}
 

@@ -243,18 +243,18 @@ atomic commit, failed-commit leaves no partial state, heartbeat-ticks-never-trig
 Runtime harness: spawns the real CLI, mirrors `test/cli/daemon-stop.test.ts`; the heartbeat-tick
 scenario reuses `bootstrap.test.ts`'s injected-clock harness.
 
-- [ ] 7.1 RED: extend `registry-commit.test.ts` for the new `"ROSTER_SYNCED"` reason (committed case,
+- [x] 7.1 RED: extend `registry-commit.test.ts` for the new `"ROSTER_SYNCED"` reason (committed case,
       commit-failed leaves no partial state — reuses the module's existing `afterRename` test seam).
-- [ ] 7.2 GREEN: add `"ROSTER_SYNCED"` to `RegistryCommitReason`.
-- [ ] 7.3 RED: `project-sync-roster.test.ts` — no-drift no-write; drift shown before commit; unbound
+- [x] 7.2 GREEN: add `"ROSTER_SYNCED"` to `RegistryCommitReason`.
+- [x] 7.3 RED: `project-sync-roster.test.ts` — no-drift no-write; drift shown before commit; unbound
       project refused; missing/invalid `conmuta.json` refused (PT-05/PT-06 reuse); operator decline
       produces no write/no audit row.
-- [ ] 7.4 GREEN: implement `runSyncRosterCommand` (read `conmuta.json` + registry, diff, confirm,
+- [x] 7.4 GREEN: implement `runSyncRosterCommand` (read `conmuta.json` + registry, diff, confirm,
       `commitRegistryChange`).
-- [ ] 7.5 RED/GREEN: extend `main.test.ts`/`main.ts` with the `project sync-roster` dispatch entry.
-- [ ] 7.6 RED: add the heartbeat-tick scenario to `bootstrap.test.ts` (N ticks, no `sync-roster`
+- [x] 7.5 RED/GREEN: extend `main.test.ts`/`main.ts` with the `project sync-roster` dispatch entry.
+- [x] 7.6 RED: add the heartbeat-tick scenario to `bootstrap.test.ts` (N ticks, no `sync-roster`
       invocation, `roster_snapshot`/`roster_hash` unchanged) — pins D-07's "never auto-resolved".
-- [ ] 7.7 Verify: `npm run build && node --test "dist/test/cli/project-sync-roster.test.js" "dist/test/installer/registry-commit.test.js" "dist/test/cli/main.test.js" "dist/test/daemon/bootstrap.test.js"`.
+- [x] 7.7 Verify: `npm run build && node --test "dist/test/cli/project-sync-roster.test.js" "dist/test/installer/registry-commit.test.js" "dist/test/cli/main.test.js" "dist/test/daemon/bootstrap.test.js"`.
 
 ### Unit 8 — Version observability
 

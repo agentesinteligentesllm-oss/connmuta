@@ -188,6 +188,7 @@ test("the usage line names the one command this build wires, and only the forms 
   assert.match(text, /bot add/);
   assert.match(text, /group add/);
   assert.match(text, /project bind <path>/);
+  assert.match(text, /project sync-roster \[path\] \[--home <dir>\]/);
   assert.match(text, /panel \[--home <dir>\]/);
   assert.match(text, /mcp --project <id>/);
   assert.equal(text.includes("[<path>"), false, "the usage text must not advertise an optional target");
@@ -311,6 +312,76 @@ test("`panel` invokes runPanelCommand and returns its exit code", async () => {
     assert.match(captured.err.join("\n"), /not running/i);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- project sync-roster subcommand dispatch ---
+//
+// `project bind <path>` still dispatches through `installer/cli.ts`'s own verb parser (see the
+// `setup`/`bot`/`group`/`project` section below); `project sync-roster` does not — it is its own
+// direct branch, matching `panel`'s own style, because it is a distinct new capability this PR alone
+// authors and `installer/cli.ts` is an already-merged, multi-purpose file this PR's own scope note
+// (tasks.md PR-07) does not list as in scope.
+
+test("`project sync-roster` checks the Node-floor gate before anything else, reporting EXIT_NODE_FLOOR on a below-floor Node", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(process, "version");
+  try {
+    Object.defineProperty(process, "version", { value: "v0.1.0", configurable: true });
+
+    const captured = makeIo();
+    const result = runCli(["project", "sync-roster"], captured.io);
+    assert.equal(result, EXIT_NODE_FLOOR, "expected a synchronous EXIT_NODE_FLOOR, not the async runSyncRosterCommand dispatch");
+    assert.match(captured.err.join("\n"), /Node\.js/);
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(process, "version", originalDescriptor);
+    }
+  }
+});
+
+test("`project sync-roster` with an unknown option is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["project", "sync-roster", "--verbose"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unknown option '--verbose'/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`project sync-roster` with --home missing its argument is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["project", "sync-roster", "--home"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /--home requires a directory/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`project sync-roster` with two positional paths is a usage error", async () => {
+  const captured = makeIo();
+  assert.equal(await runCli(["project", "sync-roster", "/tmp/a", "/tmp/b"], captured.io), EXIT_USAGE);
+  assert.match(captured.err.join("\n"), /unexpected argument '\/tmp\/b'/);
+  assert.match(captured.err.join("\n"), /usage:/);
+});
+
+test("`project sync-roster [path]` invokes runSyncRosterCommand and returns its exit code", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-cli-sync-roster-"));
+  const targetDir = mkdtempSync(join(tmpdir(), "conmuta-cli-sync-roster-project-"));
+  try {
+    writeFileSync(join(targetDir, "conmuta.json"), VALID_FILE, "utf8");
+    const captured = makeIo();
+    const result = await runCli(["project", "sync-roster", targetDir, "--home", dir], captured.io);
+    // No registry.json exists yet under this isolated --home, so the real dependency chain (a real
+    // ledger open, a real registry read) reaches its own fast, real refusal rather than a fake.
+    assert.equal(result, EXIT_UNBOUND_PROJECT);
+    assert.match(captured.err.join("\n"), /no active binding/i);
+  } finally {
+    // `openInstallerLedgerOrFail` leaves the ledger connection open (the same pre-existing behavior
+    // `bot add`/`group add`/`project bind` already have, out of this PR's own scope): on Windows the
+    // still-open `ledger.db` file keeps the directory locked, so cleanup tolerates EPERM the same way
+    // `test/daemon/bootstrap.test.ts`'s own `cleanupTempHome` does.
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup failure in tests
+    }
+    rmSync(targetDir, { recursive: true, force: true });
   }
 });
 

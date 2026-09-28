@@ -32,7 +32,7 @@ import { serializeRegistry, validateRegistryBytes } from "../registry/writer.js"
  */
 
 /** The `audit_log.reason` values a registry commit may write (design §5). */
-export type RegistryCommitReason = "REGISTRY_CREATED" | "BOT_ADDED" | "GROUP_ADDED" | "PROJECT_BOUND";
+export type RegistryCommitReason = "REGISTRY_CREATED" | "BOT_ADDED" | "GROUP_ADDED" | "PROJECT_BOUND" | "ROSTER_SYNCED";
 
 /**
  * The audit row a caller supplies for one commit.

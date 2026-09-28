@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
@@ -757,6 +757,138 @@ test("bootstrap: retention sweep runs when due during heartbeat tick", async () 
 
     await daemon.stop();
   } finally {
+    cleanupTempHome(homeDir);
+  }
+});
+
+// PR-07 (roster-sync spec.md, D-07): `roster_drift` is resolved only by a human running
+// `conmuta project sync-roster`, never by a timer. This proves the negative directly against the
+// daemon's own heartbeat loop, mirroring the PR-40a reconciliation test's harness above: a real
+// `startDaemon` with a fast `heartbeatPeriodMs`, a fake secret store and a fake `TelegramClient` so no
+// real network call is made, several ticks elapse, and `registry.json`'s stored `roster_snapshot`/
+// `roster_hash` must still equal what this test seeded — this module never even imports
+// `cli/project-sync-roster.ts`, so no invocation of it is reachable from the heartbeat path at all.
+test("bootstrap: N heartbeat ticks never invoke sync-roster, so roster_snapshot/roster_hash stay unchanged (PR-07, D-07)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+  const fakeClient: TelegramClient = {
+    async getUpdates() {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return [];
+    },
+    async sendMessage(params) {
+      return { message_id: 1, chat: { id: Number(params.chat_id), type: "group" }, date: 1, text: params.text };
+    },
+    async getMe() {
+      return { id: 555222333, is_bot: true, username: "roster_drift_bot" };
+    },
+    async getChat() {
+      return { id: -1009876543212, type: "group" };
+    },
+  };
+
+  const registryPath = join(homeDir, "registry.json");
+  const registry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [
+      {
+        bot_id: 555222333,
+        username: "roster_drift_bot",
+        token_ref: { store: "keychain", account: "bot:555222333" },
+        added_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+    groups: [{ group_id: -1009876543212, added_at: "2026-09-01T00:00:00.000Z" }],
+    projects: [{ project_id: "prj-roster-drift", path: homeDir }],
+    bindings: [
+      {
+        project_id: "prj-roster-drift",
+        bot_id: 555222333,
+        group_id: -1009876543212,
+        agent_id: "@drift-agent",
+        status: "active",
+        roster_snapshot: [{ agent_id: "@drift-agent", user_id: 555222333, username: "roster_drift_bot" }],
+        roster_hash: ROSTER_HASH,
+        bound_at: "2026-09-01T00:00:00.000Z",
+      },
+    ],
+  };
+  writeFileSync(registryPath, JSON.stringify(registry));
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 15,
+      telegramClientFactory: async () => fakeClient,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    // RDD review review-1e4a4960dde90920's R3-heartbeat-proof-is-poller-not-tick: getUpdates() proves
+    // the poller is alive, not that the heartbeat's own reconcile-on-tick path ran (an unrelated,
+    // separately-scheduled loop) -- a daemon whose heartbeat timer never fired at all would still pass a
+    // getUpdates()-only proof. Real proof (mirrors the sibling PR-40a test's own technique, line ~488):
+    // add a second binding to the registry file directly, then wait for the *next* tick and confirm its
+    // own BINDING_CHANGED audit row appears. registry.sync() (called from every tick's reconcile()) is
+    // the only thing that can ever observe this file change, so that row can only exist if a tick
+    // actually reconciled after this point -- ADR-12's "a guarantee needs a test that can fail".
+    const registryWithSecondBinding: Registry = {
+      ...registry,
+      bots: [
+        ...registry.bots,
+        {
+          bot_id: 555222334,
+          username: "roster_drift_bot_2",
+          token_ref: { store: "keychain", account: "bot:555222334" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [...registry.groups, { group_id: -1009876543213, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [...registry.projects, { project_id: "prj-roster-drift-2", path: join(homeDir, "second") }],
+      bindings: [
+        ...registry.bindings,
+        {
+          project_id: "prj-roster-drift-2",
+          bot_id: 555222334,
+          group_id: -1009876543213,
+          agent_id: "@drift-agent-2",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@drift-agent-2", user_id: 555222334, username: "roster_drift_bot_2" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(registryPath, JSON.stringify(registryWithSecondBinding));
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    const auditRows = daemon.ledger.db
+      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED' AND project_id = ?")
+      .all("prj-roster-drift-2") as Record<string, unknown>[];
+    assert.equal(
+      auditRows.length,
+      1,
+      "a genuine heartbeat tick must have reconciled the newly-added binding after boot",
+    );
+
+    const afterTicksRegistry = JSON.parse(readFileSync(registryPath, "utf8")) as Registry;
+    const originalBinding = afterTicksRegistry.bindings.find((b) => b.project_id === "prj-roster-drift");
+    assert.equal(originalBinding?.roster_hash, ROSTER_HASH);
+    assert.deepEqual(
+      originalBinding?.roster_snapshot,
+      registry.bindings[0]?.roster_snapshot,
+      "roster_snapshot must survive every heartbeat tick unchanged: only a human sync-roster invocation may change it",
+    );
+  } finally {
+    await daemon?.stop().catch(() => {});
     cleanupTempHome(homeDir);
   }
 });
