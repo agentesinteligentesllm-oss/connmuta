@@ -1487,6 +1487,36 @@ visible.
 
 ---
 
+## `bus-v2-f3-verify-audit-001` — F3 `sdd-verify` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 48) |
+| Subject | Audit `verify-report.md` for `f3-web-panel-and-observability`, produced by a delegated `general-purpose` sub-agent running the `sdd-verify` skill inline (native dispatch to the `sdd-verify` subagent type remains blocked, same defect documented sessions 44-47). Verdict `PASS WITH WARNINGS`, 0 CRITICAL, 4 WARNING (all documentation staleness, no shipped defect), 1 SUGGESTION, requirements 9/9, scenarios 20/20 (a self-corrected re-count against `tasks.md`/`state.yaml`'s stale "19 scenarios" claim). Per this session's own standing instruction from the Director (leverage Alpha as judge for every audit this session, in place of internal Judgment Day judges), this is the first F3 audit run under that explicit reaffirmation. |
+| Authority | Standing `sdd-apply`/close-out autonomy, plus the Director's session-opening instruction to route every audit through Alpha. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: independently spot-checked citations across all 3 specs (`web-panel`, `roster-sync`, `version-observability`) against the real test files, confirmed the clean rebuild, confirmed `THREAT-MODEL.md` T18/PT-29 and `CHECKLIST.md` B-14 are accurate and up to date, confirmed all 4 WARNING findings and their exact recommended corrected wording, and stated no objection to proceeding straight to `sdd-archive`. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | `sdd-archive` proceeded on this basis. |
+
+---
+
+## `bus-v2-f3-archive-audit-001` — F3 `sdd-archive` audit (closes F3)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 48) |
+| Subject | Audit `archive-report.md` for `f3-web-panel-and-observability`, produced by a delegated `general-purpose` sub-agent running the `sdd-archive` skill inline (same blocked-dispatch fallback as verify). Discloses a genuine mechanical incident, self-caught not hidden: `git mv`/`mv` failed with `Permission denied` on this Windows checkout; one intermediate PowerShell diagnostic used a relative destination (`'x'`) that resolved against PowerShell's own cwd, actually relocating the whole change folder to `<repo-root>/x` — caught immediately by the Mechanical Copy Contract's own next step (a pre-move snapshot `cp -R` failing loudly), recovered via `Move-Item` with explicit absolute paths, final `diff -r` empty. Kairo independently re-verified this after the fact rather than trusting the sub-agent's self-report: confirmed no stray `x` directory anywhere; ran `git show HEAD:<original-path>` against all 8 archived files, all byte-identical; confirmed all 3 new `openspec/specs/*` domains match their archived delta specs. Kairo also found and fixed a second issue the sub-agent's own report did not disclose: the non-`git` move left the 8 original paths as unstaged deletions in git's index, which made `test/security/repo-scan.test.js` (PT-22) fail with `ENOENT` on the ghost path when enumerating tracked files — fixed with `git add -A -- openspec/` (git auto-detected all 8 as clean renames), full suite and `test:static` both green afterward. This repo's own RDD native review also ran on this exact candidate (21 changed files, 3,074 changed lines, risk `high`) — Director-granted consent, all 4 lenses admitted with no correction required, state went straight to `approved`, `acknowledge-approved` executed, authority burned; zero blocking findings from that independent mechanism either. |
+| Authority | Standing `sdd-apply`/close-out autonomy, plus the Director's session-opening instruction to route every audit through Alpha instead of internal judges. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: independently confirmed no stray `x` directory exists; ran `git diff --cached -M --summary` confirming all 8 moved files are recognized as 100% renames with 0 insertions/deletions; confirmed the git-index diagnosis and fix are technically exact, including that `test:static`'s 57/57 pass now includes `repo-scan.test.js`; ran `git diff --no-index` on all 3 new `openspec/specs/*` domains against their archived counterparts, confirming byte-identity; suggested (non-blocking) a one-line mention of the git-index incident in `archive-report.md` itself, added by Kairo. Explicit zero objections to closing F3 as fully archived. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | F3 (`f3-web-panel-and-observability`) is fully archived to `openspec/changes/archive/2026-09-27-f3-web-panel-and-observability/`; 3 new capability domains (`web-panel`, `roster-sync`, `version-observability`) synced to `openspec/specs/`. All F1-F3 phases are now archived. Per `docs/07-plan/WORK-PLAN.md`'s dependency graph, both F4 (Claude Code channels adapter) and F5 (Arena-light 2-party) depend only on the already-archived F1 and are therefore both unblocked — which one to plan next is left for the Director, not decided here. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an

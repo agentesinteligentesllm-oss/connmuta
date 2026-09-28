@@ -4,6 +4,57 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 48 — F3 `sdd-verify` + `sdd-archive`; F3 fully closed
+
+- **Date**: 2026-09-27 (UTC).
+- **Authority**: the Director asked Kairo to run F3's two closing SDD phases (`sdd-verify`, then
+  `sdd-archive` if it passes), with full autonomy not to be asked anything, and to route every audit
+  and debate through Alpha (Arena) instead of internal Judgment Day judges — a session-opening
+  standing instruction, not scoped to this task alone. Closed with an Alpha-audited handoff.
+- **`sdd-verify`**: delegated to a `general-purpose` sub-agent (native `sdd-verify` dispatch remains
+  blocked, same `PreToolUse:Agent` hook defect documented sessions 44-47), executing the skill inline
+  per this project's established fallback. Verdict `PASS WITH WARNINGS`: 0 CRITICAL, 4 WARNING (all
+  documentation staleness — two known-stale `design.md` citations carried forward from session 46, one
+  stale `state.yaml` phase-tracking block, and a scenario-count drift the report corrected: 20 measured
+  vs. 19 previously claimed), 1 SUGGESTION. All 9 requirements / 20 scenarios across the 3 F3 spec
+  domains confirmed compliant with real, non-vacuous covering tests — every citation read directly, not
+  header-inventoried (the F1 precedent this project explicitly wanted avoided, B-59). Full suite 1473
+  tests (1467 pass, 0 fail, 6 skip), `test:static` 57/57, both reproduced clean. Audited by Alpha
+  (`bus-v2-f3-verify-audit-001`): `CONSENSUS`/`APPROVE` round 1, zero objections, independently
+  spot-checked citations and confirmed `THREAT-MODEL.md`/`CHECKLIST.md` B-14 accuracy.
+- **`sdd-archive`**: delegated the same way. **A genuine mechanical incident occurred and was
+  self-caught, not hidden**: `git mv`/`mv` failed with `Permission denied` on this Windows checkout;
+  one intermediate PowerShell diagnostic used a relative destination that resolved against
+  PowerShell's own cwd instead of the intended path, actually relocating the whole change folder to a
+  stray `<repo-root>/x` — caught immediately by the Mechanical Copy Contract's own next step (a
+  pre-move snapshot failing loudly), recovered via `Move-Item` with explicit absolute paths, final
+  `diff -r` empty. **Kairo did not just trust the sub-agent's self-report**: independently re-verified
+  after the fact — confirmed no stray directory remains, ran `git show HEAD:<path>` against all 8
+  archived files (byte-identical), confirmed all 3 new spec domains match their archived delta specs.
+  **Kairo also found and fixed a second issue the sub-agent's own report never disclosed**: the
+  non-`git` move left the 8 original paths as unstaged deletions in git's index, which made
+  `test/security/repo-scan.test.js` (PT-22) fail with `ENOENT` enumerating a ghost tracked path — fixed
+  with `git add -A -- openspec/` (git auto-detected all 8 as clean 100% renames), full suite and
+  `test:static` both green afterward. This repo's own RDD native review also ran on this exact
+  candidate (21 changed files, 3,074 lines, risk `high`) — Director-granted consent, all 4 lenses
+  admitted with zero correction required, straight to `approved`, authority burned. Audited by Alpha
+  (`bus-v2-f3-archive-audit-001`): `CONSENSUS`/`APPROVE` round 1, zero objections, independently
+  re-verified the incident recovery, the git-index fix, and all 3 spec-domain promotions; one
+  non-blocking suggestion (disclose the git-index incident in `archive-report.md` itself) applied.
+- **F3 (`f3-web-panel-and-observability`) is now fully archived** to
+  `openspec/changes/archive/2026-09-27-f3-web-panel-and-observability/`. 3 new capability domains
+  (`web-panel`, `roster-sync`, `version-observability`) synced to `openspec/specs/` — 9 requirements,
+  20 scenarios, all net-new. **F1, F2 and F3 are all archived.** Per `WORK-PLAN.md`'s dependency graph,
+  F4 (Claude Code channels adapter) and F5 (Arena-light 2-party) both depend only on the already-
+  archived F1 and are therefore both unblocked — which to plan next is a Director decision, not
+  presumed here.
+- Filed no new backlog rows: the verify report's 4 WARNING findings are archived-record documentation
+  staleness with no future action (per session 46's own established precedent for this exact class of
+  finding — text-only, already disclosed, not worth a standing backlog row once the file itself is
+  frozen in the archive).
+
+---
+
 ## Session 47 — F3 `sdd-apply` PR-06 through PR-09 (Units 6-9), 4 PRs merged; closes F3
 
 - **Date**: 2026-09-27 (UTC).

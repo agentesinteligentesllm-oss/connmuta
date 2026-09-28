@@ -11,44 +11,50 @@
 
 ## §0 — Quick start
 
-**F3 (`f3-web-panel-and-observability`) is fully implemented: all 9 units, 45/45 tasks, 4 more GitHub
-PRs merged this session (`#85`-`#88`), closing the change's `sdd-apply` phase entirely.** Native
-`sdd-status` already reports `nextRecommended: verify`. **The next session's first job is
-`sdd-verify` for F3, then `sdd-archive` if it passes** — the same two-step close-out F1 and F2 both
-already went through. The Director explicitly paused here rather than have this session continue
-into verify/archive automatically.
+**F1, F2 and F3 are all fully archived.** F3 (`f3-web-panel-and-observability`) closed this session:
+`sdd-verify` returned `PASS WITH WARNINGS` (0 CRITICAL), Alpha-audited to `CONSENSUS`/`APPROVE`, then
+`sdd-archive` moved the change to
+`openspec/changes/archive/2026-09-27-f3-web-panel-and-observability/` and synced 3 net-new spec
+domains (`web-panel`, `roster-sync`, `version-observability`) to `openspec/specs/`, also
+Alpha-audited to `CONSENSUS`/`APPROVE`. **There is no open SDD change right now.**
+
+**Per `docs/07-plan/WORK-PLAN.md`'s dependency graph, both F4 (Claude Code channels adapter) and F5
+(Arena-light 2-party) depend only on the already-archived F1 and are therefore both unblocked.**
+Neither depends on F3. **The next session's first job is to ask the Director which of F4 or F5 to
+plan next** (or something else entirely) — this handoff deliberately does not presume the answer.
 
 **First three commands, in order** (stop and report if any disagrees with §1):
 
 ```bash
 git branch --show-current && git pull --ff-only      # must be main, up to date
 rm -rf dist                                          # a stale dist/ silently fakes results
-gentle-ai sdd-status f3-web-panel-and-observability --cwd . --json
+ls openspec/changes/                                 # should show only archive/, no open change
 ```
 
-The working tree should be **clean**. `sdd-status` should show `propose`/`spec`/`design`/`tasks`/`apply`
-all `all_done`/`ready` with `taskProgress` at **45/45**, `nextRecommended: "verify"`.
+The working tree should be **clean**. `openspec/changes/` should contain only `archive/` (16 domains
+now under `openspec/specs/`, all archived changes under `openspec/changes/archive/`).
 
 **Check Arena Orion reachability live** with a real `bridge_send` attempt (not `curl`) before assuming
-Alpha responds — DN-09. This session hit a real transient outage mid-cycle: 4 consecutive `bridge_send`
-failures in a row (`ETIMEDOUT` ×3, then `MCP server "arena" is not connected`), recovering only after
-the MCP server itself reconnected (confirmed via `ToolSearch` picking the tools back up) — worse than
-prior sessions' single-retry recoveries. Retry a few times with short gaps before concluding Arena is
-genuinely unreachable and falling back to Judgment Day; it resolved on its own this time.
+Alpha responds — DN-09. This session confirmed Arena reachable and used it for both of F3's closing
+audits without incident (no retries needed, unlike session 47's transient outage).
+
+**This session's standing instruction from the Director, likely still in force**: route every audit
+and debate through Alpha (Arena) instead of internal Judgment Day judges — full autonomy, decide
+without asking except for a genuinely unresolved product/architecture question or an irreversible
+action, and close every session with documentation Alpha itself has rigorously audited for ambiguity
+or omission. Confirm this is still the Director's preference at the start of the next session rather
+than assuming it silently carries forward forever; it's a strong, explicit preference, not necessarily
+a permanent policy.
 
 **Copy-paste prompt to start the next session:**
 
 ```text
-F3 esta 100% implementado (sdd-apply cerrado, 45/45 tareas, PR-06 a PR-09 mergeados sesion pasada).
-Lee docs/08-sessions/HANDOFF.md paso a paso, despues corre sdd-verify para f3-web-panel-and-observability
-y, si pasa, sdd-archive -- el mismo cierre de dos pasos que F1 y F2 ya siguieron. Tienes autorizacion
-para decidir y ejecutar sin pedir confirmacion, salvo una decision de producto genuinamente no resuelta
-o una accion irreversible -- en ese caso debate con Alpha antes de escribir codigo, como se hizo dos
-veces la sesion pasada (bus-v2-f3-pr-08-envelope-provenance-001 y el propio roster_drift de la sesion
-anterior a esa). El dispatch nativo de sdd-apply/sdd-verify vía el Agent tool sigue bloqueado por el
-mismo defecto de PreToolUse:Agent hook documentado desde la sesion 44 -- si sdd-verify tambien lo
-sufre, ejecutalo tu mismo leyendo el skill file real (~/.claude/skills/sdd-verify/SKILL.md), como ya
-se hizo con explore/propose/spec/design/tasks/apply en sesiones anteriores.
+F1, F2 y F3 estan archivados. No hay ningun SDD change abierto. Lee docs/08-sessions/HANDOFF.md paso a
+paso. Segun docs/07-plan/WORK-PLAN.md, tanto F4 (Claude Code channels adapter) como F5 (Arena-light
+2-party) dependen solo de F1 y ya estan desbloqueados -- decide conmigo cual planear primero (o si hay
+otra prioridad). Sigue usando a Alpha via Arena como juez de cada auditoria y debate en vez de los
+jueces internos de Judgment Day, y actua con autonomia salvo una decision de producto genuinamente no
+resuelta o una accion irreversible.
 ```
 
 ---
@@ -59,60 +65,63 @@ se hizo con explore/propose/spec/design/tasks/apply en sesiones anteriores.
 |---|---|---|
 | F1 | **Archived**, unchanged since session 41. | `openspec/changes/archive/2026-09-26-f1-daemon-registry-thin-client/` |
 | F2 | **Archived**, unchanged since session 44. | `openspec/changes/archive/2026-09-27-f2-installer-and-doctor/` |
-| F3 planning | **Complete**, unchanged since session 45. | `openspec/changes/f3-web-panel-and-observability/{proposal,design,tasks}.md`, `specs/*/spec.md` |
-| F3 apply — Units 1-5 | **Merged** (session 46). PR-01 through PR-05 (`#78`-`#84`). | `tasks.md`'s Units 1-5, all task checkboxes `[x]` |
-| F3 apply — Units 6-9 | **Merged this session (47).** PR-06 (`#85`), PR-07 (`#86`), PR-08 (`#87`), PR-09 (`#88`). **F3 `sdd-apply` is fully done — 45/45 tasks.** | `tasks.md`'s Units 6-9, all task checkboxes `[x]` |
-| F3 verify/archive | **Not started.** `nextRecommended: verify`. | — |
-| Test counts | `npm test`: 1473 (1467 pass, 0 fail, 6 skip) at the last clean full-suite run this session. | — |
-| RDD review (this session's docs-close-out commit) | See §9. | — |
+| F3 | **Archived this session (48).** Verify: `PASS WITH WARNINGS`, 0 CRITICAL, 4 WARNING (doc staleness only). Archive: clean, one disclosed-and-recovered mechanical incident during the move (see §4). | `openspec/changes/archive/2026-09-27-f3-web-panel-and-observability/` |
+| Next SDD change | **None open.** F4 and F5 both unblocked per `WORK-PLAN.md`; which to plan is a Director decision. | `docs/07-plan/WORK-PLAN.md` |
+| Test counts | `npm test`: 1473 (1467 pass, 0 fail, 6 skip) — reproduced clean twice this session, after fixing a git-index staleness issue (see §4). `npm run test:static`: 57/57. | — |
+| RDD review (verify+archive commit) | `approved`, acknowledged, authority burned. See §9. | — |
 
 ---
 
-## §2 — Next slice: F3 `sdd-verify`, then `sdd-archive`
+## §2 — What this session did (for context, not to redo)
 
-F3's entire `sdd-apply` phase is done. There is no more implementation work for F3 — the next session's
-job is the two closing SDD phases, mirroring F1's and F2's own precedent exactly:
+1. Ran `sdd-verify` for `f3-web-panel-and-observability` via a delegated `general-purpose` sub-agent
+   (native `sdd-verify` dispatch is still blocked, same `PreToolUse:Agent` hook defect documented
+   sessions 44-47 — confirmed still present this session too, no need to re-test it in future
+   sessions unless something about the environment changes). Verdict `PASS WITH WARNINGS`: 0
+   CRITICAL, 4 WARNING (all archived-record documentation staleness — see §3), 1 SUGGESTION. All 9
+   requirements / 20 scenarios across the 3 F3 spec domains independently confirmed compliant with
+   real, non-vacuous covering tests, read directly rather than header-inventoried.
+2. Audited the verify report with Alpha (`bus-v2-f3-verify-audit-001`): `CONSENSUS`/`APPROVE` round 1,
+   zero objections, citations independently spot-checked.
+3. Ran `sdd-archive` the same way (delegated `general-purpose` sub-agent). **A genuine mechanical
+   incident occurred during the archive move, self-caught, not hidden** — see §4's first row for the
+   full account. Kairo independently re-verified the recovery afterward rather than trusting the
+   sub-agent's self-report, and separately found and fixed a second issue (git-index staleness) the
+   sub-agent's own report never disclosed — see §4's second row.
+4. Audited the archive with Alpha (`bus-v2-f3-archive-audit-001`): `CONSENSUS`/`APPROVE` round 1, zero
+   objections, independently re-verified the incident recovery, the git-index fix, and all 3
+   spec-domain promotions byte-for-byte.
+5. Ran this repo's own RDD native review on the verify+archive commit candidate (Director-granted
+   consent, high risk, 21 changed files, 3,074 changed lines): all 4 lenses admitted with zero
+   correction required, `approved`, acknowledged, authority burned. See §9.
+6. Updated `docs/05-tribunal/INDEX.md` (2 new debate sections), `docs/00-INDEX.md` (row 16),
+   `docs/08-sessions/LOG.md` (session 48 entry, this file), and `AGENTS.md`'s status paragraph.
 
-1. **`sdd-verify` for `f3-web-panel-and-observability`.** Read `~/.claude/skills/sdd-verify/SKILL.md`
-   if the native Agent dispatch is blocked (very likely — see §4's `PreToolUse:Agent` note) and run it
-   inline, the same fallback this project has used since session 44. Verify implementation against
-   `specs/{web-panel,roster-sync,version-observability}/spec.md`, `design.md` and `tasks.md`. Cross-check
-   in particular:
-   - All 3 new capability specs' scenarios are actually covered by shipped tests, not just
-     header-inventoried (F1's own archive found 5-of-9 specs only header-checked, filed as B-59 —
-     do the real spot-check this time, for all 3 specs, since there are only 3).
-   - `docs/02-architecture/THREAT-MODEL.md`'s T18/PT-29 rows (updated PR-09) actually match the real
-     shipped `daemon/panel/*` modules and cite real test names — re-verify, don't just trust the PR-09
-     diff audit already did this once.
-   - `docs/06-backlog/CHECKLIST.md`'s B-14 row says `done` — confirm it's not stale.
-   - Full suite + `test:static` green (rebuild first, `rm -rf dist`).
-2. **`sdd-archive` if verify passes with no CRITICAL findings.** This creates `openspec/specs/`'s
-   `web-panel`, `roster-sync` and `version-observability` domains (or merges into existing ones if any
-   already exist — check first) and moves the change folder to
-   `openspec/changes/archive/<date>-f3-web-panel-and-observability/`.
-3. Debate any genuinely unresolved verify finding with Alpha before deciding how to close it — same
-   standing instruction as every other session.
-
-**Do not re-derive F3's own implementation decisions.** Every PR (06 through 09) already went through
-a real Alpha debate (see §7's tribunal pointers) and, for PR-06 through PR-09, also this repo's own RDD
-native review — both disclosed in the tribunal index and in `docs/06-backlog/CHECKLIST.md`'s B-93/B-94.
-A genuinely new fact discovered during verify gets its own scoped, disclosed correction, never a silent
-re-plan — mirroring what this project has done for every prior surprise (`roster_drift`, the AS-IS/SEAM
-provenance question, the two RDD-found PR-07 gaps).
+**Do not re-run `sdd-verify`/`sdd-archive` for F3.** It is closed. Do not re-litigate either Alpha
+audit above — both closed `CONSENSUS` with zero objections.
 
 ---
 
 ## §3 — Pinned provenance values
 
-**New this session**: `src/shared/envelope.ts` and `test/shared/envelope.test.ts` were reclassified
-from **AS-IS to SEAM** (PR-08, `bus-v2-f3-pr-08-envelope-provenance-001`, Alpha-confirmed). Both files'
-own header comments now carry a real `Changes:` note; `test/fixtures/v1-provenance.json`'s two entries
-say `"verdict": "SEAM"`. This is F3's only provenance-registry change — no new SEAM/AS-IS vendoring
-otherwise; every other F3 file is genuinely new code.
+No change this session. F3's only provenance-registry change (`src/shared/envelope.ts` and
+`test/shared/envelope.test.ts`, AS-IS → SEAM) happened in session 47 (PR-08) and is unchanged.
 
-`src/daemon/send/validate.ts` (already SEAM since F1) gained one more numbered `Changes:` item, (12),
-for the same PR-08 fix (the wire-length guard's `headroom_chars` now also charges the version stamp's
-length) — its own AS-IS/SEAM classification did not change, only its Changes list grew.
+**Carried-forward, archived-record documentation staleness** (verify-report's WARNING-1/2, confirmed
+still true, NOT corrected — `design.md` moved into the archive byte-identical to its pre-archive
+state, per the Mechanical Copy Contract's own rule that archived files are historical record, not live
+documentation to keep editing):
+- The archived `design.md`'s Testing Strategy table claims the panel's `node:fs` allow-list "is never
+  extended" — false as of PR-05 (grew 7→8 entries). Exact corrected wording is preserved in
+  `verify-report.md`'s WARNING-1 for anyone who needs it later.
+- The archived `design.md`'s `bootstrap.ts` File Change row claims the startup catch block deletes run
+  files too — real code only calls `.close()` there; deletion is `stop()`-only. Exact corrected wording
+  is preserved in `verify-report.md`'s WARNING-2.
+
+Neither needs action. Both are frozen inside the archive folder now, which is a historical record of
+what F3 actually shipped and how it was documented at the time — not a living file anyone will edit
+again. No backlog row was filed for either, following this project's own session-46 precedent for
+this exact class of finding.
 
 ---
 
@@ -120,16 +129,11 @@ length) — its own AS-IS/SEAM classification did not change, only its Changes l
 
 | Item | State | Pointer |
 |---|---|---|
-| **The `PreToolUse:Agent` hook still blocks native `sdd-apply`/`sdd-explore`/`sdd-propose`/`sdd-spec`/`sdd-design`/`sdd-tasks` Agent dispatch, confirmed for a fourth consecutive session (44, 45, 46, 47).** It fires even immediately after a fresh, successful `AskUserQuestion` SDD preflight in the same turn. | Established fallback: read the phase's own skill file (`~/.claude/skills/sdd-<phase>/SKILL.md` + `sdd-phase-common.md`) and execute it inline as Kairo. **New this session**: delegating to a plain `general-purpose` Agent (NOT `subagent_type: sdd-apply`) does NOT hit this hook and works — used successfully for PR-07's full implementation. Worth trying first for a large PR before falling back to fully-inline execution. | This session, confirmed again on PR-06's launch attempt |
-| **RDD's "scope_changed" correction-recovery flow is a dead end for a self-service agent.** If a bounded correction touches a file outside the review candidate's original manifest, `gentle-ai review status` demands `external.authorize_recovery` / a `gentle-ai review recover --maintainer-authorization <exact binding>` neither Kairo nor (when asked) the Director could construct — every hand-built JSON attempt was rejected with "requires an exact maintainer authorization binding," and no command in this session's own repertoire generates that binding directly. | Hit once, on PR-08's CRITICAL-bug correction (which had to touch `daemon/send/validate.ts`, outside the original 5-file candidate). Resolution used: stop, disclose, rely on Alpha's own diff audit as the closing gate for that candidate instead. If this recurs, don't spend more than 1-2 attempts on `review recover` before falling back the same way. | `bus-v2-f3-pr-08-diff-audit-001`'s own disclosure |
-| **RDD review `escalated` state (`unknown_causality`) is informational, not blocking**, per the native contract's own wording ("maintainer action is informational"). Its terminal `next_transition` (`native_stop_required`) only offers "maintainer inspects" or disabling RDD for the clone — for a self-flagged-as-unverified finding on a tiny doc+test diff, neither was warranted; declined and moved on. | Hit once, on PR-09's candidate (`review-d0c040637479fddf`, finding `R2-1`, already downgraded by the readability lens itself as `unverified_location`). | this session |
-| **Alpha's own audit of THIS handoff (`bus-v2-session-47-handoff-audit-001`) approved it correctly, but one informational aside inside that approval was itself wrong**: Alpha claimed `gentle-ai sdd-status --json` reports `nextRecommended: "archive"` with both `verify`/`archive` "ready" — re-run live immediately after, the real output is `nextRecommended: "verify"`, `archive: "blocked"` (depends on verify first). This document's own content was never wrong; only extend the "verify a collaborator's citations separately" habit to asides Alpha offers unprompted, not just to objections its approval depends on. | `bus-v2-session-47-handoff-audit-001` | this session |
-| **Two independent review mechanisms (Alpha's Arena audit and this repo's own RDD native review) can each catch what the other misses — confirmed concretely, not just in theory.** Alpha's first PR-07 audit (`bus-v2-f3-pr-07-diff-audit-001`) closed `CONSENSUS`/`APPROVE` on a diff RDD's own review then found two real, fixable gaps in (a missing `project_id` cross-check, a vacuous heartbeat test). Extend this project's existing "verify a collaborator's citations and conclusions separately" lesson (session 41) to: **run both checks when both are available, and don't treat either one's approval as sufficient on its own for a PR with real logic in it.** | `bus-v2-f3-pr-07-diff-audit-001` vs. `review-21eb25a2eb6f76f7` | this session |
-| **A "fix" for a vacuous-test finding needs the same scrutiny as the original code.** PR-07's heartbeat-test fix was itself inadequate on the first attempt (proved the poller was alive, not that the heartbeat's own tick/reconcile path fired) — caught by the RDD review's own SECOND pass, not the first. When closing an ADR-12-class finding ("this guarantee needs a test that can fail"), ask specifically what mechanism the new assertion depends on, not just whether *something* now fails when the guarantee is violated. | `review-1e4a4960dde90920`'s `R3-heartbeat-proof-is-poller-not-tick` finding | this session |
-| **Test-suite flakiness under full-suite/parallel load recurred and one new instance surfaced.** B-39 (heartbeat), B-57 (bootstrap re-entrancy) both hit again, cleared on isolated rerun as always. B-91's loopback-`ETIMEDOUT` pattern also hit `daemon/ipc/routes.test.js` this time, not just `test:wrong-room` — same root class (Windows loopback TCP contention under parallel `node --test`), now confirmed to affect more than one file. **New, not yet filed as backlog**: one single, non-reproduced failure in `test/migration/integration.test.js` under full-suite load, clean on immediate isolated rerun and on a subsequent full-suite rerun — watch for a second occurrence before filing (this project's own convention: B-91 itself was filed only after a `sdd-verify` pass reproduced it, not on a first sighting). | This session, multiple `npm test` runs | — |
-| **`gentle-ai sdd-attempt settle` requires `--diagnosis`, but the tool's own bare usage/error text does not list it as required until you omit it and get told.** Also: after an `interrupted` settle, re-`acquire`-ing the SAME objective under a different actor label gets `blocked: maintainer_decision`; the fix is `gentle-ai sdd-attempt supersede` (distinct actor/approach, not a narrowing), never `rescope` (that's only for a genuinely narrower successor). | This session, PR-06's `sdd-apply` dispatch failure recovery | — |
-| **Engram `mem_save` failed all session** with "multiple active runtime sessions match the current project and directory" whenever called with `project: "telegram_bus_agent"`. The error itself reveals the resolved project is actually **`"connmuta"`** — pass that exact string, not the directory-derived name, though even that hit the same ambiguity error on a later attempt (unresolved as of this handoff; the session summary below was attempted with `project: "connmuta"`). | This session, first attempted right after PR-06 | — |
-| **`design.md`'s two confirmed-stale citations, both disclosed and worked around, neither fixed in the doc itself** (carried from session 46, still true, still not fixed) | (1) The "Testing Strategy" table's `node:fs` row says the panel's allow-list "is never extended" — false as of PR-05. (2) The bootstrap.ts File Change row claims the startup catch block mirrors `ipcServer.close()`/`deleteRunFile` — the real code only calls `.close()` there. Low priority, text-only, whoever next edits `design.md`'s relevant sections should fix both — arguably a natural fit for the upcoming `sdd-verify`/`sdd-archive` pass, since archiving reads `design.md` closely anyway. | `bus-v2-f3-pr-04c-diff-audit-001`, `bus-v2-f3-pr-05-diff-audit-001` |
+| **A `git mv`/`mv` `Permission denied` incident occurred during the F3 archive move on this Windows checkout, self-caught not hidden.** `git mv` failed with `Permission denied` for the change-folder rename; the fallback plain `mv` failed identically; PowerShell's `Move-Item` succeeded on the identical path. **During diagnosis, one intermediate PowerShell command used a relative destination (`'x'`) intended as an inert placeholder; PowerShell resolved it against its own working directory (the repo root) instead of the intended path, actually executing the move and relocating the entire change folder to `<repo-root>/x`.** This was caught immediately, not silently — the mechanical procedure's own very next mandatory step (a pre-move snapshot `cp -R`) failed loudly with "No such file or directory," exactly the kind of independent structural check the Mechanical Copy Contract's `diff -r`/pre-move-snapshot discipline exists to catch. Recovery: confirmed `x`'s file sizes matched the pre-incident listing exactly (no truncation), moved it to the correct destination via `Move-Item` with **explicit absolute paths for both source and destination** (the bug was a *relative* destination resolving against the wrong cwd), final `diff -r` readback empty. **Kairo independently re-verified this after the fact rather than trusting the delegated sub-agent's self-report**: confirmed no stray `x` directory remains anywhere in the repo; ran `git show HEAD:<original-path>` against all 8 archived files, all byte-identical; confirmed all 3 new `openspec/specs/*` domains match their archived delta specs exactly. | If a future archive move on this machine hits the same `Permission denied`, go straight to `Move-Item` with explicit absolute paths for both arguments — never a relative destination in a PowerShell command invoked as a bash subprocess, since it resolves against PowerShell's own cwd, not the caller's. Always re-verify the mechanical copy's own self-report independently (a `diff`/`git show` cross-check), not just read its claimed `diff -r` output. | `archive-report.md`'s own "Native Tooling Note"; `bus-v2-f3-archive-audit-001` |
+| **A second, distinct issue from the same archive move — found by Kairo, NOT disclosed in the delegated sub-agent's own archive report.** Because the move used the non-`git` `Move-Item` fallback, the 8 original change-folder paths stayed in git's index as unstaged deletions (`git status` showed them as ` D`, not staged). This made `test/security/repo-scan.test.js` (PT-22, enumerates tracked files via `git ls-files` and reads each from disk) fail with `ENOENT` on the ghost path — a real, reproducible test failure, not a flake. **Fixed with `git add -A -- openspec/`**, which git correctly recognized as 8 clean 100% renames (`git diff --cached -M --summary` confirms 0 insertions/deletions on each). Full suite and `test:static` both confirmed green after staging. **This is NOT a defect in the archived content or shipped code** — it is a git-index bookkeeping artifact of the mechanical move mechanics, now disclosed inside `archive-report.md` itself (added after Alpha's own audit suggested it). | If any future `sdd-archive` run falls back to a non-`git` move (whether due to this same Windows quirk or another), always run `git add -A` (or stage the specific paths) and rerun the full suite before considering the archive verified — a green `diff -r` on file *content* does not prove the git *index* is consistent, and a stale index can make an unrelated-looking test fail for a purely mechanical reason. | `archive-report.md`'s "Post-move git-index note"; `bus-v2-f3-archive-audit-001` |
+| **The `PreToolUse:Agent` hook still blocks native `sdd-verify`/`sdd-archive`/`sdd-apply`/`sdd-explore`/`sdd-propose`/`sdd-spec`/`sdd-design`/`sdd-tasks` Agent dispatch, confirmed again this session (the 5th+ consecutive session, sessions 44-48).** Established fallback, used successfully again this session for both `sdd-verify` and `sdd-archive`: delegate to a plain `general-purpose` Agent (NOT the matching `sdd-*` subagent type) with a self-contained prompt that has the agent read the phase's own skill file (`~/.claude/skills/sdd-<phase>/SKILL.md` + `_shared/sdd-phase-common.md` + any phase-specific shared files) and execute it inline. | This session, both `sdd-verify` and `sdd-archive` launches | — |
+| **Engram `mem_save`/`mem_session_summary` failed all session** with "multiple active runtime sessions match the current project and directory," identical to session 47's own unresolved breakage — tried once each for the verify-report and archive-report persistence attempts (per the hybrid artifact store), both failed the same way, neither retried further per the established one-attempt convention. The filesystem archive (already synced, moved, and `diff -r`/independently re-verified) is the authoritative artifact this repo's own `sdd-status` tooling reads; the Engram write is best-effort and does not gate anything. | If this is still broken next session, it's worth a dedicated troubleshooting pass rather than continuing to silently eat the same failure every session — it's now failed for at least 2 consecutive sessions in the same way. | This session, both persistence attempts |
+| **RDD review consent for F3's own verify+archive commit was risk `high`** (21 changed files, 3,074 changed lines) — the risk evidence cited was a false-positive pattern match ("code that starts other processes") against prose/citation text inside the newly-archived `state.yaml`, the same false-positive class already documented in sessions 45/46/47's own precedent. Director granted consent; all 4 lenses admitted clean with zero correction required. | Nothing to fix — informational precedent only, matches what earlier sessions already found. | This session's `review start` output |
 | **Commit messages** | No Co-Authored-By or AI attribution; conventional-commit style. | ongoing |
 | **`dist/` staleness fakes results** | `rm -rf dist` before believing a surprising run. | sessions 11-17 |
 | **Pronouns** | Refer to the Director by role, never a gendered pronoun. | — |
@@ -138,44 +142,31 @@ length) — its own AS-IS/SEAM classification did not change, only its Changes l
 
 ## §5 — Next session, exact sequence
 
-1. **§0** commands; confirm clean tree and F3's native status (45/45 tasks, `nextRecommended: verify`).
-2. Run `sdd-verify` for `f3-web-panel-and-observability` (inline fallback if the Agent dispatch hook
-   blocks it — see §4). Follow §2's specific cross-checks.
-3. If verify passes (0 CRITICAL): run `sdd-archive`. If it finds real issues, debate genuinely
-   unresolved ones with Alpha before deciding how to close them; fix what's clearly correctable first.
-4. **Audit the verify report and the archive itself with Alpha** before considering F3 fully closed —
-   same standing convention this project has followed for F1 and F2's own archive commits.
-5. Run the RDD review flow (`gentle-ai review status --next-transition` → `start` → lens captures →
-   `acknowledge-approved`) for the verify/archive commit(s), same as every other commit this session.
-6. **Close**: same ritual as this session followed — rewrite this file, prepend to `LOG.md`, sweep
-   `AGENTS.md`'s status line, `docs/00-INDEX.md`'s backlog board, `docs/05-tribunal/INDEX.md` (every
-   real debate), save the session summary to Engram (note §4's `project: "connmuta"` requirement and
-   its own unresolved ambiguity error), run the RDD review flow if the Stop hook demands it, commit,
-   push, hand the Director a ≤3-line mini-prompt.
-7. **Once F3 is archived, the natural next step is F4 (or whatever the `WORK-PLAN.md` names next)** —
-   check `docs/07-plan/WORK-PLAN.md` for the phase after F3 before assuming what comes next; this
-   handoff does not presume it.
+1. **§0** commands; confirm clean tree and that no SDD change is open.
+2. **Ask the Director** which phase to plan next: F4 (Claude Code channels adapter, depends on F1 +
+   spike B-09) or F5 (Arena-light 2-party, depends on F1), or a different priority entirely. Do not
+   default to either without asking — this is a genuine product-scope decision, not a mechanical one,
+   and both are equally unblocked per `WORK-PLAN.md`'s dependency graph.
+3. Once the Director picks, run `sdd-explore` for the chosen change (native dispatch will likely still
+   be blocked — see §4's fallback). Confirm whether the Director wants the same full-autonomy,
+   Alpha-as-judge instruction to continue for the new phase, or whether it was scoped to F3's close-out
+   specifically.
+4. Continue the SDD cycle (`explore` → `propose` → `spec` → `design` → `tasks` → `apply` → `verify` →
+   `archive`) per this project's own established per-phase Alpha-audit convention.
 
 ---
 
 ## §6 — Do not redo
 
-- **F1's and F2's archives are closed.** Do not re-open, re-verify, or re-archive either.
-- **F3's exploration, propose/spec/design/tasks phases, and `sdd-apply` Units 1 through 9 are ALL
-  closed and Alpha-audited.** Do not re-run any of them or re-debate an already-resolved objection —
-  including `roster_drift` (PR-04a), the AS-IS→SEAM envelope provenance reclassification (PR-08), or
-  either of PR-07's two RDD-found-and-fixed gaps.
-- **Do not re-ask the Director anything this session already had standing authorization to decide** —
-  full autonomy was pre-authorized for the entire `sdd-apply` cycle, contingent only on debating a
-  genuinely unresolved product/architecture question with Alpha instead of asking, which happened once
-  this session (`bus-v2-f3-pr-08-envelope-provenance-001`).
-- **B-91 and B-92 (session 44) are filed, not solved** — B-92 explicitly defers backfilling ~20
-  historical tribunal entries to a Director-owned decision. **B-93 and B-94 (this session) are filed,
-  not solved either** — both explicitly disclose non-blocking findings the RDD review contract itself
-  forbids re-opening their already-approved candidates to fix.
-- **Do not re-attempt `gentle-ai review recover`'s `scope_changed` path** for PR-08's already-closed
-  candidate — that correction is done, merged, and Alpha-audited; the RDD tooling gap is disclosed, not
-  something to keep retrying.
+- **F1, F2 and F3's archives are all closed.** Do not re-open, re-verify, or re-archive any of them.
+- **F3's `bus-v2-f3-verify-audit-001` and `bus-v2-f3-archive-audit-001` both closed `CONSENSUS` with
+  zero objections.** Do not re-debate either.
+- **The two `design.md` documentation-staleness items (§3) are disclosed and intentionally left
+  uncorrected inside the archive.** Do not "fix" the archived `design.md` — it is historical record now,
+  byte-identical to what F3 actually shipped with.
+- **Do not re-attempt the RDD `scope_changed`/`escalated` dead ends documented in session 47's own
+  handoff** — those were specific to PR-08/PR-09's candidates, already resolved, and not relevant to
+  any future work unless the identical symptom recurs.
 
 ---
 
@@ -183,16 +174,13 @@ length) — its own AS-IS/SEAM classification did not change, only its Changes l
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-93** | F3 PR-06's RDD review found 6 non-blocking SUGGESTION findings (an unread result field, a token-encoding defense-in-depth gap confirmed non-exploitable, a duplicated `--home` parser, three test-coverage gaps). None fixed — the review contract forbids re-opening an approved candidate for advisory-only findings. | Kairo (next touch of `cli/panel.ts`/`cli/main.ts`) |
-| **B-94** | F3 PR-07's two RDD review passes found 23 total findings; 3 real ones fixed (`project_id` cross-check, the heartbeat-tick proof, twice). 10 remain disclosed, not fixed — most notably a TOCTOU race on the sync-roster confirm prompt (judged the same as the already-accepted B-90 precedent), a diff-key/hash-key mismatch, path-match normalization, and a repo-wide unclosed-ledger-connection pattern. | Kairo (future hardening pass, or never, if this command sees only single-operator use) |
-| **B-92** | `docs/05-tribunal/INDEX.md` never got ~20 F2 per-PR Alpha debate entries during the apply cycle. Backfilling is a Director-owned scale decision. **Note**: F3's Units 1-9 per-PR debates ARE all present in the tribunal index (sessions 46 and 47 both added them as they happened) — this gap is F2-specific, not a recurring pattern. | Director |
-| **B-91** | `npm run test:wrong-room` (standalone script) fails deterministically with a loopback `ETIMEDOUT` alone or at default concurrency; passes in the full suite and at `--test-concurrency=1`. **This session confirmed the same root-cause class also hits `daemon/ipc/routes.test.js`** under full-suite load — environment-specific (Windows loopback TCP contention), not a code regression, but now known to be broader than one test file. | Director |
-| **New, unfiled** | A single, non-reproduced `test/migration/integration.test.js` failure under one full-suite run this session, clean on immediate rerun. Watch for recurrence before filing — see §4. | Whoever hits it again |
+| **B-93, B-94** | F3 PR-06/PR-07's RDD advisory findings, filed not fixed (review contract forbids re-opening an approved candidate for advisory-only findings). | Kairo (future hardening pass, or never) |
+| **B-92** | `docs/05-tribunal/INDEX.md` never got ~20 F2 per-PR Alpha debate entries during the apply cycle. Backfilling is a Director-owned scale decision. F3's own per-PR debates ARE all present (this gap is F2-specific). | Director |
+| **B-91** | `npm run test:wrong-room` (standalone script) fails deterministically with a loopback `ETIMEDOUT` alone or at default concurrency; passes in the full suite and at `--test-concurrency=1`. Not re-observed this session (ran the full suite, not the standalone script). | Director |
 | **B-60, B-59, B-58, B-57, B-53/54/56** | Carried unchanged from before session 42. | Director |
 | **macOS start-at-login (D-40/D-47)** | Designed on paper only; empirical verification deferred to F6 (B-12). | Director + Kairo |
 | **B-16 / D-10, B-11, B-12** | Licence files and copyright line; trademark screening; macOS scope. Unchanged. | Director |
-| **`design.md`'s two stale citations** | Not filed as backlog rows (text-only, already disclosed and worked around) — see §4. Fix at the next real touch of `design.md`, plausibly during F3's own `sdd-archive`. | Kairo (next `design.md` touch) |
-| ~~**B-14**~~ | ~~Version observability without autonomous emission~~ — **closed this session**, shipped in PR-08. | done |
+| **Which phase comes after F3: F4 or F5** | Both fully unblocked per `WORK-PLAN.md`'s dependency graph (both depend only on F1, already archived). Not decided — the very first thing to ask next session. | Director |
 
 The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-director-decisions).
 
@@ -204,37 +192,44 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
   3.0.2 — not re-checked this session).
 - Line endings `eol=lf` via `.gitattributes`.
 - `os.tmpdir()` on this machine resolves to an 8.3 short path (`C:\Users\LABORA~1\...`).
-- GitHub Actions: Node 24.15 and 26 matrix on pull requests and on direct pushes to `main`. Every PR
-  this session passed both legs on the first or second CI run (one B-39 heartbeat-flake rerun needed
-  for PR-07, none needed for PR-06/08/09).
 - `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`; branch `main`.
   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; **never `gh auth switch`**.
-- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**. Not read this
-  session — F3 vendors no new v1 code (PR-08's SEAM reclassification touched already-vendored files,
-  it did not vendor anything new).
+- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**. Not read this session.
 - `.mcp.json` points at `http://127.0.0.1:8766/mcp` for the Arena bridge. Never quote or commit its
-  contents. See §0/§4 for this session's own transient multi-retry outage.
-- **Receipt-driven development (RDD) is enabled for this repository** (`gentle-ai review mode
-  status`: `on`, decided by global). It ran on every single-file-set change this session, including
-  mid-implementation (uncommitted) candidates as well as post-commit ones — expect the Stop hook to
-  fire multiple times per PR, not just once at commit. See §9 for this session's own review status and
-  §4 for the two dead ends it hit (`scope_changed` recovery, `escalated`/`unknown_causality`).
+  contents. Reachable on the first try this session, no retries needed.
+- **Receipt-driven development (RDD) is enabled for this repository** (`gentle-ai review mode status`:
+  `on`, decided by global). It fired once this session, on the verify+archive commit candidate — see
+  §9.
 
 ---
 
 ## §9 — RDD review status at session close
 
-Ran the selectorless STATUS → `review start` sequence against the first documentation-close-out commit
-(`1ef791a`, 5 files, 413 changed lines, base `a04df69`). `review start` returned the mandatory
-`gentle-ai.review-integration.consent/v3` envelope — risk `medium`, risk evidence `"this change is not
-purely passive documentation, so it gets one consolidated review"` plus `"an executable change in
-AGENTS.md"` (a false-positive pattern match against prose/code-fence text in the status paragraph or a
-cited shell command, mirroring session 45's and session 46's own identical false-positive precedent —
-not independently confirmed this session either). Relayed losslessly to the Director via the mandatory
-`AskUserQuestion` gate. **The Director chose "Omitir esta vez" (decline)** — ran the exact returned
-decline invocation, confirmed `"consent": "declined_this_candidate"`. No review record was created for
-that candidate. This second round of edits (this §9 fill-in, the Alpha-citation-correction note in §4,
-and the LOG.md addition) forms a second commit on top of `1ef791a`, which will trigger its own fresh RDD
-consent prompt at session end — handle it the same way (relay, do not decide unilaterally). Delivery
-(commit, push) follows ordinary repository policy, which this session already had standing Director
-authorization for. `gentle-ai review mode status` remains `on`, decided by global.
+Ran the selectorless STATUS → `review start` sequence against the uncommitted verify+archive candidate
+(target identity `sha256:a93f47f7a13adb1231b9cb4c5c2e31353ccd3475edb1e558ef4598048ca11c75`, 21 changed
+files, 3,074 changed lines, base `785461eeeb547aad6aa67e4ef6b2d9b8f5680378`). `review start` returned the
+mandatory `gentle-ai.review-integration.consent/v3` envelope — risk `high`, risk evidence "code that
+starts other processes in openspec/changes/archive/2026-09-27-f3-web-panel-and-observability/state.yaml"
+(a false-positive pattern match against prose/citation text in the archived state file, matching the
+same false-positive class already documented in sessions 45/46/47's own precedent — not independently
+confirmed this session either, same as before). Relayed losslessly to the Director via the mandatory
+`AskUserQuestion` gate. **The Director chose "Review this change" (granted)**. All 4 lenses
+(review-risk, review-resilience, review-readability, review-reliability) launched concurrently in
+provider order, all admitted with `admission_decision: "completed"` and zero correction required.
+State went straight to `approved`; `review acknowledge-approved` executed with the exact returned
+invocation; `authority: "burned"`. `gentle-ai review mode status` remains `on`, decided by global.
+
+**Two further RDD cycles fired after this first one**, each triggered by a documentation edit changing
+the working tree while the prior candidate was still frozen mid-review: (1) the full documentation set
+(HANDOFF/LOG/AGENTS/00-INDEX/tribunal-INDEX, 26 files, 3,444 changed lines) — Director granted consent,
+all 4 lenses admitted clean, but this exact cycle also hit a transient reviewer-admission failure on
+the resilience and reliability lenses ("candidate could not be inspected" despite `inspection.status:
+"completed"), recovered per the contract's own reoffered-slot mechanism (re-query STATUS, relaunch the
+same lens) — both succeeded on the second attempt; (2) after Alpha's own documentation audit
+(`bus-v2-session-48-handoff-audit-001`) found one real objection (a stale domain count, 13 vs. the
+real 16) and Kairo fixed it, the tree changed again, superseding the just-completed clean review with
+a new candidate for the identical 26 files plus that one 2-line fix. **The Director declined this
+third, near-identical candidate** (`"consent": "declined_this_candidate"`) since the underlying content
+had already passed a clean 4-lens review moments before — no review record exists for this final
+candidate. Delivery (commit, push) follows ordinary repository policy, which this session already had
+standing Director authorization for.
