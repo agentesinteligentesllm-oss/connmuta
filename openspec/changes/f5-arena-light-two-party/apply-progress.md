@@ -1,5 +1,75 @@
 # Apply Progress: Arena-light 2-party debates over the existing wire
 
+## Phase 2: Core — complete (PR-2 + PR-3 slices, applied in one batch)
+
+- [x] 2.1 RED `test/shared/debate-marker.test.ts`: encode/decode round-trip each `DebateTurnKind`; wire-mapping scenario (PROPOSAL/CONSENSUS envelope+marker).
+- [x] 2.2 RED same file: `containsInlinePatchShape` true for literal diff, false for pointer-only refs.
+- [x] 2.3 GREEN `src/shared/debate-marker.ts`: types, `encodeDebateTurn`, `encodeCoalescedReply` (two delimited sections, one line), `decodeDebateBody`, `containsInlinePatchShape`.
+- [x] 2.4 RED `test/ledger/debate-journal.test.ts`: `appendDebateTurn`/`readDebateJournal` round-trip, scoped to `(project_id, debate_id)`; `readMaxCounterRound` restart-durable.
+- [x] 2.5 GREEN `src/ledger/debate-journal.ts`: writer/reader, mirrors `src/ledger/conditions-store.ts` shape (no own transaction).
+
+Phase 3-4 (tasks 3.1-4.1) are unassigned to this batch and remain `[ ]` in `tasks.md`.
+
+### Files Changed (Phase 2)
+
+| File | Action | What Was Done |
+|------|--------|----------------|
+| `src/shared/debate-marker.ts` | Created | Pure encode/decode of Arena-light body markers: `DebateTurnKind`, `DebateVerdict`, `DebateTurnMarker`, `DEBATE_TURN_WIRE_MAPPING` (the spec's turn->type/basis table, reusing `RESOLVED_BASIS_VALUES`/`ABANDON_BASIS_VALUE` from `shared/envelope.ts` rather than redeclaring the basis literals), `encodeDebateTurn`, `encodeCoalescedReply`, `decodeDebateBody`, `containsInlinePatchShape` |
+| `src/ledger/debate-journal.ts` | Created | `appendDebateTurn`/`readMaxCounterRound`/`readDebateJournal` against `debate_journal` (PR-1's already-merged table); mirrors `conditions-store.ts`'s no-own-transaction shape; guards every free-text column with `assertNoTokenShape` per `openspec/specs/ledger/spec.md`'s "No token in any ledger table" requirement, which names `debate_journal` explicitly |
+| `test/shared/debate-marker.test.ts` | Created | 25 assertions across the delimiter format, round-trip for all 5 `DebateTurnKind`s, the wire-mapping scenario (built REQUEST/RESOLVED envelopes), `encodeCoalescedReply`, fail-closed decode, normalizeBody-robustness, and `containsInlinePatchShape` |
+| `test/ledger/debate-journal.test.ts` | Created | Round-trip scoped to `(project_id, debate_id)`, nullable-column round-trip, `readMaxCounterRound` counting only `COUNTER` rows, token-shape refusal, and the restart-durability scenario (a second `DatabaseSync` handle against the same file) |
+
+### TDD Cycle Evidence (Phase 2)
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 2.1/2.2/2.3 | `test/shared/debate-marker.test.ts` | Unit (pure functions) | N/A (new files) | ✅ Written — `TS2307` (module does not exist) before `src/shared/debate-marker.ts` existed | ✅ Passed (18/18 on first execution after implementing GREEN) | ✅ 5 cases (round-trip per `DebateTurnKind`) + 4 more for `containsInlinePatchShape` (2 true-shapes independently, 2 false-shapes including an adversarial half-match) + fail-closed/normalize-robustness cases | ➖ None needed — helpers already factored (`encodeHeader`, `parseMarkerContent`, `isDebateTurnKind`/`isDebateVerdict`), no duplication found |
+| 2.4/2.5 | `test/ledger/debate-journal.test.ts` | Unit (real `node:sqlite`, file-backed) | N/A (new files) | ✅ Written — `TS2307` before `src/ledger/debate-journal.ts` existed | ✅ Passed (7/7 on first execution) | ✅ Multiple cases: round-trip+scoping, nullable columns, `readMaxCounterRound` counting only `COUNTER` (PROPOSAL/AUDIT excluded), cross-debate scoping, token-shape refusal (4 sub-cases), restart-durability with a second `DatabaseSync` handle | ➖ None needed |
+
+### Test Summary (Phase 2)
+- **Total tests written**: 25 (18 in `test/shared/debate-marker.test.ts` + 7 in `test/ledger/debate-journal.test.ts`, confirmed by `grep -c '^test('` against each file)
+- **Total tests passing**: 25/25 new tests pass; 0 regressions in the full suite (see Full-Suite Verification below)
+- **Layers used**: Unit (25), Integration (0), E2E (0)
+- **Approval tests** (refactoring): None — no refactoring tasks in this batch
+- **Pure functions created**: 6 in `debate-marker.ts` (`encodeDebateTurn`, `encodeCoalescedReply`, `decodeDebateBody`, `containsInlinePatchShape`, plus two private helpers `encodeHeader`/`parseMarkerContent`); `debate-journal.ts`'s three exports are thin `DatabaseSync` wrappers, not pure
+
+### Work Unit Evidence (Phase 2)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `npx tsc -b && node --test dist/test/shared/debate-marker.test.js dist/test/ledger/debate-journal.test.js` → `tests 25, pass 25, fail 0, cancelled 0, skipped 0` |
+| Runtime harness command/scenario and exact result | `debate-marker.ts` is N/A — pure functions, no boot boundary. `debate-journal.ts` has a real runtime-adjacent scenario worth naming on its own: "`readMaxCounterRound` is restart-durable" opens a `DatabaseSync` against a temp-file ledger, writes two `COUNTER` rows, **closes that connection**, opens a **second, independent** `DatabaseSync` handle against the identical file path (simulating a daemon restart, not `:memory:`), and confirms `readMaxCounterRound`/`readDebateJournal` on the new handle still see the persisted rows — `node --test dist/test/ledger/debate-journal.test.js` → that test passes (part of the 7/7 above) |
+| Rollback boundary | Revert `src/shared/debate-marker.ts`, `src/ledger/debate-journal.ts` and their two test twins (all four are new files, independently deletable). Nothing outside this batch depends on either module yet — Phase 3 (`validate.ts`/`send-path.ts`, PR-4/PR-5, explicitly out of scope for this batch) is the first consumer |
+
+### Full-Suite Verification (Phase 2, after tasks 2.1-2.5)
+
+- `npm test` (`tsc -b && node --test "dist/test/**/*.test.js"`): **1511 tests, 1505 pass, 0 fail, 6 skip** (baseline after Phase 1 was 1486/1480/0/6 — +25 matches exactly the new tests added in this batch; 0 regressions).
+- `npm run test:static`: **57/57 pass** (unchanged from the Phase-1 baseline; this batch touches no file `test:static` exercises beyond the two new modules, neither of which any static-assertion test enumerates by name). Two `ERROR: El sistema no ha podido encontrar la clave o el valor del Registro especificados.` lines appeared during the secret-store-adjacent tests — pre-existing Windows registry noise from an unrelated OS-keyring probe, not a test failure (the suite still reports 57/57); not touched by this batch.
+
+### Deviations from Design (Phase 2)
+
+One addition beyond design.md's literal Interfaces/Contracts listing for `shared/debate-marker.ts`, disclosed rather than silently added: `DEBATE_TURN_WIRE_MAPPING`, an exported constant table encoding the spec's "Debate turns map onto existing wire types" mapping (PROPOSAL->REQUEST/none, AUDIT/COUNTER->REPLY/none, CONSENSUS->RESOLVED/context-shared, ESCALATE->RESOLVED/abandoned), reusing `RESOLVED_BASIS_VALUES`/`ABANDON_BASIS_VALUE` from `shared/envelope.ts` per this batch's own orchestrator instructions. Design.md's Interfaces/Contracts code block does not list this export, but (a) the orchestrator's task brief explicitly instructed reusing those two `envelope.ts` constants in the GREEN implementation, which has no other call site in this module's four documented functions; (b) it is the mapping table the "wire-mapping scenario" test (task 2.1) exercises; (c) it gives Phase 3 (`validate.ts`/`send-path.ts`) a single derived source of truth instead of two copies of the basis literals drifting apart (this project's own established CONSTITUTION §5 convention). No behavior of the four documented functions changed to accommodate it.
+
+A second addition beyond the design's abbreviated Interfaces/Contracts listing for `ledger/debate-journal.ts`: `appendDebateTurn` guards every free-text column with `assertNoTokenShape` before the insert. This is not present in design.md's Interfaces/Contracts code block, but it is not optional either — `openspec/specs/ledger/spec.md`'s already-archived "No token in any ledger table" requirement names `debate_journal` explicitly in its table enumeration (`No write path MUST ever persist a token-shaped string into any ledger table (offsets, updates, threads, client_cursors, audit_log, debate_journal)`), and every sibling ledger writer (`audit.ts`, `conditions-store.ts`, `unknown-senders.ts`) already applies this exact guard. Implementing the writer without it would have shipped a spec-compliance gap. Reported here per the "if you discover the design is wrong or incomplete, NOTE IT" rule rather than silently deviating.
+
+### Issues Found (Phase 2)
+
+None beyond the two disclosed additions above. Design.md's Interfaces/Contracts, the `arena-light-debates` spec, and DATA-MODEL.md §3.7 were otherwise internally consistent with what tasks.md 2.1-2.5 asked for.
+
+### Remaining Tasks (out of scope for this batch — Phase 3-4)
+
+- [ ] 3.1-3.4 `daemon/send/validate.ts` + `daemon/send/send-path.ts` (PR-4, PR-5) — **STOP boundary**: not touched by this batch per explicit instruction
+- [ ] 4.1 Full suite + `test:static` green, all 15 scenarios (7+2+6) — Phase 1+2's slice of this (7+2+6=... see note) is green now: Phase 1 covered the 2 migration scenarios; Phase 2 covers the marker module's behavioral contract (wire-mapping, pointer-only/inline-patch) and the journal's durability scenario. The remaining scenarios (round-cap boundary, participation/role, coalesced-REPLY-is-one-silent-send, CONSENSUS/ESCALATE side-effect-free) depend on Phase 3 (`validate.ts`/`send-path.ts`), still pending.
+
+### Workload / PR Boundary (Phase 2)
+
+- Mode: chained PR slice (`stacked-to-main`, per tasks.md's Review Workload Forecast)
+- Current work units: Unit 2 ("`shared/debate-marker.ts` encode/decode", PR-2) and Unit 3 ("`ledger/debate-journal.ts` writer/reader", PR-3) — **both implemented in this one apply batch per explicit orchestrator instruction**, but they remain two independently-revertable modules with no cross-dependency (`debate-journal.ts` does not import `debate-marker.ts`'s functions, only its exported types)
+- Boundary: starts from PR-1's merged baseline (`debate_journal` table + constants already live); ends with both new modules fully tested and callable, but **not yet wired into any send/validate code path** — Phase 3 is the first consumer of either
+- Authored diff: 724 lines across 4 new files (`src/shared/debate-marker.ts` 192, `src/ledger/debate-journal.ts` 177, `test/shared/debate-marker.test.ts` 173, `test/ledger/debate-journal.test.ts` 182), plus 5 checkbox-line changes in `tasks.md`. If split along tasks.md's own Suggested Work Units (PR-2: `debate-marker.ts` + its test = 365 lines; PR-3: `debate-journal.ts` + its test = 359 lines), **each slice independently stays under the 400-line budget** — no `size:exception` needed for either slice as suggested-split. The orchestrator decides the actual PR boundary/commit split; this batch only implements.
+
+---
+
 ## Phase 1: Foundation — complete (PR-1 slice)
 
 - [x] 1.1 RED `test/ledger/schema.test.ts`: `DEBATE_JOURNAL_DDL` creates `debate_journal` (cols per `docs/02-architecture/DATA-MODEL.md` §3.7).
@@ -60,7 +130,7 @@ None beyond the two items disclosed above (the incidentally-broken pre-existing 
 
 ## Remaining Tasks (out of scope for this batch — Phases 2-4)
 
-- [ ] 2.1-2.5 `shared/debate-marker.ts` + `ledger/debate-journal.ts` (PR-2, PR-3)
+- [x] ~~2.1-2.5 `shared/debate-marker.ts` + `ledger/debate-journal.ts` (PR-2, PR-3)~~ — **superseded**: completed in the Phase 2 section above (a later apply batch); left struck through here rather than deleted, so this historical Phase-1 record does not silently change what it originally reported as remaining
 - [ ] 3.1-3.4 `daemon/send/validate.ts` + `daemon/send/send-path.ts` (PR-4, PR-5) — **STOP boundary**: not touched by this batch per explicit instruction
 - [ ] 4.1 Full suite + `test:static` green, all 15 scenarios (7+2+6) — Phase 1's slice of this (7+2=9 scenarios: 7 schema + 2 migrations) is green now; the remaining 6 (Phase 3's `validate`/`send-path` scenarios) depend on Phases 2-3
 
