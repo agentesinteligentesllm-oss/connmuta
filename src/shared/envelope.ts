@@ -1,7 +1,9 @@
 /**
- * Provenance: telegram-agent-bus src/envelope.ts @ bf8f365 — verdict: AS-IS (D-08).
+ * Provenance: telegram-agent-bus src/envelope.ts @ bf8f365 — verdict: SEAM (D-08).
  * v1 body sha256: e4aba6ec2128ed5dae858ae5633a94df371696e0aace95886595f61432f62663   (SHA-256 of the v1 body at bf8f365, header and import block excluded)
- * Changes: none.
+ * Changes: F3 PR-08 (version-observability) — renderMessageHtml's <b> header line now also renders
+ * SERVER_VERSION and WIRE_VERSION (bus-v2-f3-pr-08-envelope-provenance-001, reclassified from AS-IS).
+ * renderHeader and encodeEnvelope are unchanged; only the human-plane presentation gained content.
  */
 
 import { z } from "zod";
@@ -12,6 +14,7 @@ import {
   SUPPORTED_PROTOCOL_SENTINELS,
   TELEGRAM_MAX_TEXT_CHARS,
 } from "./constants.js";
+import { SERVER_VERSION, WIRE_VERSION } from "./version.js";
 
 // Exported so `src/tools/send.ts` (Phase 8) can validate its own tool-input
 // shape against the exact same patterns/enums instead of redeclaring them —
@@ -216,6 +219,14 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * The human-plane version stamp `renderMessageHtml` appends to the bold header (F3 PR-08,
+ * version-observability). Exported (not module-private) so {@link encodedTextExceedsTelegramLimit}
+ * and `daemon/send/validate.ts`'s `guardEncodedLength` can both charge its exact length against
+ * Telegram's real delivered-text ceiling — see those functions' own docs for why.
+ */
+export const VERSION_STAMP_SUFFIX = ` · v${SERVER_VERSION} (wire ${WIRE_VERSION})`;
+
+/**
  * Presentation-only rendering of {@link encodeEnvelope}'s canonical text (ADR-05c).
  *
  * Bolds the header and collapses the sentinel line into an expandable blockquote, so the
@@ -229,14 +240,15 @@ function escapeHtml(text: string): string {
  * Because the transformation is invisible to decoders, this is NOT a wire change and needs
  * no coordinated upgrade: a v0.2.0 peer reads a v0.2.1 message unchanged.
  *
- * The wire-length guard deliberately keeps measuring the canonical text, not this string —
- * the Bot API's 4096-character limit applies "after entities parsing".
+ * The wire-length guard now charges {@link VERSION_STAMP_SUFFIX}'s length against its own ceiling
+ * (F3 PR-08): the Bot API's 4096-character limit applies "after entities parsing", i.e. against
+ * this rendered text's delivered length, not the shorter canonical text alone.
  */
 export function renderMessageHtml(envelope: Envelope): string {
   const sentinelLine = `${PROTOCOL_SENTINEL} ${JSON.stringify(envelope)}`;
 
   return [
-    `<b>${escapeHtml(renderHeader(envelope))}</b>`,
+    `<b>${escapeHtml(renderHeader(envelope))}${escapeHtml(VERSION_STAMP_SUFFIX)}</b>`,
     "",
     escapeHtml(envelope.body),
     "",
@@ -285,9 +297,17 @@ export function normalizeBody(body: string): string {
  *
  * `String.length` counts UTF-16 code units, which over-counts astral characters
  * relative to Telegram's own count. The error is in the safe direction.
+ *
+ * `text` here is always {@link encodeEnvelope}'s canonical output (see `daemon/send/validate.ts`'s
+ * `guardEncodedLength`), but what Telegram actually measures ("after entities parsing") is
+ * `renderMessageHtml`'s DELIVERED text — canonical length plus {@link VERSION_STAMP_SUFFIX}'s fixed
+ * overhead (F3 PR-08). Charging that overhead here, once, keeps every caller correct without needing
+ * to know the presentation layer exists: an envelope whose canonical length passed this guard before
+ * PR-08 could now still be rejected by Telegram once rendered, since the guard only ever measured the
+ * shorter of the two texts (RDD review review-49f5f64f1398a087, R3-version-stamp-bypasses-wire-length-guard).
  */
 export function encodedTextExceedsTelegramLimit(text: string): boolean {
-  return text.length > TELEGRAM_MAX_TEXT_CHARS;
+  return text.length + VERSION_STAMP_SUFFIX.length > TELEGRAM_MAX_TEXT_CHARS;
 }
 
 /**

@@ -9,13 +9,13 @@
     "v2Path": "src/shared/envelope.ts",
     "v1Path": "src/envelope.ts",
     "commit": "bf8f365",
-    "verdict": "AS-IS"
+    "verdict": "SEAM"
   },
   {
     "v2Path": "test/shared/envelope.test.ts",
     "v1Path": "test/envelope.test.ts",
     "commit": "bf8f365",
-    "verdict": "AS-IS"
+    "verdict": "SEAM"
   },
   {
     "v2Path": "src/shared/secrets.ts",

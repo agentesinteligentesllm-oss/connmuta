@@ -27,7 +27,11 @@
  * send-path room pre-check, so both modules report through one error class; (11) `RATE_LIMITED` added
  * for PR-28's rate discipline (`send/rate.ts`), and `SendToolError` gains an optional `retry_after_s`
  * so a locally-refused or reclassified 429 carries the same field a caller would get from Telegram
- * directly, instead of it being reduced to English inside a message.
+ * directly, instead of it being reduced to English inside a message; (12) `guardEncodedLength`'s
+ * `headroom_chars` now subtracts `VERSION_STAMP_SUFFIX.length` (F3 PR-08, version-observability):
+ * once `renderMessageHtml` renders a build/wire version stamp into the delivered message, that fixed
+ * overhead counts toward Telegram's real ceiling too, so a headroom figure that ignored it overstated
+ * the real safety margin by exactly the stamp's length (RDD review review-49f5f64f1398a087).
  *
  * ---
  *
@@ -62,6 +66,7 @@ import { readThreadRecord } from "../../ledger/threads.js";
 import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../shared/constants.js";
 import {
 	ABANDON_BASIS_VALUE,
+	VERSION_STAMP_SUFFIX,
 	encodeEnvelope,
 	encodedTextExceedsTelegramLimit,
 	normalizeBody,
@@ -377,9 +382,10 @@ export function validateSend(input: SendToolInput, deps: SendValidationDeps): Va
 /**
  * The encoded-length guard (v1 `:563-574` for the throw, `:642-649` for the gauge — both outside this
  * SEAM's two cited ranges, change (5)). Pure: measures `encodeEnvelope(envelope)`, the same canonical
- * text a peer decodes and Telegram's ceiling is measured against ("after entities parsing"). PR-27
- * calls this with the envelope it has already built, after `validateSend` succeeds and
- * `eid`/`thread`/`to_user_id` have been stamped.
+ * text a peer decodes, but the ceiling itself is measured against Telegram's real delivered length
+ * ("after entities parsing") — canonical length plus `renderMessageHtml`'s fixed
+ * {@link VERSION_STAMP_SUFFIX} overhead (F3 PR-08, change (12)). PR-27 calls this with the envelope it
+ * has already built, after `validateSend` succeeds and `eid`/`thread`/`to_user_id` have been stamped.
  */
 export function guardEncodedLength(envelope: Envelope): { readonly text: string; readonly wire: WireCost } {
 	const text = encodeEnvelope(envelope);
@@ -400,7 +406,7 @@ export function guardEncodedLength(envelope: Envelope): { readonly text: string;
 		wire: {
 			chars: text.length,
 			limit: TELEGRAM_MAX_TEXT_CHARS,
-			headroom_chars: TELEGRAM_MAX_TEXT_CHARS - text.length,
+			headroom_chars: TELEGRAM_MAX_TEXT_CHARS - text.length - VERSION_STAMP_SUFFIX.length,
 		},
 	};
 }
