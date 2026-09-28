@@ -25,6 +25,15 @@ import { DEBATE_MARKER_PREFIX } from "./constants.js";
  * and consumes that single-line shape, and {@link decodeDebateBody} never assumes an unnormalized
  * input (an embedded newline) is possible — by the time it runs in production, one never is.
  *
+ * **One physical send is one turn — never two.** An earlier draft of this module coalesced an
+ * AUDIT and a COUNTER into a single composed body (`encodeCoalescedReply`, removed). That is
+ * unbuildable in practice: AUDIT is accepted only from `thread.to` and COUNTER only from
+ * `thread.from` (`daemon/send/validate.ts`'s `checkDebateTurn`, ADR-13's role split) — two
+ * different agents — so no single caller can ever legitimately compose both roles into one body,
+ * and the passive-switch core (ADR-06 L1-L2) cannot buffer one party's turn while waiting for the
+ * other's. `disable_notification` on every debate REPLY, not body-merging, is what keeps a debate
+ * within the group rate budget (T22).
+ *
  * **`refs` is the pointer-only half of D7.** It carries commit shas, PR numbers, paths and memory
  * ids — never an inline diff — and {@link containsInlinePatchShape} is the check that keeps a literal
  * patch from being smuggled through as a "pointer" (spec "Debate bodies are pointer-only, never
@@ -94,16 +103,6 @@ export function encodeDebateTurn(marker: DebateTurnMarker): string {
 	return `${header} ${marker.text}${refsSuffix}`;
 }
 
-/**
- * Composes one AUDIT and one COUNTER into the single silent REPLY the spec's coalesced-turn
- * requirement calls for — "two delimited sections, one line" (design.md Technical Approach). No new
- * composer state: the caller builds this one `body` and calls `send` once, so `rate.ts` is charged
- * once (design.md Data Flow, "one send = one budget hit").
- */
-export function encodeCoalescedReply(audit: DebateTurnMarker, counter: DebateTurnMarker): string {
-	return `${encodeDebateTurn(audit)} ${encodeDebateTurn(counter)}`;
-}
-
 /** Matches one marker header and captures its turn and (if present) verdict, globally within a body. */
 const MARKER_HEADER_PATTERN = /\[ARENA-LIGHT:([A-Z]+)(?::([A-Z_]+))?\]/g;
 
@@ -137,7 +136,10 @@ function parseMarkerContent(raw: string): { readonly text: string; readonly refs
  * `body` is always a single line by the time this runs (see the module doc) — the decoder never
  * splits on a newline and never assumes one could be present; {@link MARKER_HEADER_PATTERN} matches
  * the literal `[ARENA-LIGHT:...]` bracket wherever it sits, with no line-boundary anchor at all. A
- * coalesced reply decodes to two markers; an ordinary debate turn decodes to one.
+ * legitimate debate turn decodes to exactly one marker; a body carrying more than one (no longer
+ * producible by this module, see the module doc) is decoded structurally but never accepted — every
+ * marker's role check runs independently in `checkDebateTurn`, and no single caller can satisfy both
+ * an AUDIT's and a COUNTER's role requirement at once.
  */
 export function decodeDebateBody(body: string): readonly DebateTurnMarker[] | undefined {
 	const headerMatches = [...body.matchAll(MARKER_HEADER_PATTERN)];

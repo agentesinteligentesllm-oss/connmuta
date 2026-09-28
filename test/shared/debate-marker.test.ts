@@ -5,7 +5,6 @@ import {
 	containsInlinePatchShape,
 	decodeDebateBody,
 	DEBATE_TURN_WIRE_MAPPING,
-	encodeCoalescedReply,
 	encodeDebateTurn,
 	type DebateTurnMarker,
 } from "../../src/shared/debate-marker.js";
@@ -17,8 +16,8 @@ import { ABANDON_BASIS_VALUE, RESOLVED_BASIS_VALUES, envelopeSchema, normalizeBo
  *
  * A debate turn rides an EXISTING wire envelope as a one-line body marker (spec "Debate turns map
  * onto existing wire types") — this suite pins the exact delimiter, the round-trip for every
- * `DebateTurnKind`, the wire-mapping scenario, the coalesced-reply composition, and the pointer-only
- * vs. inline-patch boundary. All pure functions; no ledger, no `DatabaseSync`.
+ * `DebateTurnKind`, the wire-mapping scenario, and the pointer-only vs. inline-patch boundary. All
+ * pure functions; no ledger, no `DatabaseSync`.
  */
 
 const NOW = "2026-03-01T10:00:00.000Z";
@@ -104,23 +103,6 @@ test("DEBATE_TURN_WIRE_MAPPING matches the spec's marker table exactly, and its 
 	// own closed basis set, not coincidentally-matching string literals redeclared here.
 	assert.equal((RESOLVED_BASIS_VALUES as readonly string[]).includes(DEBATE_TURN_WIRE_MAPPING.CONSENSUS.basis as string), true);
 	assert.equal((RESOLVED_BASIS_VALUES as readonly string[]).includes(DEBATE_TURN_WIRE_MAPPING.ESCALATE.basis as string), true);
-});
-
-test("encodeCoalescedReply composes one AUDIT and one COUNTER into a single line that decodes back to both markers, in order", () => {
-	const audit: DebateTurnMarker = { turn: "AUDIT", verdict: "APPROVE_WITH_CHANGES", text: "rotate the secret first", refs: ["memory:sess-42"] };
-	const counter: DebateTurnMarker = { turn: "COUNTER", verdict: "REJECT", text: "rotation breaks existing sessions", refs: [] };
-
-	const coalesced = encodeCoalescedReply(audit, counter);
-
-	assert.equal(coalesced.includes("\n"), false, "the coalesced reply must stay one wire line");
-	assert.deepEqual(decodeDebateBody(coalesced), [audit, counter]);
-});
-
-test("encodeCoalescedReply round-trips when neither section carries refs", () => {
-	const audit: DebateTurnMarker = { turn: "AUDIT", verdict: "APPROVE", text: "looks fine", refs: [] };
-	const counter: DebateTurnMarker = { turn: "COUNTER", verdict: "APPROVE", text: "agreed, no changes", refs: [] };
-
-	assert.deepEqual(decodeDebateBody(encodeCoalescedReply(audit, counter)), [audit, counter]);
 });
 
 test("decodeDebateBody returns undefined for an ordinary chat message carrying no marker at all", () => {

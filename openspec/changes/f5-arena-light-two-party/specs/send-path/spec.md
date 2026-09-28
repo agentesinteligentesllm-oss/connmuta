@@ -20,17 +20,17 @@ existing lifecycle-boundary rule (`send-path.ts:160-172`) rather than replacing 
 - WHEN it is sent
 - THEN `disable_notification` is false, unchanged from today
 
-### Requirement: AUDIT and COUNTER coalesce upstream of rate discipline
+### Requirement: Each debate turn is exactly one rate-budget hit, never retried
 
-The daemon MUST compose a pending AUDIT and COUNTER for the same round into exactly one outbound
-REPLY, with two fixed-delimited sections, before the send reaches the group rate budget; this MUST
-NOT introduce a retry or a queue.
+A debate turn (`ARENA_LIGHT_MESSAGES_PER_ROUND` = 1 send) MUST reach `GROUP_MESSAGES_PER_MINUTE`
+exactly once per send, with no queue or retry — AUDIT and COUNTER are never composed into one
+outbound REPLY (different roles, `thread.to`/`thread.from`; see the arena-light-debates spec).
 
-#### Scenario: One send reaches the rate check
+#### Scenario: Each turn hits the rate check exactly once
 
-- GIVEN both an AUDIT and a COUNTER are due in one round
-- WHEN the turn is sent
-- THEN exactly one send is evaluated against `GROUP_MESSAGES_PER_MINUTE`, with no retry issued
+- GIVEN an AUDIT and a COUNTER, each due in its own round
+- WHEN each is sent
+- THEN each is evaluated against `GROUP_MESSAGES_PER_MINUTE` exactly once, with no retry issued
 
 ## MODIFIED Requirements
 
@@ -75,5 +75,5 @@ Traces: ADR-0028 §"Send carries no destination"; DATA-MODEL.md §7 `MAX_BODY_CH
 | Source | Requirement |
 |---|---|
 | send-path.ts:160-172 (lifecycle-boundary silence rule) | Marker-aware silence for debate REPLY turns |
-| THREAT-MODEL.md T22/PT-33 | AUDIT+COUNTER coalescing upstream of rate discipline |
+| THREAT-MODEL.md T22/PT-33 | Each debate turn is one rate-budget hit, never retried |
 | THREAT-MODEL.md PT-23 clause 1 | Validation pipeline round-cap stage (MODIFIED) |
