@@ -22,6 +22,8 @@ import { DualWriteTransport } from "../../../src/daemon/transport/dual.js";
 import { SendToolError, guardEncodedLength } from "../../../src/daemon/send/validate.js";
 import { BindingMutex, sendPath, type SendPathDeps } from "../../../src/daemon/send/send-path.js";
 import { SendRateBudget } from "../../../src/daemon/send/rate.js";
+import { encodeDebateTurn, type DebateTurnMarker } from "../../../src/shared/debate-marker.js";
+import { readDebateJournal } from "../../../src/ledger/debate-journal.js";
 import { FakeTelegramClient } from "../../fakes/telegram.js";
 import { deliveredText } from "../../fakes/delivered-text.js";
 
@@ -240,6 +242,16 @@ function buildDeps(db: DatabaseSync, binding: BindingFixture, overrides: Partial
 	};
 }
 
+/**
+ * The same binding's own `deps`, but called by a different roster member (F5, Arena-light: two
+ * parties on one bound project take turns as `config.agent_id`, exactly as `validate.test.ts`'s own
+ * `sampleDeps(db, { config: sampleConfig({ agent_id: ... }) })` convention already does for the
+ * validation layer). Everything else — transport, room guard, telegram fake — stays the binding's own.
+ */
+function agentDeps(db: DatabaseSync, binding: BindingFixture, agentId: string, overrides: Partial<SendPathDeps> = {}): SendPathDeps {
+	return buildDeps(db, binding, { config: { ...binding.config, agent_id: agentId }, ...overrides });
+}
+
 function sampleThread(overrides: Partial<ThreadRecord> = {}): ThreadRecord {
 	return {
 		status: "open",
@@ -302,6 +314,18 @@ function broadcastInput(overrides: Partial<SendToolInput> = {}): SendToolInput {
 
 function isWrongRoom(error: unknown): boolean {
 	return error instanceof SendToolError && error.code === "WRONG_ROOM";
+}
+
+// --- Arena-light debate turns (F5, D7) — fixture markers and journal readback ---
+
+const DEBATE_PROPOSAL_MARKER: DebateTurnMarker = { turn: "PROPOSAL", text: "opening proposal", refs: [] };
+const DEBATE_AUDIT_MARKER: DebateTurnMarker = { turn: "AUDIT", verdict: "APPROVE_WITH_CHANGES", text: "an audit verdict", refs: ["pr-42"] };
+const DEBATE_COUNTER_MARKER: DebateTurnMarker = { turn: "COUNTER", text: "a counter-proposal", refs: ["commit-abc123"] };
+const DEBATE_CONSENSUS_MARKER: DebateTurnMarker = { turn: "CONSENSUS", verdict: "APPROVE", text: "we agree", refs: ["memo-9"] };
+const DEBATE_ESCALATE_MARKER: DebateTurnMarker = { turn: "ESCALATE", text: "giving up", refs: [] };
+
+function debateJournalRows(db: DatabaseSync, projectId: string, debateId: string) {
+	return readDebateJournal(db, projectId, debateId);
 }
 
 // --- Spec scenario: "BROADCAST never crosses bindings" ---
@@ -811,6 +835,196 @@ test("wire equals guardEncodedLength's result for the built envelope", async () 
 		};
 		const recomputed = guardEncodedLength(envelope);
 		assert.deepEqual(result.wire, recomputed.wire);
+	});
+});
+
+// --- Arena-light debate turns (F5, D7; design.md Decision (c); arena-light-debates spec "Every
+// debate REPLY is silent; PROPOSAL/CONSENSUS/ESCALATE notify"; send-path delta spec "Marker-aware
+// silence for debate REPLY turns" / "Each debate turn is exactly one rate-budget hit, never retried") ---
+
+test("Arena-light: an AUDIT-marked REPLY is silent and journals one row at the current (unadvanced) round", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: ALICE, entries: ENTRIES_MAIN });
+		const deps = agentDeps(db, binding, ALICE);
+		const threadId = hexId(900);
+		// PROPOSAL opened by BOB (thread.from), addressed to ALICE (thread.to) — AUDIT is the addressee's turn.
+		writeThread(db, PROJECT_MAIN, threadId, { from: BOB, to: ALICE, to_user_id: ALICE_USER_ID, opened_eid: "open-900" });
+
+		const before = binding.telegram.sentMessages.length;
+		const result = await sendPath(replyInput({ thread: threadId, to: BOB, body: encodeDebateTurn(DEBATE_AUDIT_MARKER) }), deps);
+
+		const groupMessage = binding.telegram.sentMessages.slice(before).find((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.ok(groupMessage, "expected a group post");
+		assert.equal(groupMessage!.disable_notification, true, "an AUDIT-marked REPLY must be silent");
+
+		const rows = debateJournalRows(db, PROJECT_MAIN, threadId);
+		assert.equal(rows.length, 1, "exactly one journal row for this send — never composed");
+		assert.equal(rows[0]!.project_id, PROJECT_MAIN);
+		assert.equal(rows[0]!.debate_id, threadId);
+		assert.equal(rows[0]!.turn, "AUDIT");
+		assert.equal(rows[0]!.verdict, "APPROVE_WITH_CHANGES");
+		assert.equal(rows[0]!.eid, result.eid);
+		assert.equal(rows[0]!.from_agent_id, ALICE);
+		assert.equal(rows[0]!.to_agent_id, BOB);
+		assert.deepEqual(rows[0]!.refs, ["pr-42"]);
+		assert.equal(rows[0]!.basis_at_close, null, "AUDIT never closes a debate");
+		assert.equal(rows[0]!.round, 0, "AUDIT never advances the round; no COUNTER journaled yet");
+	});
+});
+
+test("Arena-light: a COUNTER-marked REPLY is silent and each successive COUNTER journals at the next round", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
+		const deps = agentDeps(db, binding, BOB);
+		const threadId = hexId(901);
+		writeThread(db, PROJECT_MAIN, threadId, { from: BOB, to: ALICE, to_user_id: ALICE_USER_ID, opened_eid: "open-901" });
+
+		const before1 = binding.telegram.sentMessages.length;
+		const result1 = await sendPath(replyInput({ thread: threadId, to: ALICE, body: encodeDebateTurn(DEBATE_COUNTER_MARKER) }), deps);
+		const group1 = binding.telegram.sentMessages.slice(before1).filter((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.equal(group1.length, 1, "one COUNTER send is exactly one physical group post — never composed");
+		assert.equal(group1[0]!.disable_notification, true, "a COUNTER-marked REPLY must be silent");
+
+		let rows = debateJournalRows(db, PROJECT_MAIN, threadId);
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0]!.turn, "COUNTER");
+		assert.equal(rows[0]!.round, 1, "the first journaled COUNTER occupies round 1");
+		assert.equal(rows[0]!.basis_at_close, null);
+
+		const before2 = binding.telegram.sentMessages.length;
+		const result2 = await sendPath(replyInput({ thread: threadId, to: ALICE, body: encodeDebateTurn(DEBATE_COUNTER_MARKER) }), deps);
+		const group2 = binding.telegram.sentMessages.slice(before2).filter((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.equal(group2.length, 1);
+		assert.equal(group2[0]!.disable_notification, true);
+
+		rows = debateJournalRows(db, PROJECT_MAIN, threadId);
+		assert.equal(rows.length, 2, "one row per COUNTER send — never merged");
+		assert.equal(rows[1]!.round, 2, "a second COUNTER occupies the next round");
+		assert.notEqual(result1.eid, result2.eid);
+	});
+});
+
+test("Arena-light: an ordinary REPLY with no debate marker still notifies and journals nothing", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: ALICE, entries: ENTRIES_MAIN });
+		const deps = agentDeps(db, binding, ALICE);
+		const threadId = hexId(902);
+		writeThread(db, PROJECT_MAIN, threadId, { from: BOB, to: ALICE, to_user_id: ALICE_USER_ID, opened_eid: "open-902" });
+
+		const before = binding.telegram.sentMessages.length;
+		await sendPath(replyInput({ thread: threadId, to: BOB, body: "just an ordinary reply, no marker" }), deps);
+
+		const groupMessage = binding.telegram.sentMessages.slice(before).find((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.ok(groupMessage);
+		assert.notEqual(groupMessage!.disable_notification, true, "an ordinary REPLY must still notify, unchanged from today");
+		assert.equal(debateJournalRows(db, PROJECT_MAIN, threadId).length, 0, "no marker decoded, nothing journaled");
+	});
+});
+
+test("Arena-light: a PROPOSAL-marked REQUEST notifies (never silenced) and journals at round 0", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
+		const deps = agentDeps(db, binding, BOB);
+
+		const before = binding.telegram.sentMessages.length;
+		const result = await sendPath(requestInput({ to: ALICE, body: encodeDebateTurn(DEBATE_PROPOSAL_MARKER) }), deps);
+
+		const groupMessage = binding.telegram.sentMessages.slice(before).find((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.ok(groupMessage);
+		assert.notEqual(groupMessage!.disable_notification, true, "PROPOSAL is a lifecycle boundary and must notify, never be silenced");
+
+		const rows = debateJournalRows(db, PROJECT_MAIN, result.thread);
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0]!.turn, "PROPOSAL");
+		assert.equal(rows[0]!.round, 0);
+		assert.equal(rows[0]!.basis_at_close, null);
+		assert.equal(rows[0]!.from_agent_id, BOB);
+		assert.equal(rows[0]!.to_agent_id, ALICE);
+		assert.equal(rows[0]!.eid, result.eid);
+	});
+});
+
+test("Arena-light: CONSENSUS notifies, resolves the thread, and its only extra effect beyond the ordinary RESOLVED bookkeeping is one journal row", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: ALICE, entries: ENTRIES_MAIN });
+		const deps = agentDeps(db, binding, ALICE);
+		const threadId = hexId(903);
+		// CONSENSUS (RESOLVED[context-shared]) is the addressee's to send (thread.to), per ADR-13.
+		writeThread(db, PROJECT_MAIN, threadId, { from: BOB, to: ALICE, to_user_id: ALICE_USER_ID, opened_eid: "open-903" });
+
+		const auditBefore = auditRows(db, PROJECT_MAIN).length;
+		const before = binding.telegram.sentMessages.length;
+		const result = await sendPath(
+			resolvedInput({ thread: threadId, to: BOB, basis: "context-shared", body: encodeDebateTurn(DEBATE_CONSENSUS_MARKER) }),
+			deps,
+		);
+
+		const groupMessage = binding.telegram.sentMessages.slice(before).find((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.ok(groupMessage);
+		assert.notEqual(groupMessage!.disable_notification, true, "CONSENSUS is a lifecycle boundary and must notify");
+
+		const resolvedThread = readThreadRecord(db, PROJECT_MAIN, threadId);
+		assert.equal(resolvedThread!.status, "resolved");
+
+		assert.equal(auditRows(db, PROJECT_MAIN).length, auditBefore + 1, "exactly one audit row, same as any ordinary RESOLVED send");
+
+		const rows = debateJournalRows(db, PROJECT_MAIN, threadId);
+		assert.equal(rows.length, 1, "exactly one journal row — the only effect beyond the ordinary RESOLVED bookkeeping");
+		assert.equal(rows[0]!.turn, "CONSENSUS");
+		assert.equal(rows[0]!.verdict, "APPROVE");
+		assert.equal(rows[0]!.eid, result.eid);
+		assert.equal(rows[0]!.basis_at_close, "context-shared", "CONSENSUS's basis_at_close is set, unlike AUDIT/COUNTER/PROPOSAL");
+		assert.deepEqual(rows[0]!.refs, ["memo-9"]);
+	});
+});
+
+test("Arena-light: ESCALATE notifies, resolves the thread as abandoned, and journals basis_at_close=abandoned", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: BOB, entries: ENTRIES_MAIN });
+		const deps = agentDeps(db, binding, BOB);
+		const threadId = hexId(904);
+		// ESCALATE (RESOLVED[abandoned]) is the originator's alone (ADR-13) — thread.from must be the caller.
+		writeThread(db, PROJECT_MAIN, threadId, { from: BOB, to: ALICE, to_user_id: ALICE_USER_ID, opened_eid: "open-904" });
+
+		const before = binding.telegram.sentMessages.length;
+		const result = await sendPath(
+			resolvedInput({ thread: threadId, to: ALICE, basis: ABANDON_BASIS_VALUE, body: encodeDebateTurn(DEBATE_ESCALATE_MARKER) }),
+			deps,
+		);
+
+		const groupMessage = binding.telegram.sentMessages.slice(before).find((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.ok(groupMessage);
+		assert.notEqual(groupMessage!.disable_notification, true, "ESCALATE is a lifecycle boundary and must notify");
+
+		const resolvedThread = readThreadRecord(db, PROJECT_MAIN, threadId);
+		assert.equal(resolvedThread!.status, "resolved");
+		assert.equal(resolvedThread!.basis, ABANDON_BASIS_VALUE);
+
+		const rows = debateJournalRows(db, PROJECT_MAIN, threadId);
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0]!.turn, "ESCALATE");
+		assert.equal(rows[0]!.eid, result.eid);
+		assert.equal(rows[0]!.basis_at_close, ABANDON_BASIS_VALUE);
+	});
+});
+
+test("Arena-light: an AUDIT and a COUNTER on the same debate each cost exactly one rate-budget hit apiece, never composed into one send", async () => {
+	await withLedger(async (db) => {
+		const binding = buildBinding({ projectId: PROJECT_MAIN, botId: BOT_ID_MAIN, groupId: GROUP_MAIN_ID, agentId: ALICE, entries: ENTRIES_MAIN });
+		const threadId = hexId(905);
+		writeThread(db, PROJECT_MAIN, threadId, { from: BOB, to: ALICE, to_user_id: ALICE_USER_ID, opened_eid: "open-905" });
+
+		const beforeAudit = binding.telegram.sentMessages.length;
+		await sendPath(replyInput({ thread: threadId, to: BOB, body: encodeDebateTurn(DEBATE_AUDIT_MARKER) }), agentDeps(db, binding, ALICE));
+		const groupPostsAfterAudit = binding.telegram.sentMessages.slice(beforeAudit).filter((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.equal(groupPostsAfterAudit.length, 1, "one AUDIT send is exactly one group post — one rate-budget hit");
+
+		const beforeCounter = binding.telegram.sentMessages.length;
+		await sendPath(replyInput({ thread: threadId, to: ALICE, body: encodeDebateTurn(DEBATE_COUNTER_MARKER) }), agentDeps(db, binding, BOB));
+		const groupPostsAfterCounter = binding.telegram.sentMessages.slice(beforeCounter).filter((m) => m.chat_id === GROUP_MAIN_ID);
+		assert.equal(groupPostsAfterCounter.length, 1, "one COUNTER send is exactly one group post — one rate-budget hit");
+
+		assert.equal(debateJournalRows(db, PROJECT_MAIN, threadId).length, 2, "one journal row per turn — AUDIT and COUNTER are never merged");
 	});
 });
 
