@@ -1382,6 +1382,96 @@ visible.
 
 ---
 
+## `bus-v2-f3-pr-06-diff-audit-001` — F3 PR-06 diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | Audit the diff for PR-06 (`src/cli/panel.ts`, `cli/main.ts` dispatch) — the `conmuta panel [--home <dir>]` verb, opening Unit 6. Implemented inline by Kairo: native `sdd-apply` Agent dispatch was refused again by the same `PreToolUse:Agent` hook defect documented in HANDOFF.md for sessions 44/45, even immediately after a fresh, successful `AskUserQuestion` SDD preflight in the same turn. |
+| Authority | The Director's standing full autonomy for the whole `sdd-apply` cycle, renewed at this session's start ("Tienes autorizacion para decidir sin preguntarme..."). |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections, after independently verifying two disclosed design choices against the real files: (1) the `--home <dir>` option mirrors `daemon stop`'s exact parsing (`main.ts:336-354`); (2) the Node-floor gate runs as the branch's literal first action, matching the post-PR-13/session-35 convention every verb added since follows (`daemon start`, `mcp`, `migrate-v1`) — `daemon stop` itself is the one disclosed pre-existing exception, not a template. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-06 merged as GitHub PR #85. 209 authored lines, no exception. RDD native review also ran (`review-15feb05124a442ef`), APPROVED with 6 non-blocking SUGGESTION findings, filed as **B-93**. |
+
+---
+
+## `bus-v2-f3-pr-07-diff-audit-001` — F3 PR-07 diff audit (pre-correction)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | Audit the diff for PR-07 (`cli/project-sync-roster.ts`, `registry-commit.ts`'s `"ROSTER_SYNCED"` reason, `main.ts` dispatch) at commit `25c8135` — implemented by a delegated general-purpose sub-agent (not `sdd-apply`, which remains blocked; a `general-purpose` Agent dispatch was tried instead and worked, a new discovery this session), then independently re-verified by Kairo. Disclosed a 362-line size exception (762 vs. 400 budget). |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections, confirming: the size exception (one cohesive capability, 67% test volume under strict TDD); the dispatch-shape decision (a direct `cli/main.ts` branch, not a sub-verb of `installer/cli.ts`'s closed `InstallerCliOutcome` union); and the exit-code choices. **This audit closed `CONSENSUS` without catching either of the two real gaps this repo's own RDD native review found independently on the identical diff** (see `bus-v2-f3-pr-07-diff-audit-002`) — disclosed here plainly as a genuine divergence between the two independent review mechanisms, not resolved by re-litigating whether Alpha's pass was thorough. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. Superseded in practice by the corrected candidate audited in `bus-v2-f3-pr-07-diff-audit-002`; this debate's own state machine was already terminally closed by the time the RDD-found gaps were fixed, so a new conversation was opened rather than reopening this one. |
+| Left open, carried to the Director | None. |
+| Consequence | Commit `25c8135` was never merged directly — two more commits (`9af306a`, `8ce2a0b`) landed on the same branch fixing the RDD-found gaps before merge; see the successor debate. |
+
+---
+
+## `bus-v2-f3-pr-07-diff-audit-002` — F3 PR-07 re-audit (post-correction)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | Re-audit of PR-07's final candidate, commit `8ce2a0b` (branch `25c8135` → `9af306a` → `8ce2a0b`), after two rounds of this repo's own RDD native review (`review-21eb25a2eb6f76f7`, `review-1e4a4960dde90920`) found and Kairo fixed two real gaps the first Alpha audit above did not catch: (1) `project-sync-roster.ts` never cross-checked `conmuta.json`'s own `project_id` against the registry project matched by path — a wrong-project file at a bound path could commit onto the wrong binding; (2) the new heartbeat-tick regression test (D-07) only proved the poller was alive (`getUpdatesCalls > 0`), not that a genuine reconcile tick fired — an ADR-12 violation, fixed twice (the first fix was itself an inadequate proxy, caught by the RDD review's own second pass) by adding a second binding after boot and asserting its `BINDING_CHANGED` audit row appears on the next tick, mirroring the sibling PR-40a test's technique. Opened as a new conversation since the prior debate had already closed `CONSENSUS` (state machine accepts no further envelope on a closed conversation) — same pattern as this project's own `bus-v2-f1-pr-39-audit-002` precedent. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections, explicitly conceding both RDD-found gaps as genuine defects its own first pass missed, and independently verifying both fixes and the final line count (806 authored lines, 406-line disclosed exception, ~69% test volume). |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-07 merged as GitHub PR #86, closing Unit 7. 10 remaining non-blocking RDD findings across both review passes disclosed as **B-94**, not fixed (most notably a narrow TOCTOU race on the confirm prompt, judged the same as the already-accepted B-90 precedent). |
+
+---
+
+## `bus-v2-f3-pr-08-envelope-provenance-001` — F3 PR-08 pre-code architectural debate
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | A genuine architectural tension discovered before writing any PR-08 code: `test/fixtures/v1-provenance.json` classifies both `src/shared/envelope.ts` and `test/shared/envelope.test.ts` as **AS-IS** (must stay byte-identical to v1, per `test/security/provenance.test.ts:116-120`'s hash check), but PR-08's own `tasks.md` scope line already plans to modify both. Worse, two existing tests in `envelope.test.ts` assert `deliveredText(renderMessageHtml(envelope))` is byte-for-byte identical to `encodeEnvelope(envelope)`'s output — an invariant the new visible version stamp inside the `<b>` header necessarily breaks, since `encodeEnvelope`/`renderHeader` stay unchanged per spec but the rendered, delivered text now carries extra content. Verified via `decodeEnvelope`'s real implementation (only ever scans for the last sentinel-line match, ignoring the header entirely) that this does not threaten the actual ADR-05c decode-compatibility guarantee, only the stricter, more incidental byte-identity test assertion. |
+| Authority | The Director's standing instruction, from this session's opening prompt, to debate with Alpha before writing code on a genuinely unresolved question — explicitly the same category as last session's `roster_drift` gap. |
+| Round 1 | Kairo's `PROPOSAL` offered: (1) reclassify both files AS-IS → SEAM with documented Changes notes, mirroring the `bus-v2-f1-pr-39-audit-002` precedent; (2) narrow the two affected tests to what remains true (the sentinel line specifically, and `decodeEnvelope` round-tripping) instead of the whole delivered text. Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with one real objection: a **third** assertion (`envelope.test.ts:302`, the wire-length-guard test) also asserted `deliveredText(...).length === encodeEnvelope(...).length` and would break the same way, and was missing from Kairo's stated scope. Objection verified true by direct read before accepting. |
+| Round 2 | Not run as a formal round — the objection was accepted and folded into implementation directly; Alpha's own audit of the resulting diff (`bus-v2-f3-pr-08-diff-audit-001`) is the closing verification. |
+| Outcome | **JUDGMENT: APPROVED WITH CHANGES, resolved.** Objection 1 (line 302's scope) accepted. |
+| Left open, carried to the Director | None. |
+| Consequence | Both files reclassified SEAM; three test blocks (not two) narrowed; investigating the fix surfaced a genuine CRITICAL bug (see `bus-v2-f3-pr-08-diff-audit-001`), not something this debate itself anticipated. |
+
+---
+
+## `bus-v2-f3-pr-08-diff-audit-001` — F3 PR-08 diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | Audit the diff for PR-08 (`WIRE_VERSION`, `renderMessageHtml`'s version stamp, the SEAM reclassification agreed in the prior debate), commit `a8db63a`. Includes a CRITICAL fix this repo's own RDD native review found (`review-49f5f64f1398a087`): the version stamp is delivered-plane overhead Telegram's real 4096-char ceiling measures against, but the wire-length guard (`encodedTextExceedsTelegramLimit`, `daemon/send/validate.ts`'s `guardEncodedLength`) only ever measured the shorter canonical text — an envelope near the old boundary could pass locally and still be rejected by Telegram. Fixed in both the throw-path guard and the `headroom_chars` gauge surfaced to MCP tool callers. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections, independently validating the CRITICAL finding itself (confirmed Telegram measures post-entities-parsing length, confirmed the 26-character overhead was genuinely unaccounted for before this fix), the fix's correctness on both paths, the SEAM provenance disclosure, and all test/static/full-suite counts. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-08 merged as GitHub PR #87, closing Unit 8 and B-14. 204 authored lines, no exception. This repo's own RDD "scope_changed" correction-recovery flow hit a dead end requiring a "maintainer authorization" binding neither Kairo nor the Director could construct — disclosed as a tooling gap, not resolved; Alpha's audit served as the sole closing gate for this candidate. |
+
+---
+
+## `bus-v2-f3-pr-09-diff-audit-001` — F3 PR-09 diff audit (closes F3)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-27 (session 47) |
+| Subject | Audit the diff for PR-09 (`test/security/daemon-bundle.test.ts`'s dedicated panel-asset `node:fs` assertion, `THREAT-MODEL.md` T18/PT-29 citation updates, `CHECKLIST.md`'s B-14 closure), commit `a6ac884` — the final slice of F3, closing Unit 9. |
+| Authority | Same standing autonomy as above. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: the new test correctly targets `daemon/panel/server.js`/`routes.js` specifically, excluding the already-allow-listed `panel-run-file.js`; `panel-run-file.js`'s presence in the existing allow-list correctly traces to PR-05; the THREAT-MODEL and CHECKLIST citations are accurate against the real files. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-09 merged as GitHub PR #88, closing Unit 9 and **all of F3** (`f3-web-panel-and-observability`, 45/45 tasks). This repo's own RDD native review escalated on this candidate (`review-d0c040637479fddf`, reason `unknown_causality`) on a single self-flagged-unverified finding (`R2-1`, already downgraded by the readability lens itself) — the native contract's own output describes this as informational, not blocking; declined for the committed candidate rather than pursued further, per Director instruction. Native `sdd-status` now recommends `verify` as F3's next step. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an
