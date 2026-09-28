@@ -1517,6 +1517,186 @@ visible.
 
 ---
 
+## `bus-v2-f5-explore-decisions-001` — F5 `sdd-explore` open-decisions debate
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Resolve 4 protocol-semantics decisions `sdd-explore` deliberately left open for `f5-arena-light-two-party`: CONSENSUS's basis mapping, the escalation-asymmetry premise, coalescing's concrete shape, and marker-aware silence's scope. |
+| Authority | Session-opening standing autonomy: route every audit/debate through Alpha, decide without asking except genuinely unresolved product questions. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES`: confirmed `context-shared` for CONSENSUS and the coalescing/silence shapes, but corrected the round-cap refusal code from Kairo's invented `ROUND_CAP_EXCEEDED` to the canonical, already forward-declared `ROUNDS_EXHAUSTED` (`DATA-MODEL.md`/`THREAT-MODEL.md` PT-23), and clarified that COUNTER is structurally always sent by the proposer, mooting the escalation-asymmetry concern; also narrowed marker-aware silence to REPLY-only turns per `send-path.ts`'s own lifecycle-boundary doc. |
+| Round 2 | Kairo's `CONSENSUS` accepted both objections with independently-verified evidence. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | `exploration.md` corrected; `sdd-propose` unblocked. |
+
+---
+
+## `bus-v2-f5-proposal-audit-001` — F5 `sdd-propose` diff audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit `proposal.md` for `f5-arena-light-two-party`, including a self-disclosed gap Kairo flagged before Alpha's own review: PT-23's 3 clauses were only partially reflected in Success Criteria. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES`, confirming Kairo's own hypothesis (pointer-only enforcement is generic, not PATCH-kind-specific) and requiring the 2 missing PT-23 clauses plus a named rate-budget constant be added to Scope/Success Criteria. |
+| Round 2 | Kairo fixed and reported the correction; Alpha's `AUDIT` returned `APPROVE`, zero objections. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | `proposal.md` corrected (word budget re-verified); `sdd-spec` unblocked. |
+
+---
+
+## `bus-v2-f5-design-decisions-001` — F5 named-constant ratification, plus a real spec-correctness objection
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | `sdd-spec` surfaced 2 named constants `DATA-MODEL.md` deferred to "the F5 spec" but no debate had fixed: `ARENA_LIGHT_MAX_ROUNDS`'s value and `debate_journal.verdict`'s closed token set. Kairo proposed 3 (mirroring the tribunal's own round cap) and `{APPROVE, APPROVE_WITH_CHANGES, REJECT}` (mirroring Arena Orion's own live vocabulary), with reasoning satisfying `CONSTITUTION.md`'s named-constant rule. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned **`APPROVE_WITH_CHANGES`**, not objection-free: approved both D5/D6 values and their reasoning, but raised a real objection against `arena-light-debates/spec.md:66,72` — the spec's freshly-written "CONSENSUS may be sent by either party" was incorrect under the already-shipped `validate.ts:285-298` (only the addressee may send a non-`abandoned` RESOLVED). (A broker delivery glitch meant Kairo received this only via an in-band `PATCH` resend after 2 empty `bridge_read`s on the terminal `AUDIT` state — recovered per the established protocol; the resend is what disclosed the objection had been missed on the first, silently-failed read.) |
+| Round 2 | Kairo independently re-verified the objection against the real `validate.ts` source, fixed the spec text (CONSENSUS is addressee-only), and reported the correction; Alpha's `AUDIT` returned `APPROVE`, zero objections. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | Both constants coded into `src/shared/constants.ts` (PR-1) with the ratified reasoning in their doc comments. `arena-light-debates/spec.md`'s CONSENSUS-authority text corrected here — this is the debate that actually produced that fix, not a separate `sdd-spec`-phase audit (no such separate debate exists; an earlier draft of this project's own session documentation incorrectly implied one and has been corrected to match this entry). |
+
+---
+
+## `bus-v2-f5-design-audit-001` — F5 `sdd-design` audit (escalation-deadlock gap found and closed)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit `design.md`, including a gap Kairo self-caught before sending: nothing in the ratified specs/design enforced which of the two thread parties could send AUDIT vs. COUNTER, reviving the escalation-deadlock concern `bus-v2-f5-explore-decisions-001` had dismissed as structurally moot. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES`, confirming the gap was real and mandatory to close, prescribing the exact fix: reuse `NOT_ORIGINATOR`/`NOT_ADDRESSEE` (COUNTER requires `caller===thread.from`, AUDIT requires `caller===thread.to`) rather than any new error taxonomy. (Same broker-glitch recovery pattern as above — resent via `PATCH` after empty reads.) |
+| Round 2 | Kairo fixed both the spec and design.md, reported the correction; Alpha's `AUDIT` returned `APPROVE`, zero objections. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | `design.md` and `arena-light-debates/spec.md` both corrected; `sdd-tasks` unblocked. This role-check design is what PR-4 later implemented unchanged. |
+
+---
+
+## `bus-v2-f5-tasks-audit-001` — F5 `sdd-tasks` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit `tasks.md` — 15 tasks across 4 phases, Review Workload Forecast (High risk, 5-PR stacked-to-main split), and whether the role-check fix from the design audit needed its own separate task line. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: confirmed all 15 real scenarios traced, confirmed folding the role-check into tasks 3.1/3.2 (rather than a separate task) was correct since both checks live in the same `checkDebateTurn` function within one PR slice, and confirmed the 5-PR split matched project convention. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | `sdd-apply` proceeded on this plan; F5's full SDD planning cycle (explore→propose→spec→design→tasks) is complete and ratified. |
+
+---
+
+## `bus-v2-f5-pr-01-diff-audit-001`/`002` — F5 PR-1 diff audit (schema + migration + constants)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit PR-1's diff (358 changed lines, 6 files: `debate_journal` DDL, the v1→v2 migration step, 4 named constants), independently re-verified by Kairo (diff stat and full suite both reproduced, matching the implementer's own claims exactly) before sending. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections — but the actual message content was never received (a broker delivery glitch: the debate closed straight to terminal `CONSENSUS`, but `bridge_read` returned empty twice, and `PATCH` recovery is illegal from a terminal state). |
+| Round 2 | Kairo opened a fresh conversation (`-002`) asking Alpha to restate the verdict in writing rather than infer approval from the bare state field; Alpha confirmed `APPROVE`, zero objections, with the full reasoning. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS`. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-1 committed, pushed, merged as GitHub PR #89. First instance this session of the "terminal-state broker glitch, recover via fresh conversation" pattern that recurred several more times. |
+
+---
+
+## `bus-v2-f5-pr-02-03-diff-audit-001` — F5 PR-2/PR-3 diff audit (`debate-marker.ts`, `debate-journal.ts`)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit both `shared/debate-marker.ts` and `ledger/debate-journal.ts`, implemented in one apply batch but split into 2 PRs (365 / 359 lines) matching `tasks.md`'s own suggested slices, each independently re-verified by Kairo. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: confirmed the fail-closed decode discipline, the `assertNoTokenShape` guard disclosed beyond design.md's literal interface listing, and both PR line counts under budget. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-2 (`#90`) and PR-3 (`#91`) committed as 2 separate PRs (checkbox/doc changes manually split to match), merged in sequence. |
+
+---
+
+## `bus-v2-f5-pr-04-coalescing-contradiction-001` — the coalescing design contradiction, found and resolved
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Before committing PR-4 (`validate.ts`'s round-cap+role-check stage), Kairo independently traced PR-2's already-merged `encodeCoalescedReply` (composing one AUDIT marker + one COUNTER marker into a single body) against PR-4's new role check and found them mutually exclusive: AUDIT is accepted only from the thread's addressee, COUNTER only from its originator — two different agents — so no single caller could ever produce the coalesced body PR-2 shipped. |
+| Authority | Same standing autonomy; this is the kind of "genuinely unresolved product/architecture question" the standing instruction explicitly reserves for a real debate rather than a unilateral call. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE_WITH_CHANGES` with a full architectural diagnosis: the coalescing requirement was a spurious artifact from early F0-era planning that treated a debate "round" as a static, omniscient-view entity, ignoring the bus's distributed nature (temporal causality — the proposer cannot counter-argue an AUDIT it hasn't received; role separation — no single sender can legitimately emit both roles; the passive-switch core, ADR-06 L1-L2, cannot buffer one party's turn waiting for the other's). Evaluated and rejected 2 alternative resolutions (cross-debate coalescing; relaxing the role check), adopted dropping coalescing entirely as the only sound resolution, with a concrete action plan (PR-4 unchanged; specs/design corrected; `encodeCoalescedReply` removed as a follow-up; PR-5 designed with no composition logic). |
+| Round 2 | Kairo's `CONSENSUS` accepted the objection, independently re-verified the reasoning against `validate.ts`, `envelope.ts`, and `CONSTITUTION.md`'s autonomy boundary before accepting. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 2. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-4 committed unchanged (`#92`). A dedicated follow-up cleanup PR (PR-4b) removed `encodeCoalescedReply` and corrected both delta specs and `design.md`. 7 canonical project docs (`WORK-PLAN.md`, `CONSTITUTION.md`, `THREAT-MODEL.md` ×2, `OVERVIEW.md` ×2, ADR-0004, this file's own D7 row below) were later corrected to match. This is the most consequential single finding of the session — a real design defect caught before it shipped further, not a cosmetic or documentation-only issue. |
+
+---
+
+## `bus-v2-f5-coalescing-cleanup-diff-audit-001` — F5 PR-4b diff audit (coalescing removal)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit the coalescing-removal cleanup diff (153 changed lines, 8 files): `encodeCoalescedReply` and its 2 tests removed from the already-merged `debate-marker.ts`; both delta specs and `design.md` corrected; `ARENA_LIGHT_MESSAGES_PER_ROUND`'s doc comment corrected to state the invariant it actually protects. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: confirmed the removal left no dangling references, confirmed the constant's corrected reasoning, confirmed all 4 corrected files stayed under their word budgets. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-4b committed and merged as GitHub PR #93. |
+
+---
+
+## `bus-v2-f5-pr-05-diff-audit-001`/`002` — F5 PR-5 diff audit (`send-path.ts` wiring, final code slice)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit PR-5 (367 changed lines): `isSilentSend`/`debateTurnRound`/`debateBasisAtClose` helpers and the `appendDebateTurn` wiring inside the existing post-send `withTransaction` block. Kairo independently traced the round-cap arithmetic through a full debate lifecycle before sending, confirming it matched the spec's own scenario and PT-23's "(cap+1)-th COUNTER" wording exactly, and flagged the round-value-for-non-COUNTER-turns rule as a disclosed judgment call (underspecified by design.md/either spec). |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections — same terminal-state broker glitch as PR-1's audit (state closed to `CONSENSUS`, content never delivered). |
+| Round 2 | Kairo opened a fresh conversation (`-002`); Alpha confirmed `APPROVE`, zero objections, with full reasoning. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS`. |
+| Left open, carried to the Director | None. |
+| Consequence | PR-5 committed and merged as GitHub PR #94 — F5's final code slice, closing all 15/15 tasks. This repo's own RDD native review on this same candidate found 3 non-blocking advisory findings (a round-value test-coverage gap; a rate-budget test naming-precision gap; a post-send-transaction reliability note Kairo verified was pre-existing architecture, not new risk) — disclosed in PR-5's own commit message, not fixed, per the review contract's own prohibition on reopening an approved candidate for advisory-only findings. |
+
+---
+
+## `bus-v2-f5-verify-audit-001` — F5 `sdd-verify` audit
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit `verify-report.md` (`PASS WITH WARNINGS`: 0 CRITICAL, 1 WARNING, 2 SUGGESTION — a stale coalescing mention in `OVERVIEW.md` §11 the orchestrator's own first correction sweep of 6 docs had missed, plus `proposal.md`'s own stale lines) after Kairo had already fixed all 3 findings directly. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections: independently confirmed all 15 spec scenarios compliant, the full suite and `test:static` both green, design coherence intact, and that both the WARNING and both SUGGESTIONs were genuinely resolved. Explicitly agreed proceeding straight to `sdd-archive` without a second verify pass was correct, since only documentation changed after the passing run. |
+| Round 2 | Not needed — closed straight to `CONSENSUS`. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS` round 1. |
+| Left open, carried to the Director | None. |
+| Consequence | `sdd-archive` proceeded on this basis. |
+
+---
+
+## `bus-v2-f5-archive-audit-001`/`002` — F5 `sdd-archive` audit (closes F5)
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-28 (session 49) |
+| Subject | Audit `archive-report.md` plus 4 findings from this repo's own RDD native review on the archive candidate, all fixed by Kairo before sending: a stale claim in the delegate's own archive-report (describing a duplicate-`## Traceability` composition artifact as unfixed when Kairo had already fixed it moments earlier — corrected per the archive skill's own Final-State Authority rule), a stale "Open Follow-Up" pointer to the same now-fixed issue, a missing `INLINE_PATCH_REJECTED` error-code name in the `arena-light-debates` spec's pointer-only requirement, and 2 missing scenarios documenting behavior already covered by real tests (`validate.test.ts:830`, `debate-marker.test.ts:116`) but not spec-named. Also discloses the archive move itself hit the same `git mv`/`mv` `Permission denied` class as F3's session-48 incident, recovered identically via `Move-Item`, independently re-verified byte-for-byte by Kairo against `HEAD` for all 9 archived files. |
+| Authority | Same standing autonomy. |
+| Round 1 | Alpha's `AUDIT` returned `APPROVE`, zero objections — same terminal-state broker glitch as PR-1's and PR-5's audits. |
+| Round 2 | Kairo opened a fresh conversation (`-002`); Alpha confirmed `APPROVE`, zero objections, explicitly ratifying all 4 RDD-finding fixes and the archive mechanics. |
+| Outcome | **JUDGMENT: APPROVED**, `CONSENSUS`. |
+| Left open, carried to the Director | Which phase comes after F5: F4 (needs spike B-09) or F6 (needs Director decisions B-11/B-16/B-12) — neither cleanly ready, left for the Director per `HANDOFF.md`. |
+| Consequence | F5 (`f5-arena-light-two-party`) is fully archived to `openspec/changes/archive/2026-09-28-f5-arena-light-two-party/`; 3 spec domains synced (`arena-light-debates` new, `ledger` and `send-path` delta-merged). F1 through F5 are now all archived. |
+
+---
+
 ## Inherited v1 debates (historical record, not re-audited)
 
 The v1 programme was audited per block. These ids are listed so a reader can locate the origin of an

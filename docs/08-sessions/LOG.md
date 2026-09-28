@@ -4,6 +4,76 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 49 — F5 (`f5-arena-light-two-party`) planned, implemented, verified, archived
+
+- **Date**: 2026-09-28 (UTC).
+- **Authority**: the Director asked Kairo to decide F4-vs-F5 without being asked, run the chosen
+  phase's full SDD cycle plus implementation with full autonomy, route every audit/debate through
+  Alpha, and close with an Alpha-audited handoff and a ≤3-line next-session miniprompt.
+- **Phase choice**: F5 over F4 — F4 depends on the still-unresolved spike B-09, F5 depends only on
+  the already-archived F1. A dependency-readiness call, not a product trade-off, decided without
+  asking per the Director's delegation.
+- **Planning (explore → propose → spec → design → tasks)**: all 5 phases run inline (native
+  `sdd-*` dispatch still blocked); explore, propose, design and tasks were each Alpha-audited to
+  `CONSENSUS` on their own; `sdd-spec` had no dedicated Alpha debate of its own — its one real
+  defect (CONSENSUS drafted as either-party when the shipped `validate.ts:284-298` requires the
+  addressee specifically) was instead caught and fixed inside `bus-v2-f5-design-decisions-001`,
+  the debate ratifying `ARENA_LIGHT_MAX_ROUNDS`/the verdict vocabulary. Three real corrections
+  total: `bus-v2-f5-explore-decisions-001` (round-cap refusal code corrected to the canonical
+  `ROUNDS_EXHAUSTED`; silence narrowed to REPLY-only turns); `bus-v2-f5-design-decisions-001`
+  (the CONSENSUS-addressee-only spec fix above); `bus-v2-f5-design-audit-001` (a SEPARATE
+  escalation-deadlock gap Kairo self-caught before sending to Alpha; Alpha's fix added a role check
+  reusing `NOT_ORIGINATOR`/`NOT_ADDRESSEE`).
+- **Implementation (`sdd-apply`, 6 merged PRs)**: PR-1 `#89` (schema/migration/constants), PR-2/3
+  `#90`/`#91` (`shared/debate-marker.ts`, `ledger/debate-journal.ts`), PR-4 `#92` (`validate.ts`'s
+  round-cap+role-check stage), PR-4b `#93` (coalescing-removal cleanup), PR-5 `#94`
+  (`send-path.ts` wiring). Each independently re-verified by Kairo (diff read in full, tests
+  recompiled/re-run) before committing, then Alpha diff-audited, then RDD-natively-reviewed.
+- **The coalescing contradiction**: before committing PR-4, Kairo independently traced PR-2's
+  `encodeCoalescedReply` (one body composing an AUDIT marker + a COUNTER marker) against PR-4's new
+  role check and found them mutually exclusive — AUDIT is addressee-only, COUNTER originator-only,
+  two different agents, so no single caller could ever produce the coalesced body; the
+  passive-switch core (ADR-06 L1-L2) also rules out buffering one party's turn for the other's.
+  Resolved with Alpha (`bus-v2-f5-pr-04-coalescing-contradiction-001`, CONSENSUS): coalescing
+  dropped entirely, every debate turn is its own independent silenced send. Corrected 7 canonical
+  docs (`WORK-PLAN.md`, `CONSTITUTION.md`, `THREAT-MODEL.md` ×2 rows, `OVERVIEW.md` ×2 mentions,
+  ADR-0004, tribunal `INDEX.md`'s D7 row) plus the shipped code/specs/`proposal.md`.
+- **`sdd-verify`**: delegated, one retry after a rate-limit failure (not before it found 6 of 7
+  stale canonical-doc mentions Kairo had already started fixing). `PASS WITH WARNINGS`: 0 CRITICAL,
+  1 WARNING (a 2nd, separate `OVERVIEW.md` §11 coalescing mention the first sweep missed), 2
+  SUGGESTION — all fixed by Kairo, re-audited by Alpha (`bus-v2-f5-verify-audit-001`, CONSENSUS)
+  rather than a second full verify pass, since only docs changed after the passing run. Full suite
+  1526/1520/0/6, `test:static` 57/57.
+- **`sdd-archive`**: delegated. Hit the identical `git mv`/`mv` `Permission denied` class as F3's
+  session-48 incident, recovered identically via `Move-Item` with absolute paths, mandatory
+  `diff -r` empty — independently re-verified byte-for-byte by Kairo against `HEAD` for all 9
+  archived files (not trusted from the delegate's own report). This repo's own RDD native review
+  on the archive candidate then found a real, minor defect in **Kairo's own prior fix**, not the
+  delegate's work: Kairo had already consolidated the composed `ledger`/`send-path` specs'
+  duplicate `## Traceability` sections before the review ran, but the delegate's own
+  `archive-report.md` — written before that fix — still described the problem as unfixed.
+  Corrected per the archive skill's Final-State Authority rule. Also fixed 2 SUGGESTION-tier
+  spec-completeness gaps the same review found (naming `INLINE_PATCH_REJECTED` explicitly;
+  documenting 2 scenarios already covered by real tests but not spec-named). Re-audited by Alpha
+  (`bus-v2-f5-archive-audit-001`/`002`, CONSENSUS).
+- **RDD**: 5 native reviews this session (PR-4, PR-5, the doc-fix commit, the archive candidate,
+  and this close-out-documentation commit), all `approved`/acknowledged, every consent envelope
+  relayed losslessly via `AskUserQuestion` and granted. First time RDD ran end to end across an
+  entire phase in this project's history. RDD's own review of this close-out commit's first draft
+  found 2 WARNING + 1 SUGGESTION — a domain-count arithmetic error, an internally-inconsistent RDD
+  count (claimed 5, listed 4), and a conflated debate reference (the CONSENSUS-addressee-only spec
+  fix was credited to a nonexistent separate `sdd-spec` audit rather than
+  `bus-v2-f5-design-decisions-001`, where it actually happened) — all three fixed before commit.
+- **Environment**: a background `npm test` hung at least 3 times (near-zero CPU, no output) —
+  worked around by rerunning in the foreground every time. The `getaddrinfo() thread failed to
+  start` git-over-HTTPS DNS quirk (session 40's own precedent) recurred twice, resolved by simple
+  retry both times. Engram `mem_save` failed again (3rd consecutive session) with the same
+  session-binding conflict — disclosed, non-blocking, filesystem archive remains authoritative.
+- **Outcome**: F5 fully planned, implemented, verified, archived —
+  `openspec/changes/archive/2026-09-28-f5-arena-light-two-party/`. F1-F5 all archived. Neither F4
+  (needs spike B-09) nor F6 (needs Director decisions B-11/B-16/B-12) is cleanly ready to plan
+  next — left as the first open question for the next session.
+
 ## Session 48 — F3 `sdd-verify` + `sdd-archive`; F3 fully closed
 
 - **Date**: 2026-09-27 (UTC).
