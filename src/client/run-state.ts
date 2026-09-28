@@ -8,16 +8,20 @@ import {
   watch,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
-  HOME_DIR_NAME,
   POSIX_PRIVATE_DIR_MODE,
   POSIX_PRIVATE_FILE_MODE,
   SPAWN_LOCK_STALE_SECONDS,
   SPAWN_WAIT_SECONDS,
 } from "../shared/constants.js";
+import { isProcessAlive, readRunFile, resolveClientHomeDir, type DaemonRunPayload } from "./run-file.js";
 import { spawnDaemon } from "./spawn.js";
+
+// Move-only split (F4 design D6): the run-file read primitives live in `./run-file.js`, which has no
+// spawn capability. Re-exported so every existing import path through this module keeps working.
+export { isProcessAlive, readRunFile, resolveClientHomeDir };
+export type { DaemonRunPayload };
 
 /**
  * Client-side spawn election over `run/spawn.lock` (D-16), and the client's own read of the daemon's
@@ -40,16 +44,6 @@ import { spawnDaemon } from "./spawn.js";
 
 /** Name of the client's own spawn-election lock file, distinct from the daemon's `daemon.lock`. */
 const SPAWN_LOCK_FILENAME = "spawn.lock";
-
-/** Name of the daemon's run file, as written by `daemon/lifecycle/run-file.ts`'s `writeRunFile`. */
-const DAEMON_RUN_FILENAME = "daemon.json";
-
-/** `{port, pid, secret}` as the daemon's run file carries it (mirrors `daemon/lifecycle/run-file.ts`). */
-export interface DaemonRunPayload {
-  port: number;
-  pid: number;
-  secret: string;
-}
 
 /** The spawn-lock's lease identity. No `heartbeat_at`: this is a short election, not a held singleton. */
 export interface SpawnLockPayload {
@@ -78,17 +72,6 @@ export class DaemonSpawnTimeoutError extends Error {
   }
 }
 
-/**
- * Resolves the daemon's home directory the same way `daemon/home.ts`'s `resolveHomeDir` does
- * (reimplemented locally — see the module doc).
- */
-export function resolveClientHomeDir(explicitHome?: string): string {
-  if (explicitHome !== undefined && explicitHome.trim().length > 0) {
-    return resolve(explicitHome);
-  }
-  return join(homedir(), HOME_DIR_NAME);
-}
-
 /** Ensures `<homeDir>/run` exists (private mode) and returns its path. */
 function ensureRunDir(homeDir: string): string {
   const runDir = join(homeDir, "run");
@@ -96,46 +79,6 @@ function ensureRunDir(homeDir: string): string {
     mkdirSync(runDir, { recursive: true, mode: POSIX_PRIVATE_DIR_MODE });
   }
   return runDir;
-}
-
-/**
- * Whether `pid` is still running (reimplemented locally from `daemon/lifecycle/lock.ts`'s
- * `isProcessAlive` — see the module doc). Fails CLOSED: an unreadable signal reads as alive, so this
- * can only ever make a reclaim or an invalidation happen faster, never make one happen wrongly.
- */
-export function isProcessAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) {
-    return false;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code !== "ESRCH";
-  }
-}
-
-/**
- * Reads and parses `run/daemon.json` (reimplemented locally from `daemon/lifecycle/run-file.ts`'s
- * `readRunFile` — see the module doc). Returns `null` when the file is missing, corrupt, missing a
- * required field, or names a pid that is no longer alive.
- */
-export function readRunFile(runDir: string): DaemonRunPayload | null {
-  const runFilePath = join(runDir, DAEMON_RUN_FILENAME);
-  try {
-    const raw = readFileSync(runFilePath, "utf8");
-    const data = JSON.parse(raw) as Partial<DaemonRunPayload>;
-
-    if (typeof data.port !== "number" || typeof data.pid !== "number" || typeof data.secret !== "string") {
-      return null;
-    }
-    if (!isProcessAlive(data.pid)) {
-      return null;
-    }
-    return { port: data.port, pid: data.pid, secret: data.secret };
-  } catch {
-    return null;
-  }
 }
 
 function spawnLockPath(runDir: string): string {

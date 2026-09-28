@@ -78,10 +78,10 @@ test("client bundle: child_process detection is non-vacuous (seeded negative)", 
   assert.equal(hasChildProcessReference('import { spawn } from "node:child_process";'), true);
 });
 
-test("client bundle: node:fs is confined to client/binding.js and client/run-state.js", () => {
+test("client bundle: node:fs is confined to client/binding.js, client/run-file.js and client/run-state.js", () => {
   const contents = clientBundleContents();
   const matches = [...contents.entries()].filter(([, source]) => hasFsModuleReference(source)).map(([p]) => p).sort();
-  assert.deepEqual(matches, ["client/binding.js", "client/run-state.js"]);
+  assert.deepEqual(matches, ["client/binding.js", "client/run-file.js", "client/run-state.js"]);
 });
 
 test("client bundle: node:fs detection is non-vacuous (seeded negative)", () => {
