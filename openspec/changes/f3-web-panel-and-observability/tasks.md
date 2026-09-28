@@ -288,11 +288,15 @@ Requirements: web-panel "no `node:fs` reference" scenario (as a bundle-wide asse
 unit test); THREAT-MODEL documentation for the panel's own local-process-integration boundary.
 Runtime harness: N/A — static analysis over the compiled bundle.
 
-- [ ] 9.1 RED: extend `daemon-bundle.test.ts` asserting no `daemon/panel/*.js` file appears in the
-      `node:fs` reference list (the existing 7-file list itself stays byte-identical).
-- [ ] 9.2 GREEN: fix any accidental `node:fs` import the panel modules picked up, if the RED test
-      catches one; otherwise this task is a no-op confirmation.
-- [ ] 9.3 Update THREAT-MODEL.md T18/PT-29 rows to cite the panel's real shipped mitigations
+- [x] 9.1 RED: extend `daemon-bundle.test.ts` asserting no `daemon/panel/*.js` file appears in the
+      `node:fs` reference list (the existing 7-file list itself stays byte-identical). Corrected per
+      HANDOFF's own note: the dedicated assertion targets the panel's HTML/CSS/JS-serving modules
+      (`server.js`/`routes.js`) specifically, since `panel-run-file.js` already legitimately belongs
+      in the allow-list (PR-05) as a run-discovery file, not a panel asset.
+- [x] 9.2 GREEN: fix any accidental `node:fs` import the panel modules picked up, if the RED test
+      catches one; otherwise this task is a no-op confirmation. No-op: `server.js`/`routes.js` carry
+      no `node:fs` reference.
+- [x] 9.3 Update THREAT-MODEL.md T18/PT-29 rows to cite the panel's real shipped mitigations
       (`http-guards.ts`, `PanelTokenStore`, `panel-run-file.ts`).
-- [ ] 9.4 Close B-14 in CHECKLIST.md, citing the merged PRs.
-- [ ] 9.5 Verify: `npm run build && npm test && npm run test:static`.
+- [x] 9.4 Close B-14 in CHECKLIST.md, citing the merged PRs.
+- [x] 9.5 Verify: `npm run build && npm test && npm run test:static`.
