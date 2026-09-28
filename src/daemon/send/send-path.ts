@@ -79,15 +79,28 @@
  * Design §8.2 also says the new id surfaces in "the audit row"; `audit_log` has no column for it and
  * DATA-MODEL's closed `reason` enum no code, so the row records the send as `degraded` and nothing
  * more — the same enum alignment PR-42 task 42.1 owns.
+ *
+ * (9) F5 (Arena-light 2-party debates, D7, design.md Data Flow): `silent` is extended for a REPLY
+ * whose body decoded as a debate turn (`validated.debateTurns !== undefined`) — every AUDIT/COUNTER
+ * is silent, exactly like `ACK`, so a debate does not ring four phones once per exchange
+ * (arena-light-debates spec "Every debate REPLY is silent; PROPOSAL/CONSENSUS/ESCALATE notify").
+ * PROPOSAL (REQUEST) and CONSENSUS/ESCALATE (RESOLVED) stay notifying — they are lifecycle
+ * boundaries in `validated.input.type`'s own right, even though their body also decodes as a marker;
+ * only a REPLY-typed debate turn is silenced. The existing bookkeeping `withTransaction` block gains
+ * one `appendDebateTurn` call per marker in `validated.debateTurns` (in practice 0 or 1, never more —
+ * coalescing was found unbuildable and removed, `shared/debate-marker.ts`'s module doc); journaling
+ * an accepted turn is this module's job, never `validate.ts`'s (PR-4's own module doc, stage 2.5).
  */
 
 import type { DatabaseSync } from "node:sqlite";
 
 import { appendAuditRow } from "../../ledger/audit.js";
 import { clearCondition, raiseCondition } from "../../ledger/conditions-store.js";
+import { appendDebateTurn, readMaxCounterRound } from "../../ledger/debate-journal.js";
 import { withTransaction } from "../../ledger/transaction.js";
 import { writeThreadRecord } from "../../ledger/threads.js";
 import { TOOL_PREFIX } from "../../shared/constants.js";
+import type { DebateTurnKind, DebateTurnMarker } from "../../shared/debate-marker.js";
 import { ABANDON_BASIS_VALUE, renderMessageHtml, type Envelope } from "../../shared/envelope.js";
 import { applyEnvelope, type ApplyContext } from "../../shared/protocol-apply.js";
 import type { SendToolInput } from "../../shared/tool-schemas.js";
@@ -189,6 +202,44 @@ function stampBasis(input: SendToolInput): Envelope["basis"] {
 }
 
 /**
+ * Whether this send is silent (`disable_notification: true`) — the ordinary lifecycle-boundary rule
+ * ({@link SILENT_TYPES}) extended for F5 (change (9) above): a REPLY whose body decoded as a debate
+ * turn (AUDIT/COUNTER) is silent too, so a two-party debate does not ring four phones once per
+ * exchange. `type` alone gates it, never "did the body decode as a marker" alone — a PROPOSAL
+ * (REQUEST) or a CONSENSUS/ESCALATE (RESOLVED) is a lifecycle boundary and stays notifying even
+ * though its body also decodes as a marker (arena-light-debates spec "Every debate REPLY is silent;
+ * PROPOSAL/CONSENSUS/ESCALATE notify").
+ */
+function isSilentSend(type: SendToolInput["type"], debateTurns: readonly DebateTurnMarker[] | undefined): boolean {
+	return SILENT_TYPES.has(type) || (type === "REPLY" && debateTurns !== undefined);
+}
+
+/**
+ * The `round` journaled for one accepted debate turn (design.md "Round counting": "Increments only
+ * on journaled COUNTER; cap = `readMaxCounterRound+1`"). `readMaxCounterRound` reports the highest
+ * round already journaled for a COUNTER in this debate (0 when none yet) — the same read
+ * `checkDebateTurn` (`validate.ts`, stage 2.5) already used, under the same binding mutex this whole
+ * pipeline runs inside (`sendPath`'s own doc), to enforce the round cap this COUNTER (if any) just
+ * passed; nothing could have journaled a new COUNTER in between. A COUNTER occupies the NEXT round
+ * (`+1`) — the same round its own cap check just admitted it into; every other turn (PROPOSAL opening
+ * a debate at round 0, an AUDIT answering the round already reached, or a CONSENSUS/ESCALATE closing
+ * it) is journaled at the round already reached, so `round` never regresses and a restart-durable
+ * reader can always tell how far a debate got from its highest journaled row alone.
+ */
+function debateTurnRound(db: DatabaseSync, project_id: string, debate_id: string, turn: DebateTurnKind): number {
+	const currentRound = readMaxCounterRound(db, project_id, debate_id);
+	return turn === "COUNTER" ? currentRound + 1 : currentRound;
+}
+
+/** `basis_at_close` is set only for CONSENSUS/ESCALATE (DATA-MODEL.md §3.7); every other turn journals `null`. */
+function debateBasisAtClose(marker: DebateTurnMarker, envelope: Envelope): string | null {
+	if (marker.turn !== "CONSENSUS" && marker.turn !== "ESCALATE") {
+		return null;
+	}
+	return envelope.basis ?? null;
+}
+
+/**
  * The message id and channel to stamp on a locally-recorded thread (v1 `:380-404`).
  *
  * A reply prefers the DM copy and an opening REQUEST prefers the group copy, but neither channel is
@@ -257,7 +308,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 		}
 		throw err;
 	}
-	const { input: validatedInput, existingThread, recipients } = validated;
+	const { input: validatedInput, existingThread, recipients, debateTurns } = validated;
 
 	const continuesThread = IN_THREAD_TYPES.has(validatedInput.type);
 	const isOutboundRequest = validatedInput.type === "REQUEST";
@@ -368,7 +419,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 		// bytes into that presentation, never a second source of truth for the body.
 		deliveryResult = await deps.transport.send(renderMessageHtml(envelope), [...recipients], {
 			groupReplyTo: existingThread?.group_message_id ?? undefined,
-			silent: SILENT_TYPES.has(validatedInput.type),
+			silent: isSilentSend(validatedInput.type, debateTurns),
 		});
 	} catch (err) {
 		if (!(err instanceof TransportError)) {
@@ -518,6 +569,27 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 			outcome: deliveryResult.degraded ? "degraded" : "ok",
 			reason: null,
 		});
+
+		// F5 (Arena-light, change (9) above): one journal row per decoded marker — in practice 0 or 1,
+		// never more (no coalescing exists), but this iterates whatever `debateTurns` actually holds
+		// rather than assuming exactly one, matching `decodeDebateBody`'s own array-returning contract.
+		if (debateTurns !== undefined) {
+			for (const marker of debateTurns) {
+				appendDebateTurn(deps.db, {
+					project_id: deps.project_id,
+					debate_id: envelope.thread,
+					round: debateTurnRound(deps.db, deps.project_id, envelope.thread, marker.turn),
+					turn: marker.turn,
+					verdict: marker.verdict ?? null,
+					eid,
+					from_agent_id: envelope.from,
+					to_agent_id: envelope.to!,
+					refs: marker.refs,
+					basis_at_close: debateBasisAtClose(marker, envelope),
+					at: ts,
+				});
+			}
+		}
 	});
 
 	return {
