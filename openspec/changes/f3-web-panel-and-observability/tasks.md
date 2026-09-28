@@ -265,14 +265,18 @@ Scope: `src/shared/version.ts`, `src/shared/envelope.ts`, `test/shared/version.t
 Requirements: version-observability (both requirements, both scenarios).
 Runtime harness: N/A — pure function tests.
 
-- [ ] 8.1 RED: extend `version.test.ts` — `WIRE_VERSION` matches `PROTOCOL_SENTINEL`'s digits.
-- [ ] 8.2 GREEN: export `WIRE_VERSION` from `shared/version.ts`.
-- [ ] 8.3 RED: extend `envelope.test.ts` — `renderMessageHtml`'s output contains both versions inside
+- [x] 8.1 RED: extend `version.test.ts` — `WIRE_VERSION` matches `PROTOCOL_SENTINEL`'s digits.
+- [x] 8.2 GREEN: export `WIRE_VERSION` from `shared/version.ts`.
+- [x] 8.3 RED: extend `envelope.test.ts` — `renderMessageHtml`'s output contains both versions inside
       the `<b>...</b>` line and neither inside the `<blockquote expandable>` line; `encodeEnvelope`'s
       byte output is unchanged before/after.
-- [ ] 8.4 GREEN: update `renderMessageHtml`'s `<b>` line composition to include both versions; leave
-      `renderHeader`/`encodeEnvelope` untouched.
-- [ ] 8.5 Verify: `npm run build && node --test "dist/test/shared/version.test.js" "dist/test/shared/envelope.test.js"`.
+- [x] 8.4 GREEN: update `renderMessageHtml`'s `<b>` line composition to include both versions; leave
+      `renderHeader`/`encodeEnvelope` untouched. Also reclassified `src/shared/envelope.ts` and
+      `test/shared/envelope.test.ts` from AS-IS to SEAM (Alpha-confirmed, `bus-v2-f3-pr-08-envelope-provenance-001`),
+      and fixed a CRITICAL RDD-found gap: the version stamp is delivered-plane overhead Telegram's real
+      4096-char ceiling measures, so `encodedTextExceedsTelegramLimit`/`guardEncodedLength`'s
+      `headroom_chars` (`daemon/send/validate.ts`, SEAM) now both charge that overhead.
+- [x] 8.5 Verify: `npm run build && node --test "dist/test/shared/version.test.js" "dist/test/shared/envelope.test.js"`.
 
 ### Unit 9 — Static assertions and documentation close-out
 

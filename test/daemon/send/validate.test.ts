@@ -9,7 +9,13 @@ import type { DatabaseSync } from "node:sqlite";
 import { openLedger } from "../../../src/ledger/open.js";
 import { writeThreadRecord } from "../../../src/ledger/threads.js";
 import type { ThreadRecord } from "../../../src/shared/thread-record.js";
-import { ABANDON_BASIS_VALUE, normalizeBody, type Envelope } from "../../../src/shared/envelope.js";
+import {
+	ABANDON_BASIS_VALUE,
+	VERSION_STAMP_SUFFIX,
+	encodeEnvelope,
+	normalizeBody,
+	type Envelope,
+} from "../../../src/shared/envelope.js";
 import { MAX_BODY_CHARS, TELEGRAM_MAX_TEXT_CHARS, TOOL_PREFIX } from "../../../src/shared/constants.js";
 import type { SecretRule } from "../../../src/shared/secrets.js";
 import type { SendToolInput } from "../../../src/shared/tool-schemas.js";
@@ -362,7 +368,9 @@ test("Spec scenario: a body near the effective ceiling reports small, positive h
 
 	assert.equal(result.wire.limit, TELEGRAM_MAX_TEXT_CHARS);
 	assert.equal(result.wire.chars, result.text.length);
-	assert.equal(result.wire.headroom_chars, TELEGRAM_MAX_TEXT_CHARS - result.text.length);
+	// F3 PR-08: headroom now also charges the version stamp's fixed overhead, since that is what
+	// Telegram's real delivered-length ceiling actually measures against.
+	assert.equal(result.wire.headroom_chars, TELEGRAM_MAX_TEXT_CHARS - result.text.length - VERSION_STAMP_SUFFIX.length);
 	assert.ok(result.wire.headroom_chars >= 0, "headroom must never be negative on a successful guard");
 	assert.ok(result.wire.headroom_chars < 300, "headroom should be small for a body deliberately near the ceiling");
 });
@@ -375,12 +383,30 @@ test("Spec scenario: a body under MAX_BODY_CHARS that encodes past TELEGRAM_MAX_
 	assert.throws(() => guardEncodedLength(envelope), isSendToolError("BODY_TOO_LONG"));
 });
 
-test("the encoded-length guard is inclusive: exactly TELEGRAM_MAX_TEXT_CHARS is accepted with zero headroom, two more characters are not", () => {
-	const atCeiling = guardEncodedLength(boundaryEnvelope("x".repeat(EXACT_CEILING_BODY_CHARS)));
-	assert.equal(atCeiling.text.length, TELEGRAM_MAX_TEXT_CHARS, "sanity: the fixture must encode to exactly the ceiling");
-	assert.equal(atCeiling.wire.headroom_chars, 0);
+test("F3 PR-08 regression: a body whose canonical length sits exactly at the old TELEGRAM_MAX_TEXT_CHARS ceiling is now rejected, since the delivered (rendered) length exceeds it by the version stamp", () => {
+	const canonicalLength = encodeEnvelope(boundaryEnvelope("x".repeat(EXACT_CEILING_BODY_CHARS))).length;
+	assert.equal(canonicalLength, TELEGRAM_MAX_TEXT_CHARS, "sanity: the fixture must still encode to exactly the old ceiling");
 
-	assert.throws(() => guardEncodedLength(boundaryEnvelope("x".repeat(EXACT_CEILING_BODY_CHARS + 1))), isSendToolError("BODY_TOO_LONG"));
+	assert.throws(() => guardEncodedLength(boundaryEnvelope("x".repeat(EXACT_CEILING_BODY_CHARS))), isSendToolError("BODY_TOO_LONG"));
+});
+
+test("the encoded-length guard's real (stamp-adjusted) boundary is inclusive: zero headroom is accepted, one body-step further is not", () => {
+	// Body length moves the canonical encoded length in steps of two (ADR-05b: every body character
+	// is carried twice), but VERSION_STAMP_SUFFIX.length may be odd, so the exact zero-headroom body
+	// is found by measurement rather than by dividing the stamp's length by two and hoping it is even.
+	let bodyChars = EXACT_CEILING_BODY_CHARS;
+	while (encodeEnvelope(boundaryEnvelope("x".repeat(bodyChars))).length + VERSION_STAMP_SUFFIX.length > TELEGRAM_MAX_TEXT_CHARS) {
+		bodyChars -= 1;
+	}
+
+	const atRealCeiling = guardEncodedLength(boundaryEnvelope("x".repeat(bodyChars)));
+	assert.equal(
+		atRealCeiling.wire.headroom_chars,
+		TELEGRAM_MAX_TEXT_CHARS - atRealCeiling.text.length - VERSION_STAMP_SUFFIX.length,
+	);
+	assert.ok(atRealCeiling.wire.headroom_chars >= 0 && atRealCeiling.wire.headroom_chars < 2, "zero or one step of slack, not more");
+
+	assert.throws(() => guardEncodedLength(boundaryEnvelope("x".repeat(bodyChars + 1))), isSendToolError("BODY_TOO_LONG"));
 });
 
 test("validateSend accepts the same over-encoded body the guard rejects — the raw cap and the encoded guard are different stages", async () => {

@@ -1,7 +1,10 @@
 /**
- * Provenance: telegram-agent-bus test/envelope.test.ts @ bf8f365 — verdict: AS-IS (D-08).
+ * Provenance: telegram-agent-bus test/envelope.test.ts @ bf8f365 — verdict: SEAM (D-08).
  * v1 body sha256: db6cda680cbf23264656eb778bad981c5028b94b5c72f8ae4ad71f1b4e73db7f   (SHA-256 of the v1 body at bf8f365, header and import block excluded)
- * Changes: none.
+ * Changes: F3 PR-08 (version-observability) — narrowed the renderMessageHtml/encodeEnvelope
+ * byte-identity tests to what remains true once the <b> header line also carries SERVER_VERSION/
+ * WIRE_VERSION (the sentinel line and decodeEnvelope round-tripping, not the whole delivered text);
+ * added a RED test for the new version rendering (bus-v2-f3-pr-08-envelope-provenance-001).
  */
 
 import { test } from "node:test";
@@ -20,6 +23,7 @@ import {
   renderMessageHtml,
   type Envelope,
 } from "../../src/shared/envelope.js";
+import { SERVER_VERSION, WIRE_VERSION } from "../../src/shared/version.js";
 import { deliveredText } from "../fakes/delivered-text.js";
 
 function validRequestEnvelope(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -248,11 +252,17 @@ test("every line start in an encoded message comes from the encoder, never from 
 //
 // `encodeEnvelope` remains the CANONICAL text — the bytes Telegram stores, the bytes every
 // peer decoder sees, and the subject of the wire-length guard. `renderMessageHtml` is only
-// a presentation of those same bytes: it bolds the header and collapses the sentinel line
-// into an expandable blockquote so the JSON stops dominating the human plane.
+// a presentation of those same bytes: it bolds the header (now with a version stamp, F3
+// PR-08) and collapses the sentinel line into an expandable blockquote so the JSON stops
+// dominating the human plane.
 //
-// The governing invariant is that Telegram's parse of the HTML must reproduce the canonical
-// text EXACTLY. That was verified against the live Bot API before this code was written.
+// The governing invariant, narrowed by F3 PR-08: Telegram's parse of the HTML must reproduce
+// the CANONICAL SENTINEL LINE exactly, and a peer must still decode the identical envelope out
+// of it. The header line is no longer required to be byte-identical to `renderHeader`'s own
+// output, since it now also carries `SERVER_VERSION`/`WIRE_VERSION` for a human reader —
+// content with no wire-canonical counterpart. `decodeEnvelope` never reads the header (it only
+// ever matches the LAST sentinel-line pattern), so this narrowing changes nothing a real peer
+// depends on. Verified against the live Bot API before this code was written.
 
 test("renderMessageHtml collapses the sentinel line into an expandable blockquote", () => {
   const envelope = validRequestEnvelope() as unknown as Envelope;
@@ -260,6 +270,23 @@ test("renderMessageHtml collapses the sentinel line into an expandable blockquot
   assert.ok(html.includes("<blockquote expandable>"), "the machine plane must be collapsible");
   assert.ok(html.includes(`AGENTBUS/2 ${JSON.stringify(envelope)}</blockquote>`));
   assert.ok(html.startsWith("<b>"), "the header should read as a heading");
+});
+
+test("renderMessageHtml renders SERVER_VERSION and WIRE_VERSION inside the <b> header, never inside the blockquote (F3 PR-08, version-observability)", () => {
+  const envelope = validRequestEnvelope() as unknown as Envelope;
+  const html = renderMessageHtml(envelope);
+  const [boldLine, , , , blockquoteLine] = html.split("\n");
+  // Checks for the rendered version STAMP phrases, not the bare WIRE_VERSION value alone: it is
+  // currently the single digit "2", a substring every AGENTBUS/2 sentinel legitimately contains, so
+  // a bare-substring check against the blockquote would be trivially unsatisfiable regardless of
+  // whether the version-observability stamp itself ever leaked into the machine plane.
+  const serverVersionStamp = `v${SERVER_VERSION}`;
+  const wireVersionStamp = `wire ${WIRE_VERSION}`;
+
+  assert.ok(boldLine.includes(serverVersionStamp), "SERVER_VERSION must appear in the bold header line");
+  assert.ok(boldLine.includes(wireVersionStamp), "WIRE_VERSION must appear in the bold header line");
+  assert.ok(!blockquoteLine.includes(serverVersionStamp), "the SERVER_VERSION stamp must not leak into the sentinel line");
+  assert.ok(!blockquoteLine.includes(wireVersionStamp), "the WIRE_VERSION stamp must not leak into the sentinel line");
 });
 
 test("renderMessageHtml escapes the three characters HTML parsing would otherwise consume", () => {
@@ -270,12 +297,14 @@ test("renderMessageHtml escapes the three characters HTML parsing would otherwis
   assert.ok(!/[^&]&(?!amp;|lt;|gt;)/.test(html), "no bare ampersand may survive escaping");
 });
 
-test("Telegram's parse of renderMessageHtml reproduces encodeEnvelope byte for byte", () => {
+test("Telegram's parse of renderMessageHtml reproduces encodeEnvelope's sentinel line byte for byte", () => {
   const envelope = validRequestEnvelope() as unknown as Envelope;
-  assert.equal(deliveredText(renderMessageHtml(envelope)), encodeEnvelope(envelope));
+  const deliveredSentinelLine = deliveredText(renderMessageHtml(envelope)).split("\n").at(-1);
+  const canonicalSentinelLine = encodeEnvelope(envelope).split("\n").at(-1);
+  assert.equal(deliveredSentinelLine, canonicalSentinelLine);
 });
 
-test("the canonical-text invariant survives a body built to break HTML parsing", () => {
+test("the canonical-sentinel-line invariant survives a body built to break HTML parsing", () => {
   // The exact hostile body used against the live Bot API on 2026-08-15.
   const envelope = validRequestEnvelope({
     body: normalizeBody(
@@ -284,7 +313,7 @@ test("the canonical-text invariant survives a body built to break HTML parsing",
   }) as unknown as Envelope;
 
   const delivered = deliveredText(renderMessageHtml(envelope));
-  assert.equal(delivered, encodeEnvelope(envelope));
+  assert.equal(delivered.split("\n").at(-1), encodeEnvelope(envelope).split("\n").at(-1));
 
   // And what a peer decodes out of that delivered text must be the original envelope.
   const result = decodeEnvelope(delivered);
@@ -299,7 +328,14 @@ test("renderMessageHtml is presentation only — it never changes the length the
   // measuring the canonical text, not the longer HTML payload.
   const envelope = validRequestEnvelope() as unknown as Envelope;
   assert.ok(renderMessageHtml(envelope).length > encodeEnvelope(envelope).length);
-  assert.equal(deliveredText(renderMessageHtml(envelope)).length, encodeEnvelope(envelope).length);
+  // F3 PR-08: the delivered (Telegram-parsed) text is now slightly LONGER than the canonical
+  // text, by exactly the visible version stamp's length — no longer equal, since the header
+  // carries content encodeEnvelope's own header never did. Still nowhere near Telegram's 4096
+  // "after entities parsing" ceiling that this guard exists to protect.
+  const delivered = deliveredText(renderMessageHtml(envelope));
+  const canonical = encodeEnvelope(envelope);
+  assert.equal(delivered.length, canonical.length + ` · v${SERVER_VERSION} (wire ${WIRE_VERSION})`.length);
+  assert.ok(delivered.length < TELEGRAM_MAX_TEXT_CHARS);
 });
 
 test("decodeEnvelope round-trips a valid encoded envelope", () => {
@@ -666,12 +702,24 @@ test("encodedTextExceedsTelegramLimit is true once JSON escaping pushes a within
   assert.equal(encodedTextExceedsTelegramLimit(encoded), true);
 });
 
-test("encodedTextExceedsTelegramLimit is false at exactly TELEGRAM_MAX_TEXT_CHARS", () => {
-  assert.equal(encodedTextExceedsTelegramLimit("x".repeat(TELEGRAM_MAX_TEXT_CHARS)), false);
+// F3 PR-08 (RDD review review-49f5f64f1398a087, R3-version-stamp-bypasses-wire-length-guard):
+// renderMessageHtml's version stamp is fixed-length overhead Telegram will actually deliver, so the
+// guard's real boundary sits that many characters below TELEGRAM_MAX_TEXT_CHARS, not at it. Measured
+// from the real delivered/canonical length difference rather than hand-duplicating the stamp's exact
+// template here, so this test cannot silently share a wrong assumption with the production code.
+const versionStampOverhead = (() => {
+  const probe = validRequestEnvelope() as unknown as Envelope;
+  return deliveredText(renderMessageHtml(probe)).length - encodeEnvelope(probe).length;
+})();
+
+test("encodedTextExceedsTelegramLimit is false at the version-stamp-adjusted boundary", () => {
+  assert.equal(encodedTextExceedsTelegramLimit("x".repeat(TELEGRAM_MAX_TEXT_CHARS - versionStampOverhead)), false);
 });
 
-test("encodedTextExceedsTelegramLimit is true one character over TELEGRAM_MAX_TEXT_CHARS", () => {
-  assert.equal(encodedTextExceedsTelegramLimit("x".repeat(TELEGRAM_MAX_TEXT_CHARS + 1)), true);
+test("encodedTextExceedsTelegramLimit is true one character over the version-stamp-adjusted boundary — exactly the bug the RDD review found: this text sits within the old TELEGRAM_MAX_TEXT_CHARS boundary but would still be rejected once delivered", () => {
+  const betweenOldAndNewBoundary = "x".repeat(TELEGRAM_MAX_TEXT_CHARS - versionStampOverhead + 1);
+  assert.ok(betweenOldAndNewBoundary.length <= TELEGRAM_MAX_TEXT_CHARS, "sanity: still within the old, stale boundary");
+  assert.equal(encodedTextExceedsTelegramLimit(betweenOldAndNewBoundary), true);
 });
 
 // --- ADR-13: `abandoned` sits outside the low-risk set, and that placement is asserted, not assumed ---
