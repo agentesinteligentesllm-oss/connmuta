@@ -89,11 +89,11 @@ flowchart LR
 |---|---|
 | Goal | An optional doorbell for Claude Code, fed by the daemon instead of a second reader. |
 | Deliverables | Adapter re-based on [ADR-0024](../03-adr/0024-channel-doorbell-not-a-second-reader.md) semantics: no body crosses, peek does not consume, gates on sender not room; one channel per project session. |
-| Dependencies | F1. Spike B-09 result (what a host actually renders). |
+| Dependencies | F1 (archived). Spike B-09 result: **resolved** — confirms F4 is Claude-Code-only; no doorbell-equivalent capability exists for Codex, OpenCode or Antigravity (checked and absent), Gemini CLI/Cursor remain untested ([CHECKLIST.md#B-09](../06-backlog/CHECKLIST.md)). |
 | Validation | ADR-0024/0025 invariants re-pinned against the daemon inbox: `saturated` rings once per cursor value; watermark commits after delivery; a `<channel>` event never carries peer text. |
 | SDD change | `f4-claude-channels-adapter` (proposed) |
-| Spikes | consumes B-09. |
-| Backlog | — (B-09 informs). |
+| Spikes | consumes B-09 (resolved). |
+| Backlog | — (B-09 informs, resolved). |
 | Risks | Claude Code channels are a research preview; delivery is best-effort and silently dropped when disabled. Nothing here may be documented as a delivery guarantee. |
 
 ## F5 — Arena-light, 2-party
@@ -158,7 +158,7 @@ flowchart LR
 | B-06 | post-F6 (F7) | decided | runner satellite |
 | B-07 | F0 spike → F1 | open | admin requirement for project bots |
 | B-08 | F0 spike → F1 | open | IPC design |
-| B-09 | F0 spike → F4 | open | wake-up honesty per host |
+| B-09 | F0 spike → F4 | done | wake-up honesty per host — Claude Code only (confirmed); Codex/OpenCode/Antigravity checked-and-absent; Gemini CLI/Cursor untested |
 | B-10 | post-F6 | open | N-party tribunal deferred |
 | B-11 | F0 → closes in F6 | open | name, before publish |
 | B-12 | F6 | open | macOS smoke test |
