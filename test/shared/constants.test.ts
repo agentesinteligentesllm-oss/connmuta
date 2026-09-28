@@ -17,6 +17,7 @@ import {
   SPAWN_LOCK_STALE_SECONDS,
   RESOLVED_THREAD_RETENTION_DAYS,
   AUDIT_RETENTION_DAYS,
+  MAX_BATCH,
   MAX_LONGPOLL_SECONDS,
   POLL_ERROR_BACKOFF_SECONDS,
   PRODUCT_NAME,
@@ -28,7 +29,14 @@ import {
   DEBATE_MARKER_PREFIX,
   ARENA_LIGHT_MESSAGES_PER_ROUND,
   GROUP_MESSAGES_PER_MINUTE,
+  DOORBELL_SCAN_DEPTH,
+  CHANNEL_SERVER_NAME,
+  CHANNEL_HOST_LABEL,
+  CHANNEL_RETRY_BACKOFF_SECONDS,
+  CHANNEL_META_LIST_LIMIT,
+  CHANNEL_SHUTDOWN_TIMEOUT_MS,
 } from "../../src/shared/constants.js";
+import { IPC_SESSION_HOST_MAX_CHARS } from "../../src/shared/ipc-contract.js";
 
 test("PROTOCOL_SENTINEL pins the emitted wire sentinel to AGENTBUS/2 (W1)", () => {
   assert.equal(PROTOCOL_SENTINEL, "AGENTBUS/2");
@@ -90,4 +98,31 @@ test("ARENA_LIGHT_MESSAGES_PER_ROUND is declared alongside GROUP_MESSAGES_PER_MI
   // debate turn's own send is wired to the rate check. This Phase-1 slice pins only the value.
   assert.equal(ARENA_LIGHT_MESSAGES_PER_ROUND, 1);
   assert.equal(typeof GROUP_MESSAGES_PER_MINUTE, "number");
+});
+
+// --- F4: Claude Code channels adapter (Unit 1: shared schema, constants, envelope export) ---
+
+test("DOORBELL_SCAN_DEPTH equals MAX_BATCH, so a doorbell scan never does more work than one fetch batch (D3)", () => {
+  assert.equal(DOORBELL_SCAN_DEPTH, MAX_BATCH);
+});
+
+test("CHANNEL_SERVER_NAME derives from PRODUCT_NAME and is also the adapter's bin name (D9)", () => {
+  assert.equal(CHANNEL_SERVER_NAME, `${PRODUCT_NAME}-channel`);
+});
+
+test("CHANNEL_HOST_LABEL matches DATA-MODEL §3.5's host label and fits IPC_SESSION_HOST_MAX_CHARS", () => {
+  assert.equal(CHANNEL_HOST_LABEL, "claude-code-channel");
+  assert.ok(CHANNEL_HOST_LABEL.length <= IPC_SESSION_HOST_MAX_CHARS);
+});
+
+test("CHANNEL_RETRY_BACKOFF_SECONDS equals POLL_ERROR_BACKOFF_SECONDS, the daemon's own transient-fault pacing (D7)", () => {
+  assert.equal(CHANNEL_RETRY_BACKOFF_SECONDS, POLL_ERROR_BACKOFF_SECONDS);
+});
+
+test("CHANNEL_META_LIST_LIMIT pins the distinct-values-per-meta-list cap (v1 notify.ts:10)", () => {
+  assert.equal(CHANNEL_META_LIST_LIMIT, 4);
+});
+
+test("CHANNEL_SHUTDOWN_TIMEOUT_MS bounds the shutdown DELETE /session at one local round trip, = REQUEST_OVERHEAD_SECONDS in ms", () => {
+  assert.equal(CHANNEL_SHUTDOWN_TIMEOUT_MS, REQUEST_OVERHEAD_SECONDS * 1000);
 });

@@ -39,9 +39,16 @@ export const RESOLVED_BASIS_VALUES = [...RESOLVED_LOW_RISK_BASIS, "human-approve
 const ACK_BASIS_VALUE = "acknowledged-only" as const;
 const ALL_BASIS_VALUES = [...RESOLVED_BASIS_VALUES, ACK_BASIS_VALUE] as const;
 
+/**
+ * The envelope's closed `type` set (design "Message envelope"). Extracted as a named export so
+ * `shared/ipc-contract.ts`'s doorbell response schema can enumerate exactly these values (F4 PR-01,
+ * design "Interfaces / Contracts") without redeclaring them — one definition, two consumers.
+ */
+export const ENVELOPE_TYPES = ["BROADCAST", "REQUEST", "REPLY", "ACK", "RESOLVED"] as const;
+
 const baseEnvelopeSchema = z.object({
   eid: z.string().regex(EID_PATTERN, "eid must be 12 lowercase hex characters"),
-  type: z.enum(["BROADCAST", "REQUEST", "REPLY", "ACK", "RESOLVED"]),
+  type: z.enum(ENVELOPE_TYPES),
   from: z.string().regex(AGENT_ID_PATTERN, "from must be a valid logical agent id"),
   to: z.string().regex(AGENT_ID_PATTERN, "to must be a valid logical agent id").nullable(),
   thread: z.string().regex(THREAD_PATTERN, "thread must be 12 lowercase hex characters"),

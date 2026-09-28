@@ -28,9 +28,13 @@ import {
   IPC_SESSION_HOST_MAX_CHARS,
   IPC_TRANSPORT_ERROR_CODES,
   IPC_UNSUPPORTED_MEDIA_TYPE,
+  channelCursorRequestSchema,
+  channelCursorResponseSchema,
   doctorFindingSchema,
   doctorRequestSchema,
   doctorResponseSchema,
+  doorbellRequestSchema,
+  doorbellResponseSchema,
   identityRequestQuerySchema,
   identityResponseSchema,
   ipcErrorSchema,
@@ -63,12 +67,14 @@ test("PROJECT_ID_PATTERN accepts the fixture project id used below (sanity)", ()
   assert.match(VALID_PROJECT_ID, PROJECT_ID_PATTERN);
 });
 
-test("IPC_ROUTES lists exactly the eight fixed routes, and every one has a request and a response schema", () => {
+test("IPC_ROUTES lists exactly the ten fixed routes, and every one has a request and a response schema", () => {
   assert.deepEqual(
     [...IPC_ROUTES].sort(),
     [
       "DELETE /session",
       "GET /identity",
+      "POST /channel/cursor",
+      "POST /channel/doorbell",
       "POST /doctor",
       "POST /session",
       "POST /tools/fetch",
@@ -224,6 +230,60 @@ test("every tool route's response schema is the same opaque toolSuccessSchema, a
   }
   assert.equal(toolSuccessSchema.safeParse({ ok: true, anything: [1, 2, 3] }).success, true);
   assert.equal(toolSuccessSchema.safeParse("not an object").success, false);
+});
+
+// --- F4: POST /channel/doorbell, POST /channel/cursor (Unit 1: schema only, no live route yet) ---
+
+test("the two channel routes map to the exact doorbell/cursor schema objects (reference equality)", () => {
+  assert.equal(IPC_REQUEST_SCHEMAS["POST /channel/doorbell"], doorbellRequestSchema);
+  assert.equal(IPC_RESPONSE_SCHEMAS["POST /channel/doorbell"], doorbellResponseSchema);
+  assert.equal(IPC_REQUEST_SCHEMAS["POST /channel/cursor"], channelCursorRequestSchema);
+  assert.equal(IPC_RESPONSE_SCHEMAS["POST /channel/cursor"], channelCursorResponseSchema);
+});
+
+const VALID_DOORBELL_REQUEST = { after_seq: 0 };
+
+test("doorbell request accepts after_seq alone and an optional timeout_s, and is strict about extra keys", () => {
+  assert.equal(doorbellRequestSchema.safeParse(VALID_DOORBELL_REQUEST).success, true);
+  assert.equal(doorbellRequestSchema.safeParse({ ...VALID_DOORBELL_REQUEST, timeout_s: 30 }).success, true);
+  assert.equal(doorbellRequestSchema.safeParse({ ...VALID_DOORBELL_REQUEST, extra: "nope" }).success, false);
+  assert.equal(doorbellRequestSchema.safeParse({ ...VALID_DOORBELL_REQUEST, after_seq: -1 }).success, false);
+});
+
+const VALID_DOORBELL_RESPONSE = {
+  count: 1,
+  senders: ["@ipc-agent"],
+  types: ["REQUEST"],
+  threads: ["a1b2c3d4e5f6"],
+  covered_through_seq: 5,
+  saturated: false,
+};
+
+test("doorbell response round-trips a valid non-empty summary and is strict about extra keys (closed field set)", () => {
+  assert.equal(doorbellResponseSchema.safeParse(VALID_DOORBELL_RESPONSE).success, true);
+  assert.equal(doorbellResponseSchema.safeParse({ ...VALID_DOORBELL_RESPONSE, extra: "nope" }).success, false);
+});
+
+test("doorbell response round-trips a valid empty (count: 0) summary with every list empty", () => {
+  const empty = { count: 0, senders: [], types: [], threads: [], covered_through_seq: 5, saturated: false };
+  assert.equal(doorbellResponseSchema.safeParse(empty).success, true);
+});
+
+test("doorbell response rejects count: 0 paired with a non-empty senders/types/threads list (co-emptiness refine)", () => {
+  const invalid = { ...VALID_DOORBELL_RESPONSE, count: 0 };
+  assert.equal(doorbellResponseSchema.safeParse(invalid).success, false);
+});
+
+test("channel cursor request accepts an absent commit_seq (ensure + read) and a present one, and is strict about extra keys", () => {
+  assert.equal(channelCursorRequestSchema.safeParse({}).success, true);
+  assert.equal(channelCursorRequestSchema.safeParse({ commit_seq: 7 }).success, true);
+  assert.equal(channelCursorRequestSchema.safeParse({ commit_seq: 7, extra: "nope" }).success, false);
+  assert.equal(channelCursorRequestSchema.safeParse({ commit_seq: -1 }).success, false);
+});
+
+test("channel cursor response round-trips a valid inbox_seq and is strict about extra keys", () => {
+  assert.equal(channelCursorResponseSchema.safeParse({ inbox_seq: 5 }).success, true);
+  assert.equal(channelCursorResponseSchema.safeParse({ inbox_seq: 5, extra: "nope" }).success, false);
 });
 
 test("ipcErrorSchema mirrors ToolErrorPayload exactly: a toolErrorPayload(...) result parses", () => {
