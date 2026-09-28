@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { IPC_NONCE_BYTES, PROJECT_ID_PATTERN, SESSION_TOKEN_BYTES } from "../../src/shared/constants.js";
+import { DOORBELL_SCAN_DEPTH, IPC_NONCE_BYTES, PROJECT_ID_PATTERN, SESSION_TOKEN_BYTES } from "../../src/shared/constants.js";
+import { ENVELOPE_TYPES } from "../../src/shared/envelope.js";
 import { computeRosterHash } from "../../src/shared/roster-hash.js";
 import { toolErrorPayload } from "../../src/shared/error-payload.js";
 import { fetchInputSchema, sendInputSchema, statusInputSchema, threadInputSchema } from "../../src/shared/tool-schemas.js";
@@ -272,6 +273,43 @@ test("doorbell response round-trips a valid empty (count: 0) summary with every 
 test("doorbell response rejects count: 0 paired with a non-empty senders/types/threads list (co-emptiness refine)", () => {
   const invalid = { ...VALID_DOORBELL_RESPONSE, count: 0 };
   assert.equal(doorbellResponseSchema.safeParse(invalid).success, false);
+});
+
+test("doorbell response rejects a types array longer than ENVELOPE_TYPES.length (the closed enum has no room for repeats)", () => {
+  const atCeiling = { ...VALID_DOORBELL_RESPONSE, types: [...ENVELOPE_TYPES] };
+  assert.equal(doorbellResponseSchema.safeParse(atCeiling).success, true);
+  const overCeiling = { ...VALID_DOORBELL_RESPONSE, types: [...ENVELOPE_TYPES, "REQUEST"] };
+  assert.equal(doorbellResponseSchema.safeParse(overCeiling).success, false);
+});
+
+test("doorbell response pins the DOORBELL_SCAN_DEPTH ceilings: accepted at the ceiling, rejected one over", () => {
+  const agent = (i: number): string => `@agent-${i}`;
+  const thread = (i: number): string => i.toString(16).padStart(12, "0");
+  const fullLists = {
+    senders: Array.from({ length: DOORBELL_SCAN_DEPTH }, (_, i) => agent(i)),
+    threads: Array.from({ length: DOORBELL_SCAN_DEPTH }, (_, i) => thread(i)),
+  };
+  const atCeiling = { ...VALID_DOORBELL_RESPONSE, count: DOORBELL_SCAN_DEPTH, ...fullLists };
+  assert.equal(doorbellResponseSchema.safeParse(atCeiling).success, true);
+
+  assert.equal(doorbellResponseSchema.safeParse({ ...atCeiling, count: DOORBELL_SCAN_DEPTH + 1 }).success, false, "count");
+  assert.equal(
+    doorbellResponseSchema.safeParse({ ...atCeiling, senders: [...fullLists.senders, agent(DOORBELL_SCAN_DEPTH)] }).success,
+    false,
+    "senders",
+  );
+  assert.equal(
+    doorbellResponseSchema.safeParse({ ...atCeiling, threads: [...fullLists.threads, thread(DOORBELL_SCAN_DEPTH)] }).success,
+    false,
+    "threads",
+  );
+});
+
+test("doorbell response currently ACCEPTS count > 0 with every list empty: the refine pins only the count === 0 direction", () => {
+  // Pinned as CURRENT behavior, not as a guarantee: the reverse co-emptiness direction is deliberately
+  // not enforced by the schema (F4 PR-03 Arena consensus, disclosed). Tightening it would flip this test.
+  const countWithoutLists = { count: 1, senders: [], types: [], threads: [], covered_through_seq: 5, saturated: false };
+  assert.equal(doorbellResponseSchema.safeParse(countWithoutLists).success, true);
 });
 
 test("channel cursor request accepts an absent commit_seq (ensure + read) and a present one, and is strict about extra keys", () => {

@@ -91,6 +91,7 @@ import {
 	HTTP_TOO_MANY_REQUESTS,
 	HTTP_UNAUTHORIZED,
 	IPC_BAD_REQUEST,
+	doorbellRequestSchema,
 	ipcTransportError,
 	sessionRequestSchema,
 	type IpcRouteKey,
@@ -101,6 +102,7 @@ import type { ManagedBinding } from "../bindings.js";
 import { BindingMutex, sendPath, type SendPathDeps } from "../send/send-path.js";
 import { SendRateBudget } from "../send/rate.js";
 import { SendToolError } from "../send/validate.js";
+import { serveDoorbell, type ServeDoorbellDeps } from "../serve/doorbell.js";
 import { serveFetch, type ServeFetchDeps } from "../serve/fetch.js";
 import { serveStatus, type ServeStatusDeps, type StatusDaemonFacts } from "../serve/status.js";
 import { serveThread, ThreadToolError, type ServeThreadDeps } from "../serve/thread.js";
@@ -624,11 +626,43 @@ function createThreadHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessi
 }
 
 // ---------------------------------------------------------------------------
+// POST /channel/doorbell (F4)
+// ---------------------------------------------------------------------------
+
+/** Behind the same session gate as `/tools/*`, but not a tool: the response is a body-free summary (D1, D2). */
+function createDoorbellHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessionRecord>, now: () => Date): IpcHandler {
+	return async (request: IpcRequest): Promise<IpcResponse> => {
+		const auth = authenticateSessionForTool(deps, sessions, request, now);
+		if (!auth.ok) {
+			return auth.response;
+		}
+
+		const parsedInput = doorbellRequestSchema.safeParse(request.body);
+		if (!parsedInput.success) {
+			return { status: HTTP_BAD_REQUEST, body: ipcTransportError(IPC_BAD_REQUEST, "invalid POST /channel/doorbell body") };
+		}
+
+		const doorbellDeps: ServeDoorbellDeps = {
+			db: deps.db,
+			binding: {
+				project_id: auth.session.project_id,
+				agent_id: auth.managed.binding.agent_id,
+				roster_snapshot: auth.managed.binding.roster_snapshot,
+			},
+			emitter: deps.emitter,
+			delay: deps.delay,
+		};
+
+		return dispatchTool(() => serveDoorbell(parsedInput.data, doorbellDeps));
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Factory (decision 9)
 // ---------------------------------------------------------------------------
 
 /**
- * Builds all six session/tool routes at once, closing over one shared frozen-session map and the two
+ * Builds all seven session/tool/channel routes at once, closing over one shared frozen-session map and the two
  * daemon-lifetime singletons `POST /tools/send` needs (decision 8 — this is the first PR to actually
  * construct either): preferred over six separate per-route factories threading a shared mutable map
  * between them.
@@ -647,5 +681,6 @@ export function createSessionRoutes(deps: RoutesDeps): Partial<Record<IpcRouteKe
 		"POST /tools/fetch": createFetchHandler(deps, sessions, now),
 		"POST /tools/status": createStatusHandler(deps, sessions, now),
 		"POST /tools/thread": createThreadHandler(deps, sessions, now),
+		"POST /channel/doorbell": createDoorbellHandler(deps, sessions, now),
 	};
 }

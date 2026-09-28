@@ -148,7 +148,7 @@ export interface AdmissionResult {
 const BODILESS_OUTCOMES: ReadonlySet<InboxApplyOutcome> = new Set<InboxApplyOutcome>(["rejected", "ignored"]);
 
 /** Reverse roster lookup: the verified Telegram sender id is the ONLY trusted identity source (ADR-10). */
-function reverseRosterLookup(
+export function reverseRosterLookup(
 	rosterSnapshot: readonly ProjectRosterEntry[],
 	userId: number | undefined
 ): string | null {

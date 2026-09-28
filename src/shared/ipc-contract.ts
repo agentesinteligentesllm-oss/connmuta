@@ -326,7 +326,7 @@ export const doorbellRequestSchema = z.strictObject({
 export const doorbellResponseSchema = z.strictObject({
   count: z.number().int().nonnegative().max(DOORBELL_SCAN_DEPTH),
   senders: z.array(z.string().regex(AGENT_ID_PATTERN)).max(DOORBELL_SCAN_DEPTH),
-  types: z.array(z.enum(ENVELOPE_TYPES)),
+  types: z.array(z.enum(ENVELOPE_TYPES)).max(ENVELOPE_TYPES.length),
   threads: z.array(z.string().regex(THREAD_PATTERN)).max(DOORBELL_SCAN_DEPTH),
   covered_through_seq: z.number().int().nonnegative(),
   saturated: z.boolean(),

@@ -7,7 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { openLedger } from "../../src/ledger/open.js";
 import { readThreadRecord } from "../../src/ledger/threads.js";
 import { readUnknownSender } from "../../src/ledger/unknown-senders.js";
-import { admitTelegramUpdates, type AdmissionBinding } from "../../src/daemon/admission.js";
+import { admitTelegramUpdates, reverseRosterLookup, type AdmissionBinding } from "../../src/daemon/admission.js";
 import type { TelegramUpdate } from "../../src/daemon/telegram.js";
 import { encodeEnvelope, type Envelope } from "../../src/shared/envelope.js";
 import { PROTOCOL_SENTINEL } from "../../src/shared/constants.js";
@@ -565,5 +565,20 @@ describe("daemon/admission.ts — step 1 owns the textless update (design §8.2 
 			assert.equal(updates(db).length, 0);
 			assert.equal(result.nextUpdateId, 3);
 		});
+	});
+});
+
+describe("reverseRosterLookup (exported for F4's serve-time doorbell gate)", () => {
+	it("resolves the verified Telegram user id to its roster agent id, exactly as admission's own sender check does", () => {
+		const roster = binding().roster_snapshot;
+		assert.equal(reverseRosterLookup(roster, 111), "@alice");
+		assert.equal(reverseRosterLookup(roster, 333), "@ourbot");
+	});
+
+	it("returns null for an unknown id and for an absent id, never inventing a name", () => {
+		const roster = binding().roster_snapshot;
+		assert.equal(reverseRosterLookup(roster, 999), null);
+		assert.equal(reverseRosterLookup(roster, undefined), null);
+		assert.equal(reverseRosterLookup([], 111), null);
 	});
 });
