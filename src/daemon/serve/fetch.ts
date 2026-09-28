@@ -393,18 +393,26 @@ function defaultDelay(ms: number, signal: AbortSignal): Promise<void> {
 	});
 }
 
+/** The three `ServeFetchDeps` members {@link waitForInboxRows} reads, and no others. */
+export interface InboxWaitDeps {
+	readonly emitter?: EventEmitter;
+	readonly delay?: (ms: number, signal: AbortSignal) => Promise<void>;
+	readonly signal?: AbortSignal;
+}
+
 /**
  * D-02's wait: subscribes to `inbox:<project_id>`, awaits whichever comes first — the event, the bounded
  * delay, or the caller's own abort — then reads once more. Called synchronously right after the empty
  * read, so no emit can land in between (see the module doc). The listener and the delay's timer are
- * always cleaned up, on every exit path.
+ * always cleaned up, on every exit path. Exported and generic over the row shape so `serve/doorbell.ts`
+ * shares this one race-free implementation (F4 design D4); `serveFetch` calls it unchanged.
  */
-async function waitForRows(
-	deps: ServeFetchDeps,
+export async function waitForInboxRows<Row>(
+	deps: InboxWaitDeps,
 	projectId: string,
 	waitSeconds: number,
-	readRows: () => UpdateRow[],
-): Promise<UpdateRow[]> {
+	readRows: () => Row[],
+): Promise<Row[]> {
 	const eventName = `inbox:${projectId}`;
 	const delay = deps.delay ?? defaultDelay;
 	const controller = new AbortController();
@@ -465,7 +473,7 @@ export async function serveFetch(input: FetchToolInput, deps: ServeFetchDeps): P
 	let rows = readRows();
 	const waitSeconds = effectiveWaitSeconds(input.timeout_s);
 	if (rows.length === 0 && waitSeconds > 0) {
-		rows = await waitForRows(deps, binding.project_id, waitSeconds, readRows);
+		rows = await waitForInboxRows(deps, binding.project_id, waitSeconds, readRows);
 	}
 	// The clock is read AGAIN after the wait, which can last up to FETCH_LONGPOLL_MAX_SECONDS: every
 	// instant below — ages, the gap check, the `skipped` window's upper bound, `last_seen_at` and the

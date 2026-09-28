@@ -18,6 +18,7 @@ import { CHECKPOINT_MARKER, FETCH_LONGPOLL_MAX_SECONDS } from "../../../src/shar
 import {
 	effectiveWaitSeconds,
 	serveFetch,
+	waitForInboxRows,
 	FETCH_MISSING_REJECTION_AUDIT_MESSAGE,
 	UNRESOLVED_ORIGIN_USER_ID,
 	type FetchClientSession,
@@ -316,6 +317,27 @@ test("fetch blocks against new ledger rows, not Telegram", async () => {
 		assert.equal(delaySignal?.aborted, true, "the bounded delay is cancelled once the event settles the wait");
 		assert.equal(emitter.listenerCount(`inbox:${PROJECT_ID}`), 0, "the inbox listener is removed on exit");
 	});
+});
+
+test("waitForInboxRows is the exported wait serveFetch uses: it subscribes before its first await and reads generic rows", async () => {
+	const emitter = new EventEmitter();
+	let delaySignal: AbortSignal | undefined;
+	const delay = (_ms: number, signal: AbortSignal): Promise<void> =>
+		new Promise((resolve) => {
+			delaySignal = signal;
+			signal.addEventListener("abort", () => resolve(), { once: true });
+		});
+	const rowsAfterEmit = ["row-a", "row-b"];
+
+	// No await between the call and the emit: only a listener registered before the wrapper's first
+	// await can see this event, and the never-elapsing delay cannot rescue a missed one.
+	const waiting = waitForInboxRows({ emitter, delay }, PROJECT_ID, 20, () => rowsAfterEmit);
+	assert.equal(emitter.listenerCount(`inbox:${PROJECT_ID}`), 1, "subscribed synchronously");
+	emitter.emit(`inbox:${PROJECT_ID}`);
+
+	assert.deepEqual(await waiting, rowsAfterEmit, "the re-read result is returned, whatever the row shape");
+	assert.equal(delaySignal?.aborted, true, "the bounded delay is cancelled once the event settles the wait");
+	assert.equal(emitter.listenerCount(`inbox:${PROJECT_ID}`), 0, "the listener is removed on exit");
 });
 
 test("a wait reads the clock again: last_seen_at is when the response was built, not when the call arrived", async () => {

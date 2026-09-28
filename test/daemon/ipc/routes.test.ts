@@ -18,6 +18,7 @@ import {
 	HTTP_UNAUTHORIZED,
 	IPC_BAD_REQUEST,
 	IPC_LOOPBACK_HOST,
+	doorbellResponseSchema,
 	ipcErrorSchema,
 	sessionCloseResponseSchema,
 	sessionResponseSchema,
@@ -39,6 +40,7 @@ import {
 	type RoutesDeps,
 } from "../../../src/daemon/ipc/routes.js";
 import { openLedger } from "../../../src/ledger/open.js";
+import { commitInboxBatch } from "../../../src/ledger/inbox.js";
 import { raiseCondition, readCondition } from "../../../src/ledger/conditions-store.js";
 import { BindingsReconciler } from "../../../src/daemon/bindings.js";
 import { createRegistryLoader } from "../../../src/registry/loader.js";
@@ -774,5 +776,90 @@ test("POST /tools/thread with an unknown thread id surfaces the composed fallbac
 		});
 		assert.equal(res.status, HTTP_BAD_REQUEST);
 		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, "UNKNOWN_THREAD");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// POST /channel/doorbell (F4 PR-03)
+// ---------------------------------------------------------------------------
+
+/** Writes `count` admitted rows from the fixture peer (`@bob-agent`), direct to the session's own agent. */
+function seedPeerRows(db: DatabaseSync, count: number): void {
+	const entries = Array.from({ length: count }, (_, i) => {
+		const n = i + 1;
+		return {
+			kind: "admitted" as const,
+			update: {
+				update_id: n,
+				project_id: PROJECT_ID,
+				chat_id: GROUP_ID,
+				via: "direct" as const,
+				message_id: 7000 + n,
+				message_date: 1_767_225_600,
+				from_user_id: 100000002,
+				from_agent_id: "@bob-agent",
+				eid: n.toString(16).padStart(12, "0"),
+				envelope_json: JSON.stringify({ type: "REQUEST", to: "@alice-agent", thread: n.toString(16).padStart(12, "0") }),
+				body: "peer prose the doorbell must never carry",
+				apply_outcome: "opened" as const,
+				received_at: "2026-01-01T00:00:00.000Z",
+			},
+		};
+	});
+	commitInboxBatch(db, { bot_id: BOT_ID, entries });
+}
+
+test("POST /channel/doorbell reaches serveDoorbell behind the session gate: a bound session gets a doorbellResponseSchema-shaped summary of rows past after_seq", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		seedPeerRows(h.db, 3);
+
+		const res = await sendRequest({ port: h.port, method: "POST", path: "/channel/doorbell", body: JSON.stringify({ after_seq: 1 }), authorization: `Bearer ${bearer}` });
+		assert.equal(res.status, HTTP_OK, res.bodyText);
+		const summary = doorbellResponseSchema.parse(JSON.parse(res.bodyText));
+		assert.equal(summary.count, 2, "only rows past after_seq are summarized");
+		assert.deepEqual(summary.senders, ["@bob-agent"]);
+		assert.equal(summary.covered_through_seq, 3);
+		assert.equal(summary.saturated, false);
+		assert.doesNotMatch(res.bodyText, /peer prose/, "the response never carries message text");
+	});
+});
+
+test("POST /channel/doorbell refuses a missing or unknown bearer exactly as the /tools/* routes do (401, no audit row)", async () => {
+	await withHarness(async (h) => {
+		const before = auditRows(h.db, PROJECT_ID).length;
+		const body = JSON.stringify({ after_seq: 0 });
+
+		const missing = await sendRequest({ port: h.port, method: "POST", path: "/channel/doorbell", body });
+		const garbage = await sendRequest({ port: h.port, method: "POST", path: "/channel/doorbell", body, authorization: "Bearer not-a-real-bearer" });
+		const toolRefusal = await sendRequest({ port: h.port, method: "POST", path: "/tools/status", body: "{}" });
+
+		for (const refused of [missing, garbage]) {
+			assert.equal(refused.status, HTTP_UNAUTHORIZED);
+			assert.equal(refused.bodyText, toolRefusal.bodyText, "the refusal body is identical to a tool route's");
+		}
+		assert.equal(auditRows(h.db, PROJECT_ID).length, before, "an unauthenticated call must write no audit row");
+	});
+});
+
+test("POST /channel/doorbell refuses a drifted live binding with BINDING_CHANGED (409), like the /tools/* routes", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		await h.reload(baseRegistryDocument({ group_id: -1009999999 }));
+
+		const res = await sendRequest({ port: h.port, method: "POST", path: "/channel/doorbell", body: JSON.stringify({ after_seq: 0 }), authorization: `Bearer ${bearer}` });
+		assert.equal(res.status, HTTP_CONFLICT);
+		assert.equal(ipcErrorSchema.parse(JSON.parse(res.bodyText)).code, BINDING_CHANGED);
+	});
+});
+
+test("route-level schema validation refuses a malformed /channel/doorbell body with IPC_BAD_REQUEST", async () => {
+	await withHarness(async (h) => {
+		const { bearer } = await openValidSession(h);
+		for (const body of [{}, { after_seq: -1 }, { after_seq: 0, extra: true }]) {
+			const res = await sendRequest({ port: h.port, method: "POST", path: "/channel/doorbell", body: JSON.stringify(body), authorization: `Bearer ${bearer}` });
+			assert.equal(res.status, HTTP_BAD_REQUEST, res.bodyText);
+			assert.equal(JSON.parse(res.bodyText).code, IPC_BAD_REQUEST);
+		}
 	});
 });
