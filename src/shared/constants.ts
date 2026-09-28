@@ -55,8 +55,15 @@ export const SUPPORTED_PROTOCOL_SENTINELS: ReadonlySet<string> = new Set([
  */
 export const NODE_FLOOR = "24.15.0";
 
-/** First shipped shape of the ledger's own schema. */
-export const LEDGER_SCHEMA_VERSION = 1;
+/**
+ * The ledger's own schema version.
+ *
+ * Bumped 1 -> 2 by F5's `debate_journal` addition (`ledger/migrations.ts`'s version-2 step; ledger
+ * spec "Forward migration adds `debate_journal` at schema version 2"). The version-1 DDL itself is
+ * never edited in place once shipped (design §5.1: a schema change is the next migration, not a
+ * change to a shipped one) — only this stamp moves.
+ */
+export const LEDGER_SCHEMA_VERSION = 2;
 
 /** First shipped shape of `~/.conmuta/registry.json`. */
 export const REGISTRY_VERSION = 1;
@@ -183,6 +190,42 @@ export const GROUP_MESSAGES_PER_MINUTE = 20;
 
 /** Outbound messages per second allowed to one Telegram chat (H3, new). */
 export const CHAT_MESSAGES_PER_SECOND = 1;
+
+/**
+ * Maximum COUNTER rounds one Arena-light debate may reach before the daemon refuses the next one
+ * with `ROUNDS_EXHAUSTED` (F5, D7; THREAT-MODEL.md T13: "unbounded PROPOSAL/AUDIT/COUNTER rounds"
+ * as resource exhaustion). GOVERNANCE.md's own tribunal debates cap at three rounds — one AUDIT per
+ * round, escalating past the cap rather than looping forever — this project's own precedent for a
+ * bounded adversarial back-and-forth; GOVERNANCE.md itself notes the two caps are declared
+ * independently ("the runtime round cap of Arena-light over the bus, D7, is a separate named
+ * constant fixed in the F5 spec"), but share the same reasoning. `round` is journaled per
+ * `debate_journal` (DATA-MODEL.md §3.7); the cap is `readMaxCounterRound() + 1`, so this bounds
+ * COUNTER count, never AUDIT count (design.md Architecture Decisions, "Round counting").
+ */
+export const ARENA_LIGHT_MAX_ROUNDS = 3;
+
+/**
+ * One-line body marker prefix that identifies an envelope's `body` as an Arena-light debate turn
+ * (F5, D7; design.md Decision (b): `[ARENA-LIGHT:<TURN>[:<VERDICT>]] <text> refs: <r1>; <r2>`).
+ * Bracket-delimited and regex-findable, and never spans a line break: `normalizeBody`
+ * (`daemon/send/validate.ts`) collapses every whitespace run, including newlines, to one space
+ * before this prefix is ever read.
+ */
+export const DEBATE_MARKER_PREFIX = "[ARENA-LIGHT:";
+
+/**
+ * Group rate-budget hits (posts counted against {@link GROUP_MESSAGES_PER_MINUTE}) that one
+ * Arena-light debate round is charged.
+ *
+ * A round is always exactly one physical send: PROPOSAL, CONSENSUS and ESCALATE are one send each,
+ * and design.md's coalescing rule (Data Flow: "one send = one budget hit") merges a round's AUDIT
+ * and COUNTER into a single REPLY, so the round is never charged twice for its two journaled turns
+ * (proposal.md Success Criteria: "Group rate budget per round is a named constant, asserted by
+ * behaviour"). Declared here per task 1.5; `send-path.ts` (PR-5, task 3.4) is what asserts this by
+ * behaviour — this constant has no call site yet in this Phase-1 slice, a deferred wiring, not a
+ * missing one.
+ */
+export const ARENA_LIGHT_MESSAGES_PER_ROUND = 1;
 
 /**
  * Seconds after which the daemon's own election lock is considered stale and reclaimable (D3

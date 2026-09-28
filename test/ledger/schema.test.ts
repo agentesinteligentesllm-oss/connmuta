@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
-import { LEDGER_SCHEMA_DDL } from "../../src/ledger/schema.js";
+import { DEBATE_JOURNAL_DDL, LEDGER_SCHEMA_DDL } from "../../src/ledger/schema.js";
 
 /**
  * The ledger's schema, version 1 (design §5.2): every object the DDL must create, the constraints it
@@ -622,4 +622,179 @@ test("the DDL's executable text carries no window constant, so the retention mat
 	);
 	assert.notEqual(withWindow, LEDGER_SCHEMA_DDL, "the control document must actually differ");
 	assert.deepEqual(literalsOf(withWindow), ["0", "1", "7"]);
+});
+
+// --- F5: the version-2 addition, `debate_journal` (DATA-MODEL.md §3.7) ---
+
+/**
+ * `debate_journal` is applied by its own DDL string, never folded into `LEDGER_SCHEMA_DDL` (design
+ * §5.1's Decision (a)): a fresh database with only this text applied is what these tests check
+ * against, mirroring the "check what the database does with the text" approach above.
+ */
+function withDebateJournalDatabase(operation: (db: DatabaseSync) => void): void {
+	const dir = mkdtempSync(join(tmpdir(), "conmuta-ledger-debate-journal-"));
+	const db = new DatabaseSync(join(dir, "ledger.db"));
+	try {
+		db.exec(DEBATE_JOURNAL_DDL);
+		operation(db);
+	} finally {
+		db.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+/** design.md's `DebateTurnKind` union, in DATA-MODEL.md §3.7's own CHECK order. */
+const DEBATE_TURN_KINDS = ["PROPOSAL", "AUDIT", "COUNTER", "CONSENSUS", "ESCALATE"] as const;
+
+/** DATA-MODEL.md §3.7's NOT NULL columns; `verdict` and `basis_at_close` are the nullable two. */
+const DEBATE_JOURNAL_NOT_NULL_COLUMNS = [
+	"at",
+	"debate_id",
+	"eid",
+	"from_agent_id",
+	"project_id",
+	"refs",
+	"round",
+	"to_agent_id",
+	"turn",
+] as const;
+
+/** One `debate_journal` row, a `PROPOSAL` opening turn with no verdict or close basis yet. */
+function debateJournalRow(overrides: Readonly<Record<string, SQLInputValue>> = {}): Record<string, SQLInputValue> {
+	return {
+		project_id: "prj-example",
+		debate_id: "abcdef012345",
+		round: 1,
+		turn: "PROPOSAL",
+		eid: "eid-debate-1",
+		from_agent_id: "@alice-agent",
+		to_agent_id: "@bob-agent",
+		refs: "[]",
+		at: "2026-01-01T00:00:00Z",
+		...overrides,
+	};
+}
+
+test("DEBATE_JOURNAL_DDL creates exactly `debate_journal`, with the columns DATA-MODEL.md §3.7 names", () => {
+	withDebateJournalDatabase((db) => {
+		const objects = db
+			.prepare("SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name")
+			.all();
+		assert.deepEqual(
+			objects.map((row) => `${String(row.type)}:${String(row.name)}`),
+			["table:debate_journal"],
+		);
+
+		assert.deepEqual(columnsOf(db, "debate_journal").map((column) => column.name), [
+			"id",
+			"project_id",
+			"debate_id",
+			"round",
+			"turn",
+			"verdict",
+			"eid",
+			"from_agent_id",
+			"to_agent_id",
+			"refs",
+			"basis_at_close",
+			"at",
+		]);
+	});
+});
+
+test("every NOT NULL column DATA-MODEL.md §3.7 declares is NOT NULL, and the other two are nullable", () => {
+	withDebateJournalDatabase((db) => {
+		const notNull = columnsOf(db, "debate_journal")
+			.filter((column) => column.notNull)
+			.map((column) => column.name)
+			.sort();
+		assert.deepEqual(notNull, [...DEBATE_JOURNAL_NOT_NULL_COLUMNS]);
+	});
+});
+
+test("debate_journal declares STRICT, and STRICT is load-bearing rather than declared", () => {
+	withDebateJournalDatabase((db) => {
+		const declared = db
+			.prepare("SELECT strict FROM pragma_table_list WHERE schema = 'main' AND name = 'debate_journal'")
+			.get() as { strict: number } | undefined;
+		assert.equal(Number(declared?.strict), 1);
+
+		// A declaration is only worth having if it bites (mirrors the v1 STRICT test above).
+		assertRefused(() => insertRow(db, "debate_journal", debateJournalRow({ round: "not-a-number" })), {
+			errcode: SQLITE_CONSTRAINT_DATATYPE,
+			names: "round",
+		});
+
+		const looseDdl = DEBATE_JOURNAL_DDL.replace(") STRICT;", ");");
+		assert.notEqual(looseDdl, DEBATE_JOURNAL_DDL, "the control document must actually differ");
+		const loose = new DatabaseSync(":memory:");
+		try {
+			loose.exec(looseDdl);
+			insertRow(loose, "debate_journal", debateJournalRow({ round: "not-a-number" }));
+			const stored = loose.prepare("SELECT typeof(round) AS t FROM debate_journal").get() as { t: string } | undefined;
+			assert.equal(String(stored?.t), "text", "without STRICT the same value is stored as TEXT");
+		} finally {
+			loose.close();
+		}
+	});
+});
+
+test("turn accepts exactly the five body-marker subtypes DATA-MODEL.md §3.7 names", () => {
+	withDebateJournalDatabase((db) => {
+		DEBATE_TURN_KINDS.forEach((turn, index) => {
+			insertRow(db, "debate_journal", debateJournalRow({ debate_id: `debate-${index}`, turn }));
+		});
+		// Non-vacuity: every insert really landed, one per turn kind.
+		assert.equal(rowCount(db, "debate_journal"), DEBATE_TURN_KINDS.length);
+	});
+});
+
+test("turn refuses a value outside its CHECK vocabulary, and the refusal names the column", () => {
+	withDebateJournalDatabase((db) => {
+		// Baseline: the row itself is acceptable, so the refusal below is the vocabulary's doing.
+		insertRow(db, "debate_journal", debateJournalRow());
+		assertRefused(
+			() => insertRow(db, "debate_journal", debateJournalRow({ debate_id: "debate-outside", turn: "PATCH" })),
+			{ errcode: SQLITE_CONSTRAINT_CHECK, names: "turn" },
+		);
+	});
+});
+
+test("verdict and basis_at_close are nullable, set only when a debate closes (DATA-MODEL.md §3.7)", () => {
+	withDebateJournalDatabase((db) => {
+		insertRow(db, "debate_journal", debateJournalRow());
+		insertRow(
+			db,
+			"debate_journal",
+			debateJournalRow({
+				debate_id: "debate-closed",
+				turn: "CONSENSUS",
+				verdict: "APPROVE",
+				basis_at_close: "context-shared",
+			}),
+		);
+
+		const rows = db
+			.prepare("SELECT verdict, basis_at_close FROM debate_journal ORDER BY id")
+			.all()
+			.map((row) => ({ verdict: row.verdict, basis_at_close: row.basis_at_close }));
+		assert.deepEqual(rows, [
+			{ verdict: null, basis_at_close: null },
+			{ verdict: "APPROVE", basis_at_close: "context-shared" },
+		]);
+	});
+});
+
+test("DEBATE_JOURNAL_DDL refuses a second application, so a migration cannot silently no-op", () => {
+	withDebateJournalDatabase((db) => {
+		assertRefused(() => db.exec(DEBATE_JOURNAL_DDL), {
+			errcode: SQLITE_ERROR,
+			names: "table debate_journal already exists",
+		});
+		assert.equal(
+			DEBATE_JOURNAL_DDL.includes("IF NOT EXISTS"),
+			false,
+			"no statement may be a no-op on a second application",
+		);
+	});
 });

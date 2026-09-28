@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { LEDGER_SCHEMA_VERSION } from "../shared/constants.js";
-import { LEDGER_SCHEMA_DDL } from "./schema.js";
+import { DEBATE_JOURNAL_DDL, LEDGER_SCHEMA_DDL } from "./schema.js";
 import { withTransaction } from "./transaction.js";
 
 /**
@@ -83,12 +83,23 @@ export interface LedgerMigration {
  *
  * Version 1 is design §5.2's DDL, applied as the text `schema.ts` exports: this module never edits that
  * string, because a schema change is the next migration, not a change to a shipped one.
+ *
+ * Version 2 (F5, `debate_journal`) is `DEBATE_JOURNAL_DDL` from the same module, appended as its own
+ * step for the same reason: a schema change is the next migration, never an edit to a shipped one.
+ * DATA-MODEL.md §3.7 and the `ledger` delta spec's "Forward migration adds `debate_journal` at schema
+ * version 2" are what this step exists to satisfy (design.md Architecture Decisions (a)).
  */
 export const LEDGER_MIGRATIONS: readonly LedgerMigration[] = [
 	{
 		to: 1,
 		up: (db) => {
 			db.exec(LEDGER_SCHEMA_DDL);
+		},
+	},
+	{
+		to: 2,
+		up: (db) => {
+			db.exec(DEBATE_JOURNAL_DDL);
 		},
 	},
 ];
