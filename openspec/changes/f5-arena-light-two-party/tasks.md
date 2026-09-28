@@ -39,8 +39,8 @@ Chain strategy: stacked-to-main
 - [x] 2.1 RED `test/shared/debate-marker.test.ts`: encode/decode round-trip each `DebateTurnKind`; wire-mapping scenario (PROPOSAL/CONSENSUS envelope+marker).
 - [x] 2.2 RED same file: `containsInlinePatchShape` true for literal diff, false for pointer-only refs.
 - [x] 2.3 GREEN `src/shared/debate-marker.ts`: types, `encodeDebateTurn`, `encodeCoalescedReply` (two delimited sections, one line), `decodeDebateBody`, `containsInlinePatchShape`.
-- [ ] 2.4 RED `test/ledger/debate-journal.test.ts`: `appendDebateTurn`/`readDebateJournal` round-trip, scoped to `(project_id, debate_id)`; `readMaxCounterRound` restart-durable.
-- [ ] 2.5 GREEN `src/ledger/debate-journal.ts`: writer/reader, mirrors `src/ledger/conditions-store.ts` (read-only) shape (no own transaction).
+- [x] 2.4 RED `test/ledger/debate-journal.test.ts`: `appendDebateTurn`/`readDebateJournal` round-trip, scoped to `(project_id, debate_id)`; `readMaxCounterRound` restart-durable.
+- [x] 2.5 GREEN `src/ledger/debate-journal.ts`: writer/reader, mirrors `src/ledger/conditions-store.ts` (read-only) shape (no own transaction).
 
 ## Phase 3: Integration
 
