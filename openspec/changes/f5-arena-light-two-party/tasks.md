@@ -44,8 +44,8 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Integration
 
-- [ ] 3.1 RED `test/daemon/send/validate.test.ts`: cap boundary (round 2/3 COUNTER ok, next `ROUNDS_EXHAUSTED`, unjournaled); non-participant/wrong-role (`NOT_ORIGINATOR`/`NOT_ADDRESSEE`); inline-patch rejected; ordering before secret backstop.
-- [ ] 3.2 GREEN `src/daemon/send/validate.ts`: `checkDebateTurn` stage (no-op unless decodes) between loop-prevention and secret backstop; `ROUNDS_EXHAUSTED` added to `SendErrorCode`; `debateTurns?` on `ValidatedSend`.
+- [x] 3.1 RED `test/daemon/send/validate.test.ts`: cap boundary (round 2/3 COUNTER ok, next `ROUNDS_EXHAUSTED`, unjournaled); non-participant/wrong-role (`NOT_ORIGINATOR`/`NOT_ADDRESSEE`); inline-patch rejected; ordering before secret backstop.
+- [x] 3.2 GREEN `src/daemon/send/validate.ts`: `checkDebateTurn` stage (no-op unless decodes) between loop-prevention and secret backstop; `ROUNDS_EXHAUSTED` added to `SendErrorCode`; `debateTurns?` on `ValidatedSend`.
 - [ ] 3.3 RED `test/daemon/send/send-path.test.ts`: coalesced AUDIT+COUNTER = one silent send, one rate hit; ordinary REPLY still notifies; CONSENSUS/ESCALATE side-effect-free besides send+journal row.
 - [ ] 3.4 GREEN `src/daemon/send/send-path.ts`: extend `SILENT_TYPES` check for decoded debate REPLY; call `appendDebateTurn` (1-2 rows, shared `eid`) inside the existing `withTransaction` block.
 

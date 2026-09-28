@@ -1,5 +1,69 @@
 # Apply Progress: Arena-light 2-party debates over the existing wire
 
+## Phase 3 (partial): `validate.ts` round-cap + role stage — complete (PR-4 slice, tasks 3.1-3.2 ONLY)
+
+- [x] 3.1 RED `test/daemon/send/validate.test.ts`: cap boundary (round 2/3 COUNTER ok, next `ROUNDS_EXHAUSTED`, unjournaled); non-participant/wrong-role (`NOT_ORIGINATOR`/`NOT_ADDRESSEE`); inline-patch rejected; ordering before secret backstop.
+- [x] 3.2 GREEN `src/daemon/send/validate.ts`: `checkDebateTurn` stage (no-op unless decodes) between loop-prevention and secret backstop; `ROUNDS_EXHAUSTED` added to `SendErrorCode`; `debateTurns?` on `ValidatedSend`.
+
+**Explicit STOP boundary honored**: tasks 3.3-3.4 (`send-path.ts` silence+journal wiring, PR-5) and 4.1 (full suite + `test:static` final sign-off across all 15 scenarios) are **not** part of this batch and remain `[ ]` in `tasks.md`. `send-path.ts`, `shared/debate-marker.ts`, `ledger/debate-journal.ts`, `ledger/schema.ts`, `ledger/migrations.ts` and `shared/constants.ts` were read but not modified.
+
+### Files Changed (Phase 3, tasks 3.1-3.2)
+
+| File | Action | What Was Done |
+|------|--------|----------------|
+| `src/daemon/send/validate.ts` | Modified | Added `checkDebateTurn`, a new pipeline stage inserted between `checkLoopPrevention` (stage 2) and `checkSecretBackstop` (stage 3): a no-op unless `body` decodes via `decodeDebateBody` (F5's `shared/debate-marker.ts`, already merged); for every decoded marker, in order — (1) role check reusing the existing `NOT_ORIGINATOR`/`NOT_ADDRESSEE` codes (COUNTER requires `caller === thread.from`, AUDIT requires `caller === thread.to`); (2) pointer-only check via `containsInlinePatchShape`, refusing a literal diff with the new `INLINE_PATCH_REJECTED` code; (3) round-cap check, only when a marker is COUNTER, via `readMaxCounterRound(db, project_id, debate_id) + 1 > ARENA_LIGHT_MAX_ROUNDS`, refusing with the new `ROUNDS_EXHAUSTED` code. `debate_id` is `validated.thread` (the REPLY's own thread id — the spec's "`debate_id` = the PROPOSAL `thread_id`", since every REPLY on a thread carries that same thread id). The stage journals nothing on refusal or success — `appendDebateTurn` is `send-path.ts`'s job (PR-5, explicitly out of scope). `SendErrorCode` gained `INLINE_PATCH_REJECTED` and `ROUNDS_EXHAUSTED`, each with a doc comment matching the file's existing per-member comment style (see `NOT_PARTICIPANT`'s precedent). `ValidatedSend` gained `debateTurns?: readonly DebateTurnMarker[]`, populated by `checkDebateTurn`'s return value so `send-path.ts` can read the already-decoded markers without re-parsing `body`. `validateSend` now calls the new stage between stage 2 and stage 3 and threads `debateTurns` through to its return value. The module's own SEAM provenance header (`Provenance: ... verdict: SEAM (D-08)`) gained a disclosed `(13)` entry describing this addition, matching every prior F1/F3 change to this same file (`test/security/provenance.test.ts` only requires a SEAM's hash differ from its pinned v1 hash and its `Changes` line not read `none.` — both already true before this edit; the `(13)` addition is documentation-quality parity with the file's own established convention, not something the gate itself requires) |
+| `test/daemon/send/validate.test.ts` | Modified | Added a new `--- Stage 2.5: Arena-light debate-turn stage (F5, D7; design.md Decision (c)) ---` section: 10 new tests plus one new helper (`journalCounterRounds`, seeding N already-accepted COUNTER rows via the already-merged `appendDebateTurn`) and two fixture markers (`COUNTER_MARKER`, `AUDIT_MARKER`). Covers: round-2-of-3 COUNTER accepted and carried as `debateTurns`; the (cap+1)-th COUNTER refused `ROUNDS_EXHAUSTED` with zero ledger writes (`totalChanges` unchanged); round-cap scoping to `(project_id, debate_id)` (a same-id debate under another project does not count toward the caller's cap); COUNTER-by-addressee refused `NOT_ORIGINATOR`; AUDIT-by-originator refused `NOT_ADDRESSEE`; AUDIT never checks the round cap even when COUNTER is exhausted; a literal-diff COUNTER refused `INLINE_PATCH_REJECTED`; an ordinary (non-debate) REPLY is a no-op (`debateTurns` is `undefined`); two stage-order tests (loop prevention still runs first — `UNKNOWN_THREAD` on an unknown thread even with a debate-marked body; the new stage runs before the secret backstop — a cap-exhausted, secret-shaped COUNTER is refused `ROUNDS_EXHAUSTED`, not `SECRET_PATTERN_DETECTED`) |
+
+### TDD Cycle Evidence (Phase 3, tasks 3.1-3.2)
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 3.1/3.2 | `test/daemon/send/validate.test.ts` | Unit (real `node:sqlite`, file-backed ledger via `openLedger`) | ✅ 47/47 (pre-change baseline for this file, run before any edit) | ✅ Written — `TS2339: Property 'debateTurns' does not exist on type 'ValidatedSend'` at 4 call sites, confirmed by `npx tsc -b` before `checkDebateTurn`/`debateTurns` existed | ✅ Passed (57/57 — the 47-test safety net plus all 10 new tests — on first execution after implementing GREEN) | ✅ 10 cases: cap-boundary-ok, cap-boundary-exhausted-unjournaled, cross-project cap scoping, COUNTER-wrong-role, AUDIT-wrong-role, AUDIT-ignores-cap, inline-patch-rejected, non-debate-no-op, stage-order-after-loop-prevention, stage-order-before-secret-backstop | ➖ None needed — `checkDebateTurn` follows the file's own existing per-stage function shape (`checkLoopPrevention`, `checkSecretBackstop`) with no duplication introduced |
+
+### Test Summary (Phase 3, tasks 3.1-3.2)
+- **Total tests written**: 10 (all in `test/daemon/send/validate.test.ts`)
+- **Total tests passing**: 57/57 in the focused file (47 pre-existing + 10 new); 0 regressions in the full suite (see Full-Suite Verification below)
+- **Layers used**: Unit (10), Integration (0), E2E (0)
+- **Approval tests** (refactoring): None — no refactoring tasks in this batch; `checkDebateTurn` is new code inserted into an existing pipeline function (`validateSend`), which is a genuine behavior addition (new stage), not a refactor of existing stages
+- **Pure functions created**: 1 (`checkDebateTurn` — reads `thread`/`db` but performs no write; matches the file's own existing stage functions, several of which also read `db`/`config` as inputs without being "impure" in the mutating sense)
+
+### Work Unit Evidence (Phase 3, tasks 3.1-3.2)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `npx tsc -b && node --test dist/test/daemon/send/validate.test.js` → `tests 57, pass 57, fail 0, cancelled 0, skipped 0` |
+| Runtime harness command/scenario and exact result | A real integration path within this unit's own boundary: every new test calls `validateSend` (the full five-stage pipeline, not `checkDebateTurn` in isolation) against a real file-backed `node:sqlite` ledger (`openLedger`) seeded through `writeThreadRecord`/`appendDebateTurn` exactly as `send-path.ts` (PR-5) will read/write it — not a mock. No daemon boot, IPC or transport boundary exists at this stage's own layer (design.md's Threat Matrix: "N/A — no routing, shell, subprocess..."); `node --test dist/test/daemon/send/validate.test.js` → 57/57, matching the focused command above |
+| Rollback boundary | Revert the `checkDebateTurn` function, its two `SendErrorCode` additions (`INLINE_PATCH_REJECTED`, `ROUNDS_EXHAUSTED`), the `debateTurns?` field on `ValidatedSend`, the one added `checkDebateTurn(...)` call site inside `validateSend`, the three new imports (`readMaxCounterRound`, `ARENA_LIGHT_MAX_ROUNDS`, `containsInlinePatchShape`/`decodeDebateBody`/`DebateTurnMarker`), the disclosed `(13)` provenance-header line, and the new `--- Stage 2.5 ---` test section plus its two new imports in the test file. `ROUNDS_EXHAUSTED`/`INLINE_PATCH_REJECTED` have no other call site yet (`send-path.ts`, PR-5, is their first and only future consumer) — reverting this slice alone leaves every pre-existing `validate.ts` behavior byte-for-byte unchanged (confirmed by the 47/47 safety-net rerun inside the 57/57 total) |
+
+### Full-Suite Verification (Phase 3, after tasks 3.1-3.2)
+
+- `npm test` (`tsc -b && node --test "dist/test/**/*.test.js"`): **1521 tests, 1515 pass, 0 fail, 6 skip** (baseline after Phase 2 was 1511/1505/0/6 per this same file's own recorded figure — +10 matches exactly the new tests added in this batch; 0 regressions).
+- `npm run test:static`: **57/57 pass**, including `test/security/provenance.test.ts`'s two tests — confirming the disclosed `(13)` provenance-header addition to `validate.ts` (a SEAM file) still hash-mismatches its pinned v1 body and still carries a non-`"none."` `Changes` line, exactly as every prior change to this file has. The same two `ERROR: El sistema no ha podido encontrar la clave o el valor del Registro especificados.` lines observed in Phase 2's run recurred here — the same pre-existing Windows-registry/OS-keyring probe noise already disclosed there, not a new regression, and the suite still reports 57/57.
+
+### Deviations from Design (Phase 3, tasks 3.1-3.2)
+
+One disclosed addition beyond design.md's literal Interfaces/Contracts listing: `INLINE_PATCH_REJECTED` is a new `SendErrorCode` member not named anywhere in design.md's `SendErrorCode += "ROUNDS_EXHAUSTED"` line. This is not a silent deviation — the orchestrator's own task brief explicitly anticipated this gap ("check if there's already a fitting code... if genuinely new, name it clearly, e.g. `INLINE_PATCH_REJECTED`, and add it to `SendErrorCode`"), and no existing code in the union fits "content structurally rejected for shape reasons" (`VALIDATION_ERROR` is reserved for stage-1 schema failures, `SECRET_PATTERN_DETECTED` for a different backstop entirely). The spec's own "Debate bodies are pointer-only, never inline patches" requirement demands a rejection; `INLINE_PATCH_REJECTED` is that rejection, documented with the same per-member doc-comment style as every other `SendErrorCode` entry.
+
+A second, smaller disclosed choice: the design's Data Flow line groups "decode, pointer-only, role check ... round-cap" as one bullet without specifying inter-check order among decoded markers. This batch runs, across ALL decoded markers: (1) every marker's role check, then (2) every marker's pointer-only check, then (3) one round-cap check if any marker is COUNTER — per the orchestrator's own explicit numbered algorithm (steps 2-5 of the task brief), which this implementation follows exactly. No spec scenario distinguishes a different inter-check order, so this is the only order tested.
+
+### Issues Found (Phase 3, tasks 3.1-3.2)
+
+None. Design.md's Decision (c), the `arena-light-debates` spec's "Round cap refuses the (cap+1)-th COUNTER" and "Participation and scope reuse existing invariants" requirements, and the `send-path` delta spec's MODIFIED "Validation pipeline and secret backstop run before any network call" requirement were all internally consistent with what tasks.md 3.1-3.2 asked for, and consistent with the real, already-merged `validate.ts`/`debate-marker.ts`/`debate-journal.ts`/`constants.ts` this batch read in full before writing anything.
+
+### Remaining Tasks (out of scope for this batch — Phase 3.3-3.4 and Phase 4)
+
+- [ ] 3.3-3.4 `daemon/send/send-path.ts` (PR-5, silence+journal wiring) — **STOP boundary**: not touched by this batch per explicit instruction; the first consumer of `ValidatedSend.debateTurns` and the two new `SendErrorCode` members
+- [ ] 4.1 Full suite + `test:static` green, all 15 scenarios (7+2+6) — this batch's slice of the 6 Phase-3 scenarios (round-cap boundary, participation/role) is green now; the coalesced-REPLY-is-one-silent-send and CONSENSUS/ESCALATE-side-effect-free scenarios still depend on Phase 3.3-3.4 (`send-path.ts`, PR-5)
+
+### Workload / PR Boundary (Phase 3, tasks 3.1-3.2)
+
+- Mode: chained PR slice (`stacked-to-main`, per tasks.md's Review Workload Forecast)
+- Current work unit: Unit 4 ("`validate.ts` round-cap+role stage", PR-4)
+- Boundary: starts from PR-1/PR-2/PR-3's merged baseline (`debate_journal` table, `shared/debate-marker.ts`, `ledger/debate-journal.ts` all already live and callable); ends with `validate.ts` exposing `ValidatedSend.debateTurns` and refusing round-cap/role/inline-patch violations, but **not yet wired to any silence or journal-write behavior** — Phase 3.3-3.4 (`send-path.ts`, PR-5) is the first consumer
+- Authored diff: `src/daemon/send/validate.ts` +~95 lines (new function, two doc-comment updates, three import lines, two `SendErrorCode` members, one interface field, one call site); `test/daemon/send/validate.test.ts` +~180 lines (10 new tests, one helper, two fixtures, three import lines). Combined ≈275 authored lines — well under the 400-line budget for this unit as tasks.md's own Suggested Work Units table anticipated (PR-4 has no `size:exception`)
+
+---
+
 ## Phase 2: Core — complete (PR-2 + PR-3 slices, applied in one batch)
 
 - [x] 2.1 RED `test/shared/debate-marker.test.ts`: encode/decode round-trip each `DebateTurnKind`; wire-mapping scenario (PROPOSAL/CONSENSUS envelope+marker).
@@ -58,8 +122,9 @@ None beyond the two disclosed additions above. Design.md's Interfaces/Contracts,
 
 ### Remaining Tasks (out of scope for this batch — Phase 3-4)
 
-- [ ] 3.1-3.4 `daemon/send/validate.ts` + `daemon/send/send-path.ts` (PR-4, PR-5) — **STOP boundary**: not touched by this batch per explicit instruction
-- [ ] 4.1 Full suite + `test:static` green, all 15 scenarios (7+2+6) — Phase 1+2's slice of this (7+2+6=... see note) is green now: Phase 1 covered the 2 migration scenarios; Phase 2 covers the marker module's behavioral contract (wire-mapping, pointer-only/inline-patch) and the journal's durability scenario. The remaining scenarios (round-cap boundary, participation/role, coalesced-REPLY-is-one-silent-send, CONSENSUS/ESCALATE side-effect-free) depend on Phase 3 (`validate.ts`/`send-path.ts`), still pending.
+- [x] ~~3.1-3.2 `daemon/send/validate.ts` round-cap+role stage (PR-4)~~ — **superseded**: completed in the Phase 3 (partial) section above (a later apply batch); left struck through here rather than deleted, so this historical Phase-2 record does not silently change what it originally reported as remaining
+- [ ] 3.3-3.4 `daemon/send/send-path.ts` (PR-5) — **STOP boundary**: not touched by this batch per explicit instruction
+- [ ] 4.1 Full suite + `test:static` green, all 15 scenarios (7+2+6) — Phase 1+2's slice of this (7+2+6=... see note) is green now: Phase 1 covered the 2 migration scenarios; Phase 2 covers the marker module's behavioral contract (wire-mapping, pointer-only/inline-patch) and the journal's durability scenario. The remaining scenarios (coalesced-REPLY-is-one-silent-send, CONSENSUS/ESCALATE side-effect-free) depend on Phase 3.3-3.4 (`send-path.ts`), still pending. Phase 3's round-cap boundary and participation/role scenarios are now green (see the Phase 3 (partial) section above).
 
 ### Workload / PR Boundary (Phase 2)
 
