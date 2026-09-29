@@ -3,6 +3,23 @@ import assert from "node:assert/strict";
 import { startHeartbeat } from "../../../src/daemon/lifecycle/heartbeat.js";
 import { HEARTBEAT_PERIOD_MS } from "../../../src/shared/constants.js";
 
+// Condition wait with a generous deadline (B-99): a fixed sleep expecting N ticks is flaky under
+// CPU contention, because scheduling delay eats into the window, not because the heartbeat is
+// wrong. Polling for the tick count itself, bounded by a deadline far longer than any real
+// contention observed, keeps the guarantee (ticks happen) without coupling it to wall-clock timing.
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 5000,
+  intervalMs = 5,
+): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return false;
+}
+
 test("heartbeat: ticks at periodMs", async () => {
   let tickCount = 0;
   const handle = startHeartbeat({
@@ -12,10 +29,10 @@ test("heartbeat: ticks at periodMs", async () => {
     },
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 55));
+  const reachedTwoTicks = await waitForCondition(() => tickCount >= 2);
   handle.stop();
 
-  assert.ok(tickCount >= 2, `expected at least 2 ticks, got ${tickCount}`);
+  assert.ok(reachedTwoTicks, `expected at least 2 ticks within the deadline, got ${tickCount}`);
 });
 
 test("heartbeat: calls onTick on every tick", async () => {
@@ -27,10 +44,10 @@ test("heartbeat: calls onTick on every tick", async () => {
     },
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const reachedTwoTicks = await waitForCondition(() => ticks.length >= 2);
   handle.stop();
 
-  assert.ok(ticks.length >= 2, `expected at least 2 ticks, got ${ticks.length}`);
+  assert.ok(reachedTwoTicks, `expected at least 2 ticks within the deadline, got ${ticks.length}`);
 });
 
 test("heartbeat: stops cleanly on .stop()", async () => {

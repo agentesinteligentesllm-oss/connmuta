@@ -9,6 +9,21 @@ import { IDLE_SHUTDOWN_HOURS } from "../../src/shared/constants.js";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
+// Condition wait with a generous deadline (B-99): see heartbeat.test.ts for the rationale — a
+// fixed sleep expecting N ticks is flaky under CPU contention, not because the heartbeat is wrong.
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 5000,
+  intervalMs = 5,
+): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return false;
+}
+
 test("no-emission: control test proves assertion fails if outbound send is triggered (non-vacuous)", () => {
   const recordedSends: Array<{ method: string; payload: unknown }> = [];
   const fakeClient = {
@@ -63,10 +78,10 @@ test("no-emission: simulated idle window and heartbeat ticks trigger zero outbou
     },
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 55));
+  const reachedTwoTicks = await waitForCondition(() => tickCount >= 2);
   heartbeatHandle.stop();
 
-  assert.ok(tickCount >= 2, `expected multiple ticks, got ${tickCount}`);
+  assert.ok(reachedTwoTicks, `expected multiple ticks within the deadline, got ${tickCount}`);
 
   // Run simulated idle window checks
   const now = 2_000_000_000;
