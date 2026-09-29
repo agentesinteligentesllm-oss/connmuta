@@ -12,7 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { computeClosure } from "./closure.js";
+import { computeClosure, bareSpecifiers } from "./closure.js";
 import {
   DIST_SRC_DIR,
   relPosix,
@@ -92,6 +92,40 @@ test("daemon bundle: child_process is forbidden anywhere in the closure (PT-28)"
 test("daemon bundle: child_process detection is non-vacuous, and does not fire on a disclosure comment mentioning it (seeded)", () => {
   assert.equal(CHILD_PROCESS_IMPORT_RE.test('import { spawn } from "node:child_process";'), true);
   assert.equal(CHILD_PROCESS_IMPORT_RE.test("// this bundle stays free of `child_process`"), false);
+});
+
+/**
+ * B-100(b): computeClosure only follows relative specifiers, so a bare specifier wrapping process
+ * spawning (a cross-spawn/execa-style dependency) would evade the child_process check above without
+ * ever entering this closure's own file set (channel-bundle.test.ts's own module doc names this exact
+ * gap). This test makes the daemon bundle's external dependency surface explicit: a new bare specifier
+ * fails here until deliberately reviewed and added below — it does not inspect what an allow-listed
+ * package's own code does internally.
+ */
+const ALLOWED_DAEMON_BARE_SPECIFIERS: readonly string[] = [
+  "@napi-rs/keyring",
+  "node:crypto",
+  "node:events",
+  "node:fs",
+  "node:http",
+  "node:os",
+  "node:path",
+  "node:sqlite",
+  "zod",
+];
+
+test("daemon bundle: bare (non-relative) specifiers are confined to the reviewed allow-list (B-100b)", () => {
+  const contents = daemonBundleContents();
+  const bare = new Set<string>();
+  for (const source of contents.values()) {
+    for (const specifier of bareSpecifiers(source)) bare.add(specifier);
+  }
+  assert.deepEqual([...bare].sort(), ALLOWED_DAEMON_BARE_SPECIFIERS);
+});
+
+test("daemon bundle: bare-specifier detection is non-vacuous (seeded)", () => {
+  assert.deepEqual(bareSpecifiers('import cp from "cross-spawn";'), ["cross-spawn"]);
+  assert.deepEqual(bareSpecifiers('import { x } from "./relative.js";'), []);
 });
 
 test("daemon bundle: node:fs is confined to the allow-listed home-scoped modules, and registry/*.js never writes (R6)", () => {

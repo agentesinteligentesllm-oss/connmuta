@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { computeClosure } from "./closure.js";
+import { computeClosure, bareSpecifiers } from "./closure.js";
 import { DIST_SRC_DIR, relPosix, hasChildProcessReference, hasFsModuleReference } from "./predicates.js";
 
 const CLIENT_ENTRY = join(DIST_SRC_DIR, "client/main.js");
@@ -143,6 +143,40 @@ test("client bundle: api.telegram.org, getUpdates, @napi-rs/keyring and secrets/
     assert.equal(KEYRING_IMPORT_RE.test(source), false, `${path} must not import @napi-rs/keyring`);
     assert.equal(SECRETS_PATH_RE.test(source), false, `${path} must not reference a secrets/ path`);
   }
+});
+
+/**
+ * B-100(b): computeClosure only follows relative specifiers (closure.ts's own doc comment), so a bare
+ * specifier wrapping process spawning (a cross-spawn/execa-style dependency) would evade the
+ * child_process check above without ever entering this closure's own file set. This test makes the
+ * client bundle's external dependency surface explicit: a new bare specifier fails here until
+ * deliberately reviewed and added below — it does not inspect what an allow-listed package's own code
+ * does internally (same disclosed limit as channel-bundle.test.ts's own module doc).
+ */
+const ALLOWED_CLIENT_BARE_SPECIFIERS: readonly string[] = [
+  "@modelcontextprotocol/sdk/server/mcp.js",
+  "@modelcontextprotocol/sdk/server/stdio.js",
+  "node:child_process",
+  "node:crypto",
+  "node:fs",
+  "node:os",
+  "node:path",
+  "node:url",
+  "zod",
+];
+
+test("client bundle: bare (non-relative) specifiers are confined to the reviewed allow-list (B-100b)", () => {
+  const contents = clientBundleContents();
+  const bare = new Set<string>();
+  for (const source of contents.values()) {
+    for (const specifier of bareSpecifiers(source)) bare.add(specifier);
+  }
+  assert.deepEqual([...bare].sort(), ALLOWED_CLIENT_BARE_SPECIFIERS);
+});
+
+test("client bundle: bare-specifier detection is non-vacuous (seeded)", () => {
+  assert.deepEqual(bareSpecifiers('import cp from "cross-spawn";'), ["cross-spawn"]);
+  assert.deepEqual(bareSpecifiers('import { x } from "./relative.js";'), []);
 });
 
 test("client bundle: the forbidden-pattern checks are non-vacuous (seeded negatives)", () => {
