@@ -16,6 +16,18 @@ test("raceAgainstTimeout: resolves once the promise settles when it is faster th
   assert.equal(resolved, true, "the awaited promise must have actually settled, not just the timeout");
 });
 
+test("raceAgainstTimeout: clears its own timer once the promise wins, leaking no pending handle", async (t) => {
+  const clearTimeoutMock = t.mock.method(global, "clearTimeout");
+
+  await raceAgainstTimeout(Promise.resolve(), 5_000);
+
+  assert.equal(
+    clearTimeoutMock.mock.callCount(),
+    1,
+    "the 5s timer must be cleared once the promise side wins, or it keeps the event loop alive needlessly",
+  );
+});
+
 test("raceAgainstTimeout: resolves via the timeout when the promise never settles, without throwing", async () => {
   const stuck = new Promise<void>(() => {});
 

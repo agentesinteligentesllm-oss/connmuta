@@ -53,7 +53,7 @@ Run them in the Bash tool: they use POSIX syntax (`rm -rf` does not exist in Pow
 | 5 | `git status --short` | prints nothing |
 | 6 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 7 | `gentle-ai --version` | `3.7.0` or later; check fresh each session, do not trust this number to stay current |
-| 8 | `npm run build && npm test` | exit 0; `1716 tests, 1710 pass, 0 fail, 6 skip` (session-56 close baseline) |
+| 8 | `npm run build && npm test` | exit 0; `1720 tests, 1714 pass, 0 fail, 6 skip` (session-56 close baseline) |
 
 The working tree must be clean. If `git status` shows anything, stop and report before assuming it is safe.
 
@@ -126,7 +126,7 @@ Then decide what to do (§3) with the Director.
 | **B-98** | **Closed, session 56.** Daemon `stop()`/heartbeat shutdown-ordering race. Fix `54f7d56`, backlog close `f0de180`. | `docs/06-backlog/CHECKLIST.md#B-98` |
 | B-95 remainder, B-100 | Open, carried forward. | `docs/06-backlog/CHECKLIST.md`, §7 below |
 | Next SDD change | None queued. F6 (`f6-release-and-docs`) is next in `WORK-PLAN.md` but blocked on Director decisions (B-11, B-12, B-16). | `docs/07-plan/WORK-PLAN.md` (F6 section) |
-| Tests on `main` | `npm test`: **1716 tests, 1710 pass, 0 fail, 6 skip** (session start: 1714/1708/0/6). Independently re-run by Kairo from a clean build, not just taken from a subagent's report. `test:static`: **77/77**. | — |
+| Tests on `main` | `npm test`: **1720 tests, 1714 pass, 0 fail, 6 skip** (session start: 1714/1708/0/6). Independently re-run by Kairo from a clean build at every commit, not just taken from a subagent's report. `test:static`: **77/77**. | — |
 | RDD this session | Retroactive review of session 55's tail (lineage `review-72c122cea9dcb218`): approved, acknowledged, authority burned. B-98's own work-unit assessment: `under_budget`, correctly deferred. | §9 below |
 
 ---
@@ -357,13 +357,12 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 - F4's seven implementation PRs (`#95`-`#105`) and its `sdd-verify`/`sdd-archive` are final: do not
   re-implement, re-debate, or re-review them. See `LOG.md`'s session-55 entry for the full RDD/tribunal
   lineage list — none of it is reopened.
-- B-97, B-99, B-101 are closed (session 55). **B-98 is closed (session 56), commit `54f7d56`** — do
-  not re-implement it. Its own RDD work-unit assessment (`under_budget`) is the designed behavior for
-  a small candidate, not an oversight; it stays pending in the slice until a later commit reaches
-  budget or review is explicitly requested — do not force a review it does not need.
+- B-97, B-99, B-101 are closed (session 55). **B-98 is closed (session 56), commits `54f7d56` (the
+  fix) and `d8bd7a7` (the RDD correction — see §9)** — do not re-implement either. B-102(a)(b)(c)(f)(g)
+  remain open, disclosed follow-ups (§7); (d) and (e) are closed, folded into the same two commits.
 - The retroactive RDD review of session 55's tail (`dd464a7`, `24d7dc6`, `2aa0da0`; lineage
-  `review-72c122cea9dcb218`) is approved, acknowledged, authority burned — do not re-review those three
-  commits again.
+  `review-72c122cea9dcb218`) and all four RDD lineages on B-98 itself (§9) are approved/acknowledged
+  (one superseded before acknowledgement, §9) — do not re-review any of those commits again.
 - Do not fix `WORK-PLAN.md`'s F4 Validation row (row 93) or SDD-change row (row 94) again — both are
   current as of session 55's docs-sync commit.
 
@@ -375,7 +374,7 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 |---|---|---|
 | **B-95** | Remainder: (d) the missing abort signal (design-exact, Alpha-approved not to touch), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting comment count, `to` accepting any string, the silent skip of an unreadable row). | Kairo (Director schedules) |
 | **B-100** | Blind spots of the bundle-closure detectors: `hasFsModuleReference` misses four import forms; `computeClosure` follows relative specifiers only. Deliberately deferred twice now (sessions 55 and 56) — widening risks surfacing an existing violation, unbounded scope. Needs a session with room to absorb that possibility, not a tail-end attempt. | Director + Kairo |
-| **B-102** | B-98's own RDD review (run twice, once per candidate growth) found 4 non-blocking advisories: the `stopping` guard's update-binding branch is untested; the new bootstrap regression test's negative assertion uses a fixed 60ms sleep instead of a condition-wait (reintroducing the exact B-99 anti-pattern, in this same session); the `stopping` latch is never reset (likely fine, undocumented); `stop()`'s await on an in-flight tick has no timeout, so a stalled `tick()` would hang the whole shutdown. Cheap to fix at the next touch of either file. | Kairo |
+| **B-102** | B-98's own RDD review, run 4 times as the candidate grew with each session-close edit: (d) the unbounded `currentTick` await escalated to CRITICAL on the 3rd pass and was fixed same-session (`STOP_TICK_TIMEOUT_MS` + `raceAgainstTimeout`, commit `d8bd7a7`); (e) that fix's own timer leak, found by the 4th pass, also fixed same-session (`clearTimeout` in a `finally`). Still open: (a) the `stopping` guard's update-binding branch is untested; (b) the bootstrap test's negative assertion still uses a fixed 60ms sleep (B-99-class anti-pattern); (c) the `stopping` latch is never reset (likely fine, undocumented); (f) a timed-out-then-later-resolving tick can still hit a closed database (the original B-98 symptom, narrowed); (g) a timed-out tick leaves no log/audit trace. Cheap wins at the next touch of these files — see `CHECKLIST.md`'s B-102 row for full detail. | Kairo |
 | **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 block F6's readiness (§3.3). | Director |
 | **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker. Low priority. | Director |
 
@@ -406,23 +405,33 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 
 ## §9 — RDD state at session close
 
-Two lineages this session, both fully resolved; neither is to be re-reviewed (§6):
+Five lineages this session. Four acknowledged (authority burned); one (`review-52b3d48d4017231b`)
+opened `correction_required` and was superseded by a fresh lineage once the fix was committed — it was
+never acknowledged and holds no outstanding authority. None of the five is to be re-reviewed (§6):
 
-- **Retroactive review of session 55's tail** (`dd464a7`, `24d7dc6`, `2aa0da0` against base `4ba4928`):
-  lineage `review-72c122cea9dcb218`, tier high, consent granted, all 4 lenses approved (zero blocking
-  findings, 7 informational advisories), acknowledged, authority burned.
-- **B-98's accumulated work-unit + session-close docs** (`54f7d56` + `f0de180` + `c07a7ea` against
-  base `2aa0da0`): assessed tier medium (`executable_change` in `AGENTS.md`, plus real code), 704
-  lines, `review_due_reason: "slice_budget_reached"` — granted, lineage `review-5870e8e856f250ce`,
-  approved with 3 advisories (folded into B-102), acknowledged, authority burned.
-- **The same accumulation plus B-102's own filing commit** (`54f7d56` + `f0de180` + `c07a7ea` +
-  `2012df6` against base `2aa0da0`, 706 lines): a Stop hook caught this as a distinct, not-yet-reviewed
-  target_identity — granted again (the Director's already-given consent for the near-identical prior
-  candidate was not silently reused, since this was verifiably a different target), lineage
-  `review-cd67b83acb023e0e`, approved with 3 advisories (2 repeats, 1 new — B-102 item (d), the
-  unbounded `currentTick` await), acknowledged, authority burned.
+1. **Retroactive review of session 55's tail** (`dd464a7`, `24d7dc6`, `2aa0da0` against base
+   `4ba4928`): lineage `review-72c122cea9dcb218`, tier high, granted, all 4 lenses approved (zero
+   blocking, 7 informational advisories), acknowledged.
+2. **B-98's accumulated work-unit + session-close docs** (`54f7d56`+`f0de180`+`c07a7ea` against base
+   `2aa0da0`, 704 lines, `slice_budget_reached`): lineage `review-5870e8e856f250ce`, tier medium,
+   granted, approved with 3 advisories (folded into B-102 (a)(b)(c)), acknowledged.
+3. **The same accumulation plus B-102's own filing commit** (`+2012df6`, 706 lines): a Stop hook caught
+   this as a distinct target_identity — granted again, lineage `review-cd67b83acb023e0e`, tier medium,
+   approved with 3 advisories (2 repeats, 1 new — B-102(d), the unbounded `currentTick` await),
+   acknowledged.
+4. **The same accumulation plus one more small B-102(d) doc edit** (`+eba0b5a`, 710 lines): granted a
+   third near-identical time (disclosed to the Director as such), lineage `review-52b3d48d4017231b`,
+   tier medium — this pass **escalated B-102(d) from WARNING to CRITICAL** and opened
+   `correction_required`. Fixed same-session (`STOP_TICK_TIMEOUT_MS`, `raceAgainstTimeout`, committed
+   as `d8bd7a7`), which changed the candidate's target_identity before this lineage's correction was
+   ever validated — it was superseded, not acknowledged, by lineage 5.
+5. **The corrected candidate** (`+d8bd7a7`, 865 lines, 13 files): granted, lineage
+   `review-645745a82fbabaf1`, tier high (a security-relevant test file, `daemon-bundle.test.ts`, was
+   touched), all 4 lenses approved (zero blocking, 11 informational advisories — the real one,
+   `raceAgainstTimeout`'s own uncleared timer, fixed immediately same-session, not deferred; folded
+   into B-102(e); the rest are B-102(f)(g) and reconfirmations of (a)(b)(c)), acknowledged.
 
-This file's own final small edit (folding item (d) into B-102, this paragraph) and its own commit are
-pure bookkeeping prose, matching session 55's own equivalent commit (`2aa0da0`) — not retro-fitted
-into this text once assessed; check `LOG.md`'s session-57 entry or the commit's own git log if it
-matters later.
+This file's own final edit (this paragraph, plus §6/§7's B-102 updates and the timer-leak fix) and its
+commit are the true final session-close state — not retro-fitted further once assessed; check
+`LOG.md`'s session-57 entry or the commit's own git log if a later RDD pass on this exact commit
+matters.

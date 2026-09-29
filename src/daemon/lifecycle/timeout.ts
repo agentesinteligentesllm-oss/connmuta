@@ -8,5 +8,15 @@
  * confined and auditable, same reasoning as this file's `heartbeat.ts`/`idle.ts` siblings.
  */
 export async function raceAgainstTimeout(promise: Promise<void>, timeoutMs: number): Promise<void> {
-  await Promise.race([promise, new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))]);
+  let timer: NodeJS.Timeout;
+  try {
+    await Promise.race([
+      promise,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
