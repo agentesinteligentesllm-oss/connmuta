@@ -41,11 +41,24 @@
   the RDD preflight on each candidate; the provider-issued START with the default `workspace` projection saw
   exactly the slice's staged files. Docs-only commit `8c20646` recorded #103 and the PR-06 scope as they
   landed; this close-out is one more.
-- **Not done**: PR-07, `sdd-verify`, `sdd-archive`; B-95 (d), B-97, B-98, B-99 and B-100 are open.
+- **Close-out**: audited by Alpha (`bus-v2-s54-docs-close-audit-001`, `APPROVE`, round 1). RDD: medium
+  (`AGENTS.md` and openspec artifacts read as executable), one lens, granted by the Director and approved
+  (lineage `review-e4a866d023a3fc0f`, one reliability SUGGESTION about a test-count phrase in `apply-progress.md`,
+  left as is); the later `HANDOFF.md` and `LOG.md` deltas closed as `low` with no question.
+- **Not done**: PR-07, `sdd-verify`, `sdd-archive`; B-95 (d), B-97, B-98, B-99, B-100 and B-101 are open.
+- **Judgment Day review of the HANDOFF** (`bus-v2-s54-handoff-judgment-day-001`, `APPROVED`): with Alpha out
+  of quota the Director asked for the HANDOFF to be restructured and reviewed twice by judges. Two blind read-only
+  judges ran two rounds (round 1 on the restructured file, round 2 on the revised file plus the frozen ledger);
+  no round produced a CRITICAL finding, and the parent fixed every verified WARNING and SUGGESTION. Side effects:
+  `WORK-PLAN.md` row 94 was refreshed, B-97's pointer was corrected to `src/cli/main.ts:709-714` in the live
+  documents, and B-101 (GOVERNANCE §3 does not cover a reachable Arena whose collaborator cannot answer) was
+  filed. The stale openspec artifacts the judges found (`tasks.md` 1.1-1.7, `apply-progress.md`'s PR-05 header)
+  are deferred to PR-07's recording commit. The judges took about 20 minutes and 140 tool calls each per round.
 - **Collaborator availability**: after the documentation close-out audit had been answered, the Director
   reported that Alpha's token quota was exhausted and that Alpha would not be available for now. No debate was
-  pending. The next session chooses between seating Betelgeuse (GOVERNANCE §3 accepts Alpha or Betelgeuse) and,
-  only if the Arena does not respond, the Judgment Day substitute; see `HANDOFF.md` §0.
+  pending. The next session settles it as `HANDOFF.md` §0.3 says: Alpha back, Betelgeuse seated (GOVERNANCE §3
+  accepts Alpha or Betelgeuse), or the Director's explicit instruction to use the Judgment Day substitute, which
+  GOVERNANCE §3 defines only for an unreachable Arena (gap filed as B-101).
 
 ## Session 53 — F4 PR-05b, PR-05c and PR-05d implemented, audited, and merged; PR-05 complete
 
