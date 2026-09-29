@@ -788,6 +788,101 @@ test("bootstrap: stop() awaits an in-flight heartbeat tick before stopping bindi
   }
 });
 
+test("bootstrap: stop() does not hang forever when an in-flight tick stalls (B-98 correction)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  let factoriesInFlight = 0;
+
+  const emptyRegistry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [],
+    groups: [],
+    projects: [],
+    bindings: [],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(emptyRegistry));
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 5,
+      stopTickTimeoutMs: 50,
+      telegramClientFactory: (): Promise<TelegramClient> => {
+        factoriesInFlight++;
+        // A genuinely stalled tick (a hung secret-store or network call inside reconcile()'s
+        // buildTransport) — deliberately never resolves or rejects for the life of this test.
+        return new Promise<TelegramClient>(() => {});
+      },
+    });
+
+    const registryWithBinding: Registry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [
+        {
+          bot_id: 444333223,
+          username: "test_bot_stall",
+          token_ref: { store: "keychain", account: "bot:444333223" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [{ group_id: -1004443332222, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [{ project_id: "prj-b98-stall", path: homeDir }],
+      bindings: [
+        {
+          project_id: "prj-b98-stall",
+          bot_id: 444333223,
+          group_id: -1004443332222,
+          agent_id: "@b98-stall-agent",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@b98-stall-agent", user_id: 444333223, username: "test_bot_stall" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithBinding));
+
+    // Same barrier reasoning as the sibling B-98 test above: wait until the stalled factory call has
+    // actually started before calling stop(), so stop() races the stuck tick, not the registry write.
+    const BARRIER_DEADLINE_MS = 30_000;
+    const BARRIER_POLL_MS = 5;
+    const deadline = Date.now() + BARRIER_DEADLINE_MS;
+    while (factoriesInFlight === 0) {
+      assert.ok(Date.now() < deadline, "no tick ever started the stalled factory call");
+      await new Promise((resolve) => setTimeout(resolve, BARRIER_POLL_MS));
+    }
+
+    const startedAt = Date.now();
+    await daemon.stop();
+    const elapsedMs = Date.now() - startedAt;
+
+    // Generous upper bound: comfortably above the configured 50ms stopTickTimeoutMs plus scheduling
+    // jitter, comfortably below the real 5000ms production default — proves the override actually
+    // bounded the wait rather than stop() silently falling back to (or exceeding) the real default.
+    assert.ok(
+      elapsedMs < 3000,
+      `stop() must give up on a stalled tick after stopTickTimeoutMs and proceed with shutdown ` +
+        `regardless, not hang forever; took ${elapsedMs}ms`,
+    );
+    assert.equal(
+      readRunFile(daemon.dirs.runDir),
+      null,
+      "shutdown must complete (run file deleted) even though the stalled tick's factory call never settled",
+    );
+  } finally {
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
 test("bootstrap: stop() closes the real IPC server — a subsequent request is refused (PR-40a)", async () => {
   const homeDir = createTempHome();
   const fakeStore: SecretStore = {

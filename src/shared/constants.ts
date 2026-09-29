@@ -245,6 +245,16 @@ export const DAEMON_LOCK_STALE_SECONDS = 10;
 export const HEARTBEAT_PERIOD_MS = (DAEMON_LOCK_STALE_SECONDS * 1000) / 3;
 
 /**
+ * Milliseconds `stop()` waits for an in-flight heartbeat tick before proceeding with shutdown
+ * regardless (B-98 correction).
+ *
+ * A stalled tick (a hung secret-store or network call inside `reconcile()`) must not block shutdown
+ * forever; matches the 5000ms order of magnitude `src/cli/daemon-stop.ts`'s own shutdown-related
+ * bounds already use for "give one orderly step time, then move on regardless".
+ */
+export const STOP_TICK_TIMEOUT_MS = 5000;
+
+/**
  * Seconds a spawning client waits for the daemon it just launched before giving up (tuning).
  *
  * Three times a generous cold start on a laptop disk, below every known host tool timeout; the test

@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
-import { HEARTBEAT_PERIOD_MS } from "../shared/constants.js";
+import { HEARTBEAT_PERIOD_MS, STOP_TICK_TIMEOUT_MS } from "../shared/constants.js";
 import { openLedger, type LedgerOpenResult } from "../ledger/open.js";
 import { isRetentionSweepDue, sweepRetention } from "../ledger/retention.js";
 import { createRegistryLoader, type RegistryLoader } from "../registry/loader.js";
@@ -12,6 +12,7 @@ import { ensureHomeDirs, resolveHomeDir, type HomeDirs } from "./home.js";
 import { writeDaemonLog } from "./log.js";
 import { startHeartbeat } from "./lifecycle/heartbeat.js";
 import { checkIdleShutdown } from "./lifecycle/idle.js";
+import { raceAgainstTimeout } from "./lifecycle/timeout.js";
 import { acquireLock } from "./lifecycle/lock.js";
 import { deleteRunFile, writeRunFile, type DaemonRunPayload } from "./lifecycle/run-file.js";
 import { BindingsReconciler } from "./bindings.js";
@@ -42,6 +43,9 @@ export interface DaemonOptions {
    */
   readonly telegramClientFactory?: (bot: RegistryBot) => TelegramClient | Promise<TelegramClient>;
   readonly heartbeatPeriodMs?: number;
+  /** Overrides {@link STOP_TICK_TIMEOUT_MS} (B-98 correction). Production never sets this; tests use
+   *  a small value to exercise the stalled-tick bound without a real multi-second wait. */
+  readonly stopTickTimeoutMs?: number;
 }
 
 /**
@@ -244,13 +248,15 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     // awaits it so a tick's own binding add/poller-start — `heartbeat.stop()` only clears the interval,
     // it does not know about an already-running tick — fully settles before `stopAll()` and `db.close()`
     // run; otherwise a poller the tick was still starting can be registered, or write, after shutdown.
+    // Bounded by STOP_TICK_TIMEOUT_MS (B-98 correction): a stalled tick must not hang shutdown forever.
     let currentTick: Promise<void> | null = null;
     const stop = (): Promise<void> => {
       if (stopPromise) return stopPromise;
       stopPromise = (async () => {
         heartbeat.stop();
         if (currentTick) {
-          await currentTick.catch(() => {});
+          const tickTimeoutMs = options?.stopTickTimeoutMs ?? STOP_TICK_TIMEOUT_MS;
+          await raceAgainstTimeout(currentTick.catch(() => {}), tickTimeoutMs);
         }
         await reconciler!.stopAll();
         await ipcServer!.close();

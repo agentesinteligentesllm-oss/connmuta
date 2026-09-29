@@ -167,7 +167,7 @@ test("daemon bundle: settings paths and deleteMessage( are forbidden anywhere in
   }
 });
 
-test("daemon bundle: timers are confined to poller.js, lifecycle/{heartbeat,idle}.js and serve/fetch.js, each excluding transport/send from its own closure", () => {
+test("daemon bundle: timers are confined to poller.js, lifecycle/{heartbeat,idle,timeout}.js and serve/fetch.js, each excluding transport/send from its own closure", () => {
   const contents = daemonBundleContents();
   const matches = [...contents.entries()]
     .filter(([, source]) => hasAutonomousTimerReference(source) || hasTimersModuleReference(source))
@@ -176,6 +176,7 @@ test("daemon bundle: timers are confined to poller.js, lifecycle/{heartbeat,idle
   assert.deepEqual(matches, [
     "daemon/lifecycle/heartbeat.js",
     "daemon/lifecycle/idle.js",
+    "daemon/lifecycle/timeout.js",
     "daemon/poller.js",
     "daemon/serve/fetch.js",
   ]);
