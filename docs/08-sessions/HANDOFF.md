@@ -13,9 +13,9 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. No SDD change is currently open. |
-| What is next? | No queued SDD work. F6 (`f6-release-and-docs`, release/publish) is still the only planned next phase, still blocked on Director decisions (B-11 name clearance, B-12 macOS scope, B-16 license/legal docs) — see §3. **B-98 is closed (session 56).** B-100 is the one remaining well-specified, deliberately deferred backlog item ready for a focused session (§3, §7). |
+| What is next? | No queued SDD work. F6 (`f6-release-and-docs`, release/publish) is still the only planned next phase, still blocked on Director decisions (B-11 name clearance, B-12 macOS scope, B-16 license/legal docs) — see §3. **B-98 is closed (session 56). B-100(a) is closed (session 56); B-100(b) is scoped with concrete evidence and ready for a dedicated design-focused session** (§3, §7 — this is the recommended next start). |
 | What must be settled before any work? | **Who audits.** Settle it as §0.3 says: Arena/Alpha status may have changed since this file was written (it was unreachable, MCP `ECONNREFUSED`, at the start of session 56, same as session 55). |
-| What is the Director's to decide? | B-100 (Director + Kairo, deferred); the B-95 remainder (Kairo schedules); B-11, B-12, B-16 gate F6. |
+| What is the Director's to decide? | B-100(b)'s design (Director + Kairo, scoped, not blocked — a fresh session can just start it); the B-95 remainder (Kairo schedules); B-11, B-12, B-16 gate F6. |
 | Where to read next | §0 first; then §3 (what's available, what's next) and §7 (open points) as the task needs. §4 and §8 are reference material — read only the parts a specific task touches. |
 
 ---
@@ -24,21 +24,18 @@
 
 ### 0.1 Prompt to paste
 
-No specific task is queued. Paste one of these, or state your own:
+No specific task is queued. Paste this one, or state your own:
 
 ```text
-Lee docs/08-sessions/HANDOFF.md y confirma Arena con un bridge_send real y mi autonomía con tu
-colaborador como juez. B-98 está cerrado; dime qué sigue (F6 sigue bloqueado por B-11/B-12/B-16;
-B-100 está listo para una sesión enfocada) y arráncalo.
+Lee docs/08-sessions/HANDOFF.md y confirma Arena. B-100(a) ya cerró (session 56); arranca B-100(b)
+(lista blanca de especificadores bare por bundle en computeClosure) con la evidencia ya reunida en
+CHECKLIST.md — hoy no hay violación activa, es una decisión de diseño real, no una corrida a ciegas.
+TDD estricto, tu criterio sobre el diseño del allow-list.
 ```
 
-or, to work the one remaining deferred backlog item directly:
-
-```text
-Lee docs/08-sessions/HANDOFF.md, confirma Arena, y arranca B-100 (los puntos ciegos de los
-detectores de cierre de bundle) como una ODD slice fuera de SDD, con TDD estricto y tu propio buen
-juicio sobre el alcance — incluido el riesgo de alcance no acotado que el propio backlog ya señala.
-```
+B-100(b) is deliberately the recommended start: it is the one item that is both scoped (§7, with
+concrete evidence, not an open-ended "go investigate") and needs no Director decision to begin —
+unlike F6, which is blocked on B-11/B-12/B-16 regardless of how much autonomy is delegated.
 
 ### 0.2 First commands (stop and report if any output disagrees)
 
@@ -53,7 +50,7 @@ Run them in the Bash tool: they use POSIX syntax (`rm -rf` does not exist in Pow
 | 5 | `git status --short` | prints nothing |
 | 6 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 7 | `gentle-ai --version` | `3.7.0` or later; check fresh each session, do not trust this number to stay current |
-| 8 | `npm run build && npm test` | exit 0; `1720 tests, 1714 pass, 0 fail, 6 skip` (session-56 close baseline) |
+| 8 | `npm run build && npm test` | exit 0; `1722 tests, 1716 pass, 0 fail, 6 skip` (session-56 close baseline; `test:static` 79/79) |
 
 The working tree must be clean. If `git status` shows anything, stop and report before assuming it is safe.
 
@@ -124,10 +121,11 @@ Then decide what to do (§3) with the Director.
 | B-09, B-96 | Closed (sessions 50, 54). | `docs/06-backlog/CHECKLIST.md` |
 | B-97, B-99, B-101 | Closed (session 55). | `docs/06-backlog/CHECKLIST.md` |
 | **B-98** | **Closed, session 56.** Daemon `stop()`/heartbeat shutdown-ordering race. Fix `54f7d56`, backlog close `f0de180`. | `docs/06-backlog/CHECKLIST.md#B-98` |
-| B-95 remainder, B-100 | Open, carried forward. | `docs/06-backlog/CHECKLIST.md`, §7 below |
+| **B-100(a)** | **Closed, session 56.** `hasFsModuleReference` widened, verified safe (zero new bundle matches). Fix `599e984`. | `docs/06-backlog/CHECKLIST.md#B-100` |
+| B-95 remainder, **B-100(b)** | Open, carried forward. **B-100(b) is scoped with concrete evidence**, ready for a dedicated session (§7). | `docs/06-backlog/CHECKLIST.md`, §7 below |
 | Next SDD change | None queued. F6 (`f6-release-and-docs`) is next in `WORK-PLAN.md` but blocked on Director decisions (B-11, B-12, B-16). | `docs/07-plan/WORK-PLAN.md` (F6 section) |
-| Tests on `main` | `npm test`: **1720 tests, 1714 pass, 0 fail, 6 skip** (session start: 1714/1708/0/6). Independently re-run by Kairo from a clean build at every commit, not just taken from a subagent's report. `test:static`: **77/77**. | — |
-| RDD this session | Retroactive review of session 55's tail (lineage `review-72c122cea9dcb218`): approved, acknowledged, authority burned. B-98's own work-unit assessment: `under_budget`, correctly deferred. | §9 below |
+| Tests on `main` | `npm test`: **1722 tests, 1716 pass, 0 fail, 6 skip** (session start: 1714/1708/0/6). Independently re-run by Kairo from a clean build at every commit, not just taken from a subagent's report. `test:static`: **79/79**. | — |
+| RDD this session | Ran 7 times total (§9): retroactive session-55-tail review, B-98's full close-out cycle (found and fixed one real CRITICAL, one real timer leak), and B-100(a)'s own review. All approved/acknowledged. | §9 below |
 
 ---
 
@@ -156,9 +154,19 @@ Then decide what to do (§3) with the Director.
    an irrelevant symbol dump (harmless, ignored). Resumed the same fork with corrected instructions;
    the second run delivered the real, verified fix. Feedback drafted and queued locally, not sent
    without Director approval.
-4. **F6 and B-100 deliberately left untouched**, same reasoning as session 55: F6 needs Director-only
-   decisions (B-11/B-12/B-16); B-100 needs its own focused session given the unbounded-scope risk the
-   backlog itself already names.
+4. **F6 deliberately left untouched**: needs Director-only decisions (B-11/B-12/B-16) no amount of
+   delegated autonomy resolves.
+5. **B-100(a) closed, B-100(b) scoped with evidence, both at the Director's explicit invitation to use
+   judgment on whether to tackle it now or defer to a fresh session.** Investigated first (read-only):
+   computed the real closures of `daemon/main.js` (71 files) and `client/main.js` (20 files) and
+   confirmed widening `hasFsModuleReference` produces zero new bundle matches, and that neither closure
+   currently contains a process-spawning bare-specifier dependency — this concretely de-risked (a) as
+   safe and mechanical, and confirmed (b) is a forward-looking gap, not an active violation. Implemented
+   (a) (commit `599e984`, strict TDD, seed tests placed in `client-bundle.test.ts` rather than
+   `predicates.test.ts` since that file is AS-IS pinned to v1 and would have broken the provenance
+   hash check). Left (b) for a dedicated session: it needs a real design decision (where a per-bundle
+   allow-list lives), not a mechanical change, and the evidence gathered now means that session starts
+   informed rather than blind. Full detail and evidence in `CHECKLIST.md`'s B-100 row.
 
 ---
 
@@ -179,11 +187,11 @@ detail in `docs/runbooks/channel-doorbell.md`.
 
 No SDD change is queued. Three paths, in the order a reasonable session would consider them:
 
-1. **B-100** (§7) — the one remaining well-specified, deliberately deferred backlog item. A good
-   single-session ODD slice (same TDD discipline as SDD `apply`, tracked directly since it is not an
-   open SDD change), but read its own scope-risk note first: widening the bundle-closure detector may
-   surface an existing violation in the client or daemon bundle, turning a small fix into unbounded
-   scope mid-session.
+1. **B-100(b)** (§7) — the recommended start. A good single-session ODD slice (same TDD discipline as
+   SDD `apply`, tracked directly since it is not an open SDD change). No open-ended risk left to
+   discover: session 56 already confirmed neither bundle closure currently contains a process-spawning
+   bare-specifier dependency, so this is a real, bounded design task (where the allow-list lives, how
+   the three bundle tests consume it), not a "might surface an unbounded mess" gamble anymore.
 2. **F6** (`f6-release-and-docs`, release/publish) — blocked on three Director decisions: B-11
    (trademark clearance for "Conmuta"), B-12 (macOS scope), B-16 (license/legal docs remainder). Ask
    the Director for these before proposing `sdd-explore f6-release-and-docs`.
@@ -308,11 +316,16 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
   this makes the reconciler safe in isolation, independent of any caller's own discipline. Both
   mechanisms are needed; neither alone is enough (see the commit message on `54f7d56` for why). Two
   new tests, one per file, both reproduced the pre-fix symptom as genuine RED before going GREEN.
-- **Bundle-closure detector blind spots (B-100, open, unchanged)**: the shared `hasFsModuleReference`
-  (`test/security/predicates.ts:41-43`) misses four import forms (bare `import "node:fs"`,
-  `from "fs"`, `node:fs/promises`, dynamic `import()`); `computeClosure` follows relative specifiers
-  only, so a bare-specifier dependency wrapping process spawning would evade the `child_process`
-  substring check. Still deliberately not touched — see §7's scope-risk note.
+- **`hasFsModuleReference` now catches five import forms, not the original two (B-100a, closed session
+  56)**: bare `import "node:fs"`, the unprefixed `"fs"` specifier, `node:fs/promises`, dynamic
+  `import("node:fs")`, and unprefixed `require("fs")`. Verified before shipping that neither the
+  daemon's 71-file nor the client's 20-file closure gains a new match. `client-bundle.test.ts`'s own
+  `NODE_SQLITE_RE` has the same narrow shape, deliberately not widened (low priority — `node:sqlite`
+  is already forbidden outright, so widening only tightens an already-zero-tolerance check).
+- **`computeClosure` still follows relative specifiers only (B-100b, open, scoped)**: a bare-specifier
+  dependency wrapping process spawning would evade the `child_process` substring check in all three
+  bundle tests. Confirmed session 56: neither the daemon nor client closure currently contains such a
+  dependency — see §7 for the full evidence and what remains a real design decision.
 - **Timing-sensitive tests are condition-waits, not fixed sleeps (B-99, closed session 55)**.
   Unchanged this session.
 
@@ -330,13 +343,14 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 - [ ] **1. Verify the tree.** Run §0.2's commands; the tree must match.
 - [ ] **2. Settle §0.3.** Autonomy, SDD preflight through `AskUserQuestion`, Engram session, Arena
       status (it may have changed since this file was written).
-- [ ] **3. Ask the Director what's next**, offering §3.3's paths (B-100, F6 pending its blocking
-      decisions, or something else entirely) rather than assuming one.
-- [ ] **4. If B-100 is chosen**: ODD (outside-SDD-discipline) slice — strict TDD still applies, no
+- [ ] **3. Ask the Director what's next**, offering §3.3's paths (B-100(b) recommended, F6 pending its
+      blocking decisions, or something else entirely) rather than assuming one.
+- [ ] **4. If B-100(b) is chosen**: ODD (outside-SDD-discipline) slice — strict TDD still applies, no
       `tasks.md`/`apply-progress.md` to update; track progress in Engram and this file at close. Read
-      its scope-risk note in §7 before widening the shared predicate — the risk of surfacing an
-      existing, previously-passing-by-accident bundle violation is real, not hypothetical; budget the
-      session so discovering one does not become a rushed fix.
+      `CHECKLIST.md`'s B-100 row first — the scope is already bounded by session 56's own evidence
+      (neither bundle closure currently has a process-spawning bare-specifier dependency), so this is a
+      real design task (where the allow-list lives, how the three bundle tests consume it), not a
+      blind-risk investigation.
 - [ ] **5. If F6 is chosen**: first get the Director's decisions on B-11, B-12 and B-16 (they gate the
       change's own scope), then propose `sdd-explore f6-release-and-docs` through the normal SDD entry
       routing (preflight → init guard → explore).
@@ -360,6 +374,10 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 - B-97, B-99, B-101 are closed (session 55). **B-98 is closed (session 56), commits `54f7d56` (the
   fix) and `d8bd7a7` (the RDD correction — see §9)** — do not re-implement either. B-102(a)(b)(c)(f)(g)
   remain open, disclosed follow-ups (§7); (d) and (e) are closed, folded into the same two commits.
+- **B-100(a) is closed (session 56), commit `599e984`** — do not re-widen `hasFsModuleReference` again;
+  it already catches all five known-missing forms, with seed tests (positive and negative) in
+  `client-bundle.test.ts`. Do not add those seed tests to `predicates.test.ts` — it is AS-IS pinned to
+  v1 (see the file's own header and `test/security/provenance.test.ts`).
 - The retroactive RDD review of session 55's tail (`dd464a7`, `24d7dc6`, `2aa0da0`; lineage
   `review-72c122cea9dcb218`) and all four RDD lineages on B-98 itself (§9) are approved/acknowledged
   (one superseded before acknowledgement, §9) — do not re-review any of those commits again.
@@ -373,7 +391,7 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 | Id | Point | Owner |
 |---|---|---|
 | **B-95** | Remainder: (d) the missing abort signal (design-exact, Alpha-approved not to touch), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting comment count, `to` accepting any string, the silent skip of an unreadable row). | Kairo (Director schedules) |
-| **B-100** | Blind spots of the bundle-closure detectors: `hasFsModuleReference` misses four import forms; `computeClosure` follows relative specifiers only. Deliberately deferred twice now (sessions 55 and 56) — widening risks surfacing an existing violation, unbounded scope. Needs a session with room to absorb that possibility, not a tail-end attempt. | Director + Kairo |
+| **B-100(b)** | `computeClosure` follows relative specifiers only, so a bare-specifier dependency wrapping process spawning (`cross-spawn`/`execa`-style) would evade the `child_process` check. **Scoped with evidence, session 56**: neither the daemon (71-file) nor client (20-file) closure today contains such a dependency — daemon's bare specifiers are `@napi-rs/keyring`, `node:{crypto,events,fs,http,os,path,sqlite}`, `zod`; client's are `@modelcontextprotocol/sdk/server/{mcp,stdio}.js`, `node:child_process` (the already-known, already-caught direct use in `client/spawn.js`), `node:{crypto,fs,os,path,url}`, `zod`. This is a forward-looking gap, not an active violation — the remaining work is a real design decision (where a per-bundle allow-list lives; how the three bundle tests consume it; whether `test/channel/main.test.ts`'s existing local-allow-list precedent generalizes), ready for a dedicated session, not a tail-end mechanical fix. Full detail: `CHECKLIST.md`'s B-100 row. | Director + Kairo |
 | **B-102** | B-98's own RDD review, run 4 times as the candidate grew with each session-close edit: (d) the unbounded `currentTick` await escalated to CRITICAL on the 3rd pass and was fixed same-session (`STOP_TICK_TIMEOUT_MS` + `raceAgainstTimeout`, commit `d8bd7a7`); (e) that fix's own timer leak, found by the 4th pass, also fixed same-session (`clearTimeout` in a `finally`). Still open: (a) the `stopping` guard's update-binding branch is untested; (b) the bootstrap test's negative assertion still uses a fixed 60ms sleep (B-99-class anti-pattern); (c) the `stopping` latch is never reset (likely fine, undocumented); (f) a timed-out-then-later-resolving tick can still hit a closed database (the original B-98 symptom, narrowed); (g) a timed-out tick leaves no log/audit trace. Cheap wins at the next touch of these files — see `CHECKLIST.md`'s B-102 row for full detail. | Kairo |
 | **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 block F6's readiness (§3.3). | Director |
 | **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker. Low priority. | Director |
@@ -405,9 +423,9 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 
 ## §9 — RDD state at session close
 
-Five lineages this session. Four acknowledged (authority burned); one (`review-52b3d48d4017231b`)
+Six lineages this session. Five acknowledged (authority burned); one (`review-52b3d48d4017231b`)
 opened `correction_required` and was superseded by a fresh lineage once the fix was committed — it was
-never acknowledged and holds no outstanding authority. None of the five is to be re-reviewed (§6):
+never acknowledged and holds no outstanding authority. None of the six is to be re-reviewed (§6):
 
 1. **Retroactive review of session 55's tail** (`dd464a7`, `24d7dc6`, `2aa0da0` against base
    `4ba4928`): lineage `review-72c122cea9dcb218`, tier high, granted, all 4 lenses approved (zero
@@ -430,8 +448,14 @@ never acknowledged and holds no outstanding authority. None of the five is to be
    touched), all 4 lenses approved (zero blocking, 11 informational advisories — the real one,
    `raceAgainstTimeout`'s own uncleared timer, fixed immediately same-session, not deferred; folded
    into B-102(e); the rest are B-102(f)(g) and reconfirmations of (a)(b)(c)), acknowledged.
+6. **B-100(a)'s own fix** (`599e984` against base `d843e3e`, 2 files, 28 lines): granted, lineage
+   `review-b56a350a1cf9cedb`, tier high (touches `test/security/client-bundle.test.ts` directly, a real
+   signal). All 4 lenses approved, zero blocking, 4 informational advisories — two real and cheap
+   (a "four forms" vs. the actual five count-mismatch in the doc comment/test title; the widened regex
+   repeating its specifier sub-pattern four times), both fixed same-session in a follow-up commit
+   alongside four new negative seeds the reliability lens also asked for. Acknowledged.
 
-This file's own final edit (this paragraph, plus §6/§7's B-102 updates and the timer-leak fix) and its
-commit are the true final session-close state — not retro-fitted further once assessed; check
-`LOG.md`'s session-57 entry or the commit's own git log if a later RDD pass on this exact commit
-matters.
+This file's own final edit (this paragraph, plus the B-100 documentation and the count-mismatch/seed
+follow-up) and its commit are the true final session-close state — not retro-fitted further once
+assessed; check `LOG.md`'s session-57 entry or the commit's own git log if a later RDD pass on this
+exact commit matters.

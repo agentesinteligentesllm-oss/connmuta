@@ -54,8 +54,34 @@
   (`executable_change` in `bindings.ts`, a real signal), 193 lines, `review_due: false`,
   `review_due_reason: "under_budget"` — correctly stays pending in the slice per the ODD protocol's
   own per-commit RDD step, not an oversight; independently re-run and confirmed by Kairo.
-- **B-100 and F6 left untouched**, same reasoning as session 55: B-100 needs its own focused session
-  (unbounded-scope risk), F6 needs Director decisions no amount of delegated autonomy resolves.
+- **RDD's own review of the growing session-close candidate escalated a real CRITICAL finding, fixed
+  same session, not deferred.** As each session-close docs edit re-grew the reviewed candidate (this
+  repo's stop-hook re-evaluates the full range since the last session boundary on every new commit —
+  no incremental credit across separately-acknowledged lineages), a repeat pass on `stop()`'s new
+  `await currentTick` escalated from WARNING to CRITICAL: the await had no timeout, so a stalled tick
+  (a hung secret-store or network call) would hang the entire daemon shutdown forever. Fixed same
+  session: `STOP_TICK_TIMEOUT_MS` (`shared/constants.ts`, 5000ms) bounds it via a new isolated
+  `raceAgainstTimeout` helper (`src/daemon/lifecycle/timeout.ts` — kept out of `bootstrap.ts` itself,
+  since that file's own closure legitimately reaches transport/send and a literal `setTimeout` there
+  would have broken `test/security/daemon-bundle.test.ts`'s "timers confined to isolated modules"
+  property), committed as `d8bd7a7`. A follow-up RDD pass then found that fix's own timer handle was
+  never cleared (a leak, up to 5s past `stop()` returning) — fixed immediately, `d843e3e`. Final RDD
+  pass on the corrected candidate (lineage `review-57b6ea969f29e74f`) approved with only informational
+  advisories, folded into backlog row B-102 rather than chased further. RDD ran 5 times total across
+  this close-out; test/build reverified green after every code change, not assumed.
+- **B-100, Director's explicit call ("te lo dejo a tu criterio") after the close-out report.** Before
+  deciding, investigated read-only: computed the real closures of `daemon/main.js` (71 files) and
+  `client/main.js` (20 files) and confirmed widening `hasFsModuleReference` (item a) produces zero new
+  bundle matches, and that neither closure today contains a bare-specifier dependency wrapping process
+  spawning (item b's concern). This concretely de-risked (a) as safe and mechanical — implemented same
+  session (`599e984`, strict TDD; seed tests placed in `client-bundle.test.ts`, not
+  `predicates.test.ts`, which is AS-IS pinned to v1 and would have broken the provenance hash check)
+  — and confirmed (b) is a forward-looking gap needing a real design decision, deliberately left open
+  for a dedicated session with the evidence already gathered. RDD on `599e984` (tier high, a real
+  signal — it touches a security test file directly) approved with 2 real SUGGESTION-tier findings
+  (a "four forms" vs. actual-five count mismatch; a repeated regex sub-pattern), both fixed same
+  session alongside 4 new negative seeds. F6 left untouched: needs Director decisions no amount of
+  delegated autonomy resolves.
 
 ## Session 55 — F4 PR-07 implemented, verified, archived (F4 complete); B-97, B-99, B-101 closed
 
