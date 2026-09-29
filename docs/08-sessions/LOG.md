@@ -4,6 +4,45 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 54 — F4 follow-up PR (B-95 (a)(b)(c)(e)(f), B-96) and PR-06 implemented, audited, and merged
+
+- **Date**: 2026-09-28 local time (the harness date); merge timestamps from `gh pr view` are 2026-09-29 UTC:
+  #103 03:23, #104 04:07.
+- **Authority**: the session-start prompt handed over PR-05 as complete and asked for the small B-95/B-96 PR and
+  then `sdd-apply` PR-06 ("confirma Arena (DN-09) y mi autonomía total con Alpha como juez"); that message
+  carried the re-confirmation, so it was not asked again. The Director answered the SDD preflight (Automatic /
+  Both / Auto) through `AskUserQuestion`, granted RDD consent for the follow-up PR and **declined** it for
+  PR-06. No `size:exception` was needed (193 and 360 changed lines). B-97 stayed the Director's call and was
+  not touched.
+- **Preflight**: the tree matched the session-53 HANDOFF (`473666f`, clean, `main` equal to `origin/main`);
+  Arena was reachable, proven by a real `bridge_send` (DN-09); native `sdd-status` said apply `ready`; the cold
+  baseline was 1682 tests, 1676 pass, 0 fail, 6 skip.
+- **Follow-up PR** (B-95 (a)(b)(c)(e)(f), B-96): PR #103, `b99d66b`, five work-unit commits, 193 changed lines.
+  Debates `f4-smallfix-b95-b96-scope-001` and `f4-smallfix-b95-b96-diff-audit-001`, both `CONSENSUS`,
+  `APPROVE`, round 1, no objections. RDD: risk high (a heuristic hit on the word "spawn" in a comment of
+  `channel/main.ts`), four lenses, approved with two SUGGESTIONs. The doorbell scan now skips an unreadable
+  stored row instead of stalling the adapter; the B-96 flake is fixed test-only with a state barrier.
+- **PR-06** (`test/security/channel-bundle.test.ts`, `test/twins.test.ts`): PR #104, `cdd63ca`, two work-unit
+  commits, 360 changed lines, applied by the native `sdd-apply` agent. Debates `f4-pr06-channel-bundle-scope-001`
+  and `f4-pr06-diff-audit-001`, both `CONSENSUS`. RDD: risk high (two heuristic hits), the Director declined.
+  CI was green on Node 24.15 and 26 before the merge.
+- **Findings that changed the plan** (all Alpha-audited, none silent; details in `apply-progress.md` and
+  `tasks.md`): B-96's root cause is a production gap, `stop()` never awaits a tick in flight (**B-98**).
+  PR-06's scope debate had not read `design.md:198`, which asks for no `daemon/` path at all plus `node:sqlite`
+  and keyring bans; the apply agent caught it and the test follows the design (amendment (14)). The shared
+  `hasFsModuleReference` misses four import forms and `computeClosure` skips bare specifiers (**B-100**). Under
+  CPU contention three pre-existing timer-based tests fail reproducibly (**B-99**).
+- **Process notes**: the native `sdd-apply` dispatch, assumed blocked by the `PreToolUse:Agent` hook since
+  sessions 44-50, launched without a block and was resumed once with a corrective message. The follow-up PR's
+  writer ran only targeted suites, again; Kairo's cold full runs passed. The first cold `npm test` after the
+  #104 merge failed one test and Kairo deleted its log before reading it, so that test is unidentified (nine
+  later cold runs were green): keep a log until it is read. An unfiltered `node.exe` command-line listing can
+  print other tools' credentials on this machine; filter by a marker or print counts only. The Stop hook forced
+  the RDD preflight on each candidate; the provider-issued START with the default `workspace` projection saw
+  exactly the slice's staged files. Docs-only commit `8c20646` recorded #103 and the PR-06 scope as they
+  landed; this close-out is one more.
+- **Not done**: PR-07, `sdd-verify`, `sdd-archive`; B-95 (d), B-97, B-98, B-99 and B-100 are open.
+
 ## Session 53 — F4 PR-05b, PR-05c and PR-05d implemented, audited, and merged; PR-05 complete
 
 - **Date**: 2026-09-28 local time (the harness date); merge timestamps from `gh pr list` are 2026-09-29 UTC:

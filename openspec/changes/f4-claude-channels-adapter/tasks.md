@@ -395,10 +395,11 @@ round 1):** (8) The test's paths are relative to `dist/`, so the `fs` allowlist 
 `{src/client/binding.js, src/client/run-file.js}`; the spec's `{client/binding.js, client/run-file.js}` is the
 same pair relative to `dist/src`, and a comment says so. (9) Reachability is judged on closure MEMBERSHIP
 (paths), never on a substring of source text: `src/shared/constants.ts:211` and `src/shared/envelope.ts:231,308`
-name `daemon/send/validate.ts` in comments, so a text search would false-positive. Forbidden members are paths
-under `src/daemon/transport/` or `src/daemon/send/`, and `src/daemon/telegram.js` (the Telegram client;
-`daemon-bundle.test.ts:155-159` pins `api.telegram.org` to it). The walk is transitive, so this is complete
-without banning the whole `src/daemon/` tree. Content detectors over every closure file (the `api.telegram.org`
+name `daemon/send/validate.ts` in comments, so a text search would false-positive. As the debate wrote it, the
+forbidden members were paths under `src/daemon/transport/` or `src/daemon/send/`, and `src/daemon/telegram.js`
+(the Telegram client; `daemon-bundle.test.ts:155-159` pins `api.telegram.org` to it), on the argument that a
+whole-tree ban is stricter than the spec with no added guarantee; **superseded at apply time by (14)**, because
+the debate had not read `design.md:198`. Content detectors over every closure file (the `api.telegram.org`
 URL, `.getUpdates(`, `.sendMessage(`) follow `client-bundle.test.ts:101-122`. (10) Timers: a closed allowlist
 `{channel/doorbell-loop.js}` whose own closure excludes transport/send, plus a `node:timers` ban, mirroring
 `daemon-bundle.test.ts:170-192`; not "zero timers" (the spec says the test MUST NOT assert that). (11) Seeded
@@ -412,12 +413,21 @@ that wraps process spawning would evade the `child_process` substring exactly as
 daemon bundle tests; Alpha agreed not to widen PR-06 for it. Recon (Kairo, source level): the entry closure is
 16 files (`channel/{main,daemon-link,doorbell-loop,notify}`, `src/client/{binding,run-file,session-exchange}`
 and nine `src/shared/*` modules); only `doorbell-loop` arms a timer, only the two allowlisted files reference
-`fs`, and none references `child_process`.
+`fs`, and none references `child_process`. (14) **Correction found at apply time (session 54; Alpha `APPROVE` in
+`f4-pr06-diff-audit-001`):** `design.md:198` asks for "no `daemon/` path at all, no `child_process`, `node:sqlite`,
+Telegram URL or keyring". The test follows the design: no closure member under `src/daemon/` at all (a superset
+of the spec's three families, which stay as seeds together with `src/daemon/home.js`), plus bans on `node:sqlite`
+and `@napi-rs/keyring`. The shared `hasFsModuleReference` (`predicates.ts:41-43`) matches only `from "node:fs"`
+and `require("node:fs")`; it misses bare `import "node:fs"`, `from "fs"`, `node:fs/promises` and dynamic
+`import()`, and a mutation appending `import "node:fs";` to the compiled `dist/channel/notify.js` stayed green
+under it. `channel-bundle.test.ts` therefore uses quote-anchored local regexes for `fs`, `node:sqlite` and
+keyring, and `predicates.ts` stays untouched (widening it would change the client and daemon bundle tests;
+filed as B-100).
 Runtime harness: static analysis over the compiled `dist/` bundle, mirroring
 `daemon-bundle.test.ts`/`client-bundle.test.ts`'s own build-then-scan pattern; reuses
 `test/security/predicates.ts`/`closure.ts`'s existing helpers where their shape fits.
 
-- [ ] 6.1 RED `test/security/channel-bundle.test.ts` (create): the adapter's compiled entry module's
+- [x] 6.1 RED `test/security/channel-bundle.test.ts` (create): the adapter's compiled entry module's
       import graph reaches no `daemon/transport/*`, `daemon/send/*`, or Telegram-client module; reaches
       no `child_process`/exec/shell reference, including the literal substring `child_process` even in
       a comment (the predicate is a substring match, per spec's own note); every `fs` reference in the
@@ -425,34 +435,39 @@ Runtime harness: static analysis over the compiled `dist/` bundle, mirroring
       closure references `fs`; the loop's own pacing timer in `doorbell-loop.js` is a passing case, not
       a violation; a non-vacuous floor (the test fails if the closure is empty) and seeded negative
       fixtures (a deliberately reachable violation is caught).
-- [ ] 6.2 GREEN `test/security/channel-bundle.test.ts` (create): implement the assertions against
+- [x] 6.2 GREEN `test/security/channel-bundle.test.ts` (create): implement the assertions against
       `dist/channel/main.js`'s import graph, paths relative to `dist/` (not `DIST_SRC_DIR`), following
-      `daemon-bundle.test.ts`/`client-bundle.test.ts`'s own construction.
-- [ ] 6.3 RED `test/security/pack.test.ts`: extend the packed-files whitelist assertion to expect
+      `daemon-bundle.test.ts`/`client-bundle.test.ts`'s own construction. Landed with 6.1 in PR #104
+      (`fdd4fc2`); the whole-tree `src/daemon/` ban and the local specifier regexes are amendment (14).
+- [x] 6.3 RED `test/security/pack.test.ts`: extend the packed-files whitelist assertion to expect
       `dist/channel/**` alongside the existing `dist/src/**`.
-- [ ] 6.4 GREEN: confirm PR-05's `package.json` `files` entry (task 5.11) satisfies the extended
+- [x] 6.4 GREEN: confirm PR-05's `package.json` `files` entry (task 5.11) satisfies the extended
       whitelist. No further `src`/`package.json` change expected — this task closes the loop only if
-      6.3's RED test reveals a gap.
-- [ ] 6.5 RED `test/security/client-bundle.test.ts`: extend the `fs` allowlist assertion to include
+      6.3's RED test reveals a gap. Confirmation only: done by slice 05d (PR #102, `48c8c39`).
+- [x] 6.5 RED `test/security/client-bundle.test.ts`: extend the `fs` allowlist assertion to include
       `client/run-file.js` (PR-02's moved `readRunFile`/`resolveClientHomeDir`), confirming the
       existing thin-client closure is otherwise unchanged.
-- [ ] 6.6 GREEN `test/security/client-bundle.test.ts`: add `client/run-file.js` to the allowlist
+- [x] 6.6 GREEN `test/security/client-bundle.test.ts`: add `client/run-file.js` to the allowlist
       constant. No `src/` change — the thin client's own closure was already correct after PR-02; this
-      task only updates the pinned allowlist.
-- [ ] 6.7 RED `test/twins.test.ts`: extend the walk to also cover `channel/**/*.ts` (in addition to
+      task only updates the pinned allowlist. Confirmation only: done by PR-02 (`d3cb965`);
+      `client-bundle.test.ts:81-85` already lists `client/run-file.js`.
+- [x] 6.7 RED `test/twins.test.ts`: extend the walk to also cover `channel/**/*.ts` (in addition to
       the existing `src/**/*.ts` walk), asserting every file under `channel/` has a matching
       `test/channel/**/<same>.test.ts` twin. This must fail before 6.8, since PR-05 already created
       `channel/*.ts` and their twins without this gate existing yet — confirm the test is non-vacuous
       by first running it against the pre-PR-05 tree state (or a seeded missing-twin fixture) to prove
       it can fail.
-- [ ] 6.8 GREEN `test/twins.test.ts`: implement the `channel/**/*.ts` walk alongside the existing
+- [x] 6.8 GREEN `test/twins.test.ts`: implement the `channel/**/*.ts` walk alongside the existing
       `src/**/*.ts` one, reusing the same twin-matching logic. No change to the `src/` walk's own
-      behavior.
-- [ ] 6.9 Verify: `npm run build && node --test "dist/test/security/channel-bundle.test.js"
+      behavior. Landed in PR #104 (`cdd63ca`): `findMissingTwins(sourceDir, testDir)`, the `channel/`
+      test with `MIN_CHANNEL_SOURCE_FILES = 3` and a temp-dir seeded negative, which is 6.7's
+      non-vacuity proof.
+- [x] 6.9 Verify: `npm run build && node --test "dist/test/security/channel-bundle.test.js"
       "dist/test/security/pack.test.js" "dist/test/security/client-bundle.test.js"
       "dist/test/shared/version.test.js" "dist/test/twins.test.js"` — the last file pins the
       `channel/` twin-enforcement gate is live; `version.test.js` pins `SERVER_VERSION` unchanged
-      (spec's "SERVER_VERSION is unchanged by this change" scenario).
+      (spec's "SERVER_VERSION is unchanged by this change" scenario). Run at the tip of PR #104:
+      36 tests, 0 fail (34 before amendment (14)).
 
 ### Unit 7 — Documentation
 
