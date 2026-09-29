@@ -4,6 +4,59 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 56 — B-98 closed (daemon shutdown-ordering race); retroactive RDD applied to session 55's tail
+
+- **Date**: 2026-09-29 local time (same calendar day as session 55's close; a continuation session).
+- **Authority**: the session-start prompt re-confirmed Arena unreachable, handed the Director's full
+  autonomy ("no me preguntes nada... toma las riendas"), and asked specifically to retry `gentle-ai
+  review status` (RDD) against session 55's last 3 commits (`dd464a7`, `24d7dc6`, `2aa0da0`) if the
+  tool had recovered, then choose between B-98, B-100 and F6.
+- **Preflight**: Arena's own MCP server again failed to connect (`ECONNREFUSED`) at session start —
+  the same real tool-level failure as session 55, corroborating DN-09's substitute condition
+  directly. `gentle-ai` still `3.7.0`, no further version drift this session.
+- **RDD retry on session 55's tail (3 commits)**: `gentle-ai review status`/`start` had recovered —
+  no `operation_timeout` this run. Retroactive `review assess --base-ref 4ba4928 --committed-only`
+  on `dd464a7`+`24d7dc6`+`2aa0da0` (9 paths, 861 lines) came back tier **high** (`process_boundary`
+  in `src/cli/main.ts` — B-97's process-entry-guard change, a real signal, not the `AGENTS.md`/
+  `openspec` prose false positive). Consent relayed via `AskUserQuestion`, Director granted. All 4
+  lenses (risk/resilience/readability/reliability) closed `approved`, zero blocking findings, 7
+  informational WARNING/SUGGESTION (mostly already self-disclosed in the code/docs, e.g. B-97's own
+  symlink-coverage-gap admission). Lineage `review-72c122cea9dcb218`, acknowledged, authority burned.
+- **Decision: B-98 over B-100 and F6.** F6 stays blocked on Director-only decisions (B-11 trademark,
+  B-12 macOS, B-16 license docs) regardless of delegated autonomy — not a technical call. B-100
+  carries an explicit unbounded-scope risk the backlog itself names (widening the bundle-closure
+  detector may surface an existing violation). B-98 is a well-scoped, real correctness bug, already
+  root-caused via CodeGraph before delegating it.
+- **B-98 implementation — a genuine subagent-reliability incident, disclosed rather than hidden**:
+  the first delegation (a `fork`) reported nothing usable — its task-notification arrived
+  `completed` but with a `result` field that echoed unrelated text from Kairo's own prior
+  conversation turn, not a report from the subagent; a follow-up hook separately mis-fed that raw
+  notification's XML into a CodeGraph query, producing an irrelevant symbol dump. Ground truth
+  (`git log`/`git status`) showed the fork had only written a planning stub
+  (`odd/tasks/b-98-daemon-shutdown-race.md`, every box unchecked, no code, no commit) before
+  stopping — a real, if narrow, product defect (feedback drafted and queued locally, not sent
+  without Director approval). Resumed the same fork via a direct message with corrected
+  instructions, including deleting the stub — this project tracks an ODD slice's progress via
+  Engram/HANDOFF, not a tracked-task file — and the second run delivered real, verified work.
+- **B-98 fix, independently re-verified by Kairo, not trusted from the subagent's own report**: two
+  mechanisms in one commit, `54f7d56` — `BindingsReconciler` (`src/daemon/bindings.ts`) tracks an
+  internal `stopping` flag, set by `stopAll()`, checked by `reconcile()`'s add/update paths right
+  after `createPoller` resolves (a poller that finishes creating after shutdown began is stopped,
+  never registered); `bootstrap.ts`'s `stop()` now awaits the in-flight tick (`currentTick`,
+  mirroring the existing `ticking` guard) between `heartbeat.stop()` and `reconciler.stopAll()`. Two
+  new tests reproduced the exact pre-fix symptom as genuine RED (`Error: database is not open`,
+  `ENOENT ... daemon.log`) before going GREEN. Kairo independently re-ran the full suite from a
+  clean build (`1716 tests, 1710 pass, 0 fail, 6 skip`, up from the session-55 baseline of
+  `1714/1708/0/6`) and `test:static` (`77/77`) rather than trusting the subagent's reported numbers,
+  and read the actual `git show` diff line-by-line against the design — both matched exactly.
+  `docs/06-backlog/CHECKLIST.md`'s B-98 row closed in a second commit, `f0de180`.
+- **RDD on the B-98 work-unit**: `review assess --base-ref 2aa0da0 --committed-only` → tier medium
+  (`executable_change` in `bindings.ts`, a real signal), 193 lines, `review_due: false`,
+  `review_due_reason: "under_budget"` — correctly stays pending in the slice per the ODD protocol's
+  own per-commit RDD step, not an oversight; independently re-run and confirmed by Kairo.
+- **B-100 and F6 left untouched**, same reasoning as session 55: B-100 needs its own focused session
+  (unbounded-scope risk), F6 needs Director decisions no amount of delegated autonomy resolves.
+
 ## Session 55 — F4 PR-07 implemented, verified, archived (F4 complete); B-97, B-99, B-101 closed
 
 - **Date**: 2026-09-29 local time (the harness date).
