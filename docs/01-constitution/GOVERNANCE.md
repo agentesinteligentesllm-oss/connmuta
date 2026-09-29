@@ -109,6 +109,17 @@ authoritative signal. See the debate record `judgment-day-alpha-judge-role-001` 
 the trade-off it accepted (a single external auditor, not two independent ones, corroborated instead by
 this section's own evidence-only-objection discipline plus the writer's `COUNTER` power).
 
+**When Arena is reachable but the seated collaborator cannot answer.** Neither paragraph above covers
+this case: the bridge itself is reachable (a real `bridge_send` succeeds), but the collaborator seated
+in the right panel — Alpha or Betelgeuse — cannot respond, for example because it ran out of token
+quota mid-session. This is not automatically "Arena unreachable" and does not trigger row 3's
+substitute on its own (gap identified and filed as B-101, 2026-09-29). Judgment Day may still run
+here, but only on the Director's own explicit instruction for that specific session and candidate,
+never inferred from silence or a timeout alone; each use is recorded as a DN-05 waiver in the tribunal
+index with Authority, What was waived, What was used instead and Consequence (the shape of
+`bus-v2-s54-handoff-judgment-day-001`). The waiver does not carry forward to a later session or a
+different candidate — ask again each time this situation recurs.
+
 Severity scale for findings, inherited from v1 (`docs/functional-audit/README.md:26-33`): **S1**
 defeats the stated objective or loses data; **S2** a realistic scenario produces wrong behaviour or
 an unusable experience; **S3** friction, inconsistency or latent risk; **P** a proposed new
