@@ -634,7 +634,11 @@ function createThreadHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessi
 // POST /channel/doorbell (F4)
 // ---------------------------------------------------------------------------
 
-/** Behind the same session gate as `/tools/*`, but not a tool: the response is a body-free summary (D1, D2). */
+/**
+ * Not a tool, but it reuses the tool plumbing: it authenticates through `authenticateSessionForTool` and runs inside
+ * `dispatchTool`, so a thrown error maps through the tool-error fallback (an unclassified one is a 500 `TOOL_ERROR`
+ * payload). What sets it apart is the response, a body-free summary (D1, D2).
+ */
 function createDoorbellHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessionRecord>, now: () => Date): IpcHandler {
 	return async (request: IpcRequest): Promise<IpcResponse> => {
 		const auth = authenticateSessionForTool(deps, sessions, request, now);
@@ -719,7 +723,7 @@ function createCursorHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessi
 /**
  * Builds all eight session/tool/channel routes at once, closing over one shared frozen-session map and the two
  * daemon-lifetime singletons `POST /tools/send` needs (decision 8 — this is the first PR to actually
- * construct either): preferred over six separate per-route factories threading a shared mutable map
+ * construct either): preferred over eight separate per-route factories threading a shared mutable map
  * between them.
  */
 export function createSessionRoutes(deps: RoutesDeps): Partial<Record<IpcRouteKey, IpcHandler>> {
