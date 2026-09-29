@@ -318,7 +318,7 @@ pure-function tests for `notify.test.ts`.
 - [x] 5.4 GREEN `channel/daemon-link.ts` (create): implement the session cache, route calls parsed by
       `doorbellResponseSchema`/`channelCursorResponseSchema`, the 401-once re-handshake, `DELETE` on
       close — calling `exchangeSession`/`readRunFile` (PR-02), never `ensureDaemonRunning`.
-- [ ] 5.5 RED `test/channel/doorbell-loop.test.ts` (create): `tick()` resolve → commit → advance
+- [x] 5.5 RED `test/channel/doorbell-loop.test.ts` (create): `tick()` resolve → commit → advance
       sequence returns `"rang"`; a rejected `deliver` leaves the persisted cursor and the in-memory
       watermark unmoved, and the next `tick()` re-issues the same announcement (`"deliver_failed"`); a
       failed `deliver` sleeps `CHANNEL_RETRY_BACKOFF_SECONDS` before the loop's next iteration (no
@@ -331,14 +331,18 @@ pure-function tests for `notify.test.ts`.
       `ABORTED`) also sleeps `CHANNEL_RETRY_BACKOFF_SECONDS`, not only `deliver_failed`; an `ABORTED` error
       after `signal.aborted` neither warns nor sleeps. `DaemonLink` is an interface plus the factory
       `createDaemonLink` in `channel/daemon-link.ts`, so the watcher's test injects a structural fake.
-- [ ] 5.6 GREEN `channel/doorbell-loop.ts` (create): implement `DoorbellWatcher.tick()` and
+- [x] 5.6 GREEN `channel/doorbell-loop.ts` (create): implement `DoorbellWatcher.tick()` and
       `run(signal)` per design's Data Flow and Interfaces/Contracts sections.
 - [ ] 5.7 RED `test/channel/main.test.ts` (create): the MCP `Server`'s declared capabilities carry
       `experimental["claude/channel"]` as a present key and `claude/channel/permission` absent as a key
       entirely (never `false`, never any other value); server name is `CHANNEL_SERVER_NAME`, version is
       `SERVER_VERSION`; `--project` resolves the binding via the thin client's own
       `resolveProjectBinding`; shutdown on stdio close / SIGINT / SIGTERM aborts the in-flight poll and
-      calls `DELETE /session` before exit.
+      calls `DELETE /session` before exit. **Amendment (session 53, Alpha CONSENSUS
+      `bus-v2-f4-pr05c-diff-audit-001`):** `DaemonLink.commitCursor` takes no signal and a handshake in
+      flight does not honour a caller abort, so `main.ts` must NOT await `run(signal)` unboundedly: on
+      shutdown it aborts the signal, races `run`'s completion against `CHANNEL_SHUTDOWN_TIMEOUT_MS`, then
+      calls `link.close()` and exits; 5.7 pins that a hung `run` does not block the exit.
 - [ ] 5.8 GREEN `channel/main.ts` (create): implement the bin entry — shebang, `--project` parsing, the
       low-level MCP `Server` construction with the capability object and `CHANNEL_INSTRUCTIONS`, stdio
       connect, `DoorbellWatcher` wiring, shutdown handling.
