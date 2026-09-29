@@ -91,7 +91,7 @@ flowchart LR
 | Deliverables | Adapter re-based on [ADR-0024](../03-adr/0024-channel-doorbell-not-a-second-reader.md) semantics: no body crosses, peek does not consume, gates on sender not room; one channel per project session. |
 | Dependencies | F1 (archived). Spike B-09 result: **resolved** — confirms F4 is Claude-Code-only; no doorbell-equivalent capability exists for Codex, OpenCode or Antigravity (checked and absent), Gemini CLI/Cursor remain untested ([CHECKLIST.md#B-09](../06-backlog/CHECKLIST.md)). |
 | Validation | ADR-0024/0025 invariants re-pinned against the daemon inbox: `saturated` rings once per cursor value; watermark commits after delivery; a `<channel>` event never carries peer text. |
-| SDD change | `f4-claude-channels-adapter` (proposed) |
+| SDD change | `f4-claude-channels-adapter` — planning complete (explore, proposal, spec, design, tasks all written and Alpha-audited to CONSENSUS: `bus-v2-f4-explore-open-questions-001`, `bus-v2-f4-proposal-audit-001`, `bus-v2-f4-design-audit-001`, `bus-v2-f4-tasks-audit-001`); **`sdd-apply` in progress (sessions 51-52): PR-01 to PR-04 and slice 05a of PR-05 merged (`#95`-`#99`); slices 05b, 05c, 05d, PR-06 and PR-07 remain, then `sdd-verify` and `sdd-archive`.** PR-05 was re-sliced into four slices (`tasks.md`'s PR-05 block). The Validation row above still says "`saturated` rings once per cursor value"; that text is known-stale and is amended by `tasks.md` task 7.2 (PR-07), not before. Live state: [HANDOFF](../08-sessions/HANDOFF.md) |
 | Spikes | consumes B-09 (resolved). |
 | Backlog | — (B-09 informs, resolved). |
 | Risks | Claude Code channels are a research preview; delivery is best-effort and silently dropped when disabled. Nothing here may be documented as a delivery guarantee. |
