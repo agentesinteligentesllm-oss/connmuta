@@ -12,6 +12,7 @@ import type { GitignoreCheckResult } from "../../src/installer/gitignore.js";
 import type { ToolId } from "../../src/installer/tool-targets.js";
 import type { ProjectBindOutcome } from "../../src/installer/wizards/project-bind.js";
 import {
+  CHANNEL_SERVER_NAME,
   EXIT_MIGRATION_REFUSED,
   EXIT_NODE_FLOOR,
   EXIT_UNBOUND_PROJECT,
@@ -61,11 +62,12 @@ function makeIo(files: Record<string, string> = {}, stdin = ""): CapturedIo {
 
 // --- The single bin entry (D-09: every product-shaped name derives from one constant) ---
 
-test("package.json declares exactly one bin entry and it resolves to the built CLI", () => {
+test("package.json declares the product bin and the channel adapter's, and the product bin resolves to the built CLI", () => {
   const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
     bin?: Record<string, string>;
   };
-  assert.deepEqual(Object.keys(packageJson.bin ?? {}), [PRODUCT_NAME]);
+  // F4 added the adapter as a second bin, built outside `src/` (spec "Adapter ships as a second `bin` entry").
+  assert.deepEqual(Object.keys(packageJson.bin ?? {}), [PRODUCT_NAME, CHANNEL_SERVER_NAME]);
   const entry = packageJson.bin?.[PRODUCT_NAME];
   assert.equal(entry, "dist/src/cli/main.js");
   assert.ok(existsSync(CLI_ENTRY), `expected the built CLI at ${CLI_ENTRY}: run 'npm run build' first`);
