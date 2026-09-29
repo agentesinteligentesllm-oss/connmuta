@@ -375,6 +375,7 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 |---|---|---|
 | **B-95** | Remainder: (d) the missing abort signal (design-exact, Alpha-approved not to touch), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting comment count, `to` accepting any string, the silent skip of an unreadable row). | Kairo (Director schedules) |
 | **B-100** | Blind spots of the bundle-closure detectors: `hasFsModuleReference` misses four import forms; `computeClosure` follows relative specifiers only. Deliberately deferred twice now (sessions 55 and 56) — widening risks surfacing an existing violation, unbounded scope. Needs a session with room to absorb that possibility, not a tail-end attempt. | Director + Kairo |
+| **B-102** | B-98's own RDD review found 3 non-blocking advisories: the `stopping` guard's update-binding branch is untested; the new bootstrap regression test's negative assertion uses a fixed 60ms sleep instead of a condition-wait (reintroducing the exact B-99 anti-pattern, in this same session); the `stopping` latch is never reset (likely fine, undocumented). Cheap to fix at the next touch of either file. | Kairo |
 | **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 block F6's readiness (§3.3). | Director |
 | **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker. Low priority. | Director |
 
