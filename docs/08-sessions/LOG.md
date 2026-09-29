@@ -42,6 +42,10 @@
   exactly the slice's staged files. Docs-only commit `8c20646` recorded #103 and the PR-06 scope as they
   landed; this close-out is one more.
 - **Not done**: PR-07, `sdd-verify`, `sdd-archive`; B-95 (d), B-97, B-98, B-99 and B-100 are open.
+- **Collaborator availability**: after the documentation close-out audit had been answered, the Director
+  reported that Alpha's token quota was exhausted and that Alpha would not be available for now. No debate was
+  pending. The next session chooses between seating Betelgeuse (GOVERNANCE §3 accepts Alpha or Betelgeuse) and,
+  only if the Arena does not respond, the Judgment Day substitute; see `HANDOFF.md` §0.
 
 ## Session 53 — F4 PR-05b, PR-05c and PR-05d implemented, audited, and merged; PR-05 complete
 

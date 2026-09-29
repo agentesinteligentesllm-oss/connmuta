@@ -49,6 +49,15 @@ shows anything, stop and report before assuming it is safe.
 is enough; do not wait for Alpha's reply just to clear this gate. Session 54 had Arena reachable throughout
 (4 slice debates, all `CONSENSUS`, plus the documentation close-out audit).
 
+**Alpha ran out of token quota at the close of session 54** (the Director said so after the close-out audit had
+been answered; no debate was pending). The next session must not assume Alpha will answer: a successful
+`bridge_send` does not prove it. GOVERNANCE §3 accepts an audit by Alpha **or Betelgeuse**, so the cleanest path
+is for the Director to seat Betelgeuse in the right panel when opening the Arena (the system prompt then names
+the collaborator; send envelopes to that name only). Only if the Arena does not respond at all does the
+Judgment Day substitute apply (two blind `jd-judge-a` / `jd-judge-b` subagents plus a verifier; DN-05 stays
+formally unsatisfied and is disclosed in each PR's tribunal record). Ask the Director which applies before
+starting; do not choose silently.
+
 **Standing instructions from the Director, and how to treat them.**
 - Full autonomy with Alpha as judge (including commit, push, PR and merge once Alpha and RDD have signed
   off) was re-confirmed in session 54's opening prompt. Re-confirm at the start of the next session; do not
@@ -210,7 +219,9 @@ final-state facts: the follow-up PR `#103` and PR-06 `#104`.
 ## §5 — Next session, exact sequence
 
 1. Run §0's commands; the tree must match §0 exactly.
-2. Prove Arena reachable with a real `bridge_send` (the opening debate of step 5 does it).
+2. Prove Arena reachable with a real `bridge_send` (the opening debate of step 5 does it), and confirm the
+   collaborator can actually answer: Alpha ran out of quota at the end of session 54 (§0). If the collaborator
+   does not answer, ask the Director whether to seat Betelgeuse or to use the Judgment Day substitute.
 3. The Director's opening prompt re-confirms autonomy; if it does not say so, ask one question.
 4. Run the SDD Session Preflight through `AskUserQuestion` (hard gate, re-asked every session). Start an
    Engram session (`mem_session_start` with `id` and `directory`) and pass its id to `mem_save`.
