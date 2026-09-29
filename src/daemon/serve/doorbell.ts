@@ -28,6 +28,10 @@
  * `BROADCAST`, or stored `to` equal to this agent. Room membership never gates a row. A gated or
  * irrelevant row is still examined, so it still advances `covered_through_seq`.
  *
+ * **An unreadable row is skipped, never fatal.** A stored envelope that is not JSON, not an object, or whose
+ * `type`, `thread` or `to` this response could not carry is examined but neither counted nor listed, so a
+ * corrupt row can neither stall the adapter nor produce a response its own schema rejects.
+ *
  * **The wait is fetch's (D4).** With no row past `after_seq` and a positive effective wait, this calls
  * {@link waitForInboxRows}, which subscribes to `inbox:<project_id>` before its first `await`. This
  * module owns no timer, so the daemon-bundle timer allowlist is unchanged.
@@ -38,6 +42,7 @@ import type { EventEmitter } from "node:events";
 import type { z } from "zod";
 
 import { DOORBELL_SCAN_DEPTH } from "../../shared/constants.js";
+import { ENVELOPE_TYPES, THREAD_PATTERN } from "../../shared/envelope.js";
 import type { doorbellRequestSchema, doorbellResponseSchema } from "../../shared/ipc-contract.js";
 import type { ProjectRosterEntry } from "../../shared/project-file.js";
 import { reverseRosterLookup } from "../admission.js";
@@ -88,6 +93,34 @@ function readScanRows(db: DatabaseSync, projectId: string, afterSeq: number): Sc
 		.all(projectId, afterSeq, DOORBELL_SCAN_DEPTH + 1) as unknown as ScanRow[];
 }
 
+const isEnvelopeType = (value: unknown): value is ScannedEnvelope["type"] =>
+	typeof value === "string" && (ENVELOPE_TYPES as readonly string[]).includes(value);
+
+/**
+ * Reads a stored envelope defensively: `null` when the row cannot become an entry that `doorbellResponseSchema`
+ * accepts. A throw or a schema-refused value would both fail the adapter's read, and it would then retry the
+ * same `after_seq` window forever, so a corrupt row is skipped here instead.
+ */
+function parseScannedEnvelope(envelopeJson: string): ScannedEnvelope | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(envelopeJson);
+	} catch {
+		return null;
+	}
+	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+		return null;
+	}
+	const { type, to, thread } = parsed as Record<string, unknown>;
+	if (!isEnvelopeType(type) || typeof thread !== "string" || !THREAD_PATTERN.test(thread)) {
+		return null;
+	}
+	if (to !== undefined && to !== null && typeof to !== "string") {
+		return null;
+	}
+	return { type, to: to ?? null, thread };
+}
+
 /** v1 `peek.ts:79-85`'s relevance rule, over the addressee admission already translated and stored. */
 function isRelevant(row: ScanRow, envelope: ScannedEnvelope, agentId: string): boolean {
 	return row.via === "direct" || envelope.type === "BROADCAST" || envelope.to === agentId;
@@ -122,8 +155,8 @@ export async function serveDoorbell(input: DoorbellRequest, deps: ServeDoorbellD
 		if (!senderVerified) {
 			continue;
 		}
-		const envelope = JSON.parse(row.envelope_json) as ScannedEnvelope;
-		if (!isRelevant(row, envelope, binding.agent_id)) {
+		const envelope = parseScannedEnvelope(row.envelope_json);
+		if (envelope === null || !isRelevant(row, envelope, binding.agent_id)) {
 			continue;
 		}
 		count += 1;

@@ -70,6 +70,8 @@ interface SeedOptions {
 	readonly from_agent_id?: string;
 	readonly from_user_id?: number;
 	readonly body?: string;
+	/** The stored `envelope_json` text verbatim, overriding `type`/`to`/`thread`; how a corrupt row is planted. */
+	readonly envelope_json?: string;
 }
 
 /** A 12-lowercase-hex id, distinct per `n` (the wire's `eid`/`thread` shape). */
@@ -88,11 +90,13 @@ function seedEntry(opts: SeedOptions): InboxBatchEntry {
 		from_user_id: opts.from_user_id ?? PEER_USER_ID,
 		from_agent_id: opts.from_agent_id ?? PEER_AGENT_ID,
 		eid: hexId(opts.n),
-		envelope_json: JSON.stringify({
-			type: opts.type ?? "REQUEST",
-			to: opts.to === undefined ? AGENT_ID : opts.to,
-			thread: opts.thread ?? hexId(opts.n),
-		}),
+		envelope_json:
+			opts.envelope_json ??
+			JSON.stringify({
+				type: opts.type ?? "REQUEST",
+				to: opts.to === undefined ? AGENT_ID : opts.to,
+				thread: opts.thread ?? hexId(opts.n),
+			}),
 		body: opts.body ?? `body of ${opts.n}`,
 		apply_outcome: "opened",
 		received_at: NOW,
@@ -303,6 +307,60 @@ test("relevance is direct, BROADCAST or stored-to === agent_id: a group row to a
 		const counted = await serveDoorbell({ after_seq: 1 }, { db, binding: binding() });
 		assert.equal(counted.count, 3);
 		assert.deepEqual(counted.types, ["BROADCAST", "REPLY", "REQUEST"]);
+	});
+});
+
+/**
+ * Stored `envelope_json` texts the doorbell cannot turn into a summary entry its own response schema accepts.
+ * Each is seeded from a roster-verified peer, so it passes the sender gate and really reaches the parse.
+ */
+const UNREADABLE_ENVELOPES: ReadonlyArray<readonly [name: string, envelopeJson: string]> = [
+	["malformed JSON text", "{not json"],
+	["the JSON number 123", "123"],
+	["the JSON null", "null"],
+	["a JSON array", "[]"],
+	["an object with no fields", "{}"],
+	["a type outside ENVELOPE_TYPES", JSON.stringify({ type: "SHOUT", to: AGENT_ID, thread: hexId(2) })],
+	["a non-string type", JSON.stringify({ type: 7, to: AGENT_ID, thread: hexId(2) })],
+	["a thread violating THREAD_PATTERN", JSON.stringify({ type: "REQUEST", to: AGENT_ID, thread: "NOT-A-THREAD" })],
+	["a non-string thread", JSON.stringify({ type: "REQUEST", to: AGENT_ID, thread: 2 })],
+	["a non-string to", JSON.stringify({ type: "REQUEST", to: 2, thread: hexId(2) })],
+];
+
+for (const [name, envelopeJson] of UNREADABLE_ENVELOPES) {
+	test(`a stored envelope with ${name} is skipped, not thrown on: only the readable rows count, and it is still covered`, async () => {
+		await withLedger(async (db) => {
+			seed(db, [
+				{ n: 1, type: "REQUEST", thread: hexId(1) },
+				{ n: 2, envelope_json: envelopeJson },
+				{ n: 3, type: "REPLY", thread: hexId(3) },
+			]);
+			const summary = await serveDoorbell({ after_seq: 0 }, { db, binding: binding() });
+			assert.deepEqual(doorbellResponseSchema.parse(summary), {
+				count: 2,
+				senders: [PEER_AGENT_ID],
+				types: ["REPLY", "REQUEST"],
+				threads: [hexId(1), hexId(3)],
+				covered_through_seq: maxSeq(db),
+				saturated: false,
+			});
+		});
+	});
+}
+
+test("a window of nothing but unreadable rows answers count 0 with empty lists and advances covered_through_seq, so the adapter cannot stall on it", async () => {
+	await withLedger(async (db) => {
+		seed(db, UNREADABLE_ENVELOPES.map(([, envelope_json], index) => ({ n: index + 1, envelope_json })));
+		const summary = await serveDoorbell({ after_seq: 0 }, { db, binding: binding() });
+		assert.equal(maxSeq(db), UNREADABLE_ENVELOPES.length, "sanity: every seeded row is in the ledger");
+		assert.deepEqual(doorbellResponseSchema.parse(summary), {
+			count: 0,
+			senders: [],
+			types: [],
+			threads: [],
+			covered_through_seq: maxSeq(db),
+			saturated: false,
+		});
 	});
 });
 
