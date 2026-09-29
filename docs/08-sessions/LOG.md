@@ -4,6 +4,47 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 53 — F4 PR-05b, PR-05c and PR-05d implemented, audited, and merged; PR-05 complete
+
+- **Date**: 2026-09-28 local time (the harness date); merge timestamps from `gh pr list` are 2026-09-29 UTC:
+  #100 01:05, #101 01:20, #102 01:50.
+- **Authority**: the session-start prompt handed over F4 PR-05a as merged and asked for `sdd-apply` PR-05b
+  ("confirma Arena (DN-09) y mi autonomía total con Alpha como juez"); that message carried the
+  re-confirmation, so it was not asked again. The Director answered the SDD preflight (Automatic / Both / Auto) through `AskUserQuestion`,
+  then per-candidate RDD consent (granted for 05b, 05c and 05d) and a PR-scoped `size:exception` for each
+  of 05b, 05c and 05d.
+- **Preflight**: the tree matched the session-52 HANDOFF (`a883a58`, clean, `main` equal to
+  `origin/main`); Arena was reachable, proven by a real `bridge_send` (DN-09); native `sdd-status` said
+  apply `ready`; Engram held no `sdd-init/connmuta` observation, so `openspec/config.yaml`
+  (`strict_tdd: true`) was the source.
+- **05b** (`channel/daemon-link.ts`): PR #100, `2647b06`. Debates `bus-v2-f4-apply-pr05b-001` and
+  `bus-v2-f4-pr05b-diff-audit-001`, both `CONSENSUS`, `APPROVE`, no objections. 651 lines: `size:exception`.
+  RDD: risk medium, one lens, approved with no findings. Alpha corrected Kairo's wording on the cause of
+  `BINDING_CHANGED` (the frozen `(bot_id, group_id, agent_id)` snapshot, not `roster_hash`).
+- **05c** (`channel/doorbell-loop.ts`): PR #101, `0ea55df`. Debates `bus-v2-f4-apply-pr05c-001` and
+  `bus-v2-f4-pr05c-diff-audit-001`, both `CONSENSUS`. 476 lines: `size:exception`. RDD: risk medium, one
+  lens, approved with one SUGGESTION (`buildNotification` outside a guard).
+- **05d** (`channel/main.ts`, `package.json`, `pack.test.ts`): PR #102, `48c8c39`. Debates
+  `bus-v2-f4-apply-pr05d-001` and `bus-v2-f4-pr05d-diff-audit-001`, both `CONSENSUS`. 612 changed lines in
+  6 files: `size:exception`. RDD: risk high (two heuristic hits, both checked and stated in the consent
+  question), four lenses run concurrently, approved with two readability SUGGESTIONs.
+- **Findings that changed the plan** (all Alpha-audited, none silent; details in `apply-progress.md`,
+  `tasks.md` and `design.md`'s "Corrections found during apply", item 7): task 5.3's backoff clause moved
+  to 05c (only `doorbell-loop.ts` may own a timer); 05c's `run` owns the backoff and `link_failed` sleeps it;
+  05d's shutdown bounds its wait for the watcher (`commitCursor` takes no signal); the MCP SDK's stdio
+  transport never reports stdin ending, so `channel/main.ts` maps it; the entry guard is `import.meta.main`
+  (the `src/cli/main.ts:707-711` guard may fail behind a POSIX symlinked bin: **B-97**, not reproduced);
+  `test/cli/main.test.ts:64` asserted a single `bin` entry and `npm-shrinkwrap.json`'s root `bin` was stale,
+  both fixed in 05d.
+- **Process notes**: the 05d writer ran only targeted suites and missed the `test/cli/main.test.ts`
+  failure; Kairo's full-suite run found it, so the rule "rerun the whole suite yourself" earned its place
+  again. `mem_save` failed with the ambiguous-session error once and worked when `session_id` was set to
+  the id registered by `mem_session_start`. The Stop hook forced the RDD preflight on each candidate; the
+  provider-issued START with the default `workspace` projection saw exactly the slice's staged files.
+  Docs-only commits `3c19954` and `8319cb9` recorded 05b and 05c as they landed; this close-out is one more.
+- **Not done**: PR-06, PR-07, `sdd-verify`, `sdd-archive`; B-95, B-96 and B-97 are not fixed. The Director
+  had said B-95 and B-96 are scheduled after PR-05, so they are next.
+
 ## Session 52 — F4 PR-02, PR-03, PR-04 and PR-05a implemented, audited, and merged; PR-05 re-sliced; retroactive RDD review
 
 - **Date**: 2026-09-28 (UTC). Merge timestamps from `gh pr list`: #96 20:26, #97 20:42, #98 21:34, #99 23:56.

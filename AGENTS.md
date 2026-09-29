@@ -10,8 +10,8 @@ template. v1's equivalent of that end-user document is `docs/AGENT-GUIDE-using-t
 `telegram-agent-bus` repository.
 
 **Status.** F1, F2, F3 and F5 are archived. **F4 (`f4-claude-channels-adapter`) is the one open SDD
-change, mid-`sdd-apply`:** PR-01 to PR-04 and slice 05a of PR-05 are merged (`#95`-`#99`); slices 05b,
-05c, 05d, PR-06 and PR-07 remain, then `sdd-verify` and `sdd-archive`. This field used to
+change, mid-`sdd-apply`:** PR-01 to PR-05 are merged (`#95`-`#102`); PR-06 and PR-07 remain, then
+`sdd-verify` and `sdd-archive`. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,

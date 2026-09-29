@@ -333,7 +333,7 @@ pure-function tests for `notify.test.ts`.
       `createDaemonLink` in `channel/daemon-link.ts`, so the watcher's test injects a structural fake.
 - [x] 5.6 GREEN `channel/doorbell-loop.ts` (create): implement `DoorbellWatcher.tick()` and
       `run(signal)` per design's Data Flow and Interfaces/Contracts sections.
-- [ ] 5.7 RED `test/channel/main.test.ts` (create): the MCP `Server`'s declared capabilities carry
+- [x] 5.7 RED `test/channel/main.test.ts` (create): the MCP `Server`'s declared capabilities carry
       `experimental["claude/channel"]` as a present key and `claude/channel/permission` absent as a key
       entirely (never `false`, never any other value); server name is `CHANNEL_SERVER_NAME`, version is
       `SERVER_VERSION`; `--project` resolves the binding via the thin client's own
@@ -343,15 +343,18 @@ pure-function tests for `notify.test.ts`.
       flight does not honour a caller abort, so `main.ts` must NOT await `run(signal)` unboundedly: on
       shutdown it aborts the signal, races `run`'s completion against `CHANNEL_SHUTDOWN_TIMEOUT_MS`, then
       calls `link.close()` and exits; 5.7 pins that a hung `run` does not block the exit.
-- [ ] 5.8 GREEN `channel/main.ts` (create): implement the bin entry — shebang, `--project` parsing, the
+- [x] 5.8 GREEN `channel/main.ts` (create): implement the bin entry — shebang, `--project` parsing, the
       low-level MCP `Server` construction with the capability object and `CHANNEL_INSTRUCTIONS`, stdio
       connect, `DoorbellWatcher` wiring, shutdown handling.
 - [x] 5.9 GREEN `channel/tsconfig.json` (create): composite config per D9 — `rootDir ".."`, `outDir
       "../dist"`, `references` to `../src/shared` and `../src/client`, emits to `dist/channel/*.js`.
 - [x] 5.10 GREEN root `tsconfig.json` (modify): add `{ "path": "channel" }` to `references`.
-- [ ] 5.11 GREEN `package.json` (modify): add `bin.conmuta-channel = "dist/channel/main.js"`; add
-      `"dist/channel/**"` to `files`.
-- [ ] 5.12 Verify: `npm run build && node --test "dist/test/channel/notify.test.js"
+- [x] 5.11 GREEN `package.json` (modify): add `bin.conmuta-channel = "dist/channel/main.js"`; add
+      `"dist/channel/**"` to `files`. **Amendment (session 53, found in slice 05d):** the second `bin`
+      makes `test/cli/main.test.ts`'s "exactly one bin entry" assertion (D-09) false by design, so it now
+      expects `[PRODUCT_NAME, CHANNEL_SERVER_NAME]`, and `npm-shrinkwrap.json`'s root `bin` gains the
+      adapter; both landed in 05d (PR #102, `48c8c39`), together with `pack.test.ts`.
+- [x] 5.12 Verify: `npm run build && node --test "dist/test/channel/notify.test.js"
       "dist/test/channel/daemon-link.test.js" "dist/test/channel/doorbell-loop.test.js"
       "dist/test/channel/main.test.js"`.
 
@@ -375,6 +378,18 @@ change lands; in PR-06 they are a confirmation only and 6.3 cannot be RED. (2) t
 `client/run-state.js`); 6.5 cannot be RED, so confirm and skip. (3) Real PR-06 work that remains: 6.1/6.2
 (`channel-bundle.test.ts`) and 6.7/6.8 (`twins.test.ts` walking `channel/**`, with `notify.ts` and its
 twin already present from 05a). Re-estimate PR-06's size after this.
+**Amendment (session 53, from slices 05b-05d; PR-05 is merged):** (4) Tasks 6.3/6.4 were done by slice 05d
+(`pack.test.ts` whitelist, packed `dist/channel/main.js`, bin pin; PR #102), so they are confirmations.
+(5) The closure test's entry is `dist/channel/main.js`. Its real graph is `main` -> `daemon-link`,
+`doorbell-loop`, `notify` (all in `dist/channel/`) plus `client/binding.js`, `client/run-file.js`,
+`client/session-exchange.js`, `shared/*` and the external MCP SDK. `fs` must resolve to exactly
+`{client/binding.js, client/run-file.js}`. (6) `dist/channel/doorbell-loop.js` is the ONLY file allowed a
+timer: its own twin already pins `hasAutonomousTimerReference` TRUE, while `main.ts` and `daemon-link.ts`
+pin it FALSE, so 6.1's "pacing timer passes" scenario is a real case and not only a seeded fixture.
+`AbortSignal.timeout` is not a timer identifier for that predicate. (7) `daemon-link.ts`,
+`doorbell-loop.ts` and `main.ts` each already carry a source-pin test (no child-process substring even in
+comments, no `node:timers`, no unbounded loop, an import allow-list); PR-06 should generalize over the
+whole closure, not duplicate them.
 Runtime harness: static analysis over the compiled `dist/` bundle, mirroring
 `daemon-bundle.test.ts`/`client-bundle.test.ts`'s own build-then-scan pattern; reuses
 `test/security/predicates.ts`/`closure.ts`'s existing helpers where their shape fits.

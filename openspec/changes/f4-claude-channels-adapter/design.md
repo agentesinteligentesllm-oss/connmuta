@@ -273,3 +273,15 @@ Written corrections, Alpha-audited, none silent. The decisions above stand excep
    only in v1; it was ported to `channel/notify.ts` with a provenance comment
    (`telegram-agent-bus/channel/notify.ts:25`, regex unchanged). `CHANNEL_META_LIST_LIMIT` is the port of
    v1's `META_LIST_LIMIT` (`:34`) and now caps the `senders` and `threads` meta lists.
+7. **The adapter's process entry (PR-05d, `bus-v2-f4-apply-pr05d-001` and `bus-v2-f4-pr05d-diff-audit-001`).**
+   Three facts the plan did not have. (a) The MCP SDK's `StdioServerTransport` listens only to stdin's
+   `data` and `error` (`node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js:37-38`), so
+   `server.onclose` never fires when the host closes stdin; `channel/main.ts` maps stdin's `close` onto the
+   transport's `close` (`createStdioTransport`) and a real-process test pins it. (b) The entry guard is
+   `import.meta.main`, not the comparison of `import.meta.url` with `pathToFileURL(process.argv[1])` that
+   `src/cli/main.ts:707-711` uses, which is false behind a POSIX symlinked bin (unverified on POSIX; filed
+   as B-97 for the CLI). (c) `test/cli/main.test.ts:64` asserted exactly one `bin` entry, which task 5.11
+   makes false by design; it now expects `[PRODUCT_NAME, CHANNEL_SERVER_NAME]`, and `npm-shrinkwrap.json`'s
+   root `bin` gained the adapter. Also recorded: `commitCursor` takes no signal and a handshake in flight
+   ignores a caller abort, so `main.ts` bounds its wait for the watcher by `CHANNEL_SHUTDOWN_TIMEOUT_MS`
+   (via `AbortSignal.timeout`, so `doorbell-loop.ts` stays the only timer file) before closing the link.
