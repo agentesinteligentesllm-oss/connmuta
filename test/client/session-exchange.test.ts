@@ -13,7 +13,7 @@ import {
   type HandshakeErrorCode,
 } from "../../src/client/session-exchange.js";
 import { SERVER_VERSION } from "../../src/shared/version.js";
-import { computeClosure } from "../security/closure.js";
+import { computeClosure, bareSpecifiers } from "../security/closure.js";
 
 const ROSTER_HASH = `sha256:${"d".repeat(64)}`;
 const SERVER_NONCE = "b".repeat(64);
@@ -219,4 +219,33 @@ test("the run-file.ts and session-exchange.ts import closures contain no spawn c
       assert.equal(CHILD_PROCESS_IMPORT_RE.test(readFileSync(file, "utf8")), false, `${entry} closure must not reference child_process (${basename(file)})`);
     }
   }
+});
+
+/**
+ * B-103: computeClosure only follows relative specifiers, so a bare specifier smuggled into either
+ * closure would evade the check above without ever entering this closure's own file set — the
+ * identical gap already closed for the daemon, client, channel, installer and doctor bundles (B-100b,
+ * B-103). Each entry keeps its own allow-list rather than a union of the two: run-file.js and
+ * session-exchange.js have genuinely different, smaller surfaces, and no allow-list elsewhere in this
+ * codebase unions across unrelated entries.
+ */
+const ALLOWED_BARE_SPECIFIERS: Readonly<Record<string, readonly string[]>> = {
+  "run-file.js": ["node:fs", "node:os", "node:path"],
+  "session-exchange.js": ["node:crypto", "node:fs", "node:os", "node:path", "zod"],
+};
+
+test("the run-file.ts and session-exchange.ts closures confine their bare (non-relative) specifiers to a reviewed per-entry allow-list (B-103)", () => {
+  const clientDist = fileURLToPath(new URL("../../src/client/", import.meta.url));
+  for (const entry of ["run-file.js", "session-exchange.js"]) {
+    const bare = new Set<string>();
+    for (const file of computeClosure(join(clientDist, entry))) {
+      for (const specifier of bareSpecifiers(readFileSync(file, "utf8"))) bare.add(specifier);
+    }
+    assert.deepEqual([...bare].sort(), ALLOWED_BARE_SPECIFIERS[entry], `${entry}'s bare-specifier surface changed`);
+  }
+});
+
+test("run-file.ts/session-exchange.ts bare-specifier detection is non-vacuous (seeded)", () => {
+  assert.deepEqual(bareSpecifiers('import cp from "cross-spawn";'), ["cross-spawn"]);
+  assert.deepEqual(bareSpecifiers('import { x } from "./relative.js";'), []);
 });
