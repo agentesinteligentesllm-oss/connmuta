@@ -42,11 +42,12 @@ function hasChildProcessReference(source: string): boolean {
 
 /**
  * B-100(a): widened from the original `from "node:fs"`/`require("node:fs")`-only match to also catch
- * a bare `import "node:fs"` statement, the unprefixed `"fs"` specifier, `node:fs/promises`, and a
- * dynamic `import("node:fs")` call — four forms the original regex silently let through.
+ * a bare `import "node:fs"` statement, the unprefixed `"fs"` specifier (on both `from` and
+ * `require`), `node:fs/promises`, and a dynamic `import("node:fs")` call — five forms the original
+ * regex silently let through.
  */
 function hasFsModuleReference(source: string): boolean {
-  return /(?:require\(\s*["'](?:node:)?fs(?:\/promises)?["']\s*\)|from\s+["'](?:node:)?fs(?:\/promises)?["']|import\s+["'](?:node:)?fs(?:\/promises)?["']|import\s*\(\s*["'](?:node:)?fs(?:\/promises)?["']\s*\))/.test(
+  return /(?:require|import)\s*\(\s*["'](?:node:)?fs(?:\/promises)?["']\s*\)|(?:from|import)\s+["'](?:node:)?fs(?:\/promises)?["']/.test(
     source,
   );
 }

@@ -90,17 +90,26 @@ test("client bundle: node:fs detection is non-vacuous (seeded negative)", () => 
 
 /**
  * B-100(a): `hasFsModuleReference` originally matched only `from "node:fs"` and `require("node:fs")`;
- * these four forms were found missing by the PR-06 apply agent. Placed here rather than in
+ * these five forms were found missing by the PR-06 apply agent. Placed here rather than in
  * `predicates.test.ts` (AS-IS pinned to v1, design §12/DN-06 — see `test/security/provenance.test.ts`)
  * since `predicates.ts` itself is SEAM and this repo already keeps predicate seed tests for later
  * additions here, next to the existing seeded-negative test above.
  */
-test("client bundle: node:fs detection also catches the four import forms the original regex missed (B-100a)", () => {
+test("client bundle: node:fs detection also catches the five import forms the original regex missed (B-100a)", () => {
   assert.equal(hasFsModuleReference('import "node:fs";'), true, "bare ESM import");
   assert.equal(hasFsModuleReference('import { readFileSync } from "fs";'), true, "unprefixed specifier");
   assert.equal(hasFsModuleReference('import { readFile } from "node:fs/promises";'), true, "the /promises subpath");
   assert.equal(hasFsModuleReference('const fs = await import("node:fs");'), true, "dynamic import()");
   assert.equal(hasFsModuleReference('require("fs")'), true, "unprefixed require");
+  assert.equal(hasFsModuleReference('const fs = await import("fs/promises");'), true, "unprefixed dynamic import() with /promises");
+  assert.equal(hasFsModuleReference('const fs = require("node:fs/promises");'), true, "require() with /promises");
+});
+
+test("client bundle: node:fs detection rejects near-miss specifiers (seeded negatives)", () => {
+  assert.equal(hasFsModuleReference('import fs from "fs-extra";'), false, "a package that merely starts with fs");
+  assert.equal(hasFsModuleReference('import { watch } from "fsevents";'), false, "a package that merely starts with fs");
+  assert.equal(hasFsModuleReference('import { x } from "./fs";'), false, "a relative path, not the fs module");
+  assert.equal(hasFsModuleReference('import { x } from "node:fs/other";'), false, "an fs subpath that is not /promises");
 });
 
 /**
