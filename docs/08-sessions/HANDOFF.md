@@ -74,16 +74,23 @@ Then decide what to do (§3) with the Director.
 ### 0.4 Standing instructions from the Director
 
 - **RDD consent is asked per candidate through `AskUserQuestion`; never answer it for the Director.**
-  Recommend `granted`, and keep the provider's labels, order and tokens. Session 57: granted twice
-  (both approved, zero blocking, acknowledged), declined once — see §4.6 and §9 for why the decline was
-  correct (a redundant, unrelated review chain re-surfacing already-tracked B-102(f)).
+  Recommend `granted`, and keep the provider's labels, order and tokens. Session 57: granted three
+  times (T1, T2-T4, and the selectorless chain's first occurrence — all approved, zero blocking,
+  acknowledged), **declined at least twice** on the same recurring selectorless-chain pattern — see §4.6
+  and §9 for why the decline was correct each time (a redundant, unrelated review chain re-surfacing
+  already-tracked B-102(f)). **This pattern is open-ended, not closed**: it re-triggers on every new
+  commit for as long as the underlying stale base (§4.6) is unresolved, so expect more occurrences, not
+  just the ones logged in §9.
 - **The "selectorless" Stop-hook review chain tracks its own base independently of the
   `review assess --base-ref <boundary> --committed-only`-driven flow this project's ODD protocol uses**
   (§4.6). It was still anchored at `2aa0da0` (pre-B-98) at session 57's close and may still be — check
   `gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2 --agent claude-code
-  --next-transition` early if the Stop hook fires. If it re-offers `lineage review-3b21dbe6ea7c92b0`
-  in `correction_required`, that is B-102(f) again, not a new bug — see §7's B-102 row before treating
-  it as urgent, unrelated work.
+  --next-transition` early if the Stop hook fires. **Recognize this pattern by its shape, not by a
+  specific lineage id** — a fresh lineage id is minted every time the candidate grows, so any id logged
+  in §9 will already be stale by the time you read this. The shape: `base_ref` is `2aa0da0...`, risk
+  evidence cites `test/security/*.test.ts`, and if it reaches `correction_required` the finding is
+  `R4-stalled-tick-closed-db` in `src/daemon/bootstrap.ts`/`bindings.ts` — that is B-102(f) again, not a
+  new bug. See §7's B-102 row before treating it as urgent, unrelated work.
 - **`gentle-ai review status`/`start` can fail with a persistent `operation_timeout`** (schema
   `gentle-ai.review-integration.failure/v2`, `retry_safe: false`), unrelated to network or the
   candidate's content — session 55 hit this twice; sessions 56-57 saw no recurrence. Retry at most 2-3
@@ -129,7 +136,7 @@ Then decide what to do (§3) with the Director.
 | B-95 remainder, B-102 residual items, **B-103** | Open, carried forward. **B-103 is scoped**, same shape as B-100(b) was, ready for a dedicated session (§7). | `docs/06-backlog/CHECKLIST.md`, §7 below |
 | Next SDD change | None queued. F6 (`f6-release-and-docs`) is next in `WORK-PLAN.md` but blocked on Director decisions (B-11, B-12, B-16). | `docs/07-plan/WORK-PLAN.md` (F6 section) |
 | Tests on `main` | `npm test`: **1732 tests, 1726 pass, 0 fail, 6 skip** (session start: 1722/1716/0/6). Independently re-run by Kairo from a clean build at every commit. `test:static`: **89/89**. | — |
-| RDD this session | Ran 5 times (§9): 2 lineages scoped to session 57's own commits (both approved, acknowledged); 1 redundant "selectorless" chain lineage declined pre-start, 1 more granted then left `correction_required` (B-102(f), not this session's work) — see §4.6, §9. | §9 below |
+| RDD this session | Ran 6+ times, open-ended (§9): 2 lineages scoped to session 57's own commits (both approved, acknowledged); the "selectorless" chain's first occurrence also approved/acknowledged; every occurrence since has been declined (same recurring B-102(f) rediscovery, §4.6) and will keep recurring on new commits until resolved. | §9 below |
 
 ---
 
@@ -160,17 +167,20 @@ Then decide what to do (§3) with the Director.
    to "this violation is present" — several existing rules' own seeds, `node:sqlite`,
    `@napi-rs/keyring`, `node:timers/promises`, are bare specifiers that correctly also trip the new rule
    now, a necessary and disclosed side effect of adding an intentionally-overlapping check).
-5. **RDD ran 5 times, disclosing a real process discovery about this project's own tooling, not a code
-   defect**: two lineages scoped to session 57's own commits both closed `approved`, zero blocking,
-   acknowledged. A third, separate "selectorless" review chain (triggered by the Stop hook, which
-   checks a different, independently-tracked base than the `review assess`-driven flow this project's
-   ODD protocol uses) turned out to still be anchored at `2aa0da0` (pre-B-98) — so it kept re-surfacing
-   an ever-growing cumulative diff including already-acknowledged B-98/B-100(a) work. Granted once
-   more on the grown candidate; it came back `correction_required` with one real CRITICAL finding that
-   is exactly the already-disclosed **B-102(f)**, re-discovered only because of the stale base, not
-   because of anything session 57 wrote. Declined that redundant review rather than fixing B-102(f) as
-   an unplanned detour — left in `correction_required`, unacknowledged, holding no authority over
-   unrelated work. See §4.6 for the operating detail and §7's B-102 row for what remains open.
+5. **RDD ran 6+ times (open-ended, not a fixed count), disclosing a real process discovery about this
+   project's own tooling, not a code defect**: two lineages scoped to session 57's own commits both
+   closed `approved`, zero blocking, acknowledged. A third, separate "selectorless" review chain
+   (triggered by the Stop hook, which checks a different, independently-tracked base than the `review
+   assess`-driven flow this project's ODD protocol uses) turned out to still be anchored at `2aa0da0`
+   (pre-B-98) — so it kept re-surfacing an ever-growing cumulative diff including already-acknowledged
+   B-98/B-100(a) work. Its first occurrence was granted and closed clean. Every occurrence since —
+   including at least one after this file's own first close-out edit — came back `correction_required`
+   with one real CRITICAL finding that is exactly the already-disclosed **B-102(f)**, re-discovered
+   only because of the stale base, not because of anything session 57 wrote, and was declined each
+   time rather than fixing B-102(f) as an unplanned detour. Each declined lineage is left in
+   `correction_required`, unacknowledged, holding no authority over unrelated work. **This recurs on
+   every new commit and is not resolved as of this file's own last edit** — see §4.6 for the operating
+   detail and §7's B-102 row for what remains open.
 6. **Documentation updated as the task affected it**: `CHECKLIST.md`'s B-100 row (closes (b) for
    daemon/client/channel), a new B-103 row, a session-57 disclosure note on B-102's row; `AGENTS.md`'s
    status pointer; this file; `LOG.md`'s new session-57 entry.
@@ -337,17 +347,25 @@ this repo:
    commits) counted as one ever-growing "unreviewed" candidate from this chain's point of view, even
    though each was already separately, correctly reviewed and acknowledged through path 1.
 
-Consequences to expect next session: the Stop hook may fire again demanding this same selectorless
-STATUS. If it does, and the resulting candidate's finding is B-102(f) (a `CRITICAL` resilience finding
-in `src/daemon/bootstrap.ts`/`bindings.ts` about a timed-out-then-later-resolving heartbeat tick), that
-is **not a new bug** — it is this same stale-base rediscovery, confirmed by its own citation of
-`CHECKLIST.md`'s B-102 row and this file. Session 57 declined that redundant review (lineage
-`review-3b21dbe6ea7c92b0`, left `correction_required`, unacknowledged, no authority over unrelated
-work) rather than fixing B-102(f) as an unplanned detour from that session's actual task. Two ways to
-actually close this out, neither attempted yet: fix B-102(f) for real (small, scoped, already described
-in CHECKLIST's B-102 row), or have a maintainer run `gentle-ai review abandon` with proper
-`--maintainer-authorization` on that lineage (this requires an authorization binding neither Kairo nor
-an agent should self-generate — a maintainer-owned action).
+Consequences to expect next session: the Stop hook will very likely fire again demanding this same
+selectorless STATUS, probably more than once, since **every commit this session made after the first
+occurrence — including its own documentation commits — reproduced it again with a fresh lineage id**
+(confirmed: it recurred at least three times session 57, §9). If it does, and the resulting candidate's
+finding is B-102(f) (a `CRITICAL` resilience finding in `src/daemon/bootstrap.ts`/`bindings.ts` about a
+timed-out-then-later-resolving heartbeat tick), that is **not a new bug** — it is this same stale-base
+rediscovery, confirmed by its own citation of `CHECKLIST.md`'s B-102 row and this file. Session 57
+declined every occurrence of that redundant review (each left `correction_required`, unacknowledged, no
+authority over unrelated work — see §9 for the specific lineage ids logged, none of which will still be
+the current one) rather than fixing B-102(f) as an unplanned detour from that session's actual task.
+Two ways to actually close this out, neither attempted yet, in order of how well-understood the outcome
+is: (1) fix B-102(f) for real (small, scoped, already described in CHECKLIST's B-102 row) — likely, but
+not directly verified this session, to let the next selectorless review close clean and its
+acknowledgement advance the tracked base, since `correction_required` appears to be what's blocking
+acknowledgement each time, not the base itself; or (2) have a maintainer run `gentle-ai review abandon`
+with proper `--maintainer-authorization` on whichever lineage is currently offered (an authorization
+binding neither Kairo nor an agent should self-generate — a maintainer-owned action) — this quarantines
+one lineage, but whether it also advances the underlying base for the *next* candidate was not tested
+this session; if not, the pattern could still recur even after an abandon.
 
 A smaller, unrelated gotcha from the same investigation: an **uncommitted scratch file** (e.g. a
 temporary `status.json` capture) in the workspace makes `review status`'s workspace projection demand
@@ -395,11 +413,13 @@ an `intended_untracked_selection` input before it will proceed. `rm` any scratch
   `5122e20`, `737a8b8`.** Do not re-implement the `bareSpecifiers` primitive or re-wire these three
   bundles' allow-lists — reuse the primitive for B-103 instead. Do not re-widen the allow-lists beyond
   what the actual computed output demands.
-- The retroactive RDD reviews of sessions 55-57 and all lineages listed in each session's own §9 are
-  approved/acknowledged (one superseded before acknowledgement, session 56; one declined, session 57,
-  §4.6) — do not re-review any of those commits again. The one exception, left open on purpose: lineage
-  `review-3b21dbe6ea7c92b0` (session 57, `correction_required`, unacknowledged) — not "do not redo," but
-  "do not treat its B-102(f) finding as new."
+- The retroactive RDD reviews of sessions 55-57 and every **acknowledged** lineage listed in each
+  session's own §9 are approved/acknowledged (one superseded before acknowledgement, session 56) — do
+  not re-review any of those commits again. The exception, left open on purpose and recurring: every
+  **declined** selectorless-chain lineage (session 57 onward, §4.6, §9 — there is more than one, and
+  there will likely be more still) is left `correction_required`/unacknowledged — not "do not redo," but
+  "do not treat its B-102(f) finding as new," regardless of which specific lineage id it currently
+  carries.
 - Do not fix `WORK-PLAN.md`'s F4 Validation row (row 93) or SDD-change row (row 94) again — both are
   current as of session 55's docs-sync commit.
 
@@ -441,31 +461,38 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 
 ## §9 — RDD state at session close
 
-Four lineages this session: three closed and acknowledged, one left deliberately open (not
-abandoned, not acknowledged):
+**This section is a point-in-time log, not a closed count** — the selectorless-chain pattern (§4.6)
+recurs on every new commit, including the documentation commits that closed out this file itself, so
+more occurrences happened after this section was first written than are listed below. Treat the count
+as "at least this many," not "exactly this many."
 
-1. **T1 (`bareSpecifiers` primitive + seed tests)**, against base `91a9dae` (9 lines already at
-   `009bda6`/`91a9dae` folded in via the `review assess` selector, 8 paths/323 lines total): lineage
-   `review-e1657a8ebed2f1c1`, tier high (`test/security/closure.test.ts` touched directly, a real
-   signal), granted, all 4 lenses approved, zero blocking, acknowledged, authority burned.
+1. **T1 (`bareSpecifiers` primitive + seed tests)**, against base `91a9dae` (8 paths/323 lines):
+   lineage `review-e1657a8ebed2f1c1`, tier high (`test/security/closure.test.ts` touched directly, a
+   real signal), granted, all 4 lenses approved, zero blocking, acknowledged, authority burned.
 2. **T2-T4 (daemon/client/channel allow-list wiring)**, against base `47bcd00` (3 paths/114 lines):
    lineage `review-4d682c8c0377abb9`, tier high (`test/security/channel-bundle.test.ts` touched
    directly), granted, all 4 lenses approved, zero blocking, acknowledged, authority burned.
-3. **The Stop hook's own separately-tracked selectorless chain** (§4.6), base still `2aa0da0`
-   (pre-B-98) both times it was checked this session:
-   - First check (after T1's commit only, 18 files/1173 lines): lineage `review-36dde770717e74f9`,
-     tier high, granted, all 4 lenses approved, zero blocking, acknowledged, authority burned — this
-     one closed cleanly.
-   - Second check (after all four session-57 commits, 19 files/1287 lines): lineage
-     `review-3b21dbe6ea7c92b0`, tier high, granted, came back **`correction_required`** with one real
-     CRITICAL finding (`R4-stalled-tick-closed-db`, `src/daemon/bootstrap.ts:257-260` +
-     `src/daemon/bindings.ts`) that is exactly the already-disclosed, already-tracked **B-102(f)** —
-     confirmed by the finding's own citation of `CHECKLIST.md:112` and this file. **Declined** the
-     correction rather than fixing B-102(f) as an unplanned detour from B-100(b)'s own scope. **Left in
-     `correction_required`, unacknowledged, holding no authority over unrelated work.** Do not
-     re-review this exact lineage; do treat a fresh selectorless STATUS check next session as
-     independent (§4.6 explains why it may re-offer the same finding under a new lineage id).
+3. **The Stop hook's own separately-tracked selectorless chain** (§4.6), base stuck at `2aa0da0`
+   (pre-B-98) every time it was checked this session — **recurred at least three times**, growing with
+   each new commit (documentation commits included, since the chain's diff is cumulative regardless of
+   content):
+   - 1st occurrence (after T1's commit only, 18 files/1173 lines): lineage `review-36dde770717e74f9`,
+     granted, all 4 lenses approved, zero blocking, acknowledged, authority burned — closed cleanly.
+   - 2nd occurrence (after all four B-100(b) commits, 19 files/1287 lines): lineage
+     `review-3b21dbe6ea7c92b0`, granted, came back **`correction_required`** with one real CRITICAL
+     finding (`R4-stalled-tick-closed-db`, `src/daemon/bootstrap.ts:257-260` + `src/daemon/bindings.ts`)
+     that is exactly the already-disclosed, already-tracked **B-102(f)** — confirmed by the finding's
+     own citation of `CHECKLIST.md:112` and this file. **Declined.** Left `correction_required`,
+     unacknowledged, no authority over unrelated work.
+   - 3rd occurrence (after this file's first close-out edit plus the docs commits, 19 files/1408 lines):
+     lineage `review-5661c50afdd12e4b`, same shape, same B-102(f) finding. **Declined again**, same
+     reasoning, same disposition.
+   - **Each is independent** (its own lineage id, its own unacknowledged `correction_required` state,
+     no authority over anything). None of this blocks or invalidates items 1-2 above, which are fully
+     closed. **Do not chase or "resolve" a specific lineage id from this list — recognize the pattern
+     (§4.6) instead**, since committing this very documentation fix may well have produced a 4th
+     occurrence this session never got to react to.
 
-This file's own final edit (this paragraph, plus the B-100/B-103 documentation) and its commit are the
-true final session-close state — check `LOG.md`'s session-58 entry or the commit's own git log if a
-later RDD pass on this exact commit matters.
+This file's own final edit and its commit are the true session-close state for everything **except**
+§9 itself, which by construction can never fully catch up to a pattern that retriggers on the commit
+that records it — check `LOG.md`'s session-58 entry or `git log` for what actually happened after.
