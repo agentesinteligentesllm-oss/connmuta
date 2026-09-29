@@ -53,7 +53,7 @@ task touches schemas or security.
 | Debate outcomes | `docs/05-tribunal/INDEX.md` | Landing debate `bus-v2-landing-architecture-001`; reserved `bus-v2-referee-001` |
 | Architectural decisions | `docs/03-adr/` | One ADR per file; the index carries status and supersession |
 | Cross-session memory | Engram (persistent memory, outside the tree) | Decisions, conventions, bugs; SDD phases write to it but do not replace it |
-| SDD artifacts | `openspec/` — **in active use** | `openspec/config.yaml` plus `openspec/changes/f4-claude-channels-adapter/` (`proposal.md`, `exploration.md`, `specs/`, `design.md`, `tasks.md`, `apply-progress.md`; committed at the end of session 52). That change is mid-`apply`; run `gentle-ai sdd-status f4-claude-channels-adapter --cwd .`. F1, F2, F3 and F5 are under `openspec/changes/archive/` |
+| SDD artifacts | `openspec/` | `openspec/config.yaml` is the only active artifact now; F1, F2, F3, F4 and F5 are all under `openspec/changes/archive/` |
 | Local tooling (not product) | `.claude/settings.json`, `.mcp.json` | See section 5 |
 
 When a live-state file and a design document disagree, apply the precedence rule in
