@@ -375,7 +375,7 @@ No SDD change is queued. Three paths, in the order a reasonable session would co
 |---|---|---|
 | **B-95** | Remainder: (d) the missing abort signal (design-exact, Alpha-approved not to touch), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting comment count, `to` accepting any string, the silent skip of an unreadable row). | Kairo (Director schedules) |
 | **B-100** | Blind spots of the bundle-closure detectors: `hasFsModuleReference` misses four import forms; `computeClosure` follows relative specifiers only. Deliberately deferred twice now (sessions 55 and 56) — widening risks surfacing an existing violation, unbounded scope. Needs a session with room to absorb that possibility, not a tail-end attempt. | Director + Kairo |
-| **B-102** | B-98's own RDD review found 3 non-blocking advisories: the `stopping` guard's update-binding branch is untested; the new bootstrap regression test's negative assertion uses a fixed 60ms sleep instead of a condition-wait (reintroducing the exact B-99 anti-pattern, in this same session); the `stopping` latch is never reset (likely fine, undocumented). Cheap to fix at the next touch of either file. | Kairo |
+| **B-102** | B-98's own RDD review (run twice, once per candidate growth) found 4 non-blocking advisories: the `stopping` guard's update-binding branch is untested; the new bootstrap regression test's negative assertion uses a fixed 60ms sleep instead of a condition-wait (reintroducing the exact B-99 anti-pattern, in this same session); the `stopping` latch is never reset (likely fine, undocumented); `stop()`'s await on an in-flight tick has no timeout, so a stalled `tick()` would hang the whole shutdown. Cheap to fix at the next touch of either file. | Kairo |
 | **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 block F6's readiness (§3.3). | Director |
 | **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker. Low priority. | Director |
 
@@ -411,14 +411,18 @@ Two lineages this session, both fully resolved; neither is to be re-reviewed (§
 - **Retroactive review of session 55's tail** (`dd464a7`, `24d7dc6`, `2aa0da0` against base `4ba4928`):
   lineage `review-72c122cea9dcb218`, tier high, consent granted, all 4 lenses approved (zero blocking
   findings, 7 informational advisories), acknowledged, authority burned.
-- **B-98's work-unit** (`54f7d56` + `f0de180` against base `2aa0da0`): assessed tier medium
-  (`executable_change` in `src/daemon/bindings.ts`, a real signal), 193 lines, `review_due: false`,
-  `review_due_reason: "under_budget"` — by design, no review transaction was started; stays pending in
-  the slice until a later commit in the same accumulation reaches budget or review is explicitly
-  requested.
+- **B-98's accumulated work-unit + session-close docs** (`54f7d56` + `f0de180` + `c07a7ea` against
+  base `2aa0da0`): assessed tier medium (`executable_change` in `AGENTS.md`, plus real code), 704
+  lines, `review_due_reason: "slice_budget_reached"` — granted, lineage `review-5870e8e856f250ce`,
+  approved with 3 advisories (folded into B-102), acknowledged, authority burned.
+- **The same accumulation plus B-102's own filing commit** (`54f7d56` + `f0de180` + `c07a7ea` +
+  `2012df6` against base `2aa0da0`, 706 lines): a Stop hook caught this as a distinct, not-yet-reviewed
+  target_identity — granted again (the Director's already-given consent for the near-identical prior
+  candidate was not silently reused, since this was verifiably a different target), lineage
+  `review-cd67b83acb023e0e`, approved with 3 advisories (2 repeats, 1 new — B-102 item (d), the
+  unbounded `currentTick` await), acknowledged, authority burned.
 
-This file's own session-close docs commit (`AGENTS.md`, `LOG.md`, `00-INDEX.md`, this file) is pure
-bookkeeping prose, matching session 55's own equivalent commit (`2aa0da0`) — its own RDD outcome, once
-assessed, is not retro-fitted into this text (the same reason session 55's own HANDOFF never described
-`2aa0da0`'s own review status either); check `LOG.md`'s session-57 entry or the commit's own git log
-if it matters later.
+This file's own final small edit (folding item (d) into B-102, this paragraph) and its own commit are
+pure bookkeeping prose, matching session 55's own equivalent commit (`2aa0da0`) — not retro-fitted
+into this text once assessed; check `LOG.md`'s session-57 entry or the commit's own git log if it
+matters later.
