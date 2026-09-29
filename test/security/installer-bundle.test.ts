@@ -44,7 +44,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { computeClosure } from "./closure.js";
+import { computeClosure, bareSpecifiers } from "./closure.js";
 import {
   DIST_SRC_DIR,
   relPosix,
@@ -334,4 +334,93 @@ test("installer/doctor bundle: the offline-closure network predicates are non-va
   assert.equal(NODE_HTTPS_RE.test('await import("node:https");'), true);
   assert.equal(DAEMON_TELEGRAM_IMPORT_RE.test('await import("../daemon/telegram.js");'), true);
   assert.equal(FETCH_CALL_RE.test("await prefetch(url);"), false, "prefetch( must never be mistaken for a real fetch( call");
+});
+
+// ---------------------------------------------------------------------------
+// 6. bare (non-relative) specifiers confined to a reviewed allow-list (B-103)
+// ---------------------------------------------------------------------------
+
+/**
+ * B-103: computeClosure only follows relative specifiers, so a bare specifier smuggled into the CLI,
+ * DOCTOR or OFFLINE closure would evade every check above without ever entering this closure's own
+ * file set — the identical gap already closed for the daemon, client and channel bundles (B-100b).
+ * This test makes each closure's external dependency surface explicit: a new bare specifier fails
+ * here until deliberately reviewed and added below. It does not inspect what an allow-listed
+ * package's own code does internally.
+ */
+function bareSpecifiersOf(contents: Map<string, string>): string[] {
+  const bare = new Set<string>();
+  for (const source of contents.values()) {
+    for (const specifier of bareSpecifiers(source)) bare.add(specifier);
+  }
+  return [...bare].sort();
+}
+
+const ALLOWED_CLI_BARE_SPECIFIERS: readonly string[] = [
+  "@clack/prompts",
+  "@modelcontextprotocol/sdk/server/mcp.js",
+  "@modelcontextprotocol/sdk/server/stdio.js",
+  "@napi-rs/keyring",
+  "jsonc-parser",
+  "node:child_process",
+  "node:crypto",
+  "node:fs",
+  "node:os",
+  "node:path",
+  "node:sqlite",
+  "node:url",
+  "node:util",
+  "smol-toml",
+  "zod",
+];
+
+const ALLOWED_DOCTOR_BARE_SPECIFIERS: readonly string[] = [
+  "jsonc-parser",
+  "node:child_process",
+  "node:crypto",
+  "node:fs",
+  "node:os",
+  "node:path",
+  "node:sqlite",
+  "node:url",
+  "node:util",
+  "smol-toml",
+  "zod",
+];
+
+/**
+ * Identical values to {@link ALLOWED_DOCTOR_BARE_SPECIFIERS} today (doctor/offline.js is a narrower
+ * closure inside the same doctor/ tree) — kept as its own constant rather than reused, matching this
+ * file's own precedent of never merging CLI/DOCTOR's separate allow-lists just because two values
+ * happen to coincide; a future OFFLINE-only change should not have to touch DOCTOR's list.
+ */
+const ALLOWED_OFFLINE_BARE_SPECIFIERS: readonly string[] = [
+  "jsonc-parser",
+  "node:child_process",
+  "node:crypto",
+  "node:fs",
+  "node:os",
+  "node:path",
+  "node:sqlite",
+  "node:url",
+  "node:util",
+  "smol-toml",
+  "zod",
+];
+
+test("installer/doctor bundle: bare (non-relative) specifiers in the CLI closure are confined to the reviewed allow-list (B-103)", () => {
+  assert.deepEqual(bareSpecifiersOf(cliBundleContents()), ALLOWED_CLI_BARE_SPECIFIERS);
+});
+
+test("installer/doctor bundle: bare (non-relative) specifiers in the DOCTOR closure are confined to the reviewed allow-list (B-103)", () => {
+  assert.deepEqual(bareSpecifiersOf(doctorBundleContents()), ALLOWED_DOCTOR_BARE_SPECIFIERS);
+});
+
+test("installer/doctor bundle: bare (non-relative) specifiers in doctor/offline.js's own closure are confined to the reviewed allow-list (B-103)", () => {
+  assert.deepEqual(bareSpecifiersOf(bundleContents(OFFLINE_ENTRY)), ALLOWED_OFFLINE_BARE_SPECIFIERS);
+});
+
+test("installer/doctor bundle: bare-specifier detection is non-vacuous (seeded)", () => {
+  assert.deepEqual(bareSpecifiers('import cp from "cross-spawn";'), ["cross-spawn"]);
+  assert.deepEqual(bareSpecifiers('import { x } from "./relative.js";'), []);
 });
