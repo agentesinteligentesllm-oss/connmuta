@@ -69,18 +69,21 @@ closures alike.
 
 ## Tasks
 
-- [ ] **T1** — `bareSpecifiers` in `closure.ts` + its own seed tests (positive: catches `from`, bare
-      `import`, dynamic `import()`, `require()`; negative: rejects relative specifiers). RED, then GREEN.
-      Commit.
-- [ ] **T2** — Daemon bundle allow-list (`daemon-bundle.test.ts`). RED, then GREEN. Commit.
-- [ ] **T3** — Client bundle allow-list (`client-bundle.test.ts`). RED, then GREEN. Commit.
-- [ ] **T4** — Channel bundle allow-list rule (`channel-bundle.test.ts`), reconciled against the
-      existing seeded-positives test (`node:fs` already legitimately appears via `FS_ALLOWLIST`).
-      RED, then GREEN. Commit.
-- [ ] **T5** — Document `installer-bundle.test.ts` and `test/client/session-exchange.test.ts` as new,
-      scoped backlog rows in `CHECKLIST.md` (same gap, not evidenced/implemented this session).
-- [ ] **T6** — Update `CHECKLIST.md`'s B-100(b) row (close or update), `HANDOFF.md`, `AGENTS.md` status
-      pointer; Engram session summary.
+- [x] **T1** — `bareSpecifiers` in `closure.ts` + its own seed tests (positive: catches `from`, bare
+      `import`, dynamic `import()`, `require()`; negative: rejects relative specifiers). RED (real
+      `tsc -b` compile failure), then GREEN. Commit `47bcd00`.
+- [x] **T2+T3** — Daemon and client bundle allow-lists, combined into one work unit (mechanically
+      identical, both matched actual computed output on first try). RED/GREEN cycle per file. Commit
+      `5122e20`.
+- [x] **T4** — Channel bundle allow-list rule (`channel-bundle.test.ts`). Real computed set required a
+      scratch script (session 56 never evidenced channel); required relaxing the existing per-rule
+      seed-loop assertion from "exactly this violation" to "this violation is present" since several
+      existing rules' own seeds are bare specifiers that legitimately also trip the new rule. RED,
+      then GREEN. Commit `737a8b8`.
+- [x] **T5** — Documented `installer-bundle.test.ts` and `test/client/session-exchange.test.ts` as new
+      backlog row B-103 (same gap, not evidenced/implemented this session).
+- [x] **T6** — Updated `CHECKLIST.md`'s B-100(b) row, `HANDOFF.md`, `LOG.md`, `AGENTS.md` status
+      pointer; Engram session summary. Commit `8349edc`.
 
 ## TDD mode
 
@@ -109,4 +112,10 @@ slice.
 
 ## Progress
 
-Not started.
+Done. All 6 tasks complete, strict TDD throughout, full suite green (1732 tests, 1726 pass, 0 fail,
+6 skip; `test:static` 89/89). Four work-unit commits: `47bcd00`, `5122e20`, `737a8b8`, `8349edc`.
+RDD ran 5 times (2 own-scoped, approved/acknowledged; 1 redundant selectorless-chain, approved/
+acknowledged; 1 more redundant selectorless-chain, `correction_required` on already-tracked B-102(f),
+declined — see `HANDOFF.md` §4.6/§9 for the full account). B-103 filed for the two consumers found
+out of this scope. Not pushed to `origin` (local commits only, per this project's established
+direct-to-main ODD convention).
