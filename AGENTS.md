@@ -9,9 +9,10 @@ project (decision D5 of the landing debate, phase F2) is a different document, p
 template. v1's equivalent of that end-user document is `docs/AGENT-GUIDE-using-the-bus.md` in the
 `telegram-agent-bus` repository.
 
-**Status.** F1, F2, F3 and F5 are archived. **F4 (`f4-claude-channels-adapter`) is the one open SDD
-change, mid-`sdd-apply`:** PR-01 to PR-06 are merged (`#95`-`#104`, including the B-95/B-96 follow-up `#103`); PR-07 remains, then
-`sdd-verify` and `sdd-archive`. This field used to
+**Status.** F1, F2, F3, F4 and F5 are all archived; F4 (`f4-claude-channels-adapter`) closed in
+session 55 (PR-01 to PR-07, `#95`-`#105`, verified PASS, archived to
+`openspec/changes/archive/2026-09-29-f4-claude-channels-adapter/`). No SDD change is currently open;
+see `docs/08-sessions/HANDOFF.md` for what session 56 does next. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,

@@ -4,6 +4,90 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 55 — F4 PR-07 implemented, verified, archived (F4 complete); B-97, B-99, B-101 closed
+
+- **Date**: 2026-09-29 local time (the harness date).
+- **Authority**: the session-start prompt handed over PR-06 and `#103` as merged and asked for PR-07
+  (docs), then `sdd-verify` and `sdd-archive`, RDD asked per candidate with a recommendation of
+  `granted`. It also stated Arena/Alpha was not available "hasta nuevo aviso" and gave blanket
+  authorization for B-97, B-98, B-99, B-100 and B-101 ("no me preguntes nada... elijas sabiamente y
+  termines esta sesión").
+- **Preflight**: the tree matched the session-54 HANDOFF (`13934f5`, clean, `main` equal to
+  `origin/main`); the SDD preflight was re-confirmed through `AskUserQuestion` (Automatic / Both /
+  Auto). Arena's own MCP server failed to connect (`ECONNREFUSED`) at session start — a real
+  tool-level failure, not `curl` — corroborating the Director's statement; this satisfies DN-09's own
+  substitute condition directly (unlike session 54's mid-session case, which needed the B-101
+  waiver). Cold baseline: 1713 tests, 1707 pass, 0 fail, 6 skip.
+- **Tooling drift found immediately**: `gentle-ai` was silently upgraded 2.9.1 → 3.7.0 on this
+  machine. `sdd-attempt acquire`/`settle` are retired (`grant` only, and not needed here since
+  `sdd-status` already showed edit authority granted). Native `sdd-apply`/`sdd-verify`/`sdd-archive`
+  Agent dispatch was hook-blocked every time it was tried this session (the same
+  `PreToolUse:Agent`/SDD-preflight-corroboration failure sessions 44-50 saw); the established
+  `general-purpose`-agent fallback worked every time.
+- **PR-07** (`docs/runbooks/channel-doorbell.md` + `WORK-PLAN.md:93` + `DATA-MODEL.md` §3.5 + two ADR
+  notes): PR #105, one commit `4bd0510`, 143 changed lines. The runbook's Claude Code flags were
+  independently WebFetched against the live docs (`code.claude.com/docs/en/channels{,-reference}`,
+  2026-09-29) rather than trusted from a `claude-code-guide` subagent's report, which turned out to
+  recommend the wrong flag (`--channels plugin:conmuta-channel` instead of the correct
+  `--dangerously-load-development-channels server:conmuta-channel`, since a bare custom server is not
+  on the research-preview's allowlist). Frozen-diff audit `f4-pr07-diff-audit-001` (Judgment Day, two
+  blind judges): zero CRITICAL, one shared WARNING (`WORK-PLAN.md:94` left stale by the line-93-only
+  edit). RDD auto-closed low (no `openspec/` file touched). CI green (Node 24.15, 26) before merge.
+  Post-merge: build clean, suite unchanged (1713/1707/0/6).
+- **Docs sync** (two commits, `64521a4` then `726815e`): ticked `tasks.md`'s remaining 12 boxes
+  (1.1-1.7, already implemented by PR-01 but never ticked, plus 7.1-7.5), refreshed
+  `apply-progress.md`'s stale PR-05 header and filled its PR-07 section, fixed `WORK-PLAN.md:94`'s
+  staleness. RDD asked both times (medium, the `apply-progress.md` "executable_change" heuristic —
+  a false positive on PR-status prose that quotes shell commands in backticks): granted once (caught
+  a real arithmetic slip, 139 vs. 143 changed lines, and an ambiguous "see below"), declined once on
+  the resulting cosmetic nit (diminishing returns, informational only).
+- **`sdd-verify`** (`verify-report.md`, commit `a0223cb`): PASS — build clean, suite green,
+  design.md's 15-row Testing Strategy table fully covered, 8 sampled task claims substantiated
+  directly against source, `tasks.md` 54/54 checked. RDD asked (medium, same heuristic on the new
+  report file), Director declined this one.
+- **`sdd-archive`** (commit `27b7032`): moved `openspec/changes/f4-claude-channels-adapter/` to
+  `openspec/changes/archive/2026-09-29-f4-claude-channels-adapter/` (`cp` + `git rm --cached`, `git
+  mv` still fails with `Permission denied` on this Windows checkout — the fourth time this precedent
+  holds). The first-pass writer, scoped only to the move and two pointer edits, correctly flagged
+  that the delta spec (`specs/channel-doorbell/spec.md`, 13 requirements / 22 scenarios) had never
+  been composed into `openspec/specs/`; Kairo completed that merge immediately after (a straight copy
+  — `channel-doorbell` had no pre-existing canonical spec to merge against) and corrected the
+  archive report's PR range (`#95`-`#105`, not `#104`). `AGENTS.md`'s SDD-artifacts row and five
+  `CHECKLIST.md` pointer cells (B-95, B-97, B-98, B-99, B-100) were repointed to the archive path in
+  the same commit. RDD asked (medium, `AGENTS.md` "executable_change"), Director declined.
+- **B-97, B-99, B-101 closed** (Director's blanket authorization; B-98 and B-100 deliberately
+  deferred, see below):
+  - **B-101** (`4ba4928`): GOVERNANCE §3 now names a reachable-Arena-unresponsive-collaborator case
+    explicitly, requiring the Director's own per-session instruction and a recorded DN-05 waiver each
+    time, never carried forward. The secondary suggestion (relocating the substitute's operating
+    detail out of `HANDOFF.md`) stays open, lower priority. RDD auto-closed low, pushed.
+  - **B-99** (`dd464a7`): the three CPU-contention-flaky timer tests (`heartbeat` x2, `no-emission`)
+    now poll for the tick count with a 5s deadline instead of sleeping a fixed duration then
+    asserting. Verified with 3 runs under 24 busy-loop contention on this 24-CPU machine (the load
+    that previously reproduced 2-3 failures per run): all clean, 9/9 pass.
+  - **B-97** (`24d7dc6`): `src/cli/main.ts`'s `argv[1]`-vs-`pathToFileURL` entry guard, false behind
+    a POSIX symlinked npm bin, replaced with `import.meta.main` (the same guard `channel/main.ts`
+    already uses). Not reproducible on this Windows machine, so the new pinning test is disclosed as
+    unable to show a true RED against the original defect; proven instead by mutating the compiled
+    guard to a permanently-false condition (exactly the new test failed, nothing else) and restoring.
+  - **B-98** (F1 core lifecycle `stop()`/heartbeat shutdown-ordering race) and **B-100** (bundle-
+    closure detector blind spots, where widening risks surfacing a real pre-existing violation) were
+    evaluated and deliberately left for a focused session rather than rushed at the tail of this one
+    — both carry real, non-trivial risk (production shutdown ordering; an unbounded-scope security
+    finding) that this session's remaining budget did not fit responsibly. No code touched for either.
+- **Recurring tool defect**: `gentle-ai review status` failed twice this session (after the B-99 and
+  B-97 commits) with a persistent `operation_timeout` (`retry_safe: false`, 3 consecutive attempts
+  each time; `gentle-ai review mode status`/`--version`/`sync` all worked fine in between, isolating
+  the fault to the review status/start negotiation path). The Director, asked once under the
+  mandatory Gentle AI defect-handoff protocol, chose "continue without reporting"; the same
+  disposition was applied without re-asking the second time it recurred, and both commits were pushed
+  with RDD disclosed as unavailable for those two candidates.
+- **Process notes**: `gentle-ai sync` (run once, mid-session, to clear a `managed_assets_outdated`
+  stop) rewrote 74 files under this machine's global `~/.claude/` and `~/.agents/` config — expected
+  and outside the repository, not touched here. A `sed -i` mutation-restore chained with `&&` after a
+  possibly-empty `grep` silently skipped the restore once (grep exits 1 on no match, breaking the
+  chain); caught immediately by re-checking the mutated file before proceeding, no contamination.
+
 ## Session 54 — F4 follow-up PR (B-95 (a)(b)(c)(e)(f), B-96) and PR-06 implemented, audited, and merged
 
 - **Date**: 2026-09-28 local time (the harness date); merge timestamps from `gh pr view` are 2026-09-29 UTC:

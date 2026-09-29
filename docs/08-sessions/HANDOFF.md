@@ -4,8 +4,7 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 54** (started 2026-09-28, closed 2026-09-29). Everything below describes
-> the state after it.
+> **Last rewritten: end of session 55** (2026-09-29). Everything below describes the state after it.
 
 ---
 
@@ -13,22 +12,32 @@
 
 | Question | Answer |
 |---|---|
-| Where does F4 stand? | PR-01 to PR-06 and the B-95/B-96 follow-up (`#103`) are merged; `main` equals `origin/main`; `npm test` is 1713 tests, 1707 pass, 0 fail, 6 skip. F1, F2, F3 and F5 are archived. |
-| What is next? | PR-07 (docs), then `sdd-verify`, then `sdd-archive` (§5). |
-| What must be settled before any work? | **Who audits.** Alpha is out of token quota: settle it as §0.3 says (Alpha back, Betelgeuse seated, or the Director's explicit Judgment Day instruction). |
-| What is the Director's to decide? | B-97, B-98 and B-100 (Director + Kairo); B-101 (Director); B-99 is Kairo's small test-only PR, scheduled by the Director (§7). |
-| Where to read next | §0 and §5 first; then §3 (contracts), §4 (traps), §6 (do not redo), §7 (open points) and §8 (environment) as the task needs. |
+| Where do F1–F5 stand? | **All archived.** `openspec/changes/archive/` holds five dated folders, including F4's, closed this session. No SDD change is currently open. |
+| What is next? | No queued SDD work. F6 (`f6-release-and-docs`, release/publish) is the only planned next phase, but it is blocked on Director decisions (B-11 name clearance, B-12 macOS scope, B-16 license/legal docs) — see §3. B-98 and B-100 are well-specified, deliberately deferred backlog fixes ready for a focused session (§3, §7). |
+| What must be settled before any work? | **Who audits.** Settle it as §0.3 says: Arena/Alpha status may have changed since this file was written (it was unreachable, MCP `ECONNREFUSED`, at the start of session 55). |
+| What is the Director's to decide? | B-98, B-100 (Director + Kairo, deferred); the B-95 remainder (Kairo schedules); B-11, B-12, B-16 gate F6. |
+| Where to read next | §0 first; then §3 (what's available, what's next) and §7 (open points) as the task needs. §4 and §8 are reference material — read only the parts a specific task touches. |
 
 ---
 
 ## §0 — Quick start
 
-### 0.1 Prompt to paste (three lines, per the Director's instruction)
+### 0.1 Prompt to paste
+
+No specific task is queued. Paste one of these, or state your own:
 
 ```text
-F4 PR-06 y #103 mergeados — lee docs/08-sessions/HANDOFF.md y confirma Arena con un bridge_send real y mi autonomía total con tu colaborador como juez (Alpha quedó sin cuota: si no responde, avísame antes de usar Judgment Day, DN-09).
-Arranca sdd-apply PR-07 (docs; verifica los flags de Claude Code channels contra la documentación vigente), luego sdd-verify y sdd-archive; pide RDD por candidato y recomiéndame granted.
-Árbol limpio esperado (docs de la sesión 54 ya commiteadas); B-97, B-98, B-99, B-100 y B-101 los decido yo.
+Lee docs/08-sessions/HANDOFF.md y confirma Arena con un bridge_send real y mi autonomía con tu
+colaborador como juez. F4 está cerrado; dime qué sigue (F6 está bloqueado por B-11/B-12/B-16; B-98
+y B-100 están listos para una sesión enfocada) y arráncalo.
+```
+
+or, to work one of the deferred backlog items directly:
+
+```text
+Lee docs/08-sessions/HANDOFF.md, confirma Arena, y arranca B-98 (la carrera de apagado del daemon)
+[o B-100 (los puntos ciegos de los detectores de cierre de bundle)] como una ODD slice fuera de SDD,
+con TDD estricto y tu propio buen juicio sobre el alcance.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
@@ -37,64 +46,64 @@ Run them in the Bash tool: they use POSIX syntax (`rm -rf` does not exist in Pow
 
 | # | Command | Expected |
 |---|---|---|
-| 1 | `git fetch origin && git status -sb` | first line `## main...origin/main` with no `ahead` or `behind` (if `behind`, run `git pull --ff-only`; if `ahead`, stop: §4.4) |
+| 1 | `git fetch origin && git status -sb` | first line `## main...origin/main` with no `ahead` or `behind` (if `behind`, run `git pull --ff-only`; if `ahead`, stop) |
 | 2 | `git rev-parse HEAD origin/main` | two identical hashes |
-| 3 | `git log --oneline cdd63ca..origin/main` | only docs-only commits (subjects start with `docs`); `cdd63ca` (PR-06) is the last code commit |
-| 4 | `rm -rf dist` | prints nothing; a stale `dist/` silently fakes results |
-| 5 | `ls openspec/changes/` | `archive/` and `f4-claude-channels-adapter/` |
-| 6 | `git status --short` | prints nothing |
-| 7 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; the switch is user-owned, so read it, do not assume it |
+| 3 | `rm -rf dist` | prints nothing; a stale `dist/` silently fakes results |
+| 4 | `ls openspec/changes/` | `archive` only — no bare change folder |
+| 5 | `git status --short` | prints nothing |
+| 6 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
+| 7 | `gentle-ai --version` | `3.7.0` or later (§8: this jumped from 2.9.1 mid-session-55, silently, via `gentle-ai sync`) |
+| 8 | `npm run build && npm test` | exit 0; `1714 tests, 1708 pass, 0 fail, 6 skip` (session-55 close baseline) |
 
-The working tree must be clean: the docs of session 54 were committed as docs-only commits on the Director's
-standing authorization (`8c20646` between #103 and #104, and the close-out from `7ce0ae2` on). If `git status`
-shows anything, stop and report before assuming it is safe.
+The working tree must be clean. If `git status` shows anything, stop and report before assuming it is safe.
 
 ### 0.3 Settle before any work
 
-1. **Autonomy.** The opening prompt (§0.1) re-confirms full autonomy with the collaborator as judge; if it does
-   not say so, ask one question. DN-08's rule (a PR merges after its tribunal `CONSENSUS` and green CI, without a
-   separate Director question) applies unchanged when Betelgeuse is the collaborator. Judgment Day gives no
-   `CONSENSUS`: F1 merged its PRs from PR-06 on after a Judgment Day approval (GOVERNANCE §3); if the prompt does
-   not extend the autonomy to a Judgment-Day-audited merge, ask one question.
-2. **SDD Session Preflight and memory.** Run the preflight through `AskUserQuestion` (hard gate, re-asked every
-   session; this project uses Automatic / Both / Auto). Start an Engram session (`mem_session_start` with `id`
-   and `directory`) and pass its id to `mem_save`.
-3. **Arena and collaborator.** Prove Arena reachable with a real `bridge_send`, never `curl`; a successful send
-   clears that gate. **The first debate of the session is also the probe of the collaborator**: send it, end the
-   turn and wait for the `[ARENA]` ping (do not poll, §4.1). Alpha ran out of token quota at the close of
-   session 54 (the Director said so after the close-out audit had been answered; no debate was pending), so the
-   ping may never come:
+1. **Autonomy.** Confirm the opening prompt re-states full autonomy with the collaborator as judge; if
+   it does not, ask one question.
+2. **SDD Session Preflight and memory.** Run the preflight through `AskUserQuestion` (hard gate,
+   re-asked every session; this project uses Automatic / Both / Auto). Start an Engram session
+   (`mem_session_start` with `id` and `directory`) and pass its id to `mem_save`.
+3. **Arena and collaborator.** Prove Arena reachable with a real `bridge_send`, never `curl`. Session 55
+   found the `arena` MCP server itself refusing to connect (`ECONNREFUSED`) at session start — a real
+   tool-level failure that satisfies DN-09's substitute condition directly, with no B-101 waiver needed
+   (that waiver is for a *reachable* Arena whose seated collaborator cannot answer mid-session, now
+   GOVERNANCE §3's own third case). If Arena is reachable this time, run one real debate as the probe
+   and wait for the `[ARENA]` ping (do not poll, HANDOFF's own historical §4.1 in `LOG.md`'s prior
+   entries has the detail, or the installed `judgment-day` skill for the substitute's operating detail).
+   If the bridge itself fails, that's DN-09 directly: confirm with the failed real call, tell the
+   Director, and use Judgment Day.
 
-   | Situation | Action |
-   |---|---|
-   | The Director says Alpha is back | Proceed as in session 54. |
-   | The Director seats **Betelgeuse** in the right panel (preferred; GOVERNANCE §3 accepts Alpha or Betelgeuse) | Send envelopes to `betelgeuse` only, the name the system prompt gives. No recorded debate has had Betelgeuse yet, so the first envelope is also the first contact: the ping must name Betelgeuse. |
-   | The `bridge_send` itself fails | The bridge is unreachable: DN-09 applies and the Judgment Day substitute is the standing audit (GOVERNANCE §3, `AGENTS.md` §3). Confirm with the failed real call (never `curl` alone), tell the Director, and run the substitute as §4.1 describes. |
-   | The send succeeds but no ping comes | Arena's own watchdog re-pings once after 5 minutes (`ARENA_DEBATE_TIMEOUT_MS`) and escalates to the Director after a second expiry (`Arena_Orion/src/main/ArenaBroker.js:116-118`); it does not wake an idle session. End the turn with "sent, waiting for the collaborator" as the report; the Director's next message decides. Judgment Day only on the Director's explicit instruction (§4.1); never start it on your own. |
-
-   GOVERNANCE §3 defines the Judgment Day substitute only for an Arena unreachable at a session's own start (the
-   third row). A reachable Arena with a collaborator who cannot answer (the fourth row) is a gap in it (B-101):
-   session 54 used the substitute there on the Director's explicit request, recorded as a waiver of DN-05 in the
-   tribunal index.
-
-Then follow §5.
+Then decide what to do (§3) with the Director.
 
 ### 0.4 Standing instructions from the Director
 
-- **RDD consent is asked per candidate through `AskUserQuestion`; never answer it for the Director.** Recommend
-  `granted`, and keep the provider's labels, order and tokens. Session 54: granted for the follow-up PR and for
-  the docs close-out, **declined** for PR-06; do not presume an answer. When the tier is `high`, check whether
-  the evidence is a heuristic false positive and say so in the question. Ask after the collaborator's verdict,
-  so a change does not waste the answer.
-- **`size:exception` is asked per PR**, after the collaborator's view on the frozen diff, with a recommendation.
-  None was needed in session 54 (193 and 360 lines). Never open an over-budget PR without that answer.
-- **Commit messages and PR descriptions carry no `Co-Authored-By` and no AI attribution**; conventional commits
-  only. This overrides the harness's attribution reminder. Commit by work unit (tests with the code they verify,
-  one purpose each): #103 landed as five commits and #104 as two.
-- **Docs commits.** Session-bookkeeping docs-only commits (recording a merged slice, the session close-out) go
-  straight to `main`: DN-08 ("session-close documentation commits stay direct") on top of DN-04's delegation of
-  commits, PRs and merges. A documentation *slice* such as PR-07 is not bookkeeping: it goes through a branch, an
-  audit and a PR.
+- **RDD consent is asked per candidate through `AskUserQuestion`; never answer it for the Director.**
+  Recommend `granted`, and keep the provider's labels, order and tokens. Session 55: granted once
+  (a docs-sync commit; caught two real nits), declined three times (a cosmetic follow-up, the
+  verify-report, the archive commit). When the tier is `medium` or `high`, check whether the evidence
+  is a heuristic false positive and say so in the question — `openspec/changes/**` and `AGENTS.md`
+  files consistently trip an `executable_change` heuristic that is almost always a false positive on
+  prose (session 55's own repeated experience, consistent with session 54's).
+- **`gentle-ai review status`/`start` can fail with a persistent `operation_timeout`** (schema
+  `gentle-ai.review-integration.failure/v2`, `retry_safe: false`), unrelated to network or the
+  candidate's content — session 55 hit this twice, 3 consecutive attempts each time, while
+  `gentle-ai review mode status`/`--version`/`sync` all kept working. Retry at most 2-3 times; if it
+  keeps failing, this is the mandatory Gentle AI defect-handoff trigger (ask the Director
+  report/continue/stop once per distinct occurrence — the Director chose "continue without reporting"
+  both times in session 55, disclosed and pushed the already-verified commit without RDD for that one
+  candidate). Do not silently skip RDD without disclosing it, and do not loop on the retry.
+- **`size:exception` is asked per PR**, after the collaborator's view on the frozen diff, with a
+  recommendation. None was needed in session 55 (PR-07 was 143 lines).
+- **Commit messages and PR descriptions carry no `Co-Authored-By` and no AI attribution**; conventional
+  commits only. This overrides the harness's attribution reminder. Commit by work unit.
+- **Docs commits.** Session-bookkeeping docs-only commits (recording a merged slice, closing a backlog
+  row, the session close-out) go straight to `main`. A documentation *slice* that's a planned SDD
+  deliverable (like F4's PR-07 was) goes through a branch, an audit and a PR.
+- **`gentle-ai sync`** rewrites the machine's global `~/.claude/` and `~/.agents/` config (skills,
+  agents, `CLAUDE.md`, `settings.json` — 74 files in session 55) when a `review status` call reports
+  `managed_assets_outdated`. This is expected, outside the repository, and not something to second-guess
+  or revert; just re-run the `review status`/`start` call after it completes.
 
 ---
 
@@ -102,344 +111,247 @@ Then follow §5.
 
 | Item | State | Pointer |
 |---|---|---|
-| F1, F2, F3, F5 | **Archived**, unchanged. | `openspec/changes/archive/` (four dated folders) |
-| B-09 | **Closed** (session 50). | `docs/06-backlog/CHECKLIST.md#B-09` |
-| F4 planning | Explore, proposal, spec, design, tasks all written and Alpha-audited to `CONSENSUS` (session 50). | `openspec/changes/f4-claude-channels-adapter/` |
-| F4 PR-01 to PR-04 | **Merged** (`#95` `952fbcd`, `#96` `d3cb965`, `#97` `33cd1e6`, `#98` `e03498a`). | `apply-progress.md` |
-| F4 PR-05a to 05d | **Merged** (`#99` `9262939`, `#100` `2647b06`, `#101` `0ea55df`, `#102` `48c8c39`). PR-05 is complete. | `apply-progress.md` |
-| Follow-up PR 05e | **Merged.** B-95 (a)(b)(c)(e)(f) and B-96. `#103`, tip `b99d66b` of five work-unit commits, 193 lines. | `apply-progress.md` ("Follow-up PR 05e") |
-| F4 PR-06 | **Merged.** `test/security/channel-bundle.test.ts` and the `channel/` twin gate. `#104`, tip `cdd63ca` of two work-unit commits, 360 lines, applied by the native `sdd-apply` agent. | `apply-progress.md` ("PR-06") |
-| F4 PR-07 | **Next.** Runbook, `WORK-PLAN.md` amendment (task 7.2), DATA-MODEL and ADR notes. | `tasks.md` (PR-07 block) |
-| After PR-07 | `sdd-verify`, then `sdd-archive`, each audited like F1/F2/F3/F5. | — |
-| Backlog open | **B-95** remainder ((d), the `fetch.ts` parse, three notes), **B-97**, **B-98**, **B-99**, **B-100**, **B-101**, plus the carried rows in §7. B-96 is closed. | `docs/06-backlog/CHECKLIST.md` |
-| Tests on `main` | `npm test`: **1713 tests, 1707 pass, 0 fail, 6 skip** (session start: 1682/1676/0/6). | — |
-| Tribunal record | Debates and audits are indexed, including session 54's four debates, the close-out audit `bus-v2-s54-docs-close-audit-001` and the Judgment Day review of this file, `bus-v2-s54-handoff-judgment-day-001`. | `docs/05-tribunal/INDEX.md` |
+| F1, F2, F3, F5 | **Archived**, unchanged this session. | `openspec/changes/archive/` |
+| F4 (`f4-claude-channels-adapter`) | **Archived, session 55.** PR-01 through PR-07 merged (`#95`-`#105`), `sdd-verify` PASS, delta spec merged into `openspec/specs/channel-doorbell/spec.md`. | `openspec/changes/archive/2026-09-29-f4-claude-channels-adapter/` |
+| B-09 | Closed (session 50). | `docs/06-backlog/CHECKLIST.md#B-09` |
+| B-96 | Closed (session 54). | `docs/06-backlog/CHECKLIST.md#B-96` |
+| B-97, B-99, B-101 | **Closed, session 55.** | `docs/06-backlog/CHECKLIST.md` |
+| B-95 remainder, B-98, B-100 | Open, carried forward. | `docs/06-backlog/CHECKLIST.md`, §7 below |
+| Next SDD change | None queued. F6 (`f6-release-and-docs`) is next in `WORK-PLAN.md` but blocked on Director decisions (B-11, B-12, B-16). | `docs/07-plan/WORK-PLAN.md` (F6 section) |
+| Tests on `main` | `npm test`: **1714 tests, 1708 pass, 0 fail, 6 skip** (session start: 1713/1707/0/6). | — |
+| Tribunal record | Session 55's Judgment Day audit is indexed as `f4-pr07-diff-audit-001`. | `docs/05-tribunal/INDEX.md` |
 
 ---
 
-## §2 — What session 54 did (context, not to redo; detail in `LOG.md` and `apply-progress.md`)
+## §2 — What session 55 did (context, not to redo; detail in `LOG.md` and `apply-progress.md`)
 
-1. **Two code PRs, each through the full loop** (scope debate, `sdd-attempt`, writer or native `sdd-apply`, cold
-   suite, `settle`, frozen-diff debate, RDD, PR, CI, rebase merge, post-merge suite): the follow-up `#103`
-   (doorbell scan skips an unreadable row; the B-96 flake fixed test-only) and PR-06 `#104` (closure test and
-   twin gate).
-2. **Findings that changed the plan**, all written down: B-96's root cause is a production gap (`stop()` never
-   awaits a tick in flight: B-98); PR-06's debate missed `design.md:198` (no `daemon/` path at all, plus
-   `node:sqlite` and keyring), so the test follows the design; `hasFsModuleReference` misses four import forms
-   and `computeClosure` skips bare specifiers (B-100); three timer-based tests fail under CPU contention (B-99);
-   GOVERNANCE §3 does not cover a collaborator that cannot answer (B-101).
-3. **Close-out.** Alpha audited the documentation (`APPROVE`) before its quota ran out and the RDD review was
-   granted and approved. Afterwards the Director asked for this file to be restructured and reviewed twice by
-   judges: Judgment Day, `bus-v2-s54-handoff-judgment-day-001`.
+1. **F4 PR-07** (`docs/runbooks/channel-doorbell.md` + `WORK-PLAN.md:93` + `DATA-MODEL.md` §3.5 + two
+   ADR append-only notes): implemented, audited (Judgment Day, zero CRITICAL), merged as `#105`.
+   The runbook's Claude Code flags were independently WebFetched against the live docs, which caught
+   and corrected a wrong flag a `claude-code-guide` subagent had proposed.
+2. **`sdd-verify`**: PASS, full report at the (now-archived) `verify-report.md`.
+3. **`sdd-archive`**: F4 moved to `openspec/changes/archive/2026-09-29-f4-claude-channels-adapter/`;
+   the delta spec merged into `openspec/specs/channel-doorbell/spec.md` (a gap the first-pass writer
+   correctly flagged rather than silently skip, then Kairo closed immediately). Five live pointers
+   (`AGENTS.md`, five `CHECKLIST.md` rows) repointed to the archive path in the same commit.
+4. **B-97, B-99, B-101 closed** under the Director's blanket authorization; **B-98 and B-100
+   deliberately deferred** (real, non-trivial risk that did not fit this session's remaining budget
+   responsibly — a production shutdown-ordering race and an unbounded-scope security-detector change).
+5. **Tooling drift discovered and worked around**: `gentle-ai` silently upgraded 2.9.1 → 3.7.0
+   (`sdd-attempt acquire`/`settle` retired); native `sdd-*` Agent dispatch stayed hook-blocked all
+   session (the `general-purpose` fallback, as in sessions 44-50); `gentle-ai review status` failed
+   with a persistent `operation_timeout` twice, worked around per the Director's disposition (§0.4).
 
 ---
 
-## §3 — Contracts the next work needs (read the files, do not re-derive)
+## §3 — What's available now, and what's next
 
-### 3.1 The adapter as merged (`channel/`, for PR-07's runbook)
+### 3.1 F1 through F5, all archived
+
+`openspec/changes/archive/` holds five dated folders (F1 2026-09-26, F2 and F3 2026-09-27, F5
+2026-09-28, F4 2026-09-29). Each has its own `verify-report.md` and `archive-report.md`. Canonical
+specs live under `openspec/specs/<capability>/spec.md`, one directory per capability — F4 added
+`channel-doorbell`.
+
+### 3.2 F4 as merged (`channel/`, for anything touching the adapter)
 
 - `main.ts` (bin `conmuta-channel`): `runChannel(options)` never exits the process; the guarded entry
-  (`import.meta.main`) parses `--project <id>` and `--project=<id>` strictly, then hard-exits. It imports
-  `./daemon-link.js`, `./doorbell-loop.js`, `./notify.js`, `../src/client/binding.js` (the only `fs` user besides
-  `run-file`), `../src/shared/*` and the MCP SDK. It never imports `client/main`, `run-state`, `spawn`,
-  `handshake`, `ipc-stub` or anything under `src/daemon`. The shutdown bound is the named local
-  `watcherStopBound` (an `AbortSignal.timeout`, evaluated right before the race).
-- `daemon-link.ts`: `createDaemonLink(deps)` returns the `DaemonLink` interface; eight-code `DaemonLinkError`;
-  reads the run file afresh per handshake, **never spawns**, throws `NO_DAEMON` with zero fetches when the daemon
-  is down. Bounds use `AbortSignal.timeout` (not a timer identifier).
-- `doorbell-loop.ts`: `DoorbellWatcher` and `abortableSleep`. **The only file in `channel/` that arms a timer**
-  (global `setTimeout`, never `node:timers`). `deliver_failed` and `link_failed` back off
-  `CHANNEL_RETRY_BACKOFF_SECONDS`; `rang` and `silent` never sleep. A throw from `buildNotification` is
-  deliberately not caught (fail-fast: `run` ends and `main.ts` exits 1), documented on `tick` and pinned by a test.
-- Exit codes: usage `EXIT_USAGE` (2), unbound project 3, project mismatch 4, unexpected failure or a crashed loop
-  1, a clean shutdown 0. Diagnostics go to stderr only; stdout carries MCP frames only.
-- Capability: `{ experimental: { "claude/channel": {} } }`, **no `permission` key at all**; the event is
-  `notifications/claude/channel` with `{ content, meta }` from `buildNotification`.
-- The adapter needs a **running daemon** and never starts one (D7). Sessions are minted lazily by the first route
-  call and released by `DELETE /session` at shutdown (D10).
+  (`import.meta.main`) parses `--project <id>` / `--project=<id>` strictly, then hard-exits. Imports
+  `./daemon-link.js`, `./doorbell-loop.js`, `./notify.js`, `../src/client/binding.js`, `../src/shared/*`
+  and the MCP SDK; never `client/main`, `run-state`, `spawn`, `handshake`, `ipc-stub`, or anything under
+  `src/daemon`.
+- Capability: `{ experimental: { "claude/channel": {} } }`, no `permission` key. Event
+  `notifications/claude/channel`, `{ content, meta }`.
+- Needs a **running daemon**, never starts one. `docs/runbooks/channel-doorbell.md` is the operator
+  runbook — read it before answering any question about how a user arms this adapter; do not restate
+  its flags from memory in an unrelated doc, they were verified against the live Claude Code
+  documentation at apply time and may drift as the research-preview feature evolves.
+- Full contract detail: `openspec/specs/channel-doorbell/spec.md` (13 requirements, 22 scenarios) and
+  the archived `design.md`'s Testing Strategy table.
 
-### 3.2 PR-07 (docs)
+### 3.3 What's next
 
-- Read `tasks.md`'s PR-07 block (tasks 7.1 to 7.5). The `WORK-PLAN.md` amendment text (task 7.2) is stored in
-  `design.md` ("WORK-PLAN :93 amendment text"). Row 94 of `WORK-PLAN.md` (the change's status) was refreshed in
-  session 54; row 93 (Validation) stays stale until task 7.2 (§4.5).
-- The runbook states the adapter as best-effort and documents `conmuta-channel --project <id>`, the need for a
-  running daemon, and that events are dropped silently if the host has not enabled the channel.
-- **Where the flags come from**: the current Claude Code documentation, never memory (`design.md`, "Migration /
-  Rollout"). Ask the `claude-code-guide` agent or use `WebFetch` and `WebSearch` on the Claude Code documentation
-  site, and record the exact URL and the access date in the runbook.
-- **Stale F4 artifacts to sync** (found by the session-54 judges): tick tasks 1.1 to 1.7 in `tasks.md` (PR-01
-  merged as `#95`, and `apply-progress.md` already shows them done; until then `sdd-status` reports 42 of 54 tasks
-  complete) and refresh `apply-progress.md`'s PR-05 header status (it still says 05b to 05d are not started). Do it
-  in the docs-only commit that records PR-07 after its merge, together with the 7.x marks, and before
-  `sdd-verify`, whose task-completeness check needs it; not inside the PR branch, where an openspec edit would
-  raise the RDD tier (§4.3).
+No SDD change is queued. Three paths, in the order a reasonable session would consider them:
 
-### 3.3 `sdd-verify`
-
-- The spec is `openspec/changes/f4-claude-channels-adapter/specs/channel-doorbell/spec.md`; `design.md`'s Testing
-  Strategy table (rows around 190-201) maps each guarantee to its test. Read those rows before judging coverage.
-- `apply-progress.md` is current through `#104`; no `verify-report` exists yet (`sdd-status`:
-  `verifyReport: missing`).
-
-### 3.4 The bundle-closure test as merged (`test/security/channel-bundle.test.ts`, the model for future closure tests)
-
-- Entry `dist/channel/main.js`, paths relative to `dist/` (so the `fs` allow-list reads `src/client/binding.js`
-  and `src/client/run-file.js`). The closure is 16 files: nothing under `src/daemon/`, `fs` only in those two
-  client modules, a timer only in `channel/doorbell-loop.js`.
-- A `RULES` table of 10 rules, each with seeds that must trip exactly that rule (a loop generates one test per
-  rule); one `findViolations(Map<path, source>)` helper judged on the real bundle and on synthetic maps; seeded
-  positives for the allow-listed modules; a two-hop temp-dir fixture. To add a guarantee, add a rule with seeds.
-- `fs`, `node:sqlite` and keyring use quote-anchored local regexes; the shared `hasFsModuleReference` is not used
-  (B-100). `test/twins.test.ts` also walks `channel/**` against `test/channel/`.
-
-### 3.5 Already in `main` and relevant
-
-- Constants (`src/shared/constants.ts`): `DOORBELL_SCAN_DEPTH` (:328), `CHANNEL_SERVER_NAME` (:329, equals
-  `conmuta-channel`, also the bin name), `CHANNEL_HOST_LABEL` (:331), `CHANNEL_RETRY_BACKOFF_SECONDS` (:333),
-  `CHANNEL_META_LIST_LIMIT` (:335), `CHANNEL_SHUTDOWN_TIMEOUT_MS` (:337, 20 s).
-- The live IPC route table has **ten** entries (`createSessionRoutes` builds eight of them). `channel/tsconfig.json`
-  is a composite project (`rootDir ".."`, `outDir "../dist"`) emitting `dist/channel/*.js`; `src/` emits `dist/src/*`.
-- Closure rule for `channel/*.ts`: banned is reachability to anything under `src/daemon/` and any reference to the
-  child-process module **including the literal substring inside a comment** (each of the four `channel/*.ts`
-  modules pins it; `notify.ts` through its purity test). Timers only in `doorbell-loop.ts`.
+1. **B-98 or B-100** (§7) — well-specified, deliberately deferred this session for focused attention,
+   not because they're blocked on anything external. Either is a good single-session ODD slice
+   (implement under the same TDD discipline as SDD `apply`, but the orchestrator tracks progress
+   directly rather than through `tasks.md`/`apply-progress.md`, since neither belongs to an open SDD
+   change).
+2. **F6** (`f6-release-and-docs`, release/publish) — the next planned phase in `WORK-PLAN.md`, but
+   blocked on three Director decisions: B-11 (trademark clearance for "Conmuta"), B-12 (macOS scope),
+   B-16 (license/legal docs remainder — SECURITY.md, CONTRIBUTING.md, CHANGELOG.md, copyright line).
+   Ask the Director for these before proposing `sdd-explore f6-release-and-docs`.
+3. **Whatever the Director actually asks for.** This board is not a queue the Director must follow —
+   ask what's next rather than assuming one of the above.
 
 ---
 
 ## §4 — Facts that will bite you
 
-**Which parts matter next.** For PR-07 (docs), `sdd-verify` and `sdd-archive` read 4.1 to 4.4 and 4.6, plus two
-bullets of 4.5: the B-99 rerun rule (it governs every cold full-suite run) and the `WORK-PLAN.md` row 93 rule. The
-rest of 4.5 applies only when code changes.
-
 ### 4.1 Audit and collaborators
 
-- **A collaborator's report can contain false claims; re-verify the concrete ones yourself.** Session 52: Alpha
-  "verified verbatim" four Director quotes that exist nowhere. Session 54: in the scope audit Alpha called
-  `hasAutonomousTimerReference` an AST pin (it is a regex); in the close-out audit it cited two lines
-  approximately; in the PR-06 diff audit it asserted a directory-walk timing ("<3ms") that nobody measured
-  (caveats are in the tribunal rows). Every other pointer Kairo re-checked was correct, and the last audit listed
-  what it re-read. Never accept a "confirmed" for a quote, a line number or a count without one `grep` or
-  `sed -n` of your own.
-- **Read `design.md`'s Testing Strategy table before scoping a test PR.** Its rows can be stricter than the spec:
-  PR-06's scope debate followed the spec and missed `design.md:198`.
-- **A long `bridge_read` wait can time out at the tool level** (`wait_seconds` of 90 and 120 both did in
-  session 54; 45 and 60 worked). Do not loop on it: end the turn and wait for the `[ARENA]` ping.
-- **Arena's wake-up is PTY keystroke injection, not an MCP notification** (`Arena_Orion/src/main/ArenaBroker.js:3-9`,
-  in the sibling `Arena_Orion` checkout). Never cite the ping as MCP-notification evidence.
+- **A collaborator's or subagent's report can contain false or unverifiable claims; re-verify the
+  concrete ones yourself.** Session 55: a `claude-code-guide` subagent's summary of Claude Code's
+  channels docs recommended a flag (`--channels plugin:conmuta-channel`) that turned out to be wrong
+  once independently WebFetched — a bare custom MCP server is not on the research-preview allowlist
+  the plain `--channels` flag accepts; the correct form is
+  `--dangerously-load-development-channels server:<name>`. Never ship an unverified subagent claim
+  into documentation, a commit, or a decision when the primary source is one `WebFetch` away.
+- **Judgment Day** (the standing audit when Arena is unreachable, DN-09; or on the Director's explicit
+  instruction for a reachable-but-unresponsive-collaborator case, GOVERNANCE §3's third paragraph,
+  recorded as a DN-05 waiver each time — B-101, closed session 55, formalized this). Skill
+  `~/.agents/skills/judgment-day/SKILL.md`, formats in its `references/prompts-and-formats.md`. Two
+  blind judges (`jd-judge-a`, `jd-judge-b`, model `sonnet`), an identical brief with every git/`gh`/test
+  fact as ground truth (they have no shell), one JSON verdict each
+  (`{"findings":[...],"evidence":[...]}`), merged and persisted (Engram, tribunal index). Only
+  both-judge-confirmed CRITICAL findings get a bounded fix actor; WARNING and SUGGESTION are
+  informational. Session 55's PR-07 audit: zero CRITICAL from either judge, one shared WARNING
+  (a stale doc row), no fix round needed.
 - **Pronouns**: refer to the Director by role, never a gendered pronoun.
-- **Judgment Day** (the standing audit when the Arena is unreachable at a session's start, DN-09; otherwise only on
-  the Director's explicit instruction). Skill `~/.agents/skills/judgment-day/SKILL.md`, formats in its
-  `references/prompts-and-formats.md`. GOVERNANCE §3 points to this block for the operating detail: carry it
-  forward when this file is overwritten (B-101 proposes a durable home).
-  - One immutable target (paths plus a sha256, or a frozen commit range); two blind read-only judges,
-    `jd-judge-a` and `jd-judge-b` (model `sonnet`), launched in parallel with an identical brief; each returns
-    one JSON object `{"findings":[...],"evidence":[...]}`. The judges have no shell: put the git, `gh` and test
-    facts in the brief as ground truth. A sweep of a 400-line document took about 22 minutes and 140 tool calls per
-    judge.
-  - The parent merges the findings into a frozen ledger and persists it (Engram). Only severe findings
-    (`CRITICAL` in the judge JSON) confirmed by both judges are fixed by the bounded actor `jd-fix-agent`, after
-    asking; a finding from one judge is only a suspect, judges that contradict each other go to the Director, and
-    WARNING and SUGGESTION stay informational. At most two fix rounds and two scoped re-judgments, then an
-    independent final verification (GOVERNANCE §3 names a separate agent that reproduces the figures and re-runs
-    the verification); the terminal verdicts are `APPROVED` and `ESCALATED`.
-  - It issues no receipt and no `CONSENSUS`, and it satisfies the pre-merge audit only in spirit (GOVERNANCE §3):
-    DN-05 stays formally unsatisfied. Record it in the tribunal index with Authority, What was waived, What was
-    used instead and Consequence (the shape of `bus-v2-f1-pr-06-waiver-001`).
-  - It has no scope debate: replace that step by a scope note (ask the Director when the scope is a real
-    decision), and run the frozen-diff, `sdd-verify` and `sdd-archive` audits as Judgment Day runs.
 
-### 4.2 SDD, attempts and writers
+### 4.2 SDD and writers, under gentle-ai 3.7.0
 
-- **Native `sdd-*` Agent dispatch worked in session 54** (`sdd-apply`, model `sonnet`, no block). Sessions 44-50
-  saw the `PreToolUse:Agent` hook block it; 51-53 did not test it. The parent runs `sdd-attempt acquire` and
-  passes the token; the agent must not `settle`. It normally edits `tasks.md` and `apply-progress.md`: the brief
-  forbade that so the RDD candidate stayed code-only, and it reported its progress instead. If a dispatch is
-  blocked, fall back to a `general-purpose` writer with the same brief. Pointer:
-  `~/.claude/skills/_shared/sdd-phase-common.md`.
-- **The archive move fails on this Windows checkout**: `git mv` failed with `Permission denied` (or fell back) in
-  the F1, F2, F3 and F5 archives. F1 and F2 used `cp -R` + `git rm` (`--cached` in F2) + `git add`, which keeps the
-  index coherent. F3 and F5 used PowerShell `Move-Item` with **absolute** paths (a relative destination once
-  relocated the whole change folder to a stray `<repo-root>/x`); a non-git move leaves the old paths as unstaged
-  deletions, and `test/security/repo-scan.test.ts` (PT-22; it runs as `dist/test/security/repo-scan.test.js`) then
-  fails with `ENOENT` on a ghost path until `git add -A -- openspec/` (git detects the renames). Take a snapshot
-  first and read the result back with `diff -r`. Moving `openspec/changes/f4-claude-channels-adapter/` also breaks
-  the live pointers to it (`AGENTS.md` §2, the pointer column of five `CHECKLIST.md` rows, this file, and whatever
-  PR-07 adds): find them with a search for `changes/f4-claude-channels-adapter` and update them in the same commit
-  (GOVERNANCE §6, "Pointer integrity"). Details: the archive reports of F1, F2 and F5, and `LOG.md`'s F3 and F5
-  archive entries.
-- **A writer runs only targeted tests; you run the whole suite.** Session 53's writer missed
-  `test/cli/main.test.ts:64`; session 54's writers passed, but the rule stands. Always `rm -rf dist`, build, and
-  run the full suite to a file, echoing the exit code, before believing a writer.
-- **Writer prompt shape that worked nine times**: self-contained; names the slice's tasks; requires RED-first with
-  the observed RED recorded per task; forbids all git operations; lists the files the writer may touch; lists
-  constraints as HARD CONSTRAINTS; asks for `<command>: <observed result>` per verification, cheap mutation checks
-  on the compiled `dist/`, and the measured line count; asks to close with `## Key Learnings`. Session 54 added:
-  forbid edits to docs and Engram (the orchestrator records), tell the writer to filter process listings, and
-  resume a finished agent with one message of numbered fixes. Kairo always re-reads the diff and re-runs build and
-  tests itself.
-- **`tsc -b` does not emit on a type error**, so a missing export or module is a compile-error RED
-  (`TS2305`, `TS2307`, `TS2552`); acceptable evidence, say so. A pin for behavior that already exists passes on
-  its first run and cannot show a RED: disclose it as a pin and prove it with a mutation.
-- **`sdd-attempt acquire --max-changed-lines` is a hard cap counted as added + deleted.** Slices landed at 651,
-  476 and 612 under caps of 1000, then 193 under 500 and 360 under 600, all `settle`d `complete`. Use about 2×
-  the estimate. An over-budget attempt gives a `settle_obligation` that the next passing `settle` must carry via
-  `--remediates-evidence-revision`.
-- **Staged files make `settle` simple.** With the slice's files `git add`ed (a new file needs `git add` too, or it
-  is untracked) `sdd-attempt settle` needs no untracked flags; the `--evidence-revision` is
-  `current_snapshot_identity` from `gentle-ai review status ... --next-transition --projection=staged`. Only when
-  files stay untracked do `--untracked-scope=select` and `--intended-untracked` matter.
-- **Engram**: `mem_save` failed with `multiple active runtime sessions match the current project and directory`
-  in session 53 and again in session 54 after `mem_session_end`. What worked: `mem_session_start` with `id` and
-  `directory` set to the repo root, then the same `session_id` on every `mem_save`. After each successful save,
-  `mem_judge` every candidate by its own `judgment_id` (all were `not_conflict`, `related` or `scoped`). A
-  subagent's `mem_save` can fail for the same reason: the orchestrator persists. Engram has no `sdd-init/connmuta`
-  observation and none for `sdd/f4-claude-channels-adapter/apply-progress` (the openspec files are the artifact
-  store in practice); sessions 53 and 54 used `openspec/config.yaml` (`strict_tdd: true`, `npm test`) and native
-  `sdd-status` (apply `ready`). Say so again or run `sdd-init` if the Director prefers.
+- **`gentle-ai` silently upgraded 2.9.1 → 3.7.0 mid-session-55** (via `gentle-ai sync`, triggered by an
+  RDD `managed_assets_outdated` stop). Check `gentle-ai --version` at session start; don't assume the
+  number in an old HANDOFF is current.
+- **`gentle-ai sdd-attempt` now exposes only `grant`**; `acquire`, `settle`, `status`, `reset` are
+  retired ("Runtime attempt operations are retired"). Do not follow an older skill file's
+  acquire/settle instructions. Check `gentle-ai sdd-status <change> --cwd . --json` first —
+  `applyState`/`blockedReasons`/`actionContext.allowedEditRoots` already tell you whether edit
+  authority is present; only call `sdd-attempt grant` if status reports
+  `blocked(edit_authority_missing)` with a consent envelope, and only after the Director grants it.
+- **Native `sdd-*` Agent dispatch was hook-blocked every single time it was tried in session 55**
+  (`sdd-apply`, `sdd-verify`, `sdd-archive` — three separate attempts, three separate refusals: "SDD
+  child dispatch refused: parent-confirmed SDD preflight is missing, invalid, or uncorroborated"),
+  even immediately after a successful `AskUserQuestion` preflight. This matches sessions 44-50's
+  pattern, not session 54's (which dispatched fine once). Don't retry the native dispatch more than
+  once per phase — go straight to a `general-purpose` agent with the same brief; it worked cleanly all
+  four times this session (writer, verify, archive, plus the sync-commit's own edits done directly).
+- **A writer scoped to a narrow task will correctly flag work outside its authorized scope rather than
+  silently doing or skipping it.** Session 55's archive writer, briefed only for the folder move and
+  two pointer edits, correctly flagged that the delta spec was never merged into `openspec/specs/`
+  instead of either doing it unprompted or omitting the finding. Read every disclosed gap in a
+  sub-agent's final report before considering a phase done.
+- **A writer's own report can contain small factual errors even when its actual file edits are
+  correct** — the archive writer's report cited the PR range as `#95`-`#104`, missing PR-07 (`#105`).
+  Spot-check counts and ranges the same way you'd spot-check a collaborator's claim (§4.1).
 
 ### 4.3 RDD
 
-- **Candidate scoping.** `review status` and `start` default to the `workspace` projection, which sweeps in every
-  uncommitted tracked file. When the tree holds only the slice's staged files that is exactly the candidate; if
-  unrelated docs are dirty, `git add` exactly the PR's files and pass `--projection=staged`. Build `review start`
-  from the tokens `status` returns (plus `--consent=relay`).
-- **The Stop hook forces the preflight per candidate.** Running STATUS and START early, while the collaborator
-  audits, is fine; ask the Director only after the verdict.
-- **Consent and the review.** Relay the envelope through `AskUserQuestion` with a recommendation, then run the
-  exact captured invocation once. `granted` at a medium tier is one lens: run its single
-  `review capture-result` with the returned tokens, then the exact `acknowledge-approved` command. At a **high**
-  tier there are four lenses: give one forecast, then run the four `capture-result` calls concurrently (a small
-  node script that spawns `gentle-ai review capture-result` with each input's argument tokens and writes each
-  output to a file in `$TEMP` worked again); only the last admitted capture carries the closure and the
-  acknowledge command. `declined` runs the exact `declined` invocation once and leaves no record.
-- **The tier follows the files as well as the size** (observed in session 54): a delta of `HANDOFF.md`, `LOG.md`
-  and other plain docs closed as `low` with no question (`action: closed`); adding an `openspec/` artifact or
-  `AGENTS.md` made it `medium` (they read as executable); a security-test file or a file that merely mentions
-  `spawn` made it `high`. When a small docs delta would trigger a question, consider splitting it.
+- **`openspec/changes/**` and `AGENTS.md` files consistently trip an `executable_change` heuristic
+  that reads as a false positive on prose** — every candidate touching `apply-progress.md`,
+  `verify-report.md`, `tasks.md`, or `AGENTS.md` in session 55 came back `medium`, citing "an
+  executable change in <path>" even though the content is PR-status prose or bootstrap documentation.
+  Say so plainly in the RDD question so the Director isn't left wondering why a docs commit reads as
+  risky.
+- **`gentle-ai review status`/`start` can fail with a persistent, non-transient
+  `operation_timeout`** (`gentle-ai.review-integration.failure/v2`, `retry_safe: false`,
+  `next_action: stop`) while every other `gentle-ai` subcommand (`review mode status`, `--version`,
+  `sync`, `sdd-status`) keeps working — session 55 hit this twice, isolated to the review
+  status/start negotiation path specifically. Retry 2-3 times; if it doesn't clear, this is the
+  mandatory Gentle AI defect-handoff trigger (§0.4) — don't loop on it past that, and don't silently
+  skip RDD without disclosing the failure and the Director's chosen disposition.
+- **A `sed -i` mutation-restore chained with `&&` after a possibly-empty `grep` can silently skip the
+  restore** — `grep` exits 1 on no match, which breaks an `&&` chain before the restore command runs.
+  Always re-check a mutated file's actual content (a fresh `grep`) before trusting that a restore
+  happened, never trust the chain's own exit code alone.
+- **Candidate scoping and consent mechanics**: `review status`/`start` default to `workspace`
+  projection (every uncommitted tracked file). `granted` at `medium` is one lens: run its single
+  `review capture-result`, then the exact `acknowledge-approved` command. `declined` runs the exact
+  `declined` invocation once and leaves no record. When `gentle-ai sync` runs mid-flow (a
+  `managed_assets_outdated` stop), just re-run `review status`/`start` after it completes — it does
+  not touch the repository.
 
 ### 4.4 Shell and test-run hygiene
 
-- **MSYS/Windows shell.** The default shell is PowerShell; Bash (Git Bash) is available through the Bash tool.
-  `/tmp` is not visible to `node`; feed scripts through stdin (`node - <<'EOF'`) or use `$TEMP`. Apostrophes break
-  `node -e` and unquoted heredocs; use quoted heredocs or the Edit/Write tools. Never leave logs in the
-  repository root: redirect to `$TEMP` and delete them (untracked files disturb `sdd-attempt` and `review`).
-- **Keep a test log until you have read it.** Session 54 deleted the log of the one failing post-merge run and
-  never learned which test failed.
-- **Never print an unfiltered `node.exe` command-line listing**: other tools' credentials sit on those command
-  lines. Mark your own busy-loop children with a comment marker and count leftovers by that marker.
-- **`npm test` output**: the summary lines start with `ℹ` (for example `ℹ fail 0`), not `#`, and failing tests
-  print as `✖ name`. A background run can hang near zero CPU (run it in the foreground), and piping through
-  `tail` masks the real exit code: redirect to a file and `echo $?`. ANSI colour hides the summary from `grep`:
-  strip it with `sed 's/\x1b\[[0-9;]*m//g'`. `dist/` staleness fakes results: `rm -rf dist` first. A full run
-  takes about 17 seconds on this machine.
-- **Local `main` can silently sit ahead of `origin/main`** (session 51 found two unpushed commits), and
-  `git pull --ff-only` says nothing then: read `git status -sb` (§0.2). Always `git diff --stat <local> <remote>`
-  before any reset; stash with `-u` first.
-- **Line endings**: `.gitattributes` is `eol=lf`; some working copies are CRLF; git shows only a warning, no real diff.
+- **MSYS/Windows shell.** PowerShell is default; Bash (Git Bash) is available through the Bash tool.
+  `rm -rf`, `sed`, `grep -c` work there; they do not in PowerShell. A slow command (build, full test
+  suite under contention) can exceed the tool's default timeout and move to background — wait for its
+  notification rather than polling with `sleep`.
+- **`npm test` output**: summary lines start with `ℹ`, failing tests print `✖ name`. Strip ANSI with
+  `sed 's/\x1b\[[0-9;]*m//g'` before grepping. `dist/` staleness fakes results: `rm -rf dist` first.
+  A full run takes roughly 10-40 seconds depending on machine load (session 55 saw both).
+- **Mark busy-loop child processes with a distinctive comment string** (e.g.
+  `node -e "/*my-marker*/ while(true){}"`) so you can `pkill -f` them specifically and count leftovers
+  by that marker — never print an unfiltered `node.exe`/process listing (other tools' credentials sit
+  on those command lines).
+- **A condition-wait-with-deadline test helper already exists** (`waitForCondition(predicate,
+  timeoutMs, intervalMs)`, first written in `test/daemon/main.test.ts`, now also in
+  `heartbeat.test.ts` and `no-emission.test.ts` after B-99): prefer it over a fixed `setTimeout` sleep
+  whenever a test waits for an async condition under a deadline instead of a precise duration.
 
 ### 4.5 Code and test facts
 
-- **Timing-sensitive tests still exist (B-99).** Under CPU contention `heartbeat: ticks at periodMs` and
-  `heartbeat: calls onTick on every tick` (`test/daemon/lifecycle/heartbeat.test.ts`) and
-  `no-emission: simulated idle window ...` (`test/daemon/no-emission.test.ts`) fail reproducibly, and the first
-  cold run after the #104 merge failed one unidentified test. **If the full suite fails exactly one test, read the
-  log first; if it is one of these three, rerun the full suite once and report both runs.** The B-96 test
-  (`bootstrap.test.ts:543`) is fixed by a state barrier, so a failure there is new information.
-- **`stop()` does not await a tick in flight (B-98).** `src/daemon/bootstrap.ts:243-260` calls `heartbeat.stop()`
-  (which only clears the interval) and then `stopAll()`; a tick mid-`reconcile()` can start a poller after
-  `stopAll()`. Not fixed on purpose (F1 core lifecycle code, the Director's call). A new test that tears down a
-  daemon while a slow add is in flight needs a state barrier, as the B-96 fix has.
-- **The channel tests use real timers and real processes** (`abortableSleep` with a 20 ms timer,
-  `process.getActiveResourcesInfo()`, spawned `dist/channel/main.js`, a real stdin end). Stable in repeated runs.
-  If one fails alone, rerun once and report; do not weaken the bound. The spawned-entry cases need `dist` built,
-  the same convention as `test/cli/main.test.ts`.
-- **The MCP SDK's `StdioServerTransport` never reports stdin ending**
-  (`node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js:37-38` listens to `data` and `error` only).
-  Any new stdio server here must map stdin `close` itself, as `channel/main.ts` does.
-- **`import.meta.main`** (Node >= 24.2; `engines` is >= 24.15.0) is the entry guard for `channel/main.ts`.
-  `src/cli/main.ts:709-714` (`isDirectlyExecuted()`) still uses the `argv[1]` comparison (B-97).
-- **`package.json` and `npm-shrinkwrap.json` must agree on `bin`.** The lockfile's root record lists the `bin`
-  map; adding an entry means editing both. `pack.test.ts` asserts the `files` whitelist by exact equality and
-  `dist/channel/main.js` in the dry run.
-- **The doorbell relevance rule is implemented in `doorbell.ts` (`isRelevant`), not reused from fetch**, because
-  fetch has none (design D5 said otherwise; corrected in `design.md`). The doorbell counts `rejected` and
-  `ignored` rows on purpose. The daemon waits only when the scan finds no row past `after_seq`; a backlog of
-  irrelevant rows returns at once with `count: 0`. **An unreadable stored row** (not JSON, not an object, or a
-  `type`, `thread` or `to` the response cannot carry) is skipped by `parseScannedEnvelope` but still examined, so
-  `covered_through_seq` advances; `serve/fetch.ts:244-246` keeps the same unguarded parse (B-95).
-- **`docs/07-plan/WORK-PLAN.md`'s F4 Validation row (row 93) still says "`saturated` rings once per cursor
-  value"**: deliberately stale until `tasks.md` task 7.2 (PR-07) applies the amendment text stored in
-  `design.md`. Do not fix that row earlier.
-- **The `client-bundle`, PT-27 and installer-bundle security tests grep raw source.** Even a comment naming the
-  child-process module in a client module fails them, and each `channel/*.ts` file has a source pin with the same
-  property. The shared `hasFsModuleReference` (`test/security/predicates.ts:41-43`) only matches
-  `from "node:fs"` and `require("node:fs")` (B-100).
+- **`import.meta.main` is now the entry guard in both `channel/main.ts` and `src/cli/main.ts`**
+  (Node >= 24.2; `engines` is >= 24.15.0, already satisfies it). B-97's fix: the prior
+  `process.argv[1]` vs. `pathToFileURL(...).href` comparison was false behind a POSIX symlinked npm
+  bin, because Node doesn't realpath `argv[1]` while `import.meta.url` reflects the symlink's real
+  target. Not reproducible on this Windows machine; the new pinning test
+  (`test/cli/main.test.ts`, "spawning the built CLI directly runs it") is disclosed as unable to show
+  a true RED against the original symlink defect, proven instead by mutating the compiled guard to a
+  permanently-false condition.
+- **`stop()` still does not await a tick in flight (B-98, open)**. `src/daemon/bootstrap.ts:243-260`
+  calls `heartbeat.stop()` (only clears the interval) then `stopAll()`; a tick mid-`reconcile()` can
+  start a poller after `stopAll()`. F1 core lifecycle code — deliberately not touched this session
+  despite blanket authorization, because a shutdown-ordering race deserves unhurried, focused work,
+  not a rushed fix at the tail of a long session. Fix sketch already exists in the backlog row: a
+  stopping flag checked by the tick and the add path, `stop()` awaiting the in-flight tick.
+- **Bundle-closure detector blind spots (B-100, open)**: the shared `hasFsModuleReference`
+  (`test/security/predicates.ts:41-43`) misses four import forms (bare `import "node:fs"`,
+  `from "fs"`, `node:fs/promises`, dynamic `import()`); `computeClosure` follows relative specifiers
+  only, so a bare-specifier dependency wrapping process spawning would evade the `child_process`
+  substring check. Deliberately not touched this session: widening the shared predicate risks
+  exposing an existing reference in the client or daemon bundle tests that were passing only because
+  of the gap, which would become new, unbounded-scope work mid-fix — exactly the kind of thing that
+  needs a full session, not a tail-end rush.
+- **Timing-sensitive tests are now condition-waits, not fixed sleeps (B-99, closed)**. If a new
+  timer-dependent test is added anywhere in `test/daemon/`, use the `waitForCondition` pattern from
+  the start rather than a fixed `setTimeout`.
 
 ### 4.6 Budgets and CI
 
-- **Review budget**: the fixed policy is 400 changed lines per PR (added + deleted). Over budget means re-slice or
-  a disclosed, PR-scoped `size:exception` with the Director's authorization. Estimate against measured:
-
-  | Slice | Estimate | Measured |
-  |---|---|---|
-  | PR-01 | ≈220 | 213 |
-  | PR-02 | ≈420 | 986 (661 added, 325 deleted; `size:exception`) |
-  | PR-03 | ≈480 | 706 |
-  | PR-04 | ≈200 | 306 |
-  | PR-05, four slices | ≈750 | 1963 (05a 224, 05b 651, 05c 476, 05d 612) |
-  | Follow-up 05e | — | 193 |
-  | PR-06 | ≈280 | 360 |
-  | PR-07 | ≈120 | — |
-
-- **CI** (`.github/workflows/ci.yml`) runs on every pull request and on every push to `main`, on `windows-latest`
-  with Node 24.15 and 26 (build, test, wrong-room, pack, repo-scan), and takes about two minutes. Pushing a PR
-  branch before the PR exists triggers nothing. Session 54 waited for it before merging #104 (a
-  platform-sensitive test) and merged #103 while it ran; both were green.
+- **Review budget**: 400 changed lines per PR (added + deleted). PR-07 measured 143 (est. ≈120).
+- **CI** (`.github/workflows/ci.yml`): every PR and every push to `main`, `windows-latest`, Node
+  24.15 and 26, build + test + wrong-room + pack + repo-scan, about two minutes.
 
 ---
 
 ## §5 — Next session, exact sequence
 
+There is no queued multi-step sequence like F4's PR-07→verify→archive was. Instead:
+
 - [ ] **1. Verify the tree.** Run §0.2's commands; the tree must match.
-- [ ] **2. Settle §0.3.** Autonomy, SDD preflight through `AskUserQuestion`, Engram session. The Arena proof and
-      the collaborator are settled by the first debate, which is step 3's scope debate.
-- [ ] **3. PR-07 (docs).**
-  - Debate the scope with the collaborator (`kind: PROPOSAL`, pointers, not pasted code); under Judgment Day
-    replace the debate by a scope note (§4.1).
-  - Fetch the current Claude Code channels documentation for the runbook's flags (§3.2).
-  - Branch `f4/07-channel-docs`; `sdd-attempt acquire`; the native `sdd-apply` agent (fall back to a
-    `general-purpose` writer if the hook blocks it).
-  - Cold rebuild and full suite; `settle`; frozen-diff audit; RDD consent (the tier depends on the files, §4.3).
-  - PR, wait for CI, rebase merge, post-merge rebuild and suite, then the docs-only commit that records it: the
-    7.x marks plus the sync of the stale F4 artifacts (§3.2).
-- [ ] **4. `sdd-verify`**, audited. Read `design.md`'s Testing Strategy rows first (§3.3).
-- [ ] **5. `sdd-archive`**, audited. Mind the Windows move hazard and pointer integrity (§4.2). Forward the
-      final-state facts for anything completed after the verify report.
-- [ ] **6. Close the session.** Overwrite this file and carry §4.1's Judgment Day block forward (GOVERNANCE §3
-      points to it). Add the session's entry at the top of `LOG.md` (newest first) and append its tribunal-index
-      rows. Update the backlog rows (never delete one: mark it done or dropped with a pointer), the latest session
-      row of the pending-decisions board in `00-INDEX.md`, the `AGENTS.md` status pointer and `WORK-PLAN.md`
-      row 94. The F4 artifacts (`tasks.md`, `apply-progress.md`) are updated per merged slice and are frozen once
-      `sdd-archive` has moved them. Then have the result audited.
+- [ ] **2. Settle §0.3.** Autonomy, SDD preflight through `AskUserQuestion`, Engram session, Arena
+      status (it may have changed since this file was written).
+- [ ] **3. Ask the Director what's next**, offering §3.3's three paths (B-98/B-100, F6 pending its
+      blocking decisions, or something else entirely) rather than assuming one.
+- [ ] **4. If B-98 or B-100 is chosen**: this is not an open SDD change, so treat it as an ODD
+      (outside-SDD-discipline) slice — strict TDD still applies, but there is no `tasks.md`/
+      `apply-progress.md` to update; track progress in Engram and this file at close, same as any
+      other work. Both have a fix sketch already written in `docs/06-backlog/CHECKLIST.md` (§7).
+- [ ] **5. If F6 is chosen**: first get the Director's decisions on B-11, B-12 and B-16 (they gate the
+      change's own scope), then propose `sdd-explore f6-release-and-docs` through the normal SDD entry
+      routing (preflight → init guard → explore).
+- [ ] **6. Close the session.** Overwrite this file; add the session's entry at the top of `LOG.md`;
+      add its tribunal-index row(s) if any audit ran; update the backlog rows touched (never delete
+      one); update the pending-decisions board in `00-INDEX.md`; update `AGENTS.md`'s status pointer if
+      it changed. Then have the result audited (Arena or Judgment Day per §0.3).
 
 ---
 
 ## §6 — Do not redo
 
-- F1, F2, F3 and F5 archives are closed. B-09 is closed. B-96 is closed.
-- F4's five planning phases (session 50) are final. PR-01 to PR-06 and the follow-up PR 05e are merged: do not
-  re-implement or re-debate them. The `CONSENSUS` debates of sessions 51-54 are indexed in the tribunal record;
-  none is reopened.
-- RDD lineages `review-39a0ff92bc18e85d` (PR-01), `review-15bbc1e2b034a77a` (retroactive PR-03/04/05a),
-  `review-f22ebcffa06e871b` (05b), `review-7c68cd7c0744c817` (05c), `review-8d944602c30cc117` (05d),
-  `review-4cab6b97f2871cfb` (05e) and `review-e4a866d023a3fc0f` (the session-54 docs close-out) are approved,
-  acknowledged, authority burned. Do not re-review that code; their findings are in `apply-progress.md` and
-  B-95. PR-06's review was declined by the Director and left no record.
-- F4's design decisions D1-D12 stand except where `design.md`'s "Corrections found during apply" (items 1-7)
-  says otherwise, and `tasks.md`'s PR-06 amendments (1)-(14) supersede the earlier PR-06 text. Reopening one
-  needs new evidence, a written correction and the collaborator.
-- Do not fix `WORK-PLAN.md`'s F4 Validation row (row 93) before PR-07 (§4.5).
+- F1 through F5 archives are closed, including F4's (session 55). B-09, B-96 are closed.
+- F4's seven implementation PRs (`#95`-`#105`) and its `sdd-verify`/`sdd-archive` are final: do not
+  re-implement, re-debate, or re-review them. RDD lineages for F4 (session 51 through 55) are
+  approved/acknowledged/authority-burned or explicitly Director-declined; none is reopened. Tribunal
+  entries `bus-v2-f4-*`, `f4-*`, `bus-v2-s54-*` and this session's `f4-pr07-diff-audit-001` are
+  indexed and closed.
+- B-97, B-99, B-101 are closed (session 55) with their fixes described in §4.5, §4.5, and GOVERNANCE
+  §3 respectively. Do not re-open them without new evidence.
+- Do not fix `WORK-PLAN.md`'s F4 Validation row (row 93) or SDD-change row (row 94) again — both are
+  current as of session 55's docs-sync commit.
 
 ---
 
@@ -447,15 +359,11 @@ rest of 4.5 applies only when code changes.
 
 | Id | Point | Owner |
 |---|---|---|
-| **Collaborator** | Alpha is out of token quota: settle it as §0.3 says (Alpha back, Betelgeuse, or an explicit Judgment Day instruction). | Director |
-| **B-95** | Remainder of the RDD follow-ups: (d) the missing abort signal (design-exact, Alpha), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting count in a comment, `to` accepting any string, the silent skip of an unreadable row). (a), (b), (c), (e), (f) are done in `#103`. | Kairo (Director schedules) |
-| **B-97** | `src/cli/main.ts:709-714`'s entry guard may silently do nothing behind a POSIX symlinked npm bin (not reproduced: Windows machine, `windows-latest` CI only). Verify on Linux or macOS, then use `import.meta.main`. | Director + Kairo |
-| **B-98** | `stop()` does not await a tick in flight; a tick mid-`reconcile()` can start a poller after `stopAll()`. F1 core lifecycle code. | Director + Kairo |
-| **B-99** | Three timer-based tests (`heartbeat` x2, `no-emission`) fail under CPU contention; replace the fixed waits by condition waits with a deadline. | Kairo (Director schedules) |
-| **B-100** | Blind spots of the bundle-closure detectors: the shared `hasFsModuleReference` misses four import forms, and `computeClosure` follows relative specifiers only (a bare-specifier dependency that wrapped process spawning would evade the `child_process` substring). | Director + Kairo |
-| **B-101** | GOVERNANCE §3 defines the Judgment Day substitute only for an Arena unreachable at a session's own start; a reachable Arena whose collaborator cannot answer (Alpha's quota, session 54) is not covered. | Director |
-| **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 still block F6's readiness, and B-97 is relevant to the macOS scope (D-40/D-47, designed on paper only, B-12). | Director |
-| **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker for F4. Low priority. | Director |
+| **B-95** | Remainder: (d) the missing abort signal (design-exact, Alpha-approved not to touch), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting comment count, `to` accepting any string, the silent skip of an unreadable row). | Kairo (Director schedules) |
+| **B-98** | `stop()` does not await a tick in flight; a tick mid-`reconcile()` can start a poller after `stopAll()`. F1 core lifecycle code. Deliberately deferred, session 55 (real risk, needs a focused session, not a tail-end rush) — see §4.5 for the fix sketch. | Director + Kairo |
+| **B-100** | Blind spots of the bundle-closure detectors: `hasFsModuleReference` misses four import forms; `computeClosure` follows relative specifiers only. Deliberately deferred, session 55 (widening risks surfacing an existing violation, unbounded scope) — see §4.5. | Director + Kairo |
+| **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 block F6's readiness (§3.3). | Director |
+| **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker. Low priority. | Director |
 
 The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-director-decisions).
 
@@ -463,32 +371,29 @@ The whole backlog board is indexed in [`../00-INDEX.md`](../00-INDEX.md#pending-
 
 ## §8 — Environment facts not to re-measure
 
-- Windows 11, Node v24.16.0 and `gentle-ai` 2.9.1 (both re-measured in session 54); shell is PowerShell primary
-  with Bash (Git Bash) available. The machine has 24 logical CPUs; the B-96 and B-99 flakes need about 1x to 4x CPU
-  oversubscription with busy loops to show.
-- `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`. Every `gh` command runs
-  with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; **never `gh auth switch`**.
-  Force-push and deletion of `main` are blocked; there is no PR or status-check requirement (docs-only
-  bookkeeping commits went straight to `main`, code went through PRs).
-- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**; cite as `path:line`. v1's
-  `channel/index.ts` is the reference for the MCP `Server` construction and the notification call.
-- `.mcp.json` points at the Arena bridge; never quote or commit its contents. `.claude/settings.json` is
-  gitignored tooling. `prompt.txt` is gitignored (`*.txt`); `.arena/` is ignored only by this clone's
-  `.git/info/exclude`, so a fresh clone would show it as untracked.
+- Windows 11, Node v24.16.0, **`gentle-ai` 3.7.0** (upgraded from 2.9.1 mid-session-55 via
+  `gentle-ai sync` — check `--version` fresh each session, don't trust this number to stay current).
+  Shell is PowerShell primary with Bash (Git Bash) available. 24 logical CPUs; B-99's fix was verified
+  clean under 24-busy-loop contention (the load that previously reproduced its flake).
+- `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`. Every `gh`
+  command runs with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`;
+  **never `gh auth switch`**. Force-push and deletion of `main` are blocked; no PR or status-check
+  requirement.
+- v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, **read-only**; cite as `path:line`.
+- `.mcp.json` points at the Arena bridge; never quote or commit its contents. `.claude/settings.json`
+  is gitignored tooling.
 - `os.tmpdir()` resolves to an 8.3 short path under the user profile (`C:\Users\<USER>~1\...`).
-- Stale local branches from F1 (`f1/19-telegram-client-p2`, `f1/21-room-guard-bindings`, `f1/22a-admission`,
-  `f1/22b-poller`, `main-local`, `main-local-backlog`) are already merged or superseded; not this work's business
-  to clean up. The F4 slice branches were deleted after each merge.
-- The SDD preflight for this project is Automatic / Both (hybrid) / Auto (`stacked-to-main`), asked again every
-  session.
+- The SDD preflight for this project is Automatic / Both (hybrid) / Auto (`stacked-to-main`), asked
+  again every session.
 
 ---
 
 ## §9 — RDD state at session close
 
-No candidate is under review and no authority is outstanding. Session 54: the follow-up PR `#103` was granted and
-approved (lineage `review-4cab6b97f2871cfb`, two SUGGESTIONs filed under B-95); PR-06 `#104` was declined by the
-Director; the documentation close-out was granted and approved (lineage `review-e4a866d023a3fc0f`, one SUGGESTION
-left as is), and the later `HANDOFF.md` and `LOG.md` deltas closed as `low` with no question. Earlier candidates
-and their tiers are in `LOG.md` and `apply-progress.md`; the lineages not to re-review are in §6. The next
-candidate, PR-07, will be the next RDD question when its tier asks for one (§4.3).
+No candidate is under review and no authority is outstanding. Session 55's lineages: PR-07's own
+commit closed low with no question; the docs-sync commit was granted (one `review-reliability` lens,
+approved with 2 SUGGESTIONs, both fixed in a same-session follow-up commit that itself closed with a
+3rd, deliberately un-chased cosmetic SUGGESTION); the verify-report and archive commits were declined
+by the Director. The B-101 governance fix closed low with no question. The B-99 and B-97 commits
+were pushed with RDD explicitly disclosed as unavailable (`gentle-ai review status` `operation_timeout`,
+§0.4) rather than silently skipped. None of these lineages are to be re-reviewed (§6).
