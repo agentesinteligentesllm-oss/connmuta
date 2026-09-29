@@ -16,9 +16,9 @@
 **F1, F2, F3 and F5 are archived and untouched. F4 (`f4-claude-channels-adapter`) is the one open SDD
 change, in `sdd-apply`; PR-01 to PR-06 and the B-95/B-96 follow-up PR are merged.** Merged to `main` so far:
 PR-01 (`#95`), PR-02 (`#96`), PR-03 (`#97`), PR-04 (`#98`), PR-05's four slices (`#99`-`#102`), the follow-up
-PR 05e (`#103`, tip `b99d66b`) and PR-06 (`#104`, tip `cdd63ca`, the last code commit). Two docs-only commits
-(`7ce0ae2`, the close-out, and `ac084e5`, the note about Alpha) sit on top of it (see `git log`), and `main`
-equals `origin/main`. **Not started: PR-07 (docs), then
+PR 05e (`#103`, tip `b99d66b`) and PR-06 (`#104`, tip `cdd63ca`, the last code commit). Docs-only commits
+(the close-out `7ce0ae2` and the ones after it) sit on top of it (see `git log`), and `main` equals
+`origin/main`. **Not started: PR-07 (docs), then
 `sdd-verify` and `sdd-archive`.**
 
 **Copy-paste prompt to start the next session** (kept to 3 lines per the Director's instruction):
@@ -33,7 +33,7 @@ Arranca sdd-apply PR-07 (docs; verifica los flags de Claude Code channels contra
 
 ```bash
 git branch --show-current && git pull --ff-only     # must be main, up to date
-git log --oneline -3 origin/main                     # cdd63ca (PR-06) is the last code commit; two docs-only commits are on top; must equal local HEAD
+git log --oneline -3 origin/main                     # cdd63ca (PR-06) is the last code commit; docs-only commits are on top; must equal local HEAD
 rm -rf dist                                          # a stale dist/ silently fakes results
 ls openspec/changes/                                 # archive/ and f4-claude-channels-adapter/
 git status --short                                   # must print nothing
@@ -43,7 +43,7 @@ git status --short                                   # must print nothing
 `docs/05-tribunal/INDEX.md`, `docs/06-backlog/CHECKLIST.md`, `docs/08-sessions/HANDOFF.md`,
 `docs/08-sessions/LOG.md`) and the F4 artifacts under `openspec/changes/f4-claude-channels-adapter/`
 (`tasks.md`, `apply-progress.md`) were committed as docs-only commits on the Director's standing
-authorization: `8c20646` right after #103 landed, and two commits on top of `cdd63ca` (`7ce0ae2`, `ac084e5`). If `git status`
+authorization: `8c20646` right after #103 landed, and the commits on top of `cdd63ca` from `7ce0ae2` on. If `git status`
 shows anything, stop and report before assuming it is safe.
 
 **Arena reachability (DN-09).** Check it live with a real `bridge_send`, never `curl`. A successful send
