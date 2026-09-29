@@ -5,11 +5,14 @@ import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { spawnSync, execFileSync } from "node:child_process";
 
+import { CHANNEL_SERVER_NAME } from "../../src/shared/constants.js";
+
 // dist/test/security/pack.test.js -> repo root is three levels up
 // (dist/test/security/ -> dist/test/ -> dist/ -> repo root).
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
-const PACKAGE_JSON_WHITELIST = ["dist/src/**", "npm-shrinkwrap.json", "package.json", "README.md", "LICENSE"];
+const PACKAGE_JSON_WHITELIST = ["dist/src/**", "dist/channel/**", "npm-shrinkwrap.json", "package.json", "README.md", "LICENSE"];
+const CHANNEL_BIN_TARGET = "dist/channel/main.js";
 const FORBIDDEN_LIFECYCLE_SCRIPTS = ["preinstall", "install", "postinstall", "prepare"];
 
 interface NpmPackEntry {
@@ -62,6 +65,7 @@ test("npm pack --dry-run lists only the declared whitelist (PT-21)", () => {
   const unexpected = packedPaths.filter((path) => !isWhitelisted(path));
   assert.deepEqual(unexpected, [], `unexpected packed path(s): ${unexpected.join(", ")}`);
   assert.ok(packedPaths.length > 0, "expected npm pack to report at least one file");
+  assert.ok(packedPaths.includes(CHANNEL_BIN_TARGET), `the channel adapter's bin target ${CHANNEL_BIN_TARGET} must be packed`);
 
   // `tsc`'s incremental build info carries absolute build-machine paths (T11/T12); it must never
   // reach the tarball even though it lands under the whitelisted `dist/src/**` glob.
@@ -74,6 +78,13 @@ test("package.json declares the exact PT-21 files whitelist", () => {
     files: string[];
   };
   assert.deepEqual(packageJson.files, PACKAGE_JSON_WHITELIST);
+});
+
+test("package.json maps the channel adapter's bin name to its built entry", () => {
+  const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
+    bin: Record<string, string>;
+  };
+  assert.equal(packageJson.bin[CHANNEL_SERVER_NAME], CHANNEL_BIN_TARGET);
 });
 
 test("package.json has no install lifecycle script (PT-21)", () => {
