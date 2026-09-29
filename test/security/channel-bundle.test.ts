@@ -21,9 +21,11 @@
  *   instead of asserting "zero timers", which the spec forbids: Invariant 5 bans autonomous emission,
  *   not loops.
  *
- * Known limit shared with the client and daemon bundle tests: `computeClosure` follows only relative
- * specifiers, so a bare-specifier dependency (the MCP SDK, zod) that wrapped process spawning would
- * evade the `child_process` substring (tasks.md, PR-06 amendment 13; out of scope here).
+ * B-100(b), closed: `computeClosure` follows only relative specifiers, so a bare-specifier dependency
+ * (the MCP SDK, zod) wrapping process spawning would evade the `child_process` substring without ever
+ * entering the closure's own file set (tasks.md, PR-06 amendment 13, named this as a known limit shared
+ * with the client and daemon bundle tests). The "references a bare specifier outside the reviewed
+ * allow-list" rule below closes it: any bare specifier not already reviewed and allow-listed fails.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -31,7 +33,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { computeClosure } from "./closure.js";
+import { computeClosure, bareSpecifiers } from "./closure.js";
 import {
   hasAutonomousTimerReference,
   hasChildProcessReference,
@@ -70,6 +72,23 @@ const FS_ALLOWLIST: readonly string[] = ["src/client/binding.js", "src/client/ru
 
 /** The only closure file allowed to arm a timer: the paced loop's own pacing sleep. */
 const TIMER_ALLOWLIST: readonly string[] = ["channel/doorbell-loop.js"];
+
+/**
+ * B-100(b): computeClosure only follows relative specifiers, so a bare specifier wrapping process
+ * spawning would evade the "references child_process" rule below without ever entering this closure's
+ * own file set — the exact gap this file's own module doc (above) already discloses. Makes the
+ * closure's external dependency surface explicit: a new bare specifier fails until deliberately
+ * reviewed and added here. Does not inspect what an allow-listed package's own code does internally.
+ */
+const ALLOWED_CHANNEL_BARE_SPECIFIERS: readonly string[] = [
+  "@modelcontextprotocol/sdk/server/index.js",
+  "@modelcontextprotocol/sdk/server/stdio.js",
+  "node:crypto",
+  "node:fs",
+  "node:os",
+  "node:path",
+  "zod",
+];
 
 /**
  * The one directory the adapter's closure must never enter. Transport, send and Telegram-client code all
@@ -160,6 +179,11 @@ const RULES: readonly Rule[] = [
       ["channel/notify.js", 'const keyring = await import("@napi-rs/keyring");'],
       ["channel/notify.js", 'const keyring = require("@napi-rs/keyring");'],
     ],
+  },
+  {
+    name: "references a bare specifier outside the reviewed allow-list",
+    violates: (_path, source) => bareSpecifiers(source).some((s) => !ALLOWED_CHANNEL_BARE_SPECIFIERS.includes(s)),
+    seeds: [["channel/notify.js", 'import cp from "cross-spawn";']],
   },
   {
     name: "arms a timer outside the allow-list",
@@ -259,7 +283,15 @@ for (const rule of RULES) {
   test(`channel bundle: the "${rule.name}" rule is non-vacuous (seeded negatives)`, () => {
     assert.ok(rule.seeds.length > 0, "a rule without a seed cannot be shown to fail");
     for (const [path, source] of rule.seeds) {
-      assert.deepEqual(findViolations(new Map([[path, source]])), [`${path}: ${rule.name}`]);
+      // A seed may legitimately trip more than one rule when it uses a bare specifier that is
+      // independently forbidden by name too (e.g. node:sqlite, @napi-rs/keyring, node:timers/promises
+      // all also violate "references a bare specifier outside the reviewed allow-list", B-100b) — assert
+      // this rule's own violation fires, not that it fires alone.
+      const violations = findViolations(new Map([[path, source]]));
+      assert.ok(
+        violations.includes(`${path}: ${rule.name}`),
+        `expected "${path}: ${rule.name}" among violations, got: ${violations.join(", ") || "none"}`,
+      );
     }
   });
 }
