@@ -550,6 +550,8 @@ test("bootstrap: an overlapping heartbeat tick does not start a second poller wh
   };
 
   let factoryCalls = 0;
+  // Calls still awaiting their delay. Those delays are the only awaits inside a tick, so zero means no tick is mid-add.
+  let factoriesInFlight = 0;
   const fakeClient: TelegramClient = {
     async getUpdates() {
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -591,10 +593,15 @@ test("bootstrap: an overlapping heartbeat tick does not start a second poller wh
       heartbeatPeriodMs: 5,
       telegramClientFactory: async () => {
         factoryCalls++;
-        // Longer than several heartbeat periods, so multiple ticks are guaranteed to fire before this
-        // resolves if the guard does not skip them.
-        await new Promise((resolve) => setTimeout(resolve, 40));
-        return fakeClient;
+        factoriesInFlight++;
+        try {
+          // Longer than several heartbeat periods, so multiple ticks are guaranteed to fire before this
+          // resolves if the guard does not skip them.
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          return fakeClient;
+        } finally {
+          factoriesInFlight--;
+        }
       },
     });
 
@@ -626,7 +633,23 @@ test("bootstrap: an overlapping heartbeat tick does not start a second poller wh
     writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithBinding));
 
     // Several 5ms ticks will observe the new file before the first one's factory call (40ms) resolves.
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    // Wait for the state that means the add is over, not for a guessed time: the audit row is written after the add's
+    // last factory call, so a row with no call pending means the tick that made it has finished. stop() only clears the
+    // heartbeat timer and never awaits a tick, so a fixed sleep that ended mid-add tore the ledger down under it (B-96).
+    const { db } = daemon.ledger;
+    const countBindingChangedRows = (): number =>
+      (db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE reason = 'BINDING_CHANGED'").get() as { n: number }).n;
+    // Bounds the barrier so an add that never finishes fails with a message instead of hanging the runner. Generous on
+    // purpose: an add takes ~2 x 40ms on an idle machine, but this whole test was seen taking ~9s with four times
+    // more busy processes than CPUs, and a false failure here is exactly the flake being removed.
+    const BARRIER_DEADLINE_MS = 30_000;
+    // Short next to the 40ms factory delay, so a passing run gains little latency from polling.
+    const BARRIER_POLL_MS = 10;
+    const deadline = Date.now() + BARRIER_DEADLINE_MS;
+    while (countBindingChangedRows() === 0 || factoriesInFlight > 0) {
+      assert.ok(Date.now() < deadline, "the binding-add never finished");
+      await new Promise((resolve) => setTimeout(resolve, BARRIER_POLL_MS));
+    }
 
     // One binding-add calls the factory exactly twice by design: once for `buildTransport`'s own
     // `createTelegramClient` (bootstrap.ts's `reconciler` construction) and once for `createPoller`'s
