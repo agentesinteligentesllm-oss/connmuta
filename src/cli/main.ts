@@ -7,7 +7,6 @@
 // emitted line so this can fail instead of regressing.
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import type { DatabaseSync } from "node:sqlite";
 
 import { EXIT_NODE_FLOOR, EXIT_USAGE, PRODUCT_NAME } from "../shared/constants.js";
@@ -699,19 +698,14 @@ function createProcessIo(): CliIo {
 	};
 }
 
-/**
- * Whether this module is the process entry point rather than an import.
- *
- * Load-bearing: `test/cli/main.test.ts` imports this module, and an unguarded top-level call would
- * make every import print usage and set an exit code. Compared through `pathToFileURL` so a Windows
- * drive-lettered `process.argv[1]` matches the file URL form of `import.meta.url`.
- */
-function isDirectlyExecuted(): boolean {
-	const entry = process.argv[1];
-	return entry !== undefined && import.meta.url === pathToFileURL(entry).href;
-}
-
-if (isDirectlyExecuted()) {
+// `import.meta.main` (Node >= 24.2; `engines` is >= 24.15.0), the same guard `channel/main.ts`
+// uses. Load-bearing: `test/cli/main.test.ts` imports this module, and an unguarded top-level call
+// would make every import print usage and set an exit code. The prior `process.argv[1]` compared
+// through `pathToFileURL` was false behind a POSIX symlinked npm bin (B-97): Node does not realpath
+// `argv[1]` while `import.meta.url` reflects the symlink's real target, so the two never matched and
+// `conmuta` silently did nothing when installed globally. `import.meta.main` is Node's own answer to
+// "is this the entry point," immune to that mismatch.
+if (import.meta.main) {
 	// `exitCode` rather than `process.exit`: the stdio streams must flush, and an abrupt exit can
 	// truncate the very lines a hook reads.
 	process.exitCode = await runCli(process.argv.slice(2), createProcessIo());

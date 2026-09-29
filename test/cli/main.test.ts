@@ -103,6 +103,21 @@ test("importing the CLI module does not execute it", () => {
   }
 });
 
+// B-97: the entry guard (`import.meta.main`) has no test that actually spawns the built CLI and
+// confirms it runs. The prior `process.argv[1]` guard was silently false only behind a POSIX
+// symlinked npm bin, which this Windows machine cannot reproduce, so this test cannot show a RED
+// against that specific defect; it pins the guard firing on direct execution at all, a guarantee
+// that had no test before. Proven with a mutation, not a reproduced symlink bug: a direct temporary
+// edit to a permanently-false condition made this test fail before the fix landed.
+test("spawning the built CLI directly runs it (the entry guard fires)", () => {
+  const result = spawnSync(process.execPath, [CLI_ENTRY], { encoding: "utf8", shell: false });
+  assert.equal(result.status, EXIT_USAGE, `expected the guard to fire and runCli to run: ${result.stderr}`);
+  assert.ok(
+    result.stderr.includes(PRODUCT_NAME),
+    `expected usage output naming ${PRODUCT_NAME} on stderr, got: ${JSON.stringify(result.stderr)}`,
+  );
+});
+
 // --- Dispatcher: exactly one wired subcommand, and every misuse is a usage error ---
 
 test("`validate <path>` on a valid file exits 0", () => {
