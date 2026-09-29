@@ -235,7 +235,7 @@ Per-client "already shown" state does **not** live here; it lives in §3.5 so tw
 |---|---|---|---|---|
 | `client_id` | TEXT PK | yes | daemon (random, minted at `POST /session`) | Carried on every tool call |
 | `project_id` | TEXT NOT NULL | yes | frozen binding | A client never changes binding |
-| `host` | TEXT | no | client hello | Informational: `claude-code`, `cursor`, `opencode`, … |
+| `host` | TEXT | no | client hello | Informational: `claude-code`, `cursor`, `opencode`, `claude-code-channel` (F4, `f4-claude-channels-adapter`), … |
 | `pid` | INTEGER | no | client hello | Stale-session cleanup |
 | `started_at`, `last_seen_at` | TEXT (ISO) | yes | daemon | Idle-shutdown input |
 | `inbox_seq` | INTEGER NOT NULL DEFAULT 0 | yes | fetch | Last `updates.seq` delivered to **this** client (I-3: per-client cursors) |

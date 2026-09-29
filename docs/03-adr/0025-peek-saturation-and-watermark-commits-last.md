@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | inherited-valid — the rules carry; the two mechanisms bound to [ADR-0024](./0024-channel-doorbell-not-a-second-reader.md)'s peek follow its revisit in F4 |
+| **Status** | inherited-valid — the rules carry; the two mechanisms bound to [ADR-0024](./0024-channel-doorbell-not-a-second-reader.md)'s peek follow its revisit in F4. Resolved by F4 (`f4-claude-channels-adapter`, PR-01 through PR-07): the saturation redesign this ADR named as pending is merged. |
 | **Date** | 2026-08-25 (unversioned; commit `82a1841`). Tribunal consensus recorded as 2026-08-26 |
 | **Origin** | v1 `openspec/changes/telegram-agent-bus/design.md:539-560` (ADR-25); audited in debate `agentbus-channel-fixes-audit-001` — the third addressing branch is the auditor's finding |
 | **Supersedes / superseded by** | — / — |
@@ -38,3 +38,4 @@ Pinned by (v1 tests): `channel/watcher.test.ts:334` full window with nothing rel
 - **Mechanisms bound to the peek.** Saturation exists only because the v1 watcher could not page without consuming; under D3 the daemon is the sole consumer and pages continuously into a durable inbox, so whether any finite window remains for a doorbell to be blind behind is decided by the F4 SDD change, together with the signal source of the adapter (see ADR-0024).
 - **The thundering herd is what D4's per-client cursors are for.** Two clients of one binding each read the inbox through their own cursor, so one client's fetch no longer empties the box for the other. Under ADR-0012's governing rule this guarantee needs a test that can fail; the F1 SDD spec owns it and [DATA-MODEL](../02-architecture/DATA-MODEL.md) drafts `client_cursors`.
 - The 409 clarification is now structural: Invariant 3 says a second daemon instance refuses to poll. Analysis verdict: YES (analysis bundle, `governance-docs` key_facts[25]).
+- **Resolved by F4.** The saturation redesign this ADR named as pending is delivered: the doorbell now pages past `DOORBELL_SCAN_DEPTH` with an advancing `after_seq` instead of merely announcing saturation, per the [WORK-PLAN.md:93](../07-plan/WORK-PLAN.md) amendment, merged across PR-01 through PR-07 of `f4-claude-channels-adapter`.

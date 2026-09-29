@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | inherited-revisit — semantics carry; the peek mechanism and the one-home-per-machine deployment do not survive [ADR-0029](./0029-per-user-daemon-and-thin-clients.md) |
+| **Status** | inherited-revisit — semantics carry; the peek mechanism and the one-home-per-machine deployment do not survive [ADR-0029](./0029-per-user-daemon-and-thin-clients.md). Resolved by F4 (`f4-claude-channels-adapter`, PR-01 through PR-07): the open item this ADR flagged as pending — the Claude Code channels adapter mechanism — is merged as `channel/*.ts`. |
 | **Date** | 2026-08-25 (unversioned; ships on top of v1 `v1.0.1`; commits `2ad454d`, `9a86560`, `7653f1d`, `82a1841`). Tribunal consensus recorded as 2026-08-26 |
 | **Origin** | v1 `openspec/changes/telegram-agent-bus/design.md:509-537` (ADR-24); audited in debate `agentbus-channel-audit-001` |
 | **Supersedes / superseded by** | — / mechanism superseded by ADR-0029 and Invariant 3; semantics retained for the F4 adapter |
@@ -41,3 +41,4 @@ Pinned by (v1 tests): `channel/notify.test.ts:132`, `:174` emitted meta key sets
 - **The mechanism cannot carry.** Invariant 3 makes the daemon the *sole* `getUpdates` consumer per token and D3 forbids any client from polling Telegram; one token admits exactly one `getUpdates` consumer (H1, HTTP 409). A v2 doorbell therefore cannot peek Telegram at all; where it takes its signal is specified by the F4 SDD change ([WORK-PLAN](../07-plan/WORK-PLAN.md)). The daemon's durable inbox and per-client cursors (D4) exist for exactly this question.
 - **Deployment scope is per binding, not per machine.** The v1 rule "arm exactly one session per machine" rested on one `AGENTBUS_HOME` per machine; under [ADR-0028](./0028-project-scoped-bijective-binding.md) the unit is the binding. The analysis verdict is YES for semantics, REVISIT for deployment (analysis bundle, `governance-docs` key_facts[24]).
 - The static-assertion discipline (no `child_process`, no timers, `fs` only inside the home) is Invariant 5 in the [CONSTITUTION](../01-constitution/CONSTITUTION.md) and a [THREAT-MODEL](../02-architecture/THREAT-MODEL.md) test requirement for the daemon and the thin client alike.
+- **Resolved by F4.** The adapter mechanism this ADR named as pending is delivered as `channel/*.ts`, merged across PR-01 through PR-07 of `f4-claude-channels-adapter`, and documented for operators in [`docs/runbooks/channel-doorbell.md`](../runbooks/channel-doorbell.md).
