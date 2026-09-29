@@ -4,6 +4,57 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 58 — B-103 closed: bare-specifier allow-list for installer/doctor and session-exchange
+
+- **Date**: 2026-09-29 local time (same calendar day as sessions 55-57's close; a continuation session).
+- **Authority**: the session-start prompt (mirroring HANDOFF.md §0.1's suggested template) asked to
+  confirm Arena, confirm B-100(b) closed, and start B-103 with strict TDD and the design left to my
+  judgment — compute the real bare-specifier sets for the five entry points before assuming no
+  violation.
+- **Preflight**: Arena's own MCP server again failed to connect (`ECONNREFUSED`) at session start — the
+  same real tool-level failure as sessions 55-57, corroborating DN-09's substitute condition directly.
+  `gentle-ai` still `3.7.0`. Baseline verified exactly: 1732 tests, 1726 pass, 0 fail, 6 skip (matching
+  session 57's close).
+- **Mapping (a fork, resumed once)**: a background mapping fork's first completion notification
+  returned a garbled, unrelated result (2 tool calls, 20s) — a session-56-style corrupted-report
+  incident (HANDOFF §4.1). Resumed via `SendMessage` rather than discarded; its second report was
+  coherent and detailed (11 tool calls, 290s): `closure.ts`'s exact API, each precedent bundle's idiom,
+  both target files' current structure, and the real computed bare-specifier set for all 5 entry
+  points. Independently re-verified every number with a direct script against the built `dist/` — both
+  sources agreed exactly, and every non-builtin specifier cross-checked against `package.json`'s 6
+  declared dependencies. No live violation anywhere (same outcome as B-100(b)).
+- **Design (my judgment)**: reused `bareSpecifiers`/`computeClosure` from `closure.ts` unchanged.
+  `installer-bundle.test.ts` got 3 separate constants + 3 separate tests (CLI/DOCTOR/OFFLINE),
+  mirroring the file's own precedent of never merging CLI/DOCTOR even where values could coincide.
+  `session-exchange.test.ts` got one new test extending its existing loop-shaped idiom, with a small
+  per-entry lookup rather than a unioned list (the two entries have genuinely different surfaces).
+- **Strict TDD, two work-unit commits for the code, both green**: `06d31eb` (installer/doctor's three
+  allow-lists — RED against a deliberately empty array showed the real 15/11/11-item sets, then GREEN);
+  `2a579b9` (session-exchange's two — same RED/GREEN discipline). Full suite green throughout (1738
+  tests, 1732 pass, 0 fail, 6 skip at close; `test:static` 93/93).
+- **RDD ran twice — one terminal stop and one clean approval, a new process finding distinct from the
+  selectorless chain**: the first lineage (`review-688b995abb754a4c`, granted) correctly found
+  `CHECKLIST.md`/`HANDOFF.md` describing all 5 entry points as unevidenced when the committed code
+  already enforced 3 of them; the correction (a docs fix, commit `d620320`) was submitted and
+  committed, but the follow-up `review status` call returned a **terminal** `captured_artifacts_
+  unverifiable` stop rather than progressing to validation — left `correction_required`,
+  unacknowledged, no authority over anything, not chased further (disclosed to the Director; the
+  prescribed terminal continuations, maintainer inspection or disabling RDD, didn't apply here). The
+  second lineage (`review-7f532587be32a283`, granted, opened after the session-exchange commit) hit the
+  same-shaped finding once more — my own prior correction's "session-exchange remains open" text was
+  now stale too — and this time the identical correct-plan → commit → re-check sequence progressed
+  cleanly through `targeted_validation_required` to `approved`, acknowledged, authority burned. Two
+  non-blocking advisory WARNINGs on the final pass (identical hand-typed DOCTOR/OFFLINE allow-lists
+  with no structural cross-check; the same doc-staleness pattern cited a third time against B-100(b)'s
+  own task file, correctly a historical record, not something to rewrite) — disclosed, not acted on.
+  **Unresolved for a future session**: whether the terminal stop was a one-off or reproducible under
+  some specific condition is not known; the second attempt's clean success suggests it is
+  lineage-specific, not systemic — do not assume a docs-only correction will always fail this way.
+- **Documentation**: `CHECKLIST.md`'s B-103 row updated twice (first partial, then full closure) as the
+  RDD reviews found it stale against the shipping code; `HANDOFF.md` §3.3/§7 updated the same way;
+  `AGENTS.md`'s status pointer and this file updated; ODD task file
+  `odd/tasks/b-103-bare-specifier-closure-gaps.md` completed.
+
 ## Session 57 — B-100(b) closed for daemon/client/channel bundles; B-103 filed for the rest
 
 - **Date**: 2026-09-29 local time (same calendar day as sessions 55-56's close; a continuation session).

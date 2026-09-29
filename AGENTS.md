@@ -14,8 +14,9 @@ session 55 (PR-01 to PR-07, `#95`-`#105`, verified PASS, archived to
 `openspec/changes/archive/2026-09-29-f4-claude-channels-adapter/`); session 56 closed B-98 (daemon
 shutdown-ordering race, `54f7d56`) and B-100(a) (`599e984`); session 57 closed B-100(b) for the
 daemon, client and channel bundles and filed B-103 for two more `computeClosure` consumers sharing
-the same gap, not yet evidenced or fixed. No SDD change is currently open;
-see `docs/08-sessions/HANDOFF.md` for what session 57 does next. This field used to
+the same gap; session 58 closed B-103 for both remaining consumers (installer/doctor and
+session-exchange), all five entry points now evidenced and enforced. No SDD change is currently open;
+see `docs/08-sessions/HANDOFF.md` for what session 58 does next. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,
