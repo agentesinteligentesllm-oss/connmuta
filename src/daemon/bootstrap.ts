@@ -240,10 +240,18 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
     }
 
     let stopPromise: Promise<void> | null = null;
+    // Set by `onTick` while its `tick()` call is running, cleared in its `finally` (B-98). `stop()`
+    // awaits it so a tick's own binding add/poller-start — `heartbeat.stop()` only clears the interval,
+    // it does not know about an already-running tick — fully settles before `stopAll()` and `db.close()`
+    // run; otherwise a poller the tick was still starting can be registered, or write, after shutdown.
+    let currentTick: Promise<void> | null = null;
     const stop = (): Promise<void> => {
       if (stopPromise) return stopPromise;
       stopPromise = (async () => {
         heartbeat.stop();
+        if (currentTick) {
+          await currentTick.catch(() => {});
+        }
         await reconciler!.stopAll();
         await ipcServer!.close();
         deleteRunFile(dirs.runDir, runFile.pid);
@@ -277,10 +285,12 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
       onTick: async () => {
         if (ticking) return;
         ticking = true;
+        currentTick = tick();
         try {
-          await tick();
+          await currentTick;
         } finally {
           ticking = false;
+          currentTick = null;
         }
       },
       onError: (err) => {

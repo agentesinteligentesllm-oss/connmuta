@@ -671,6 +671,123 @@ test("bootstrap: an overlapping heartbeat tick does not start a second poller wh
   }
 });
 
+test("bootstrap: stop() awaits an in-flight heartbeat tick before stopping bindings, so a poller a tick was adding is not leaked (B-98)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  let getUpdatesCalls = 0;
+  let factoriesInFlight = 0;
+  const fakeClient: TelegramClient = {
+    async getUpdates() {
+      getUpdatesCalls++;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return [];
+    },
+    async sendMessage(params) {
+      return { message_id: 1, chat: { id: Number(params.chat_id), type: "group" }, date: 1, text: params.text };
+    },
+    async getMe() {
+      return { id: 444333222, is_bot: true, username: "test_bot" };
+    },
+    async getChat() {
+      return { id: -1004443332221, type: "group" };
+    },
+  };
+
+  // Boot with no active binding, same reasoning as the PR-40a test above: the boot-time reconcile() runs
+  // strictly before the heartbeat starts, so only a heartbeat-tick reconcile can be the one stop() races.
+  const emptyRegistry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [],
+    groups: [],
+    projects: [],
+    bindings: [],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(emptyRegistry));
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 5,
+      telegramClientFactory: async () => {
+        factoriesInFlight++;
+        try {
+          // Long enough that the barrier below reliably observes it in flight before stop() is called —
+          // this delay IS the B-98 race window: stop() must wait for the add it is part of.
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          return fakeClient;
+        } finally {
+          factoriesInFlight--;
+        }
+      },
+    });
+
+    const registryWithBinding: Registry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [
+        {
+          bot_id: 444333222,
+          username: "test_bot",
+          token_ref: { store: "keychain", account: "bot:444333222" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [{ group_id: -1004443332221, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [{ project_id: "prj-b98", path: homeDir }],
+      bindings: [
+        {
+          project_id: "prj-b98",
+          bot_id: 444333222,
+          group_id: -1004443332221,
+          agent_id: "@b98-agent",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@b98-agent", user_id: 444333222, username: "test_bot" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithBinding));
+
+    // Wait until a tick's reconcile() has actually started adding the binding (a factory call in flight)
+    // before calling stop() — otherwise stop() would race the registry file write, not the tick.
+    const BARRIER_DEADLINE_MS = 30_000;
+    const BARRIER_POLL_MS = 5;
+    const deadline = Date.now() + BARRIER_DEADLINE_MS;
+    while (factoriesInFlight === 0) {
+      assert.ok(Date.now() < deadline, "no tick ever started adding the binding");
+      await new Promise((resolve) => setTimeout(resolve, BARRIER_POLL_MS));
+    }
+
+    // The actual B-98 race: stop() while the tick's add is still in flight.
+    await daemon.stop();
+
+    assert.ok(
+      getUpdatesCalls > 0,
+      "stop() must await the in-flight tick's add before tearing the daemon down, so the poller it " +
+        "starts gets to run against a still-open database instead of being silently dropped",
+    );
+
+    const callCountAtStop = getUpdatesCalls;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal(
+      getUpdatesCalls,
+      callCountAtStop,
+      "the poller a mid-flight tick started must actually be stopped by stop(), not leaked",
+    );
+  } finally {
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
 test("bootstrap: stop() closes the real IPC server — a subsequent request is refused (PR-40a)", async () => {
   const homeDir = createTempHome();
   const fakeStore: SecretStore = {

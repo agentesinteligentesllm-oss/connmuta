@@ -112,6 +112,13 @@ export class BindingsReconciler {
   private readonly createTransport?: TransportFactory;
   private readonly createTelegramClient?: (bot: RegistryBot) => TelegramClient | Promise<TelegramClient>;
   private readonly managedBindings = new Map<string, ManagedBinding>();
+  /**
+   * Set by `stopAll()` and never cleared — once shutdown has begun, a binding add/update still in
+   * flight (`reconcile()`'s own async `createPoller` call, racing a concurrent `stopAll()`) must not
+   * register its poller, only stop it (B-98). Defense in depth independent of any caller's own
+   * discipline about not overlapping `reconcile()` with `stopAll()`.
+   */
+  private stopping = false;
 
   constructor(options: BindingsReconcilerOptions = {}) {
     this.db = options.db;
@@ -258,6 +265,12 @@ export class BindingsReconciler {
         // New active binding
         const { transport, roomGuard } = await this.buildTransport(binding, config, bot);
         const poller = this.createPoller ? await this.createPoller(binding, config, transport) : undefined;
+        if (this.stopping) {
+          // stopAll() ran while this add was still in flight (B-98) — the poller just started must be
+          // stopped, never registered into a map nothing will ever call stopAll() on again.
+          if (poller?.stop) await poller.stop();
+          continue;
+        }
 
         this.managedBindings.set(projectId, {
           binding,
@@ -281,6 +294,11 @@ export class BindingsReconciler {
 
           const { transport, roomGuard } = await this.buildTransport(binding, config, bot);
           const poller = this.createPoller ? await this.createPoller(binding, config, transport) : undefined;
+          if (this.stopping) {
+            // Same B-98 guard as the new-binding branch above.
+            if (poller?.stop) await poller.stop();
+            continue;
+          }
 
           this.managedBindings.set(projectId, {
             binding,
@@ -305,6 +323,7 @@ export class BindingsReconciler {
   }
 
   async stopAll(): Promise<void> {
+    this.stopping = true;
     for (const managed of this.managedBindings.values()) {
       if (managed.poller?.stop) {
         await managed.poller.stop();

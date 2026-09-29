@@ -246,6 +246,49 @@ describe("BindingsReconciler (registry hot-reload, poller lifecycle, BINDING_CHA
     assert.equal(reconciler.getActiveBindings().length, 0);
   });
 
+  it("stopAll() prevents a poller factory that resolves after it ran from being registered or left running (B-98)", async () => {
+    const db = createTestDatabase();
+    let pollerStopCalled = false;
+    let releaseCreatePoller: (() => void) | undefined;
+    const createPollerGate = new Promise<void>((resolve) => {
+      releaseCreatePoller = resolve;
+    });
+    let signalCreatePollerCalled: (() => void) | undefined;
+    const createPollerCalled = new Promise<void>((resolve) => {
+      signalCreatePollerCalled = resolve;
+    });
+
+    const reconciler = new BindingsReconciler({
+      db,
+      createPoller: async () => {
+        signalCreatePollerCalled?.();
+        // Simulates a slow poller factory still in flight when stopAll() runs — the exact B-98 window.
+        await createPollerGate;
+        return {
+          stop: async () => {
+            pollerStopCalled = true;
+          },
+        };
+      },
+    });
+
+    const reconcilePromise = reconciler.reconcile(baseRegistry);
+    await createPollerCalled;
+
+    await reconciler.stopAll();
+    assert.equal(reconciler.getActiveBindings().length, 0, "nothing was registered yet when stopAll ran");
+
+    releaseCreatePoller?.();
+    await reconcilePromise;
+
+    assert.equal(pollerStopCalled, true, "a poller created after stopAll() began must be stopped, not leaked");
+    assert.equal(
+      reconciler.getActiveBindings().length,
+      0,
+      "a poller created after stopAll() began must never end up registered",
+    );
+  });
+
   it("reconciles from loader.current() when loader was already synced before reconciler creation (JD-A-001)", async () => {
     const db = createTestDatabase();
     const mockLoader: RegistryLoader = {
