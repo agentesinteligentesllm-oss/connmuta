@@ -71,6 +71,12 @@ export class DoorbellWatcher {
 			});
 	}
 
+	/**
+	 * `buildNotification` is deliberately outside any `catch`: the link already schema-parsed the summary, so a
+	 * throw is a code defect. Mapped to `deliver_failed` it would back off and re-read the same unadvanced window
+	 * forever (the zombie `main.ts` exists to avoid); mapped to `silent` it would drop notifications. Propagating
+	 * ends `run`, and `main.ts` reports that as one stderr line and exit 1.
+	 */
 	async tick(signal?: AbortSignal): Promise<TickOutcome> {
 		const summary = await this.readSummary(signal);
 		if (summary === undefined) {

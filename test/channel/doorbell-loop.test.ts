@@ -216,6 +216,20 @@ test("a rejection that is not an Error is reported as an unknown error", async (
 	assert.deepEqual(failedDeliver.warnings, ["doorbell deliver failed: unknown error"]);
 });
 
+test("a summary that breaks the DoorbellResponse shape makes tick and run reject: nothing is delivered, committed, slept on or swallowed", async () => {
+	// Cast at the link boundary: the real link schema-parses, so only a code defect could hand the watcher this.
+	const malformed = { ...bell(8), senders: null } as unknown as DoorbellResponse;
+	const ticked = rig({ reads: [malformed] });
+	const ran = rig({ reads: [malformed] });
+	await assert.rejects(ticked.watcher.tick(), Error);
+	await assert.rejects(ran.watcher.run(ran.controller.signal), Error);
+	for (const r of [ticked, ran]) {
+		assert.deepEqual(r.log, ["commit()", "read(5)"], "no deliver, and no commit of covered_through_seq");
+		assert.deepEqual(r.sleeps, [], "no backoff: nothing is retried");
+		assert.deepEqual(r.warnings, [], "no warning: the failure is not mapped to a tick outcome");
+	}
+});
+
 const BACKOFF_CASES: ReadonlyArray<readonly [string, RigOptions, number]> = [
 	["a failed read", { reads: [new Error("boom"), new Error("boom")] }, 2],
 	["a failed bootstrap", { bootstrap: [new Error("boom")] }, 1],
