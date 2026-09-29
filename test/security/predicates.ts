@@ -9,7 +9,9 @@
  * `dist/src/` from the compiled file's own directory needs one extra `../`; (4) every function and
  * the DIST_SRC_DIR constant gained a trailing named export so predicates.test.ts, closure.ts (both
  * PR-39) and PR-40's bundle-assertion tables can reuse them — v1 exported nothing because everything
- * lived in one file.
+ * lived in one file; (5) `hasFsModuleReference` widened (B-100a, session 56) to also catch a bare
+ * `import "node:fs"`, the unprefixed `"fs"` specifier, `node:fs/promises`, and a dynamic
+ * `import("node:fs")` call.
  */
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -38,8 +40,15 @@ function hasChildProcessReference(source: string): boolean {
   return source.includes("child_process");
 }
 
+/**
+ * B-100(a): widened from the original `from "node:fs"`/`require("node:fs")`-only match to also catch
+ * a bare `import "node:fs"` statement, the unprefixed `"fs"` specifier, `node:fs/promises`, and a
+ * dynamic `import("node:fs")` call — four forms the original regex silently let through.
+ */
 function hasFsModuleReference(source: string): boolean {
-  return /(?:require\(\s*["']node:fs["']\s*\)|from\s+["']node:fs["'])/.test(source);
+  return /(?:require\(\s*["'](?:node:)?fs(?:\/promises)?["']\s*\)|from\s+["'](?:node:)?fs(?:\/promises)?["']|import\s+["'](?:node:)?fs(?:\/promises)?["']|import\s*\(\s*["'](?:node:)?fs(?:\/promises)?["']\s*\))/.test(
+    source,
+  );
 }
 
 function hasSettingsPathReference(source: string): boolean {

@@ -89,6 +89,21 @@ test("client bundle: node:fs detection is non-vacuous (seeded negative)", () => 
 });
 
 /**
+ * B-100(a): `hasFsModuleReference` originally matched only `from "node:fs"` and `require("node:fs")`;
+ * these four forms were found missing by the PR-06 apply agent. Placed here rather than in
+ * `predicates.test.ts` (AS-IS pinned to v1, design §12/DN-06 — see `test/security/provenance.test.ts`)
+ * since `predicates.ts` itself is SEAM and this repo already keeps predicate seed tests for later
+ * additions here, next to the existing seeded-negative test above.
+ */
+test("client bundle: node:fs detection also catches the four import forms the original regex missed (B-100a)", () => {
+  assert.equal(hasFsModuleReference('import "node:fs";'), true, "bare ESM import");
+  assert.equal(hasFsModuleReference('import { readFileSync } from "fs";'), true, "unprefixed specifier");
+  assert.equal(hasFsModuleReference('import { readFile } from "node:fs/promises";'), true, "the /promises subpath");
+  assert.equal(hasFsModuleReference('const fs = await import("node:fs");'), true, "dynamic import()");
+  assert.equal(hasFsModuleReference('require("fs")'), true, "unprefixed require");
+});
+
+/**
  * Real-import/real-call-anchored checks, mirroring `predicates.ts`'s own `hasFsModuleReference` style
  * (`require(...)`/`from "..."` for a module specifier; an actual `.method(` call for an API method) —
  * NOT a naive substring search. A naive `.includes()` check on these exact strings produces false
