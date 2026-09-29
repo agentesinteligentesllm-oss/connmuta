@@ -390,6 +390,29 @@ pin it FALSE, so 6.1's "pacing timer passes" scenario is a real case and not onl
 `doorbell-loop.ts` and `main.ts` each already carry a source-pin test (no child-process substring even in
 comments, no `node:timers`, no unbounded loop, an import allow-list); PR-06 should generalize over the
 whole closure, not duplicate them.
+**Amendment (session 54, scope debate `f4-pr06-channel-bundle-scope-001`, `CONSENSUS`, Alpha `APPROVE`,
+round 1):** (8) The test's paths are relative to `dist/`, so the `fs` allowlist reads
+`{src/client/binding.js, src/client/run-file.js}`; the spec's `{client/binding.js, client/run-file.js}` is the
+same pair relative to `dist/src`, and a comment says so. (9) Reachability is judged on closure MEMBERSHIP
+(paths), never on a substring of source text: `src/shared/constants.ts:211` and `src/shared/envelope.ts:231,308`
+name `daemon/send/validate.ts` in comments, so a text search would false-positive. Forbidden members are paths
+under `src/daemon/transport/` or `src/daemon/send/`, and `src/daemon/telegram.js` (the Telegram client;
+`daemon-bundle.test.ts:155-159` pins `api.telegram.org` to it). The walk is transitive, so this is complete
+without banning the whole `src/daemon/` tree. Content detectors over every closure file (the `api.telegram.org`
+URL, `.getUpdates(`, `.sendMessage(`) follow `client-bundle.test.ts:101-122`. (10) Timers: a closed allowlist
+`{channel/doorbell-loop.js}` whose own closure excludes transport/send, plus a `node:timers` ban, mirroring
+`daemon-bundle.test.ts:170-192`; not "zero timers" (the spec says the test MUST NOT assert that). (11) Seeded
+negatives (ADR-12): the assertions are pure helpers over a `Map<relPath, source>`, exercised with synthetic
+maps, plus one temp-dir fixture proving the transitive walk catches a violation two hops from the entry.
+(12) `twins.test.ts`: the channel twin lives under `test/channel/` (an extra `channel/` segment; `src/` twins
+sit directly under `test/`), so the finder becomes a function of `(sourceDir, testDir)` and a temp-dir fixture
+proves a missing twin is reported (task 6.7), with a named non-vacuous floor (real count 4). (13) Out of scope,
+for the Director as a possible backlog row: `computeClosure` does not follow bare specifiers, so a dependency
+that wraps process spawning would evade the `child_process` substring exactly as it does for the client and
+daemon bundle tests; Alpha agreed not to widen PR-06 for it. Recon (Kairo, source level): the entry closure is
+16 files (`channel/{main,daemon-link,doorbell-loop,notify}`, `src/client/{binding,run-file,session-exchange}`
+and nine `src/shared/*` modules); only `doorbell-loop` arms a timer, only the two allowlisted files reference
+`fs`, and none references `child_process`.
 Runtime harness: static analysis over the compiled `dist/` bundle, mirroring
 `daemon-bundle.test.ts`/`client-bundle.test.ts`'s own build-then-scan pattern; reuses
 `test/security/predicates.ts`/`closure.ts`'s existing helpers where their shape fits.
