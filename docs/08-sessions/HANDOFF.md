@@ -204,11 +204,11 @@ detail in `docs/runbooks/channel-doorbell.md`.
 
 No SDD change is queued. Three paths, in the order a reasonable session would consider them:
 
-1. **B-103** (§7) — in progress. `installer-bundle.test.ts`'s three entry points (`cli/main.js`,
-   `doctor/main.js`, `doctor/offline.js`) are now evidenced and enforced (commit `06d31eb`): real
-   computed bare-specifier sets, verified independently twice, cross-checked against `package.json`'s
-   dependencies — no live violation. `session-exchange.test.ts`'s two entries (`run-file.js`,
-   `session-exchange.js`) remain open.
+1. **B-103** (§7) — closed. Both `installer-bundle.test.ts`'s three entries (`cli/main.js`,
+   `doctor/main.js`, `doctor/offline.js`, commit `06d31eb`) and `session-exchange.test.ts`'s two
+   entries (`run-file.js`, `session-exchange.js`, commit `2a579b9`) are now evidenced and enforced:
+   real computed bare-specifier sets, verified independently twice, cross-checked against
+   `package.json`'s dependencies — no live violation anywhere.
 2. **F6** (`f6-release-and-docs`, release/publish) — blocked on three Director decisions: B-11
    (trademark clearance for "Conmuta"), B-12 (macOS scope), B-16 (license/legal docs remainder). Ask
    the Director for these before proposing `sdd-explore f6-release-and-docs`.
@@ -431,7 +431,7 @@ an `intended_untracked_selection` input before it will proceed. `rm` any scratch
 |---|---|---|
 | **B-95** | Remainder: (d) the missing abort signal (design-exact, Alpha-approved not to touch), `serve/fetch.ts:244-246`'s unguarded parse, and three non-blocking notes (a drifting comment count, `to` accepting any string, the silent skip of an unreadable row). | Kairo (Director schedules) |
 | **B-102** | Residual items from B-98's own RDD review. Open: (a) the `stopping` guard's update-binding branch is untested; (b) the bootstrap test's negative assertion still uses a fixed 60ms sleep (B-99-class anti-pattern); (c) the `stopping` latch is never reset (likely fine, undocumented); **(f)** a timed-out-then-later-resolving tick can still hit a closed database (the original B-98 symptom, narrowed) — **re-confirmed session 57 by a redundant selectorless RDD review, not fixed** (see §4.6; declined as an unplanned detour from that session's actual task, not because the finding is wrong); (g) a timed-out tick leaves no log/audit trace. (d) and (e) are closed. Cheap wins at the next touch of these files. | Kairo |
-| **B-103** | `test/security/installer-bundle.test.ts`'s three entries (`cli/main.js`, `doctor/main.js`, `doctor/offline.js`) are now evidenced and enforced (commit `06d31eb`): real bare-specifier sets computed and verified independently twice, cross-checked against `package.json`'s 6 declared dependencies — no live violation. `test/client/session-exchange.test.ts`'s two entries (`run-file.js`, `session-exchange.js`) remain open, same fix pending commit, reusing `bareSpecifiers` (`test/security/closure.ts`); outside `test/security/`, so only full `npm test` runs it, not `test:static`. | Director + Kairo |
+| **B-103** | Both `test/security/installer-bundle.test.ts`'s three entries (`cli/main.js`, `doctor/main.js`, `doctor/offline.js`, commit `06d31eb`) and `test/client/session-exchange.test.ts`'s two entries (`run-file.js`, `session-exchange.js`, commit `2a579b9`) are now evidenced and enforced: real bare-specifier sets computed and verified independently twice, cross-checked against `package.json`'s 6 declared dependencies — no live violation anywhere. Reused `bareSpecifiers` (`test/security/closure.ts`) unchanged. `session-exchange.test.ts` is outside `test/security/`, so only full `npm test` runs it, not `test:static`. | Director + Kairo |
 | **Every other open row** of `CHECKLIST.md` (read its Status column) | Carried unchanged. B-11, B-12 and B-16 block F6's readiness (§3.3). | Director |
 | **Gemini CLI / Cursor doorbell capability** | Untested for B-09; not a blocker. Low priority. | Director |
 | **The selectorless RDD chain's stale base** (§4.6) | Process observation, not a backlog row of its own — tracked here and in B-102's row since its symptom (re-surfacing B-102(f)) is what a future session will actually see. | Director/maintainer (needs `gentle-ai review abandon` authorization, or B-102(f) fixed for real) |
