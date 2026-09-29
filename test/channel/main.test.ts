@@ -60,9 +60,21 @@ const FILE: ProjectFile = { schema_version: PROJECT_FILE_SCHEMA_VERSION, project
 const PROJECT_FILE_TEXT = JSON.stringify(FILE);
 /** Planted in a rejected project file: the refusal line may count its problems but must never echo them. */
 const LEAK_MARKER = "hunter2-marker";
-const ALLOWED_SPECIFIER =
-	/^(?:node:events|@modelcontextprotocol\/sdk\/server\/(?:index|stdio)\.js|@modelcontextprotocol\/sdk\/shared\/transport\.js|\.\/(?:daemon-link|doorbell-loop|notify)\.js|\.\.\/src\/shared\/[\w-]+\.js|\.\.\/src\/client\/binding\.js)$/;
+/** Everything `channel/main.ts` may import, one anchored matcher per source; a specifier that none accepts breaks the adapter closure. */
+const ALLOWED_SPECIFIERS: readonly RegExp[] = [
+	/^node:events$/, // the signal emitter's type
+	/^@modelcontextprotocol\/sdk\/server\/(?:index|stdio)\.js$/, // the MCP server and its stdio transport
+	/^@modelcontextprotocol\/sdk\/shared\/transport\.js$/, // the transport type
+	/^\.\/(?:daemon-link|doorbell-loop|notify)\.js$/, // the adapter's own modules
+	/^\.\.\/src\/shared\/[\w-]+\.js$/, // any shared module: pure code, no daemon, spawn or timer
+	/^\.\.\/src\/client\/binding\.js$/, // the project-file resolver, the one thin-client module the adapter reuses
+];
 const FORBIDDEN_SPECIFIER = /client\/(?:main|run-state|spawn|handshake|ipc-stub)|daemon\//;
+/**
+ * Floor for the import scan, below the module's real import count (11 when this was written) so dropping an
+ * import does not break the test, yet above what a scan whose pattern stopped matching would still find.
+ */
+const MIN_SCANNED_SPECIFIERS = 8;
 
 const bell = (covered: number): DoorbellResponse => ({
 	count: 1,
@@ -351,9 +363,12 @@ test("channel/main.ts stays inside the adapter closure: shebang, no spawn, timer
 	assert.equal([...source.matchAll(/process\.exit\(/g)].length, 1);
 	assert.ok(source.indexOf("process.exit(") > source.indexOf("if (import.meta.main)"), "the only exit is in the guarded entry, never the core");
 	const specifiers = [...source.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1] ?? "");
-	assert.ok(specifiers.length >= 8, "non-vacuous: the scan must see the module's imports");
+	assert.ok(specifiers.length >= MIN_SCANNED_SPECIFIERS, "non-vacuous: the scan must see the module's imports");
 	for (const specifier of specifiers) {
-		assert.match(specifier, ALLOWED_SPECIFIER);
+		assert.ok(
+			ALLOWED_SPECIFIERS.some((allowed) => allowed.test(specifier)),
+			`import outside the allow-list: ${specifier}`,
+		);
 		assert.doesNotMatch(specifier, FORBIDDEN_SPECIFIER);
 	}
 });
