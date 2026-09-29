@@ -207,7 +207,9 @@ export async function runChannel(options: RunChannelOptions): Promise<number> {
 	for (const name of SHUTDOWN_SIGNALS) {
 		signals.off(name, stop);
 	}
-	await Promise.race([running, whenAborted(AbortSignal.timeout(options.shutdownTimeoutMs ?? CHANNEL_SHUTDOWN_TIMEOUT_MS))]);
+	// An AbortSignal bound, not a timer call: this file must stay free of timer identifiers (its source pin checks).
+	const watcherStopBound = AbortSignal.timeout(options.shutdownTimeoutMs ?? CHANNEL_SHUTDOWN_TIMEOUT_MS);
+	await Promise.race([running, whenAborted(watcherStopBound)]);
 	await link.close();
 	// Closing after the transport already closed is harmless; a failure here must not change the exit.
 	await server.close().catch(() => undefined);
