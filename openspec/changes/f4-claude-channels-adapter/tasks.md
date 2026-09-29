@@ -93,31 +93,31 @@ Runtime harness: N/A — pure schema/constant modules, no daemon boot required. 
 so a route declared in `IPC_ROUTES`/`IPC_REQUEST_SCHEMAS`/`IPC_RESPONSE_SCHEMAS` with no handler yet
 404s exactly like any unbound path — this PR changes no runtime behavior.
 
-- [ ] 1.1 RED `test/shared/envelope.test.ts`: extend — `ENVELOPE_TYPES` is exported `as const` and its
+- [x] 1.1 RED `test/shared/envelope.test.ts`: extend — `ENVELOPE_TYPES` is exported `as const` and its
       values match exactly what `baseEnvelopeSchema`'s existing type validator accepts.
-- [ ] 1.2 GREEN `src/shared/envelope.ts`: export `ENVELOPE_TYPES`; refactor `baseEnvelopeSchema`'s type
+- [x] 1.2 GREEN `src/shared/envelope.ts`: export `ENVELOPE_TYPES`; refactor `baseEnvelopeSchema`'s type
       validator to build from it. No behavior change — same accepted values before and after.
-- [ ] 1.3 RED `test/shared/constants.test.ts`: extend — `DOORBELL_SCAN_DEPTH === MAX_BATCH`;
+- [x] 1.3 RED `test/shared/constants.test.ts`: extend — `DOORBELL_SCAN_DEPTH === MAX_BATCH`;
       `CHANNEL_SERVER_NAME === \`${PRODUCT_NAME}-channel\``; `CHANNEL_HOST_LABEL === "claude-code-channel"`
       and its length is `<= IPC_SESSION_HOST_MAX_CHARS`; `CHANNEL_RETRY_BACKOFF_SECONDS ===
       POLL_ERROR_BACKOFF_SECONDS`; `CHANNEL_META_LIST_LIMIT === 4`; `CHANNEL_SHUTDOWN_TIMEOUT_MS ===
       REQUEST_OVERHEAD_SECONDS * 1000`.
-- [ ] 1.4 GREEN `src/shared/constants.ts`: add the six named constants above (design's
+- [x] 1.4 GREEN `src/shared/constants.ts`: add the six named constants above (design's
       Interfaces/Contracts `shared/constants.ts` block, verbatim); update `MAX_ACTIVE_SESSIONS`'s doc
       comment to cite the F4 session cost (D10) — no value change.
-- [ ] 1.5 RED `test/shared/ipc-contract.test.ts`: extend — the route-count assertion moves from eight
+- [x] 1.5 RED `test/shared/ipc-contract.test.ts`: extend — the route-count assertion moves from eight
       to ten; `doorbellRequestSchema`/`doorbellResponseSchema`/`channelCursorRequestSchema`/
       `channelCursorResponseSchema` each round-trip a valid payload and reject a payload carrying any
       key outside their own closed set (spec's "Response schema rejects fields outside the closed set"
       scenario, at the schema level); `IPC_REQUEST_SCHEMAS` and `IPC_RESPONSE_SCHEMAS` each gain
       matching `"POST /channel/doorbell"` and `"POST /channel/cursor"` entries.
-- [ ] 1.6 GREEN `src/shared/ipc-contract.ts`: add `"POST /channel/doorbell"` and `"POST
+- [x] 1.6 GREEN `src/shared/ipc-contract.ts`: add `"POST /channel/doorbell"` and `"POST
       /channel/cursor"` to `IPC_ROUTES`; add `doorbellRequestSchema`, `doorbellResponseSchema`,
       `channelCursorRequestSchema`, `channelCursorResponseSchema` (design's Interfaces/Contracts
       `shared/ipc-contract.ts` block, verbatim, including the `.refine()` count/senders/types/threads
       co-emptiness rule); wire both routes into `IPC_REQUEST_SCHEMAS`/`IPC_RESPONSE_SCHEMAS`; update
       the module's own doc comment from "eight" to "ten".
-- [ ] 1.7 Verify: `npm run build && node --test "dist/test/shared/ipc-contract.test.js"
+- [x] 1.7 Verify: `npm run build && node --test "dist/test/shared/ipc-contract.test.js"
       "dist/test/shared/constants.test.js" "dist/test/shared/envelope.test.js"`.
 
 ### Unit 2 — Move-only client refactor
@@ -486,23 +486,23 @@ afterwards" rule.
 Runtime harness: N/A — structural readback, no automated test (design's own Testing Strategy table:
 "Docs best-effort; WORK-PLAN :93 amended | Structural readback in verify and archive").
 
-- [ ] 7.1 Write `docs/runbooks/channel-doorbell.md`: manual configuration steps for arming the adapter
+- [x] 7.1 Write `docs/runbooks/channel-doorbell.md`: manual configuration steps for arming the adapter
       against a bound project, worded as best-effort with no delivery guarantee, no acknowledgement,
       and no reliability claim beyond that (matching the platform's own documented contract, ADR-0024
       row 7). Any Claude Code flags cited must be checked against the current channels documentation at
       apply time, not stated from memory (design's Migration/Rollout note).
-- [ ] 7.2 Apply design.md's "WORK-PLAN :93 amendment text" (already written verbatim there) to
+- [x] 7.2 Apply design.md's "WORK-PLAN :93 amendment text" (already written verbatim there) to
       `docs/07-plan/WORK-PLAN.md`'s Validation row at line 93 — copy it exactly, do not redraft it.
-- [ ] 7.3 Update `docs/02-architecture/DATA-MODEL.md` §3.5's `client_cursors.host` documentation to
+- [x] 7.3 Update `docs/02-architecture/DATA-MODEL.md` §3.5's `client_cursors.host` documentation to
       add `claude-code-channel` alongside the existing `claude-code`/`cursor`/`opencode` examples,
       citing this change.
-- [ ] 7.4 Append a resolution note to `docs/03-adr/0024-channel-doorbell-not-a-second-reader.md`'s
+- [x] 7.4 Append a resolution note to `docs/03-adr/0024-channel-doorbell-not-a-second-reader.md`'s
       Status field and "Relevance to Conmuta" section, and to
       `docs/03-adr/0025-peek-saturation-and-watermark-commits-last.md`'s equivalent, recording that
       F4 (`f4-claude-channels-adapter`) resolved the open items those ADRs named as pending (the
       mechanism and the saturation redesign) — append only, per this project's "ADRs are appended,
       not rewritten" convention; do not delete or rewrite the original text.
-- [ ] 7.5 Verify (structural readback): confirm all docs render; the runbook contains no
+- [x] 7.5 Verify (structural readback): confirm all docs render; the runbook contains no
       delivery-guarantee language; `WORK-PLAN.md:93` no longer asserts the inherited v1 windowed-peek
       "`saturated` rings once per cursor value" claim; `DATA-MODEL.md` §3.5 lists `claude-code-channel`;
       both ADRs carry an appended resolution note pointing at this change. sdd-verify/sdd-archive
