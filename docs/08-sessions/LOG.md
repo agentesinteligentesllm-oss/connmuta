@@ -4,6 +4,60 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 57 — B-100(b) closed for daemon/client/channel bundles; B-103 filed for the rest
+
+- **Date**: 2026-09-29 local time (same calendar day as sessions 55-56's close; a continuation session).
+- **Authority**: the session-start prompt (HANDOFF.md §0.1's own suggested template) asked to confirm
+  Arena, then start B-100(b) with strict TDD and full delegation of the allow-list's design.
+- **Preflight**: Arena's own MCP server again failed to connect (`ECONNREFUSED`) at session start — the
+  same real tool-level failure as sessions 55-56, corroborating DN-09's substitute condition directly.
+  `gentle-ai` still `3.7.0`.
+- **Mapping (a fork) corrected the task's own scope claim before implementation**: session 56's
+  evidence ("no active violation today") only covered the daemon and client closures. The fork found
+  two more `computeClosure` consumers sharing the identical relative-only blind spot that were never
+  evidenced — `test/security/installer-bundle.test.ts` and `test/client/session-exchange.test.ts` — and
+  confirmed `channel-bundle.test.ts`'s own module doc already scoped the intended fix to exactly three
+  bundles (daemon, client, channel), matching HANDOFF's "three bundle tests" language. Decision:
+  implement the three originally-scoped bundles this session; file the other two as **B-103** rather
+  than silently including or dropping them. No live-violation risk either way — `package.json` has
+  exactly 6 real dependencies, independently re-verified against source, none a process-spawning
+  wrapper.
+- **Design (delegated to Kairo's judgment)**: new `bareSpecifiers` function in `test/security/closure.ts`
+  (sibling to the existing private `relativeSpecifiers`, exported since three test files need it
+  directly; not placed in `predicates.ts` to avoid that file's SEAM/provenance friction). Each bundle
+  wires its own allow-list in its own already-established idiom: `daemon-bundle.test.ts` and
+  `client-bundle.test.ts` get a local sorted array + `assert.deepEqual` (matching their existing
+  `node:fs`-confinement-list tests); `channel-bundle.test.ts` gets a new `Rule` entry in its existing
+  table, generalizing `test/channel/main.test.ts`'s local allow-list precedent to whole-closure scope.
+  Every allow-list value reconciled against the actual computed output (a small uncommitted scratch
+  script), not hand-copied from prose — channel's own set was never evidenced before this session.
+- **Strict TDD, four work-unit commits, all green** (`47bcd00` bareSpecifiers + its own seed tests;
+  `5122e20` daemon+client allow-lists; `737a8b8` channel allow-list rule, plus relaxing an existing
+  per-rule seed-loop assertion from "exactly this violation" to "this violation is present," since
+  several existing rules' own seeds — `node:sqlite`, `@napi-rs/keyring`, `node:timers/promises` — are
+  bare specifiers that correctly also trip the new rule now). Full suite green throughout (1732 tests,
+  1726 pass, 0 fail, 6 skip at close; `test:static` 89/89).
+- **RDD ran 5 times this session, disclosing a real process discovery**: two lineages scoped to this
+  session's own commits (base `91a9dae`/`47bcd00`) both closed `approved` with zero blocking findings,
+  acknowledged. A third, unrelated "selectorless" review chain — triggered by the Stop hook, which
+  tracks its own base independently of the `review assess --base-ref`-driven flow this project's ODD
+  protocol uses — turned out to still be anchored at `2aa0da0` (pre-B-98), so it kept re-surfacing a
+  cumulative, ever-growing diff including B-98's and B-100(a)'s already-acknowledged work. Granted once
+  (closed approved), granted again on the grown candidate — this second pass came back
+  `correction_required` with one real CRITICAL finding that is exactly the already-disclosed,
+  already-tracked **B-102(f)** (a timed-out-then-later-resolving heartbeat tick can still hit a closed
+  database), re-discovered only because this candidate's stale base predates B-98. Declined that
+  redundant review rather than fixing B-102(f) as an unplanned detour from B-100(b)'s own scope — the
+  lineage (`review-3b21dbe6ea7c92b0`) is left in `correction_required`, unacknowledged, holding no
+  authority over unrelated work. **Unresolved for a future session**: that selectorless chain's base
+  may still be stuck at `2aa0da0` and will likely keep re-surfacing on every Stop-hook check until
+  either B-102(f) is actually fixed or a maintainer runs `gentle-ai review abandon` with proper
+  authorization on that lineage.
+- **Documentation**: `CHECKLIST.md`'s B-100 row updated (closes (b) for daemon/client/channel, points to
+  B-103); new **B-103** row filed; B-102's row got a session-57 disclosure note about the redundant RDD
+  re-confirmation and the selectorless-chain process observation above; `AGENTS.md`'s status pointer and
+  this file updated; `HANDOFF.md` rewritten for session 58.
+
 ## Session 56 — B-98 closed (daemon shutdown-ordering race); retroactive RDD applied to session 55's tail
 
 - **Date**: 2026-09-29 local time (same calendar day as session 55's close; a continuation session).
