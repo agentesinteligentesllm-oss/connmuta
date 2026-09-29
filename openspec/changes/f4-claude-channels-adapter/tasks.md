@@ -307,12 +307,15 @@ pure-function tests for `notify.test.ts`.
       redundant with the schema bounds, drop the constant in this PR instead and say so here.
 - [x] 5.2 GREEN `channel/notify.ts` (create): implement `buildNotification(summary)` and
       `CHANNEL_INSTRUCTIONS` per design's Interfaces/Contracts section.
-- [ ] 5.3 RED `test/channel/daemon-link.test.ts` (create): handshake is `GET /identity` then `POST
+- [x] 5.3 RED `test/channel/daemon-link.test.ts` (create): handshake is `GET /identity` then `POST
       /session` with `host = CHANNEL_HOST_LABEL`; a 401 on a route call re-handshakes exactly once and
       retries; a second consecutive 401 surfaces as a failure (no infinite retry loop); `DELETE
       /session` fires on close, bounded by `CHANNEL_SHUTDOWN_TIMEOUT_MS`; no run file present means no
-      spawn attempt and a `CHANNEL_RETRY_BACKOFF_SECONDS` backoff before the next probe.
-- [ ] 5.4 GREEN `channel/daemon-link.ts` (create): implement the session cache, route calls parsed by
+      spawn attempt (the link throws `NO_DAEMON` with zero fetch calls). **Amendment (session 53, Alpha
+      CONSENSUS `bus-v2-f4-apply-pr05b-001`):** the backoff half of this clause moved to 05c (task 5.5).
+      `channel/doorbell-loop.ts` is the only timer file, so the link owns no sleep; 05b pins that the
+      module source has no timer, spawn, loop or fs reference. Merged as PR #100, `2647b06`.
+- [x] 5.4 GREEN `channel/daemon-link.ts` (create): implement the session cache, route calls parsed by
       `doorbellResponseSchema`/`channelCursorResponseSchema`, the 401-once re-handshake, `DELETE` on
       close — calling `exchangeSession`/`readRunFile` (PR-02), never `ensureDaemonRunning`.
 - [ ] 5.5 RED `test/channel/doorbell-loop.test.ts` (create): `tick()` resolve → commit → advance
@@ -323,7 +326,11 @@ pure-function tests for `notify.test.ts`.
       watermark (D12, warns only); `count === 0` advances the in-memory watermark to
       `covered_through_seq` with no `deliver` call and no commit call (D11, `"silent"`); a saturated
       page is re-read immediately with no sleep; `run(signal)` uses `while (!signal.aborted)`, never
-      `for(;;)`, and returns promptly once the signal aborts mid-wait.
+      `for(;;)`, and returns promptly once the signal aborts mid-wait. **Amendment (session 53, Alpha
+      CONSENSUS `bus-v2-f4-apply-pr05b-001`):** a `link_failed` tick (any `DaemonLinkError` other than
+      `ABORTED`) also sleeps `CHANNEL_RETRY_BACKOFF_SECONDS`, not only `deliver_failed`; an `ABORTED` error
+      after `signal.aborted` neither warns nor sleeps. `DaemonLink` is an interface plus the factory
+      `createDaemonLink` in `channel/daemon-link.ts`, so the watcher's test injects a structural fake.
 - [ ] 5.6 GREEN `channel/doorbell-loop.ts` (create): implement `DoorbellWatcher.tick()` and
       `run(signal)` per design's Data Flow and Interfaces/Contracts sections.
 - [ ] 5.7 RED `test/channel/main.test.ts` (create): the MCP `Server`'s declared capabilities carry
