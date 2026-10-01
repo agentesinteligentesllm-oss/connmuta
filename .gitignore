@@ -13,6 +13,10 @@ dist/
 .atl/
 .codegraph/
 
+# the SDD preflight cache is this machine's session state, not an artifact of the change it
+# describes: it records one operator's choices for one session, so it is never part of the tree
+.pi/gentle-ai/
+
 # session dumps
 *.txt
 !test/fixtures/repo-scan-negative.txt
