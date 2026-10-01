@@ -81,6 +81,7 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 | B-95 remainder, B-102 residuals | Open, low priority, "cheap win at the next touch" | §7 |
 | **B-106** | Open, **measured in session 60**: the daemon's 64-slot pool leaks ≈2.5 session-shapes per hour and stays invisible to `status`/`doctor` | `docs/06-backlog/CHECKLIST.md` |
 | **B-107** | Open, filed in session 60: a project `.pi/mcp.json` makes the project trust-gated, and a non-UI run loses those servers without a saved decision | `docs/06-backlog/CHECKLIST.md` |
+| **B-108** | Open, filed in session 60: every `npm test` leaves one `%TEMP%\conmuta-*` scratch directory behind (242 had accumulated, 29 MB; the pile was removed) | `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued; **B-105(a)** is the natural next unit (`f7a-wake-satellite`); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
 | Tests on `main` | `npm test` **1841/1835/0/6**; `test:static` **99/99** | — |
 
@@ -257,6 +258,7 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 | **B-105(a)** | the F7a SDD artifact set — the only owed item of the phase's record. (b) is satisfied for `pi`: the wake path ran live four times and the 04:22:00Z turn read a peer message and replied on the bus; (c)(d)(e) are documented design consequences, not defects | Director schedules; Kairo writes |
 | **B-106** | the daemon's session pool (measured: ≈2.5 session-shapes/hour, 13 of 64 in the current boot, and every runner restart burns one). Cheap remedy now: restart the daemon; the real fix is releasing the slot on the client's exit | Kairo (F1 follow-up) |
 | **B-107** | a project `.pi/mcp.json` makes the project trust-gated; the installer and the runbook must state the one-time grant, or the satellite needs a signed trusted run | Kairo (F1 + F7a follow-up) |
+| **B-108** | one scratch directory per full test run under `%TEMP%` (test hygiene, not correctness); the accumulated 29 MB were removed, the row stays open until the suite stops adding new ones | Kairo |
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), and three backups to delete once nothing needs reverting | Director |
 | B-95 remainder, B-102 residuals | Carried; cheap wins at the next touch | Kairo |
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in session 59 | Director/maintainer |
