@@ -6,7 +6,8 @@
   "license": "Apache-2.0",
   "bin": {
     "conmuta": "dist/src/cli/main.js",
-    "conmuta-channel": "dist/channel/main.js"
+    "conmuta-channel": "dist/channel/main.js",
+    "conmuta-runner": "dist/runner/main.js"
   },
   "engines": {
     "node": ">=24.15.0"
@@ -14,6 +15,7 @@
   "files": [
     "dist/src/**",
     "dist/channel/**",
+    "dist/runner/**",
     "npm-shrinkwrap.json",
     "package.json",
     "README.md",

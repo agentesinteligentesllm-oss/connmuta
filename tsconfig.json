@@ -18,6 +18,7 @@
     { "path": "src/daemon" },
     { "path": "src/client" },
     { "path": "channel" },
+    { "path": "runner" },
     { "path": "src/migration" },
     { "path": "src/doctor" }
   ]
