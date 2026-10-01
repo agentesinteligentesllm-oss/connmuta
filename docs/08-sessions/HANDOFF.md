@@ -202,6 +202,14 @@ corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
   roster gates addressing.
 - The SDD preflight for this project is Automatic / Both (hybrid) / Auto (`stacked-to-main`), asked again
   whenever a *new* SDD change starts.
+- **Two identifiers must not be mixed.** This repository's Engram project is **`connmuta`** (from its own
+  remote), while the FRISCO work has **Engram `frisco-erp`** (remote `consultores-orion/frisco-erp`) and
+  **bus `frisco`** (the `FRISCO` parent folder). A session can only write memory into its **own** project —
+  the provider refuses otherwise — so cross-project knowledge goes in a session of that project, in a
+  `global`-scope note, or by message.
+- **A Pi session-to-session message needs an explicit recipient id** when many sessions are advertised
+  (45 on 2026-10-01), and acceptance is an enqueue, never a read receipt; identity is confirmed only by the
+  peer's own reply.
 - **CodeGraph**: present and usable, `codegraph_explore` directly — do not re-init.
 
 ---
