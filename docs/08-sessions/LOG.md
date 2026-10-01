@@ -57,11 +57,15 @@
   attribution bullets and lost "two untracked files are deliberate" (the tree is clean now), the satellite
   README gained the hot-edit hazard and the project-trust requirement, B-105(b) and B-106 were updated from
   what was measured, and B-107 was filed.
-- **RDD**: the documentation candidate went through native review — `inspect`; `start` closed it by itself
-  (`risk_tier: low`, `lenses_required: false`, `selected_lenses: []`, `risk_reasons: [non_executable_only]`,
-  1 file / 40 changed lines); `status` offered the approved acknowledgement; `acknowledge-approved` burned
-  authority (`gentle-ai.review-acknowledged/v1`, lineage `review-73e0e357217ed1c5`). No lens ran, no consent
-  envelope was raised, and the durable trail is the receipt under `.git/gentle-ai/` — not a source commit.
+- **RDD**: two candidates, two closures. The first (the 40-line HANDOFF close-out) closed itself at `start`
+  (`risk_tier: low`, `lenses_required: false`, `reason [non_executable_only]`) and burned its authority
+  (lineage `review-73e0e357217ed1c5`). The delivered candidate (this entry plus §4 and B-106/B-107, 131 lines)
+  was tier `medium` with ONE lens — `AGENTS.md` counts as an executable change — and needed two machine-level
+  fixes before the reviewer would launch: `~/.pi/gentle-ai/models.json` did not exist at all, and the anthropic
+  credential refuses completions with `403 oauth_not_allowed_for_organization` even though `pi auth check`
+  answers `ready`. On `omniroute/agy/gemini-3.8-flash-high` the lens ran, closed `approved` with no findings,
+  and burned authority (lineage `review-b3b86a4c78346ad7`). No consent envelope was raised in either cycle, and
+  the durable trail is the receipt under `.git/gentle-ai/` — never a source commit.
 - **State at close**: suite 1841/1835/0/6, `test:static` 99/99, `src/` untouched, one runner, ladder `wake`,
   the tree clean, `main` pushed.
 

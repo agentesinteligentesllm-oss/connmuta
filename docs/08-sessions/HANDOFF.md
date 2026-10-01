@@ -27,12 +27,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md y confirma Arena. F7a (el despertador) está implementado, auditado, en
-main y CORRIENDO para `frisco` (nivel wake, arnés pi, autostart + bucle de reinicio). Lo que sigue es
-operativo: (1) mover el registro MCP del bus a nivel de PROYECTO (.pi/mcp.json) en vez de la global
-~/.pi/agent/mcp.json; (2) verificar con una segunda sesión abierta en FRISCO que las cuatro herramientas
-aparecen y que sigue habiendo UN solo runner por binding; (3) armar otros bindings cuando yo lo pida.
-B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
+Lee docs/08-sessions/HANDOFF.md (§0, §3, §4) y confirma Arena con una llamada real. La sesión 60 cerró lo
+operativo (bus por proyecto, un solo runner, `$HOME` sin repo fantasma, FRISCO fijado a Engram `frisco`): no lo
+rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el código entregado—; después B-106, B-107 y los residuales de cloud sync de Engram.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
@@ -82,7 +79,9 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
 | **F7a** | **Implemented** (not blocked on F6); F7b (referee) still follows F6 and `bus-v2-referee-001` | `docs/07-plan/WORK-PLAN.md` |
 | **B-105** | **Open** — the owed items: (a) the `f7a-wake-satellite` SDD artifact set; (b) **partially satisfied 2026-10-01**: the wake path is proven live end to end for `pi` on Windows (armed `frisco: wake (pi)`; a NEW BROADCAST from `@rodrigo-agent` at 02:10:42Z produced one `wake` row with `outcome: exited` and advanced the watermark 24→25) — what remains is the other three harnesses' argv forms and a turn that acts rather than correctly staying silent; (c) the Windows `.cmd` gate is now documented, with the working remedy (a real shell-free launcher on the runner process's PATH only — commit `86a26dd`); (d) `autopilot`'s profile is prompt + harness policy, not a mechanism; (e) the wake ledger is self-reported | `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` Implementation note; `docs/runbooks/wake-satellite.md` |
 | B-95 remainder, B-102 residuals | Open, low priority, "cheap win at the next touch" | §7 |
-| Next SDD change | None queued; F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
+| **B-106** | Open, **measured in session 60**: the daemon's 64-slot pool leaks ≈2.5 session-shapes per hour and stays invisible to `status`/`doctor` | `docs/06-backlog/CHECKLIST.md` |
+| **B-107** | Open, filed in session 60: a project `.pi/mcp.json` makes the project trust-gated, and a non-UI run loses those servers without a saved decision | `docs/06-backlog/CHECKLIST.md` |
+| Next SDD change | None queued; **B-105(a)** is the natural next unit (`f7a-wake-satellite`); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
 | Tests on `main` | `npm test` **1841/1835/0/6**; `test:static` **99/99** | — |
 
 ---
@@ -184,6 +183,13 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
   so a token-shaped literal inside a brand-new file is invisible to it until that file is committed — session
   59's suite was green at nine commits and turned red on the tenth, when the file carrying the fixture became
   tracked. Run the full suite **after** `git add`, or keep fixtures' values non-token-shaped from the start.
+- **The RDD reviewer lens routing did not exist until session 60**, and it now lives at
+  `~/.pi/gentle-ai/models.json` (`review-risk`, `review-resilience`, `review-readability`, `review-reliability`
+  → `{"model": "omniroute/agy/gemini-3.8-flash-high", "thinking": "high"}`). Without that file the host relay
+  refuses every lens-requiring candidate (*no model is configured for …*), which is why earlier sessions only
+  ever saw low-tier closures or declines. Do not point a lens at `anthropic/…` on this machine: `pi auth check
+  --provider anthropic` answers `ready` and completions still fail with
+  `403 oauth_not_allowed_for_organization`.
 - **The installer's two `*.bak-pre-conmuta-*` files were removed (session 60)** after checking what each
   held: `AGENTS.md`'s conmuta block is committed (`git show HEAD:AGENTS.md`), and the `.mcp.json` backup
   carried nothing the live file lacks (same arena bearer, no extra server). The tree is now clean, so §0.2's
@@ -213,16 +219,21 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
 
 - [ ] **1. Verify the tree** (§0.2); the suite must be 1841/1835/0/6 and `test:static` 99/99.
 - [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
-- [ ] **3. Ask the Director what is next** (§3's two paths are the real end-to-end run and B-105; F6 stays
-      blocked).
-- [ ] **4. If the live `frisco` binding needs attention**, read its ledger and
+- [ ] **3. The default unit is B-105(a)**: write `openspec/changes/f7a-wake-satellite/` (proposal, spec,
+      design, tasks) against the shipped code, not against the ADR's intentions — ADR-0032's "Implementation
+      note" lists the six refinements a spec now owns, and §7's B-106/B-107 rows are the evidence for two of
+      them. Announce the new SDD change and ask the four preflight questions (Automatic / Both / Auto is the
+      recorded default) before `sdd-propose`.
+- [ ] **4. Alternatives the Director may prefer**: B-106 (release the thin client's slot; the measurement is in
+      the backlog row), B-107 (the installer and the runbook must state the project-trust grant), or arming
+      another binding on request (`ladder set` per project, one runner per binding).
+- [ ] **5. If the live `frisco` binding needs attention**, read its ledger and
       `C:\Users\LABORATORIO\conmuta-runner\runner.log` together. Treat an `unavailable` outcome as the Windows
       `.cmd` question (§4) rather than as a code defect, and remember one legitimate result: a `wake` turn that
       reads, finds nothing addressed to its agent and stays silent is **correct**.
-- [ ] **5. If B-105(a) happens**, write the SDD artifacts against the shipped code, not against the ADR's
-      intentions — the ADR's "Implementation note" lists the six refinements that a spec must now own.
 - [ ] **6. Close the session**: overwrite this file, add the LOG entry at the top, update `AGENTS.md`'s Status
-      pointer, the tribunal index if an audit ran, and the backlog rows touched.
+      pointer, the tribunal index if an audit ran, and the backlog rows touched. The RDD preflight runs per
+      candidate, and the reviewer lens routing now exists at `~/.pi/gentle-ai/models.json` (§4).
 
 ---
 
@@ -243,7 +254,10 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-105** | (a) the F7a SDD artifact set; (b) a real end-to-end run plus harness-argv verification; (c) the Windows `.cmd` refusal (by design, documented); (d) `autopilot` is prompt + harness policy; (e) the self-reported ledger | Kairo (Director schedules) |
+| **B-105(a)** | the F7a SDD artifact set — the only owed item of the phase's record. (b) is satisfied for `pi`: the wake path ran live four times and the 04:22:00Z turn read a peer message and replied on the bus; (c)(d)(e) are documented design consequences, not defects | Director schedules; Kairo writes |
+| **B-106** | the daemon's session pool (measured: ≈2.5 session-shapes/hour, 13 of 64 in the current boot, and every runner restart burns one). Cheap remedy now: restart the daemon; the real fix is releasing the slot on the client's exit | Kairo (F1 follow-up) |
+| **B-107** | a project `.pi/mcp.json` makes the project trust-gated; the installer and the runbook must state the one-time grant, or the satellite needs a signed trusted run | Kairo (F1 + F7a follow-up) |
+| Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), and three backups to delete once nothing needs reverting | Director |
 | B-95 remainder, B-102 residuals | Carried; cheap wins at the next touch | Kairo |
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in session 59 | Director/maintainer |
 | B-11, B-12, B-16 | Gate F6 | Director |
