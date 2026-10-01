@@ -133,6 +133,19 @@ corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
   so in the operator's words.
 - **The wake ledger is self-reported** (ADR-0032 R6a): the daemon cannot corroborate it.
 - **Judge and auditor citations get checked against the file** (§0.4).
+- **The daemon's session pool is bounded and is never reclaimed by the thin client.** `MAX_ACTIVE_SESSIONS = 64`
+  (`src/shared/constants.ts`), in memory, per boot, freed only by a graceful `DELETE /session` — and
+  `src/client/ipc-stub.ts:16` says in the client's own words that *nothing in this client ever calls it*. The
+  runner and the channel adapter do release theirs. Every host session that ends therefore leaves a bearer
+  behind: five or six concurrent sessions are far below the cap, but a day of opening and closing them is not,
+  and the ceiling stays invisible in `status`/`doctor` until new sessions start being refused. Filed as
+  **B-106**; restarting the daemon frees the pool meanwhile.
+- **Two ways to give a folder the bus tools, and only one of them is per project.** The designed mechanism is
+  the **project-level** MCP entry — for Pi, `.pi/mcp.json`, which `src/installer/tool-targets.ts:73` already
+  writes per project (id-only, opt-in per tool, merging never overwriting, and Pi reads it after the project
+  is trusted). A **user-level** entry (`~/.pi/agent/mcp.json`) is global: an entry bound to `--project frisco`
+  makes every Pi session on the machine load a client that refuses in any other project's folder. Use the
+  project file for a project's binding.
 - **PT-22's repository scan reads TRACKED files only** (`test/security/repo-scan.test.ts` over `git ls-files`),
   so a token-shaped literal inside a brand-new file is invisible to it until that file is committed — session
   59's suite was green at nine commits and turned red on the tenth, when the file carrying the fixture became
