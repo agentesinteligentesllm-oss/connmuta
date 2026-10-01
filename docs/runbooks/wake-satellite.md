@@ -14,12 +14,17 @@ and never writes to any settings or permissions file.
 
 1. **A running daemon bound to the project you want to wake.** The runner never starts one. Confirm with
    `conmuta panel` or `conmuta doctor` if you are unsure.
-2. **A harness installed and working by hand.** Run the harness's own headless form yourself first (for
+2. **A harness that a process can actually start.** Run the harness's own headless form yourself first (for
    example `claude -p "<a prompt>"` from the project directory). If that does not work in your shell, the
-   runner cannot make it work either — see "Limits" below.
-3. **The project's MCP registration.** The woken turn reaches the bus with the same thin client every other
-   session uses, so the project needs its `conmuta` MCP entry (the installer writes it). A turn that cannot
-   call `conmuta_fetch` will do nothing useful.
+   runner cannot make it work either — and on Windows there is a second, harder gate: see "Windows: the four
+   harnesses are `.cmd` shims" below, because for those four names a shell is the *only* thing your
+   terminal has that the runner deliberately refuses.
+3. **The project's bus registration, wherever your host keeps it.** The woken turn reaches the bus with the
+   same thin client every other session uses, so the host needs a `conmuta` MCP entry bound to
+   `--project <id>`. That entry can live in the host's own **user-level** config — a Pi host keeps it in
+   `~/.pi/agent/mcp.json` — so a project-level `.mcp.json` is not required and its absence is not a symptom.
+   (Verified 2026-10-01: a woken turn with only the user-level entry called `conmuta_fetch` and read its
+   inbox.) A turn that cannot call `conmuta_fetch` will do nothing useful.
 
 ## The ladder: one machine-local record per binding
 
@@ -45,11 +50,23 @@ conmuta-runner ladder set --project "<project-id>" --level wake --harness pi --b
 conmuta-runner ladder set --project "<project-id>" --level autopilot --harness claude --by "Director: audited review only"
 
 # 4. Start the runner (leave it running; Ctrl-C stops it).
-conmuta-runner run --project "<project-id>"
+#    `--cwd` must name the directory that holds THIS binding's conmuta.json, or run it from inside the project:
+conmuta-runner run --project "<project-id>" --cwd "<binding root>"
 
 # 5. The kill switch: the binding resolves back to off within one ladder poll (5 s).
 conmuta-runner ladder disable --project "<project-id>" --by "Director: stopping"
 ```
+
+**Why `--cwd` matters.** The runner resolves the binding by walking up from the directory it was started in
+and stopping at the **nearest** `conmuta.json`. Start it from another repository and it finds *that*
+repository's file and refuses:
+
+```text
+conmuta.json is bound to '<the other project>', expected '<your project id>'
+```
+
+Naming `--cwd` (or starting the runner from inside the project) is what makes `--project` and the walk-up
+agree. `ladder get|set|disable` do not need it: they are machine-local and never touch a project's tree.
 
 `--harness` is mandatory for `wake` and `autopilot` because it decides **which program gets executed**; the
 four names the runner will ever run are `pi`, `claude`, `codex` and `opencode`. Additional literal arguments
@@ -121,9 +138,24 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
   prompt is appended as the final argument. Harness CLIs change: verify the form by hand for the version you
   have installed, and use `--arg` if it differs. The phase's tests pin the *shape* (closed executable, literal
   argv, `shell: false`, confined cwd and environment), not any particular harness version's flags.
-- **On Windows, a `.cmd` shim will be refused** (`unavailable` in the ledger). The runner will not fall back
-  to a shell, because that fallback is exactly the command-injection path this design exists to prevent. Use a
-  harness invocation that is a real executable, or run the runner where the harness is one.
+- **On Windows the four harnesses are `.cmd` shims, and the runner refuses them.** npm installs `pi`,
+  `claude`, `codex` and `opencode` as batch shims, and a process started with `shell: false` cannot execute a
+  `.cmd` (`EINVAL` — pinned by `test/runner/harness.test.ts`'s "a launch failure is `unavailable`, never a
+  shell fallback"). The ledger then shows `wake` with `outcome: "unavailable"` and the message **stays
+  pending**, so a permanently misconfigured harness produces one refusal a minute instead of losing anything.
+  The fix is a **real executable** that takes the same argv: a small shell-free launcher (the team's working
+  example is a Go `pi.exe` that runs `exec.Command` with a literal argv) delivered **only to the runner
+  process's environment**, by prepending its directory to that process's own `PATH`.
+- **Never put that executable on the machine `PATH`.** A `pi.exe` ahead of npm's `pi.cmd` would shadow the
+  interactive `pi` command for **every** terminal on the machine. The runner's shell-free requirement is the
+  runner's; the rest of the machine keeps its shims.
+- **The runner will not fall back to a shell**, because that fallback is exactly the command-injection path
+  this design exists to prevent. `unavailable` is the correct, fail-closed answer.
+- **Running it permanently.** Keep the autostart its **own** entry — a `Run` value of its own, or a tiny
+  wrapper with a restart loop — never a Windows service, and never folded into the installer's existing
+  `conmuta` value, which starts the daemon and nothing else. With a restart-loop wrapper, **killing the node
+  process does not stop it**; the real switch is `ladder disable`, which the running process honours on its
+  next ladder read.
 - **The wake ledger is self-reported.** The daemon does not know the runner exists, so nothing in the daemon
   can corroborate these rows (ADR-0032 R6a). Treat the ledger as the satellite's own account.
 - **The roster and the private group are not controls here.** They decide who may send. What a rostered peer
@@ -144,7 +176,9 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 | `refused (in_flight)` | A turn is still running. It is bounded by the ten-minute turn timeout. |
 | `link_failed` | No live daemon for this user, or the run file's daemon died. Start the daemon and run again. |
 | A peer message arrives but no new `wake` row appears | The message was sent by the binding's **own** agent: the doorbell skips self-echo (`row.from_agent_id !== binding.agent_id`, `src/daemon/serve/doorbell.ts:154`), so a binding cannot wake itself. Test with **another** roster agent — a `REQUEST` to this binding's agent, or a `BROADCAST` with no `to` (a `BROADCAST` carrying `to` is refused by the wire schema). A human typing in Telegram does not work either: their `user_id` is not on the roster and ingest drops it as `unknown_sender`. |
-| `woke` but nothing appears on the bus | The turn's own harness output is on stderr (capped). Most often the harness form is wrong, or the project's MCP registration is missing. |
+| `woke` but nothing appears on the bus | Two very different cases. (a) The turn ran and **legitimately decided to do nothing** — a `wake` turn may read its inbox, find nothing addressed to it, and reply-not at all; the ledger's `outcome: "exited"` is the whole truth, and a silent turn is a correct turn. (b) Something is wrong: read the turn's own output on the runner's stderr (capped), and check the reminder that the harness form and the host's MCP entry are the two things a turn needs. |
+| `unavailable` on every wake, and a `refused` row roughly every minute | The harness could not be started: on Windows, a `.cmd` shim under `shell: false` (`EINVAL`). See "Windows: the four harnesses are `.cmd` shims" in Limits. The message stays pending throughout, so nothing is lost while you fix it. |
+| A permanent wrapper will not stop when I kill the process | A restart-loop wrapper revives it. The real switch is `ladder disable`, honoured on the running process's next ladder read. |
 | The harness exits immediately with a permission error | Your harness's own configuration refuses headless tool use. That refusal is the control working; the runner will not override it. |
 
 ## Related
