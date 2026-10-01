@@ -7,6 +7,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { reportProjectBindOutcome, runCli, type CliIo } from "../../src/cli/main.js";
+import { RUNNER_NAME } from "../../runner/constants.js";
 import type { EditFileOutcome } from "../../src/installer/file-edit.js";
 import type { GitignoreCheckResult } from "../../src/installer/gitignore.js";
 import type { ToolId } from "../../src/installer/tool-targets.js";
@@ -24,6 +25,8 @@ import {
 // dist/test/cli/main.test.js -> repo root is three levels up.
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const CLI_ENTRY = join(REPO_ROOT, "dist", "src", "cli", "main.js");
+const RUNNER_BIN_TARGET = "dist/runner/main.js";
+const RUNNER_ENTRY = join(REPO_ROOT, "dist", "runner", "main.js");
 
 const VALID_FILE = JSON.stringify({
   schema_version: 1,
@@ -62,15 +65,18 @@ function makeIo(files: Record<string, string> = {}, stdin = ""): CapturedIo {
 
 // --- The single bin entry (D-09: every product-shaped name derives from one constant) ---
 
-test("package.json declares the product bin and the channel adapter's, and the product bin resolves to the built CLI", () => {
+test("package.json declares the product bin, the channel adapter's and the wake satellite's, and the product bin resolves to the built CLI", () => {
   const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
     bin?: Record<string, string>;
   };
-  // F4 added the adapter as a second bin, built outside `src/` (spec "Adapter ships as a second `bin` entry").
-  assert.deepEqual(Object.keys(packageJson.bin ?? {}), [PRODUCT_NAME, CHANNEL_SERVER_NAME]);
+  // F4 added the adapter as a second bin, built outside `src/` (spec "Adapter ships as a second `bin` entry");
+  // F7a added the wake satellite as a third (ADR-0032 R2, PT-34), also built outside `src/`.
+  assert.deepEqual(Object.keys(packageJson.bin ?? {}), [PRODUCT_NAME, CHANNEL_SERVER_NAME, RUNNER_NAME]);
   const entry = packageJson.bin?.[PRODUCT_NAME];
   assert.equal(entry, "dist/src/cli/main.js");
   assert.ok(existsSync(CLI_ENTRY), `expected the built CLI at ${CLI_ENTRY}: run 'npm run build' first`);
+  assert.equal(packageJson.bin?.[RUNNER_NAME], RUNNER_BIN_TARGET);
+  assert.ok(existsSync(RUNNER_ENTRY), `expected the built runner at ${RUNNER_ENTRY}: run 'npm run build' first`);
 });
 
 // ADR-0012 remediation 2 pins the shebang with an assertion over the built bundle, because the
