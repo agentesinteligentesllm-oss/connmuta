@@ -20,8 +20,9 @@ satellite**: ADR-0032 + CONSTITUTION §3.1 sanction a per-binding, machine-local
 (`off`·`notify`·`wake`·`autopilot`) and implement it as a third bin, `conmuta-runner` (`runner/`), which
 consumes the already-shipped body-less doorbell and starts one bounded harness turn; F7 splits into F7a
 (done, **not** blocked on F6) and F7b (referee), and B-105 files what is still owed (the SDD artifact set
-and a real end-to-end run). No SDD change is open; see `docs/08-sessions/HANDOFF.md` for what session 60
-does next. This field used to
+and a real end-to-end run). No SDD change is open; session 60 closed the operational finish (project-scoped
+bus registration, one runner verified, the `$HOME` ghost git repository removed, FRISCO pinned to Engram
+project `frisco`) — see `docs/08-sessions/HANDOFF.md` for the current state and what is owed. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,

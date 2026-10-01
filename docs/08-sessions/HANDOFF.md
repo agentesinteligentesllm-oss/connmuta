@@ -4,7 +4,8 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 59** (2026-10-01 local). Everything below describes the state after it.
+> **Last rewritten: end of session 60** (2026-10-01 local). Session 59's text is preserved; the edits marked
+> `DONE, session 60` carry this session's evidence, and §4 lists what changed on the machine.
 
 ---
 
@@ -13,10 +14,10 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **F7a is implemented**: the wake satellite `conmuta-runner` (`runner/`), ADR-0032 + CONSTITUTION §3.1, audited `APPROVED` (`bus-v2-f7a-audit-001`), committed and pushed. |
-| What is next? | **The Director's real end-to-end run** (armed for the `frisco` binding), then the two owed items in **B-105**. F6 is still the only planned phase and still blocked on B-11/B-12/B-16. |
+| What is new? | **Session 60's operational finish**: the bus is registered per project (`FRISCO\.pi\mcp.json`), one restart loop and one runner serve the binding, the `$HOME` ghost git repository is gone, and FRISCO is pinned to Engram project `frisco`. F7a itself (`conmuta-runner`, ADR-0032 + CONSTITUTION §3.1, `bus-v2-f7a-audit-001`) was session 59's. |
+| What is next? | **B-105(a)** (the F7a SDD artifact set; B-105(b) is now satisfied for `pi`, including a turn that replied on the bus) and **B-106** (measured — see §7), then the Director's calls: the Engram cloud-sync bookkeeping rows, and F6 once B-11/B-12/B-16 are decided. |
 | What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real tool call). |
-| What is the Director's to decide? | The real run and its level; B-105's order; B-11/B-12/B-16 for F6. |
+| What is the Director's to decide? | The order of B-105(a)/B-106; the Engram cloud-sync bookkeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. |
 | Where to read next | §0 first; then §3 and §7. §4 is the list of traps. |
 
 ---
@@ -38,10 +39,10 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
 
 | # | Command | Expected |
 |---|---|---|
-| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; `main` is pushed as of `f00e8fb` |
+| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; the LOG's newest entry names the head at session close |
 | 2 | `rm -rf dist` | prints nothing |
 | 3 | `ls openspec/changes/` | `archive` only |
-| 4 | `git status --short` | only the two `*.bak-pre-conmuta-*` files (installer scratch, deliberately untracked) |
+| 4 | `git status --short` | **empty** (the installer's two `*.bak-pre-conmuta-*` files were removed in session 60 — see §4) |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `3.7.0` or later — check fresh each session |
 | 7 | `npm run build && npm test` | exit 0; **1841 tests, 1835 pass, 0 fail, 6 skip**; `test:static` **99/99** |
@@ -116,11 +117,28 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
    overwriting). A **user-level** entry that hardcodes `--project <id>` is global: it makes every Pi session
    on the machine load a client that refuses in any other project's folder. Fix: register the bus in each
    project's `.pi/mcp.json`, and leave the user-level file without a project-bound bus entry.
+   **DONE, session 60:** `FRISCO/.pi/mcp.json` carries `conmuta --project frisco`; the global entry is gone
+   (backup `~/.pi/agent/mcp.json.bak-pre-project-scope-20260930-215503`). Verified: `pi mcp list` in FRISCO →
+   `conmuta: connected, 4 tools (codemode, project)`; in an unrelated folder → no `conmuta`. **Caveat, measured
+   with Pi's own code:** a project `.pi/mcp.json` is read only with a saved trust decision
+   (`~/.pi/agent/trust.json`), and a non-UI run (`pi -p`, i.e. the woken turn) resolves *not trusted* without
+   one — the turn would keep its quota cost and lose the bus tools. FRISCO's decision was recorded on the
+   Director's explicit instruction. Sessions whose cwd is a FRISCO subfolder (`frisco-erp`, `frisco-caseta`, …)
+   do **not** inherit the entry: project config is cwd-relative, with no ancestor walk-up. The project file
+   carries the bus only; the Engram project for that root is pinned by `FRISCO\.engram\config.json` instead
+   (see §4), so no global server definition is duplicated per project.
 3. **Verify the "N sessions, one runner" property on the machine.** Open a second session in `FRISCO` and
    confirm the four `conmuta_*` tools appear there; confirm with
    `Get-CimInstance Win32_Process` that exactly **one** `dist\runner\main.js` serves that binding, and that
    the ladder is still `wake`. This is the check that turns the Director's requirement ("any number of
    sessions in one folder, permanently") into evidence rather than an intention.
+   **DONE, session 60:** the four `conmuta_*` tools were confirmed in a FRISCO session and by a real headless
+   turn that read the bus and posted a reply; exactly one `cmd /c run-frisco.cmd` and one
+   `node dist\runner\main.js` serve the binding; the ladder is still `frisco: wake (pi)`. A **duplicate restart
+   loop** was found and removed: the autostart wrapper had been left reading a hot-edited `run-frisco.cmd`, so
+   it only pinged and started no runner, while the live runner hung off a manually started loop that dies at
+   logoff. One loop now, relaunched through `start-frisco.vbs`; the hazard and its symptom are documented in
+   the satellite's README (`C:\Users\LABORATORIO\conmuta-runner\README.md`).
 4. **Arm any other binding the Director names**, one signed `ladder set` per project, never a second runner
    per binding (§4's session-pool and one-runner rules).
 5. **B-105(a)**: write the `openspec/changes/f7a-wake-satellite/` artifact set (proposal, spec, design,
@@ -166,9 +184,24 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
   so a token-shaped literal inside a brand-new file is invisible to it until that file is committed — session
   59's suite was green at nine commits and turned red on the tenth, when the file carrying the fixture became
   tracked. Run the full suite **after** `git add`, or keep fixtures' values non-token-shaped from the start.
-- **Two untracked files are deliberate**: `.mcp.json.bak-pre-conmuta-20260930T040537Z` and
-  `AGENTS.md.bak-pre-conmuta-20260930T040537Z` are the installer's own backups. Do not commit them; do not
-  delete them without asking.
+- **The installer's two `*.bak-pre-conmuta-*` files were removed (session 60)** after checking what each
+  held: `AGENTS.md`'s conmuta block is committed (`git show HEAD:AGENTS.md`), and the `.mcp.json` backup
+  carried nothing the live file lacks (same arena bearer, no extra server). The tree is now clean, so §0.2's
+  row 4 expects **no** `git status --short` output.
+- **`$HOME`'s ghost git repository was removed (session 60).** `C:\Users\LABORATORIO\.git` existed (created
+  2026-09-23), held **0 commits, 0 objects, no refs/index/stash**, and made every folder under `$HOME` that
+  has no repo of its own — including `…\ORION OCG\FRISCO`, the binding root — report `C:/Users/LABORATORIO` as
+  its toplevel, so `git status`/`git add` there operated against a zero-commit home repo. A copy of the only
+  file with information (`engram-project-identity.json`) sits in `.git-ghost-backup-20260930T2245\`. The
+  machine `AGENTS.md` guardrail that caught it is unchanged and still applies.
+- **Engram project attribution changed with it.** Delete-the-ghost-repo made Engram's cwd detection explicit:
+  a folder is `ambiguous` when several repos live inside it, and `FRISCO` (whose real work is in
+  `frisco-erp`) was previously attributed to `laboratorio` through that ghost root. `FRISCO\.engram\config.json`
+  now pins it (`{"project_name":"frisco"}`, detection `source=config`), while descendants keep their own
+  projects (`frisco-erp` via remote, `frisco-caseta` via its own root). `$HOME` and `Downloads` stay explicitly
+  ambiguous; a memory write from there needs `--project`/`ENGRAM_PROJECT`. Same session, `engram projects prune`
+  removed 21 zero-observation projects and `projects consolidate --all` merged the two case duplicates
+  (`Vannar`→`vannar`, `alexa-claudeCode`→`alexa-claudecode`); 108 → 85 projects, no observation lost.
 - **`conmuta.json` is now committed** (it is the D5 project file the installer wrote).
 - **MSYS/Windows shell**, PowerShell default, Bash available; `rm -rf`/`grep` work there only. `npm test`
   output lines start with `ℹ`; `dist/` staleness fakes results — remove it first. `npm run test:static` prints
@@ -255,3 +288,12 @@ B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
    `declined_this_candidate` (`risk_level: high`, 43 files / 4553 lines, `lineage_created: false`,
    `mutation_performed: false`). No lineage exists and no authority was burned; nothing to acknowledge or
    chase. If the Director later wants the four lenses on this candidate, that is a fresh START.
+4. **This session's first candidate (session 60, the 40-line HANDOFF close-out)**: `inspect` → `start` closed it
+   at the start (`risk_tier: low`, `lenses_required: false`, `selected_lenses: []`,
+   `risk_reasons: [non_executable_only]`, 1 file / 40 changed lines, correction budget 20) → `status` offered
+   `approved_acknowledgement_required` → `acknowledge-approved` burned authority
+   (`gentle-ai.review-acknowledged/v1`, lineage `review-73e0e357217ed1c5`). No lens ran and no consent envelope
+   was raised; the durable trail is the receipt under `.git/gentle-ai/`, not a source commit. **The candidate
+   grew again after that burn** (this session added the LOG entry, these §4 bullets and B-106/B-107 to the
+   checklist), so what was delivered is a fresh candidate: its own closure is recorded in the close-out
+   commit's message, and delivery stayed ordinary repository policy.

@@ -4,6 +4,67 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 60 — the operational finish: a project-scoped bus, one runner, and the machine cleaned
+
+- **Date**: 2026-10-01 local time (opened on the handoff prompt session 59 left, closed the same day).
+- **Authority**: the Director's instruction, restated three times. First the operational list (move the bus
+  registration to project scope, verify "N sessions, one runner" on the machine, arm other bindings on
+  request). Then, after the report: "tienes toda mi autorización para depurar borrar todo lo que se considere
+  basura, lo que no esté justificado o lo que definitivamente queda obsoleto o inutil. Toma las riendas …
+  hazlo con maestría. Si ves necesario el que vuelvas a medir, vuelve a medir". Finally the standing decision:
+  `C:\Users\LABORATORIO\.git` was confirmed as something to remove.
+- **Preflight**: `git fetch`/`status` clean at `2a102ba`, `main` aligned with `origin/main`; suite
+  **1841/1835/0/6** and `test:static` **99/99**; **Arena unreachable again** — `mcp connect arena` answered
+  `fetch failed — Nothing is listening at http://127.0.0.1:8765/mcp`, and the `frisco-erp` bridge on port 8766
+  was closed too, so DN-09's substitute (Judgment Day) applied to any audit this session.
+- **Bus registration, project scope (HANDOFF §3.2, closed)**: `…\FRISCO\.pi\mcp.json` carries
+  `conmuta --project frisco` in the installer's own entry shape (node's realpath, no `env`, no `cwd`), and the
+  project-bound entry was removed from `~/.pi/agent/mcp.json` (backup kept). Verified three ways:
+  `pi mcp list` in FRISCO → `conmuta: connected, 4 tools (codemode, project)`; an unrelated folder → no
+  `conmuta`; and a real headless turn (`pi -p`, the satellite's exact shape) called `conmuta_status` and
+  reported `frisco`. **The gate this exposed**: Pi reads a project `.pi/mcp.json` only when the project is
+  **trusted**, and a non-UI run resolves *not trusted* when no decision is saved — measured with Pi's own
+  `resolveProjectTrusted`/`loadMcpConfig`, which is why the satellite's turns would have silently lost the bus
+  tools after the global entry went away. FRISCO's decision was recorded on the Director's explicit
+  instruction; the design gap is filed as **B-107**.
+- **One runner per binding (HANDOFF §3.3, closed)**: the property held — exactly one
+  `node dist\runner\main.js` — but the installation had **two restart loops**, and the autostart one was a
+  zombie: `run-frisco.cmd` had been rewritten in place (20:14) while that loop was reading it, so cmd resumed
+  at a stale byte offset and spent the rest of the day pinging without ever starting a runner, while the live
+  runner hung off a manually started loop that dies at logoff. Both loops and their children were stopped and
+  one was relaunched through `start-frisco.vbs`; the resilience claim was then re-measured by killing the
+  runner on purpose — the wrapper logged `el runner salio (codigo -1); reintento en 15 s` and
+  `arrancando el runner` ~15 s later, with the ladder and the watermark intact. The hazard, its symptom and
+  the name-filtered process check are in `C:\Users\LABORATORIO\conmuta-runner\README.md`.
+- **The satellite ran in production, not only in tests**: the ledger gained two rows while this session worked
+  (04:22:00Z and 04:35:05Z, each `outcome: exited`, watermark 26 → 29). The 04:22 turn read
+  `[#404/#405 despliegue]` from `@rodrigo-agent` and **replied on the bus with `conmuta_send`** — a turn that
+  acted rather than correctly staying silent, which is the half of B-105(b) that was still owed. The ladder
+  stayed `frisco: wake (pi)` throughout: **nothing was re-armed**.
+- **Machine cleanup (Director-authorized, each item with its own verification)**: the `$HOME` ghost git
+  repository was removed — the machine guardrail's check first (0 commits, 0 objects, no refs, no index, no
+  stash), with its only informational file copied to `.git-ghost-backup-20260930T2245\`; the installer's two
+  `.bak-pre-conmuta-*` files were removed (AGENTS.md's conmuta block is in git history, the `.mcp.json` backup
+  carried nothing new); seven stale `~/.pi/agent` config backups were removed; my own probe session files were
+  removed. Engram: `projects prune` dropped 21 zero-observation projects and `projects consolidate --all`
+  merged the two case-duplicates (`Vannar`→`vannar`, `alexa-claudeCode`→`alexa-claudecode`) — 108 → 85
+  projects, no observation lost, the database backed up first. Removing the ghost repo made Engram's cwd
+  detection explicit (`ambiguous` when several repos live in one folder), and `FRISCO\.engram\config.json`
+  (`{"project_name":"frisco"}`) now pins that root, so FRISCO-rooted sessions stopped writing to
+  `laboratorio` while descendants keep their own projects (`frisco-erp` by remote, `frisco-caseta` by its own
+  root).
+- **Documentation**: HANDOFF §3.2/§3.3 marked done with their evidence, §4 gained the ghost-repo and Engram
+  attribution bullets and lost "two untracked files are deliberate" (the tree is clean now), the satellite
+  README gained the hot-edit hazard and the project-trust requirement, B-105(b) and B-106 were updated from
+  what was measured, and B-107 was filed.
+- **RDD**: the documentation candidate went through native review — `inspect`; `start` closed it by itself
+  (`risk_tier: low`, `lenses_required: false`, `selected_lenses: []`, `risk_reasons: [non_executable_only]`,
+  1 file / 40 changed lines); `status` offered the approved acknowledgement; `acknowledge-approved` burned
+  authority (`gentle-ai.review-acknowledged/v1`, lineage `review-73e0e357217ed1c5`). No lens ran, no consent
+  envelope was raised, and the durable trail is the receipt under `.git/gentle-ai/` — not a source commit.
+- **State at close**: suite 1841/1835/0/6, `test:static` 99/99, `src/` untouched, one runner, ladder `wake`,
+  the tree clean, `main` pushed.
+
 ## Session 59 — the wake satellite (B-104): constitutional amendment, implementation, and its audit
 
 - **Date**: 2026-09-30 local time (started 2026-09-30, closed 2026-10-01 local).
