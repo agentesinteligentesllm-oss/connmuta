@@ -46,6 +46,6 @@ Pinned by (v1 `test/tools/fetch.test.ts`): `:2012` `telegram_message_id` omitted
 ## Relevance to Conmuta
 
 - **Carries verbatim** in the reused fetch pipeline (D1). For Arena-light (D7) it is load-bearing: `AUDIT` and `COUNTER` are `REPLY` turns, so a debate participant's `needs_action` entry must show the peer's latest turn, which is exactly "the last message that is not ours".
-- **A governance lesson, not only a fix.** Real use found in one hour what two ADR-level audits had missed. The [GOVERNANCE](../01-constitution/GOVERNANCE.md) rule that every guarantee is pinned by a test that can fail (ADR-0012) is necessary and not sufficient; the F7 referee role (backlog B-01) is the first v2 consumer of `needs_action` and should be exercised on a real binding before F5 declares Arena-light done ([WORK-PLAN](../07-plan/WORK-PLAN.md)).
+- **A governance lesson, not only a fix.** Real use found in one hour what two ADR-level audits had missed. The [GOVERNANCE](../01-constitution/GOVERNANCE.md) rule that every guarantee is pinned by a test that can fail (ADR-0012) is necessary and not sufficient; the F7b referee role (backlog B-01) is the first v2 consumer of `needs_action` and should be exercised on a real binding before F5 declares Arena-light done ([WORK-PLAN](../07-plan/WORK-PLAN.md)).
 - **Number collisions are a process risk.** This register keeps one file per ADR and a single [INDEX](./INDEX.md) precisely so that the next number is read from the tree, never recalled.
 - Analysis verdict: YES (analysis bundle, `governance-docs` key_facts[27]).

@@ -144,7 +144,7 @@ mitigation.
 | # | Layer | Rule in Conmuta | Strength |
 |---|---|---|---|
 | 1 | Capability isolation | The core (daemon + thin client) has no exec, no shell, no arbitrary file access, no ability to invoke another tool. Only effects: HTTPS to `api.telegram.org`, loopback IPC on `127.0.0.1`, reads/writes under its own home (`~/.conmuta`) | Enforced, load-bearing |
-| 2 | Zero autonomous emission | No timer that emits, no background task that sends, no auto-reply. The daemon's long-poll is a **read** loop; the only send path is an explicit tool call in an agent turn. Version observability rides the render-only header of posts the agent sends anyway — no heartbeat (amendment A1, B-14) | Enforced |
+| 2 | Zero autonomous emission | No timer that emits, no background task that sends, no auto-reply. The daemon's long-poll is a **read** loop; the only send path is an explicit tool call in an agent turn. Version observability rides the render-only header of posts the agent sends anyway — no heartbeat (amendment A1, B-14). A **local, body-less wake notification** (the doorbell family, §3.1) is not an emission: it never leaves the machine, never reaches Telegram, and starts no turn by itself | Enforced |
 | 3 | Settings immutability | No component reads, writes or proposes edits to any IDE settings or permissions file (`.claude/settings*.json`, `permissions.allow` or their equivalents in other hosts). The installer writes only an id-only MCP registration entry into a **detected** tool's project-level config, merging never overwriting, opt-in per tool (D5) | Enforced |
 | 4 | Fail-closed `basis` enum | Every `RESOLVED` declares `basis ∈ {context-shared, work-confirmed, lock-released, human-approved, abandoned}`; nothing else has a representation (v1 ADR-06 L4, ADR-13) | Enforced at schema level |
 | 5 | `human-approved` escape hatch | Requires a non-empty `approval_ref`. The bus cannot verify that a human approved anything | Audit trail, not a control |
@@ -156,7 +156,7 @@ Decisions that fix the boundary for v2:
 - **The core is a passive switch** (D6, Alpha objection n1). A headless runner that invokes an
   agent CLI on new `needs_action` violates layers 1–2 and creates an RCE vector via indirect prompt
   injection from Telegram. It is out of the core: an optional satellite package `@conmuta/runner`,
-  post-F6, with its own constitution, read/reply-only by default (B-06). Its constitution may not be
+  in phase F7a (§3.1; [ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md)), with its own constitution, read/reply-only by default (B-06). Its constitution may not be
   weaker than invariants 2, 4 and 5.
 - **The Claude Code channels adapter is a doorbell only** (D6): no body crosses, it never writes,
   it never replaces a fetch (v1 ADR-24 semantics, `design.md:509-537`).
@@ -165,6 +165,55 @@ Decisions that fix the boundary for v2:
 - **The bot never holds an admin role** in its group (v1 hard rule 2, `HANDOFF.md:298-299`). Spike
   B-07 measures whether non-admin bots see each other's posts; if it forces a change, that change
   needs an ADR that re-examines this rule and the "pinning" entry in §6 explicitly.
+
+### 3.1 Component classes and the wake ladder (amendment 1, [ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md))
+
+Added 2026-09-30 on the Director's instruction (backlog B-104). It **adds** a sanctioned component
+class and an explicit opt-in model; it releases no invariant, no pinning test and no default, and the
+rules above keep their exact text. The detail, the options considered and the pinning tests live in
+ADR-0032; this section is the law it amends.
+
+- **Three component classes.** (a) The **core**: daemon, thin stdio client, installer/doctor, local web
+  panel — bounded exactly as above. (b) **Doorbell adapters**: body-less consumers of the local wake
+  signal; the F4 Claude Code adapter is the shipped example. (c) The **wake satellite**: the only
+  component that may start a harness process; it ships as its own `bin` outside the core's bundles, and
+  the core's built closures must contain no reference to it.
+- **The trigger path carries no prose.** The satellite consumes only the body-less local wake signal the
+  daemon already serves — no new route, no IPC contract change, no wire change (§4 untouched). It holds
+  no bot token, never calls the Telegram API, and never reads the ledger directly: peer bodies reach a
+  turn only through the thin client's `fetch`, inside the turn, inside the untrusted-input fence.
+- **Opt-in is a human action, machine-local.** The ladder is per **binding**, stored under the daemon
+  home, and written only by an explicit, audit-logged human action. The committed `conmuta.json` stays
+  id-only (D5) and carries no ladder key. A binding with no ladder record is `off` — and so is a missing,
+  unreadable, malformed or unknown-level record: the ladder fails closed, and the resolution is counted
+  and surfaced, not silent. Nothing in the satellite, the daemon or the bus may raise it.
+- **The ladder is monotone**: `off` (default) → `notify` (notify the human; **no turn starts**) →
+  `wake` (one turn in the read/reply-only profile) → `autopilot` (one turn in a declared, confined act
+  profile). Level names and every bound's value are named constants fixed in the F7a spec (§5), never
+  here.
+- **Bounds are structural**: per-binding wake cooldown, a per-window wake budget, at most one turn in
+  flight per binding, and a kill switch that returns the binding to `off`. The satellite keeps its own
+  append-only wake ledger: exactly one row per accepted wake naming the trigger's verified identity, the
+  thread, the level and the action taken — never a body, never a token. A refused wake is a counted
+  refusal with a reason, never a silent drop. The daemon knows nothing of this ledger and cannot attest
+  to it: its own `audit_log` keeps recording only what the daemon itself does.
+- **`autopilot` is bounded where a bound can be enforced, and instructed where it cannot.** Enforced by
+  construction: one spawn site, a closed executable set (the four harness names), an argv that cannot carry a
+  shell, an interpreter or a permission-bypass flag, an allow-listed environment, the binding's own project
+  directory, and a bounded turn. The profile itself — no `git push`/`merge`/`tag`/release, no settings or
+  permissions write, no secret read, no `deleteMessage`, no admin role, no send outside the binding's group —
+  is what the prompt tells the turn and what the harness's own configuration must refuse: the runner never
+  invokes git, the settings files or the secret store, so no static assertion can pin those. A woken turn's
+  capability is the profile it was started with, never the group's privacy.
+- **The satellite's own constitution** may not be weaker than invariants 2, 4 and 5, and may not weaken
+  the core's layers 1–3. Its own threat model and pinning tests are F7a deliverables.
+- **Nothing is applied automatically.** A woken turn's conclusions reach the bus only as ordinary sends;
+  any code change remains a human-authorized commit and merge (§8; invariant 5 unchanged).
+- **Nothing is released.** Invariant 5's "no exec" clause binds the core and is unchanged: this
+  amendment locates, outside the core, the capability the core may never hold. "Read/reply-only by
+  default" stays true — `off` is the default overall, and `wake` is the default when a human enables the
+  ladder. If this is ever read as weakening an invariant rather than clarifying its scope, §9.3 applies
+  and a superseding ADR naming the invariant and the tests it releases is required.
 
 ---
 
@@ -294,7 +343,7 @@ Inherited hard rules that are neither invariants nor closed entries (v1 `HANDOFF
 | 0 Precedence | v1 `docs/ROLLOUT-LOG.md:20-34`; decision record ("the Director authorizes and has the last word") |
 | 1 Governing rule | v1 `design.md:258-291` (ADR-12); `docs/functional-audit/README.md:22-23` |
 | 2 Five invariants | decision record, verbatim; analysis bundle `research[security-isolation]` recommendation and findings T01–T15 |
-| 3 Autonomy boundary | v1 `design.md:181-197` (ADR-06); `test/security.test.ts:176-270`; D6; B-06, B-14 |
+| 3 Autonomy boundary | v1 `design.md:181-197` (ADR-06); `test/security.test.ts:176-270`; D6; B-06, B-14; §3.1 added 2026-09-30 by [ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md) (Director instruction, B-104) |
 | 4 Wire and freeze doctrine | D1, D2, D7; v1 `design.md:449-467, 531`; `README.md:121, 162-166`; `CLAUDE.md:235, 247, 253`; `HANDOFF.md:311-314` |
 | 5 Named-constant rule | v1 `HANDOFF.md:359-369`; `test/config.test.ts:49-59` |
 | 6 Closed permanently | v1 `06-verdict.md:160-177`; `HANDOFF.md:297-309, 336-345`; D3, D4 |
@@ -307,3 +356,4 @@ Inherited hard rules that are neither invariants nor closed entries (v1 `HANDOFF
 | Version | Date | Change | Debate / ADR |
 |---|---|---|---|
 | 0.1 | 2026-09-15 | Initial text from the landing debate; pending Director confirmation | `bus-v2-landing-architecture-001`; ADR-0028..0031 |
+| 0.2 | 2026-09-30 | Amendment 1: §3.1 added — three component classes, the layer-2 clarification (a local body-less wake is not an emission), and the per-binding wake ladder `off`·`notify`·`wake`·`autopilot`. No invariant, pinning test or default released | `bus-v2-b104-wake-satellite-001`; [ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md) (Director instruction, backlog B-104) |

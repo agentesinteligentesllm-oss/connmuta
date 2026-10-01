@@ -4,7 +4,7 @@
 
 ## Status
 
-`accepted` — accepted by the tribunal (`bus-v2-landing-architecture-001`) and confirmed by the Director on 2026-09-16 (Director note DN-04).
+`accepted` — accepted by the tribunal (`bus-v2-landing-architecture-001`) and confirmed by the Director on 2026-09-16 (Director note DN-04). **Superseded in part by [ADR-0032](0032-wake-satellite-and-per-binding-ladder.md):** the phase-target sentence of the "Headless runner inside the core" row in *Options considered* below (the satellite is F7a, not post-F6). Rules 1–7, the rejection of an in-core runner and every "Tests that must pin it" row are unchanged.
 
 ## Date
 
@@ -38,7 +38,7 @@ The v1 constitution forbids a daemon (ADR-03; "closed permanently" list,
 | Per-OS-user daemon + thin stdio clients | One daemon per OS user is the sole `getUpdates` consumer per token; per-project stdio MCP clients talk to it over local IPC. | Removes 409 and 24 h loss while alive; requires a lifecycle (spawn, lock, autostart) and an IPC contract. | **Chosen** |
 | Docker sidecar | Daemon inside a container. | Docker Desktop licensing gate, WSL2 admin + reboot, 1–4 GB idle RAM, stdio inside containers; no local bus in the state of the art uses it (`research[packaging-runtime]`). | Rejected (D4) |
 | OS service wrappers (NSSM, WinSW, pm2) | Install as a real service. | NSSM/WinSW need admin and are stagnant; pm2 is AGPL-3.0 without native Windows startup. | Rejected |
-| Headless runner inside the core | Daemon invokes `claude -p` / `codex exec` / `opencode run` / `gemini -p` on new `needs_action`. | Violates [0006](0006-autonomy-boundary.md) layers 1–2 and opens an RCE path via indirect prompt injection from Telegram (Alpha objection n1). | Rejected for the core; optional satellite `@conmuta/runner` post-F6 (B-06) |
+| Headless runner inside the core | Daemon invokes `claude -p` / `codex exec` / `opencode run` / `gemini -p` on new `needs_action`. | Violates [0006](0006-autonomy-boundary.md) layers 1–2 and opens an RCE path via indirect prompt injection from Telegram (Alpha objection n1). | Rejected for the core; optional satellite `@conmuta/runner` in phase **F7a** (B-06; phase target only superseded in part by [ADR-0032](0032-wake-satellite-and-per-binding-ladder.md)) |
 | IPC over named pipe / unix socket | Per-user pipe with DACL / socket 0600. | Node cannot set a DACL on a Windows named pipe; reachability by another local user is unverified. | Deferred — spike B-08 |
 | IPC over loopback HTTP, static bearer | Random port, per-boot secret. | After a daemon crash, Windows ephemeral-port reuse could make a new client send its bearer to a foreign process (Alpha objection n2). | Hardened (see Decision) |
 
@@ -106,3 +106,11 @@ The v1 constitution forbids a daemon (ADR-03; "closed permanently" list,
 | Core has no exec and no timers that emit | Static assertions over the built bundle, equivalent to v1 `test/security.test.ts:176-244`: no `child_process`, `fs` confined to the home, no `setInterval`/`setTimeout` on a send path. |
 | Idle shutdown respects open threads | Daemon with one open thread in any binding does not shut down on idle. |
 | No heartbeat emission | Test asserts zero outbound messages from the daemon over a simulated idle window. |
+
+## Amendment note (2026-09-30, [ADR-0032](0032-wake-satellite-and-per-binding-ladder.md))
+
+Rule 6 above is **not** affected: it says that no *verified wake-up contract exists for an interactive host
+session* (spike B-09), which is still true, and ADR-0032 does not claim one. The wake satellite starts a **new
+headless turn** on a local, body-less signal; it never wakes a host session, and no host-specific logic enters
+the core. Only the phase-target sentence in "Options considered" is superseded in part: the satellite is F7a,
+not post-F6. Rules 1-7 keep their exact text.

@@ -32,7 +32,7 @@ Source of truth for **who is on this project's bus**. Decided by D5 / objection 
 | `roster[].agent_id` | string matching `^@[a-z0-9][a-z0-9-]{1,30}$` (v1 `src/envelope.ts:13`) | yes | — | Enforced at load — v1 did **not** enforce the wire regex on config, so a bad id was emitted and silently discarded by peers as `malformed` (bundle: maps[config-state] must_change) |
 | `roster[].user_id` | integer `> 0` — numeric Telegram user id of that member's **bot** | yes | — | The identity anchor on ingest (I-4); the only field authorization uses |
 | `roster[].username` | string, display only | yes | — | Never used for authorization: usernames are mutable (bundle: research[security-isolation] T07) |
-| `referee` | `agent_id`, must be a roster member | no | this file | Reserved for the group referee role (B-01, F7) |
+| `referee` | `agent_id`, must be a roster member | no | this file | Reserved for the group referee role (B-01, F7b) |
 
 **Must never contain:** any local path; any token-shaped string (`\d+:[A-Za-z0-9_-]{35}`, v1 `src/secrets.ts:16`); any `Authorization` literal; the bot username of the machine owner as an authority field. A token-shape validator runs in pre-commit and in `doctor` (I-2).
 

@@ -27,7 +27,10 @@ flowchart LR
   F3 --> F6
   F4 --> F6
   F5 --> F6
-  F6 --> F7[F7 referee satellite]
+  F1 --> F7a[F7a wake satellite]
+  F4 --> F7a
+  F7a --> F7b[F7b referee satellite]
+  F6 --> F7b
   F6 --> F8[F8 desktop tray shell]
 ```
 
@@ -122,18 +125,31 @@ flowchart LR
 | Backlog | B-11 (close), B-12, B-16. |
 | Risks | macOS claimed without evidence — forbidden by D9; publish under a name that later fails clearance — forbidden by B-11 ordering. |
 
-## F7 — Group referee, skill templates, ticket ledger (satellite)
+## F7a — Wake satellite (the despertador)
 
 | Field | Content |
 |---|---|
-| Goal | The first consumer of the optional runner satellite: a mechanical referee per group. |
-| Deliverables | `@conmuta/runner` satellite with its own constitution, read/reply-only by default (B-06); referee role and rule set (B-01); skill templates offered per bot/group (B-02); ticket ledger location decided after B-01 — daemon table exposed as MCP tools vs external adapters (B-03). |
-| Dependencies | F6 (published core); dedicated debate `bus-v2-referee-001` ([../05-tribunal/INDEX.md](../05-tribunal/INDEX.md)). |
+| Goal | Let a bound agent be woken by its own bus traffic instead of waiting for a human to open a session: a satellite outside the core starts one harness turn on the daemon's existing body-less doorbell. |
+| Deliverables | `@conmuta/runner` (name fixed by this phase) with its own constitution (not weaker than invariants 2, 4 and 5) and its own threat model; the per-binding, machine-local wake ladder `off`·`notify`·`wake`·`autopilot` with a human-only, audit-logged opt-in and a kill switch; the bounds (cooldown, per-window budget, one turn in flight) as named constants with their values; one audit row per wake; adapters for the team's harnesses (Pi and Claude Code first). |
+| Dependencies | F1 (daemon IPC, ledger, audit) and F4's shipped doorbell (`/channel/doorbell`, body-less, roster-gated). **Not F6**: the satellite consumes the local IPC, not the published package. |
+| Validation | The satellite's own static assertions (PT-37), plus the core-side pins PT-34 (the core closures cannot reach the satellite), PT-35 (no ladder key in `conmuta.json`; no record means `off`), PT-36 (bounded, counted, audited wakes) and PT-38 (the trigger path stays body-less). Invariant re-asserted: the core bundle stays free of the runner. **Session 59 status: implemented and pinned** (`test/security/runner-bundle.test.ts` for PT-34/PT-37, `test/runner/*` for PT-35/PT-36/PT-38); full suite 1824/1818/0/6, `src/` untouched. |
+| SDD change | `f7a-wake-satellite` — **implemented under ODD, and its SDD artifact set (proposal/spec/design/tasks) is owed**: filed as B-105(a) rather than left implicit |
+| Spikes | none scheduled; B-09 stays untested for Gemini CLI / Cursor and is not a blocker (the satellite wakes a headless turn, it does not wake a host session). |
+| Backlog | B-06 (the satellite), **B-104** (this phase's requirement, now `done`), **B-105** (the owed SDD artifacts and the real end-to-end run), B-09 (carried, low priority). |
+| Risks | This is the RCE surface Alpha objected to (n1). It must never ship inside `conmuta`; `off` is the default; the enabled default stays read/reply-only; `autopilot` is a per-binding human decision whose control is the confined profile, not the group's privacy (ADR-0032 R7, THREAT-MODEL T24). |
+
+## F7b — Group referee, skill templates, ticket ledger (satellite)
+
+| Field | Content |
+|---|---|
+| Goal | The first consumer of the wake satellite: a mechanical referee per group. |
+| Deliverables | Referee role and rule set (B-01); skill templates offered per bot/group (B-02); ticket ledger location decided after B-01 — daemon table exposed as MCP tools vs external adapters (B-03). |
+| Dependencies | F6 (published core) **and F7a** (the satellite the referee runs on); dedicated debate `bus-v2-referee-001` ([../05-tribunal/INDEX.md](../05-tribunal/INDEX.md)). |
 | Validation | Defined by the referee debate; at minimum the satellite's own static assertions and the invariant that the core bundle stays free of the runner. |
-| SDD change | `f7-referee-satellite` (proposed; name may change with the debate) |
+| SDD change | `f7b-referee-satellite` (proposed; name may change with the debate) |
 | Spikes | none scheduled yet. |
-| Backlog | B-01, B-02, B-03, B-06. |
-| Risks | The runner is the RCE surface Alpha objected to (n1); it must never ship inside `conmuta`, and its default must remain read/reply-only. |
+| Backlog | B-01, B-02, B-03. |
+| Risks | A referee that acts automatically is a higher `autopilot` level than the wake satellite's own default; the referee debate must fix its profile explicitly and may not weaken ADR-0032 R7. |
 
 ## F8 — Desktop tray shell
 
@@ -152,10 +168,10 @@ flowchart LR
 
 | Backlog | Phase | Status in CHECKLIST | Where it is honored |
 |---|---|---|---|
-| B-01, B-02, B-03 | F7 | open | referee debate `bus-v2-referee-001` |
+| B-01, B-02, B-03 | F7b | open | referee debate `bus-v2-referee-001` |
 | B-04 | F8 | open | tray shell |
 | B-05 | F0 spike → F2 | open | installer config matrix |
-| B-06 | post-F6 (F7) | decided | runner satellite |
+| B-06 | F7a | decided | wake satellite (own package, own constitution; [ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md)) |
 | B-07 | F0 spike → F1 | open | admin requirement for project bots |
 | B-08 | F0 spike → F1 | open | IPC design |
 | B-09 | F0 spike → F4 | done | wake-up honesty per host — Claude Code only (confirmed); Codex/OpenCode/Antigravity checked-and-absent; Gemini CLI/Cursor untested |
@@ -168,3 +184,5 @@ flowchart LR
 | B-16 | F0 → F6 | open | repository hygiene, LICENSE pending Director |
 | B-17 | F2 | decided | Node ≥ 24 first gate |
 | B-18 | F1 | decided | `conmuta.json` |
+| B-19 … B-103 | F1–F5 follow-ups | see CHECKLIST | carried; none blocks the phases below — the rows are read at the next touch of the files they name |
+| B-104 | F7a | decided | the wake requirement phase F7a exists for ([ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md)) |

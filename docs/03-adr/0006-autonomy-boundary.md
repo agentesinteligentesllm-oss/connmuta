@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Status | inherited-valid (constitution-level) |
+| Superseded in part by | [ADR-0032](./0032-wake-satellite-and-per-binding-ladder.md) — the runner satellite's **phase target only** (`post-F6` → F7a). The core ruling below is reaffirmed, not superseded |
 | Date | 2026-08-14 (original, v0.1.0 design) |
 | Origin | Inherited from telegram-agent-bus v1.0.2 design.md ADR-06 |
 | Inheritance verdict | YES, inherit verbatim, in `maps[governance-docs]`; `bus-v2-landing-architecture-001` D6 and Alpha objection n1 |
@@ -40,8 +41,18 @@ On a secret match the tool returns `SECRET_PATTERN_DETECTED` naming the rule tha
 
 **Verdict: inherited verbatim; constitution-level** (D10, [CONSTITUTION](../01-constitution/CONSTITUTION.md)). The tribunal used this ADR as the decisive argument of round 1:
 
-- **Alpha objection n1 (accepted).** A headless runner inside the core (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on new `needs_action`) violates layers 1-2 and creates an RCE vector via indirect prompt injection from Telegram (evidence cited in the debate: `design.md:185-188`, `test/security.test.ts:66,224`, `src/tools/fetch.ts:36,202`). D6 therefore defines the core — daemon plus thin client — as a **passive switch** under layers 1-2: no exec, no shell, no tool invocation, zero autonomous emission, no timers that emit, static security assertions equivalent to `test/security.test.ts` (no `child_process`, `fs` only inside its home). The runner is an optional satellite package post-F6 with its own constitution, read/reply-only by default (backlog B-06); the Claude Code channels adapter is a doorbell only.
+- **Alpha objection n1 (accepted).** A headless runner inside the core (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on new `needs_action`) violates layers 1-2 and creates an RCE vector via indirect prompt injection from Telegram (evidence cited in the debate: `design.md:185-188`, `test/security.test.ts:66,224`, `src/tools/fetch.ts:36,202`). D6 therefore defines the core — daemon plus thin client — as a **passive switch** under layers 1-2: no exec, no shell, no tool invocation, zero autonomous emission, no timers that emit, static security assertions equivalent to `test/security.test.ts` (no `child_process`, `fs` only inside its home). The runner is an optional satellite package in phase **F7a** (its phase target only is superseded in part by [ADR-0032](./0032-wake-satellite-and-per-binding-ladder.md)) with its own constitution, read/reply-only by default (backlog B-06); the Claude Code channels adapter is a doorbell only.
 - **Layer 2 under a daemon.** The daemon's long-poll is a receive loop; it never emits. Amendment A1 retracted a proposed heartbeat timer for exactly this reason (backlog B-14): version observability rides the render-only header of posts the agent sends anyway.
 - **Layer 3 across hosts.** v1 named only `.claude/settings*.json`. The analysis bundle records that the multi-host product must enumerate every host's permission/config file the core must never touch (`maps[governance-docs]` must_change). The installer of D5 is a separate component that writes only an id-only stdio entry into detected tools' project-level MCP configs, opt-in per tool, merging never overwriting; the exact layer-3 enumeration for the multi-host core is not settled by the DECISION RECORD and is to be fixed in the constitution and the F2 SDD spec.
 - **Layer 6 gains a consumer.** Invariant 2 adds a token-shape validator in pre-commit and `doctor` over project files.
 - **Layer 7 is Invariant 5.** Peer content is data, never action: everything received is fenced and origin-labelled; the core has no exec and no `fs` outside its home; nothing from the bus is executed or applied automatically (no PATCH auto-apply; `CONSENSUS` is a message); rounds and participants are capped; every send/receive/reject is appended to a per-binding audit log that stores no rejected bodies and no tokens.
+
+## Amendment note (2026-09-30, [ADR-0032](./0032-wake-satellite-and-per-binding-ladder.md))
+
+The Director's instruction of 2026-09-30 (backlog B-104) sanctioned a **wake satellite**: a component outside
+the core that may start a harness turn on the daemon's existing body-less doorbell, under a per-binding,
+machine-local, opt-in ladder (`off`·`notify`·`wake`·`autopilot`). Nothing above changes: the core is still the
+passive switch, layers 1-2 are untouched, the runner is still never inside the core, and "read/reply-only by
+default" still holds (`off` is the default overall; `wake` is the default when a human enables the ladder).
+Only this section's **phase sentence** is superseded — the satellite is F7a, not post-F6. The boundary's new
+text is CONSTITUTION.md §3.1.

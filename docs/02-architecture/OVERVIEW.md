@@ -207,7 +207,7 @@ The daemon watches `registry.json` (inside its home), validates it strictly, and
 | Peer content is data | Nothing received is executed or applied; `CONSENSUS` is a message; no `PATCH` auto-apply | Invariant 5 |
 | Secrets never leave | Tokens never in URLs exposed to logs, errors or stacks; the HTTP client redacts by construction; a bundle-level test asserts no error path can contain the token shape | Invariant 2; bundle: research[security-isolation] T04 |
 
-The headless runner (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on new `needs_action`) would violate layers 1–2 and create an RCE path through indirect prompt injection from Telegram (objection n1, evidence v1 `design.md:185-188`, `test/security.test.ts:66, 224`, `src/tools/fetch.ts:36, 202`). It is therefore **out of the core** (§13).
+The headless runner (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on new `needs_action`) would violate layers 1–2 and create an RCE path through indirect prompt injection from Telegram (objection n1, evidence v1 `design.md:185-188`, `test/security.test.ts:66, 224`, `src/tools/fetch.ts:36, 202`). It is therefore **out of the core** (§13) — and located in phase **F7a** as the wake satellite, under a per-binding, human-set ladder ([ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md)).
 
 ## 8. The thin client
 
@@ -218,7 +218,7 @@ The headless runner (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on n
 | Errors | Structured `isError` payloads `{code, message, retryable, retry_after_s?, new_chat_id?}` with a closed retryable allowlist (v1 `src/index.ts:45-63`); new codes at least `DAEMON_DOWN`, `WRONG_ROOM`, `UNBOUND_PROJECT` (names to be fixed in F1) |
 | Holds | Nothing secret: no token, no registry, no ledger handle; only the per-boot IPC credential in memory after the handshake |
 | Binding | Resolved once (§6), frozen for the session |
-| Wake-up | Pull only. No verified wake-up contract exists for Cursor, OpenCode, Codex, Gemini CLI or Antigravity; Claude Code channels are a research preview (spike B-09). Hosts rely on the fetch cadence documented in the project's `AGENTS.md`; the daemon makes each fetch near-instant (D6) |
+| Wake-up | Pull only. No verified wake-up contract exists for Cursor, OpenCode, Codex, Gemini CLI or Antigravity; Claude Code channels are a research preview (spike B-09). Hosts rely on the fetch cadence documented in the project's `AGENTS.md`; the daemon makes each fetch near-instant (D6). Separately, when a human enables that binding's ladder, the optional wake satellite (F7a) may start a **new headless turn** on the same body-less doorbell — it never wakes an interactive host session ([ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md)) |
 | Host-neutral wording | The v1 contract hard-coded Claude Code's permission flow and an Engram `mem_save` obligation (v1 `src/tools/send.ts:655`; bundle: maps[protocol-tools]); v2 wording is host-neutral |
 
 ## 9. IPC handshake (D3, objection n2)
@@ -338,10 +338,10 @@ Two-party debates ride the existing thread model with **no wire change**: `PROPO
 
 | Satellite | Status | Boundary |
 |---|---|---|
-| `@conmuta/runner` (headless runner: `claude -p`, `codex exec`, `opencode run`, `gemini -p` on new `needs_action`) | Post-F6, own constitution, read/reply-only by default; first consumer = the group referee (F7, debate `bus-v2-referee-001`) | Never inside the core (objection n1; B-06) |
+| `@conmuta/runner` — the **wake satellite** (headless runner: `claude -p`, `codex exec`, `opencode run`, `pi -p`) | **F7a — implemented (session 59)**: its own constitution and threat model, read/reply-only by default, enabled per binding by a human only through the ladder `off`·`notify`·`wake`·`autopilot` ([ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md); CONSTITUTION §3.1; runbook [`runbooks/wake-satellite.md`](./runbooks/wake-satellite.md)). It consumes the daemon's existing body-less doorbell — no new route, no wire change | Never inside the core (objection n1; B-06). It ships as its own `bin`, and the core's built closures must contain no reference to it (PT-34) |
 | Claude Code channels adapter | F4, optional doorbell only; body-less events fed by the daemon's inbox, replacing v1's per-session `getUpdates` peek loop (v1 `channel/watcher.ts:154-185`) | Claude Code research preview; no equivalent verified for other hosts (B-09) |
 | Desktop tray shell | F8, optional; wraps the **same** daemon (sidecar) and the **same** web panel; Alpha recommends Tauri v2 (amendment A2; B-04) | The daemon runs headless without it |
-| Group referee role, skill templates, ticket ledger | F7, dedicated debate | B-01, B-02, B-03 |
+| Group referee role, skill templates, ticket ledger | F7b, dedicated debate | B-01, B-02, B-03 |
 
 ## 14. Pending decisions and spikes that touch this document
 

@@ -29,7 +29,7 @@ where `design.md` names one; the full v1 debate list is in
 | [0003](0003-per-machine-subprocess-no-daemon.md) | Per-machine session subprocess, no daemon | untagged | `superseded` | by [0029](0029-per-user-daemon-and-thin-clients.md) | — | The subprocess survives as the thin client; the daemon owns token, poller and inbox. |
 | [0004](0004-dual-channel-delivery.md) | Dual-channel delivery: group for humans, direct DM for agents | untagged | `inherited-valid` | — | — | Per (bot, group) pair it maps 1:1 onto a project (0028). |
 | [0005](0005-wire-format-sentinel.md) | Wire format: sentinel-prefixed single-line JSON (+05a/05b/05c) | untagged; amendments dated 2026-08-15 | `inherited-valid` (frozen) | — | — | This is the wire. No wire change in v2 (D1). |
-| [0006](0006-autonomy-boundary.md) | Autonomy boundary: capability isolation + fail-closed basis | untagged | `inherited-valid` | — | — | Constitution-level; layers 1–2 keep the headless runner out of the core (D6). |
+| [0006](0006-autonomy-boundary.md) | Autonomy boundary: capability isolation + fail-closed basis | untagged | `inherited-valid` | superseded **in part** by [0032](0032-wake-satellite-and-per-binding-ladder.md) (the satellite's phase target only) | — | Constitution-level; layers 1–2 keep the headless runner out of the core (D6). The core ruling stands; 0032 locates the capability in an F7a satellite instead of post-F6. |
 | [0007](0007-loop-prevention.md) | Loop prevention in the tool layer | untagged | `inherited-valid` | — | — | |
 | [0008](0008-checkpoint-windows.md) | `[CHECKPOINT-ESTADO]` windows synthesis | untagged | `inherited-valid` | — | — | Marker is wire-visible; kept as is because v2 makes no wire change. |
 | [0009](0009-ack-non-closing.md) | `ACK` is non-closing; only `RESOLVED` closes | untagged | `inherited-valid` | — | — | |
@@ -52,10 +52,12 @@ where `design.md` names one; the full v1 debate list is in
 | [0026](0026-unapplied-transition-is-a-diagnostic.md) | A transition that could not be applied is a diagnostic, not news | unversioned | `inherited-valid` | — | `agentbus-orphan-transitions-001` | |
 | [0027](0027-needs-action-projects-the-waiting-turn.md) | `needs_action` describes the turn that is waiting | unversioned (v1 HEAD) | `inherited-valid` | — | `agentbus-needs-action-muestra-apertura-001` | |
 
-## New in this repository (0028–0031)
+## New in this repository (0028–0032)
 
-All four were accepted by the tribunal in `bus-v2-landing-architecture-001` (consensus after two
-rounds) and stay `proposed` until the Director confirms.
+0028–0031 were accepted by the tribunal in `bus-v2-landing-architecture-001` (consensus after two
+rounds) and confirmed by the Director (DN-04). 0032 was accepted by the tribunal in
+`bus-v2-b104-wake-satellite-001` (Judgment Day substitute, DN-09) and stays `proposed` until the
+Director confirms.
 
 | # | Title | Status | Supersedes / amends | Debate | Decision record |
 |---|---|---|---|---|---|
@@ -63,6 +65,7 @@ rounds) and stay `proposed` until the Director confirms.
 | [0029](0029-per-user-daemon-and-thin-clients.md) | Per-user daemon + host-agnostic thin clients | `accepted` | 0003 (fully); re-bases the deployment of 0024 | `bus-v2-landing-architecture-001` | D3, D6; invariant (3) |
 | [0030](0030-sqlite-ledger-and-json-registry.md) | `node:sqlite` ledger + JSON registry + OS secret store | `accepted` | 0002 (in part); re-bases the mechanics of 0015 | `bus-v2-landing-architecture-001` | D4; invariants (2) and (3) |
 | [0031](0031-npm-distribution-and-license.md) | npm distribution and license | `accepted` | amends 0001 in part | `bus-v2-landing-architecture-001` | D9, D10 |
+| [0032](0032-wake-satellite-and-per-binding-ladder.md) | Wake satellite and the per-binding wake ladder (`off`·`notify`·`wake`·`autopilot`) | `proposed` (pending Director) | 0006 in part (phase target only); 0029 in part (same); amends CONSTITUTION §3 | `bus-v2-b104-wake-satellite-001` | Director instruction 2026-09-30; B-104, B-06; invariant (5) scope clarification |
 
 ## Closed-permanently items and the two reopened ones
 
