@@ -134,6 +134,10 @@ corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
   so in the operator's words.
 - **The wake ledger is self-reported** (ADR-0032 R6a): the daemon cannot corroborate it.
 - **Judge and auditor citations get checked against the file** (§0.4).
+- **PT-22's repository scan reads TRACKED files only** (`test/security/repo-scan.test.ts` over `git ls-files`),
+  so a token-shaped literal inside a brand-new file is invisible to it until that file is committed — session
+  59's suite was green at nine commits and turned red on the tenth, when the file carrying the fixture became
+  tracked. Run the full suite **after** `git add`, or keep fixtures' values non-token-shaped from the start.
 - **Two untracked files are deliberate**: `.mcp.json.bak-pre-conmuta-20260930T040537Z` and
   `AGENTS.md.bak-pre-conmuta-20260930T040537Z` are the installer's own backups. Do not commit them; do not
   delete them without asking.

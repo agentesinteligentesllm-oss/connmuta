@@ -158,8 +158,10 @@ test("harness: only the allow-listed environment reaches the child — a token-s
 			env: {
 				PATH: "/usr/bin",
 				HOME: "/home/placeholder",
-				// A token-shaped value: exactly what must not be handed to a woken turn.
-				TELEGRAM_BOT_TOKEN: "123456789:AAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				// The KEY is what must not reach a woken turn. The VALUE is deliberately not token-shaped: PT-22
+				// scans the tracked tree for the real pattern, and a fixture that quoted one verbatim would retrip
+				// that gate on this file — the doc-hygiene lesson session 3's tribunal row already recorded.
+				TELEGRAM_BOT_TOKEN: "placeholder-value-not-token-shaped",
 				GITHUB_TOKEN: "placeholder",
 			},
 		},
@@ -169,7 +171,7 @@ test("harness: only the allow-listed environment reaches the child — a token-s
 	await pending;
 
 	assert.deepEqual(Object.keys(calls[0].options.env).sort(), ["HOME", "PATH"]);
-	assert.ok(!JSON.stringify(calls[0].options.env).includes("123456789:"));
+	assert.ok(!Object.keys(calls[0].options.env).some((key) => key.includes("TOKEN")));
 });
 
 test("confinedEnv: an allow-listed key that is absent or empty is simply not present", () => {
