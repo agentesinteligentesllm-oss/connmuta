@@ -26,9 +26,12 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md y confirma Arena. F7a (el despertador) ya está implementado, auditado y
-en main. No hay trabajo en cola: pregúntame si vamos por la prueba real, por B-105 (artefactos SDD y
-corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
+Lee docs/08-sessions/HANDOFF.md y confirma Arena. F7a (el despertador) está implementado, auditado, en
+main y CORRIENDO para `frisco` (nivel wake, arnés pi, autostart + bucle de reinicio). Lo que sigue es
+operativo: (1) mover el registro MCP del bus a nivel de PROYECTO (.pi/mcp.json) en vez de la global
+~/.pi/agent/mcp.json; (2) verificar con una segunda sesión abierta en FRISCO que las cuatro herramientas
+aparecen y que sigue habiendo UN solo runner por binding; (3) armar otros bindings cuando yo lo pida.
+B-105(a) (artefactos SDD) y B-106 (cupo de sesiones) quedan como backlog.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
@@ -107,11 +110,24 @@ corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
    `wake` row with `outcome: exited` and moved the watermark 24→25. To inspect it, read
    `~/.conmuta/runner/wake-ledger.jsonl` and that wrapper's `runner.log`; the real switch is
    `ladder disable`, not killing the process.
-2. **B-105(a)**: write the `openspec/changes/f7a-wake-satellite/` artifact set (proposal, spec, design, tasks)
-   against the shipped code, so the phase has the SDD record every other phase has.
-3. **B-105(b)**: a real daemon + real harness + real message run, and the four harness argv forms verified
-   against the installed versions.
-4. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
+2. **Make the bus registration project-scoped, not global.** Pi reads project servers from
+   `.pi/mcp.json` and user servers from `~/.pi/agent/mcp.json`, and the installer already writes the
+   project file for its `pi` tool target (`src/installer/tool-targets.ts:73`, id-only, merging never
+   overwriting). A **user-level** entry that hardcodes `--project <id>` is global: it makes every Pi session
+   on the machine load a client that refuses in any other project's folder. Fix: register the bus in each
+   project's `.pi/mcp.json`, and leave the user-level file without a project-bound bus entry.
+3. **Verify the "N sessions, one runner" property on the machine.** Open a second session in `FRISCO` and
+   confirm the four `conmuta_*` tools appear there; confirm with
+   `Get-CimInstance Win32_Process` that exactly **one** `dist\runner\main.js` serves that binding, and that
+   the ladder is still `wake`. This is the check that turns the Director's requirement ("any number of
+   sessions in one folder, permanently") into evidence rather than an intention.
+4. **Arm any other binding the Director names**, one signed `ladder set` per project, never a second runner
+   per binding (§4's session-pool and one-runner rules).
+5. **B-105(a)**: write the `openspec/changes/f7a-wake-satellite/` artifact set (proposal, spec, design,
+   tasks) against the shipped code, so the phase has the SDD record every other phase has. **B-106**: the
+   daemon's session pool (the thin client never releases its slot) — the one ceiling "permanently, for days"
+   runs into.
+6. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
 
 ---
 
