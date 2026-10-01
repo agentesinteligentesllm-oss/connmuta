@@ -143,6 +143,7 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 | `refused (arguments_refused)` | The record's `--arg` list contains an interpreter or permission-bypass flag. |
 | `refused (in_flight)` | A turn is still running. It is bounded by the ten-minute turn timeout. |
 | `link_failed` | No live daemon for this user, or the run file's daemon died. Start the daemon and run again. |
+| A peer message arrives but no new `wake` row appears | The message was sent by the binding's **own** agent: the doorbell skips self-echo (`row.from_agent_id !== binding.agent_id`, `src/daemon/serve/doorbell.ts:154`), so a binding cannot wake itself. Test with **another** roster agent — a `REQUEST` to this binding's agent, or a `BROADCAST` with no `to` (a `BROADCAST` carrying `to` is refused by the wire schema). A human typing in Telegram does not work either: their `user_id` is not on the roster and ingest drops it as `unknown_sender`. |
 | `woke` but nothing appears on the bus | The turn's own harness output is on stderr (capped). Most often the harness form is wrong, or the project's MCP registration is missing. |
 | The harness exits immediately with a permission error | Your harness's own configuration refuses headless tool use. That refusal is the control working; the runner will not override it. |
 
