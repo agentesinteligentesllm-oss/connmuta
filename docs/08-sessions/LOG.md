@@ -4,6 +4,48 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 59 — the wake satellite (B-104): constitutional amendment, implementation, and its audit
+
+- **Date**: 2026-09-30 local time (started 2026-09-30, closed 2026-10-01 local).
+- **Authority**: the Director's two instructions. The first: enable the "despertador" that B-104 asked for,
+  amending the constitution if necessary, with the "notify a human" shape and a "piloto automático" mode as
+  the user's own per-binding option. The second, after the governance half was reported: implement it in this
+  session, Arena is down, full authorization, no RDD needed, and "tengo toda mi autorización para hacer los
+  commits". Both recorded as Director notes DN-10 (tribunal index).
+- **Preflight**: Arena's MCP server again failed to connect (`mcp connect arena`: nothing listening at
+  `http://127.0.0.1:8765/mcp`), a real tool-level failure, so DN-09's substitute (Judgment Day) applied with no
+  B-101 waiver.
+- **Governance half**: new **ADR-0032** + **CONSTITUTION §3.1** (three component classes; the layer-2
+  clarification that a local body-less wake is not an emission; the ladder `off`·`notify`·`wake`·`autopilot`,
+  per binding, machine-local, human-signed; bounds; one wake ledger row per accepted wake). Frozen of the
+  satellite as **F7a** (not blocked on F6) with the referee moved to **F7b**; THREAT-MODEL **T23–T25** and
+  **PT-34–PT-38**; reciprocal in-part supersession notes on ADR-0006 and ADR-0029 (phase target only); the
+  RFC's three corrections; B-104 decided. Audited as debate `bus-v2-b104-wake-satellite-001` (2 rounds,
+  Judgment Day, `APPROVED`).
+- **Implementation half**: `runner/` as a third bin, `conmuta-runner` — ladder store (fail-closed) + ledger +
+  wake prompt + harness adapter (closed executable set, `shell: false`, allow-listed env, bounded turn) + wake
+  loop (re-reads the ladder after each poll, three bounds, commit-only-on-`exited`) + persisted watermark +
+  strict CLI. **`src/` was not touched**: the core stays the passive switch, pinned by PT-34 in
+  `test/security/runner-bundle.test.ts`. Suite grew from the session-58 baseline 1738/1732/0/6 to
+  **1841/1835/0/6** (+103), `test:static` 93/93 → **99/99**.
+- **Audit**: `bus-v2-f7a-audit-001`, Judgment Day, two rounds. Round 1 found **eleven real defects** across both
+  judges (four CRITICAL): an argument-refusal list matched by exact equality (so `--command=sh` passed), the
+  ladder resolved only before the long poll (the kill switch could be outrun), a silent read that advanced no
+  watermark (a full-speed spin), an aborted or timed-out turn that still covered its message, a restart that
+  re-bootstrapped the daemon's catch-up window, a refusal memo that was not cleared by an accepted wake, a
+  `readLedgerRows` that threw on a torn line, a bare `50` against §5, the abort check after the spawn, no
+  `SIGKILL` escalation, and a §3.1 that still said `autopilot` was "confined by construction". All eleven were
+  verified against the code, fixed with a regression test each, and round 2 returned **zero findings** from
+  both judges.
+- **Commits**: nine work-unit commits on `main` (`e1ef614` ladder/ledger/prompt, `8c0b5dd` harness,
+  `828adb1` loop+watermark, `4334deb` CLI/bin, `a0ea37f` PT-34 pins, `188bd07` ADR-0032 + §3.1,
+  `c862339` runbook, `cfc8fe7` ODD records, `f00e8fb` the conmuta binding) plus this close-out, and **pushed**
+  (`2aa0da0..f00e8fb`). Two installer backup files stay untracked on purpose.
+- **Left owed (filed as B-105, not hidden)**: the `f7a-wake-satellite` SDD artifact set (implemented under
+  ODD), a real end-to-end run (the tests drive a scripted link and a scripted turn), the four harness argv
+  forms unverified against installed harness versions, the Windows `.cmd` refusal, `autopilot`'s profile being
+  instruction-plus-harness-policy rather than a mechanism, and the self-reported wake ledger.
+
 ## Session 58 — B-103 closed: bare-specifier allow-list for installer/doctor and session-exchange
 
 - **Date**: 2026-09-29 local time (same calendar day as sessions 55-57's close; a continuation session).
