@@ -100,14 +100,13 @@ corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
 
 ## §3 — What's next
 
-1. **The real end-to-end test**, which only the Director can start because arming is a human action:
-   ```sh
-   conmuta-runner ladder set --project frisco --level wake --harness pi --by "<quién lo pide>"
-   conmuta-runner run --project frisco --once      # one tick, then look at the ledger
-   conmuta-runner run --project frisco             # leave it running
-   ```
-   A `wake` arm is a turn that reads and replies; `autopilot` is the confined act profile. Check the ledger at
-   `~/.conmuta/runner/wake-ledger.jsonl` and the runner's stderr.
+1. **The `frisco` binding is already armed and running — do not re-arm it.** Level `wake`, harness `pi`, since
+   2026-10-01T01:49:43Z; it auto-starts at logon from the per-user Startup folder and a restart-loop wrapper
+   keeps it alive (`C:\Users\LABORATORIO\conmuta-runner\README.md` documents what is installed and the order in
+   which to stop it). The wake path is **proven live**: a new BROADCAST from `@rodrigo-agent` produced one
+   `wake` row with `outcome: exited` and moved the watermark 24→25. To inspect it, read
+   `~/.conmuta/runner/wake-ledger.jsonl` and that wrapper's `runner.log`; the real switch is
+   `ladder disable`, not killing the process.
 2. **B-105(a)**: write the `openspec/changes/f7a-wake-satellite/` artifact set (proposal, spec, design, tasks)
    against the shipped code, so the phase has the SDD record every other phase has.
 3. **B-105(b)**: a real daemon + real harness + real message run, and the four harness argv forms verified
@@ -154,8 +153,10 @@ corrida end-to-end) o por las decisiones que bloquean F6 (B-11/B-12/B-16).
 - [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
 - [ ] **3. Ask the Director what is next** (§3's two paths are the real end-to-end run and B-105; F6 stays
       blocked).
-- [ ] **4. If the real run happens**, watch the ledger and the runner's stderr together, and treat the first
-      `wake` row with outcome `unavailable` as the harness-argv question (§4) rather than as a code defect.
+- [ ] **4. If the live `frisco` binding needs attention**, read its ledger and
+      `C:\Users\LABORATORIO\conmuta-runner\runner.log` together. Treat an `unavailable` outcome as the Windows
+      `.cmd` question (§4) rather than as a code defect, and remember one legitimate result: a `wake` turn that
+      reads, finds nothing addressed to its agent and stays silent is **correct**.
 - [ ] **5. If B-105(a) happens**, write the SDD artifacts against the shipped code, not against the ADR's
       intentions — the ADR's "Implementation note" lists the six refinements that a spec must now own.
 - [ ] **6. Close the session**: overwrite this file, add the LOG entry at the top, update `AGENTS.md`'s Status

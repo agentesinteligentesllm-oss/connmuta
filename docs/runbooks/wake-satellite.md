@@ -74,6 +74,11 @@ are allowed (`--arg=--model --arg=placeholder-model`); a value beginning with `-
 Arguments that would defeat the closed-executable rule (`-c`, `eval`, `--dangerously-skip-permissions`, …) are
 refused when the record is used.
 
+> **On Windows, none of the four can be started as they are installed** — npm ships them as `.cmd` shims and a
+> shell-free spawn refuses them (`EINVAL`). The failure is **silent**: the message stays pending and the ledger
+> records `unavailable`, once a minute, with no error on screen. Read the Windows bullet under *Limits* before
+> arming, and give the runner process a real executable of its own.
+
 ### Checking it by hand
 
 ```sh
@@ -135,9 +140,11 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 - **A woken turn is headless.** There is no human at a permission prompt. That is why `wake` is the default
   for an enabled binding and why `off` is the default overall.
 - **The argv templates mirror the RFC's proposal** (`pi -p`, `claude -p`, `codex exec`, `opencode run`) and the
-  prompt is appended as the final argument. Harness CLIs change: verify the form by hand for the version you
-  have installed, and use `--arg` if it differs. The phase's tests pin the *shape* (closed executable, literal
-  argv, `shell: false`, confined cwd and environment), not any particular harness version's flags.
+  prompt is appended as the final argument. **`pi -p` is verified against Pi 0.99.2 on Windows (2026-10-01): the
+  turn started, called `conmuta_fetch` and read its inbox.** The other three are still unverified against
+  installed versions. Harness CLIs change: verify the form by hand for the version you have installed, and use
+  `--arg` if it differs. The phase's tests pin the *shape* (closed executable, literal argv, `shell: false`,
+  confined cwd and environment), not any particular harness version's flags.
 - **On Windows the four harnesses are `.cmd` shims, and the runner refuses them.** npm installs `pi`,
   `claude`, `codex` and `opencode` as batch shims, and a process started with `shell: false` cannot execute a
   `.cmd` (`EINVAL` — pinned by `test/runner/harness.test.ts`'s "a launch failure is `unavailable`, never a
@@ -151,11 +158,19 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
   runner's; the rest of the machine keeps its shims.
 - **The runner will not fall back to a shell**, because that fallback is exactly the command-injection path
   this design exists to prevent. `unavailable` is the correct, fail-closed answer.
-- **Running it permanently.** Keep the autostart its **own** entry — a `Run` value of its own, or a tiny
-  wrapper with a restart loop — never a Windows service, and never folded into the installer's existing
-  `conmuta` value, which starts the daemon and nothing else. With a restart-loop wrapper, **killing the node
-  process does not stop it**; the real switch is `ladder disable`, which the running process honours on its
-  next ladder read.
+- **Running it permanently.** Keep the autostart its **own** entry — a `Run` value of its own, a shortcut in the
+  per-user **Startup folder**, or a tiny wrapper with a restart loop — never a Windows service, and never folded
+  into the installer's existing `conmuta` value, which starts the daemon and nothing else. A restart-loop
+  wrapper revives the runner about fifteen seconds after it dies, so **killing the node process does not stop
+  it**. To stop a permanent installation, in this order: (1) `ladder disable` — the binding returns to `off`
+  within one poll and stops waking at once, which is the step that actually matters; (2) remove the autostart
+  entry so it does not come back at the next logon; (3) stop the wrapper **and** its node process.
+- **The woken turn is a separate, headless turn — your open session is not notified.** Arming this does not make
+  the session you are sitting in receive anything: the runner starts a **new** harness turn, which reads the
+  inbox, may reply on the bus and may save to its own memory, and then exits. A doorbell *into an interactive
+  session* is a different mechanism — the F4 `conmuta-channel` adapter, today exclusive to Claude Code
+  ([`channel-doorbell.md`](channel-doorbell.md)). If you armed the runner and "nothing arrived" in the window
+  you were looking at, this is why, and it is not a fault.
 - **The wake ledger is self-reported.** The daemon does not know the runner exists, so nothing in the daemon
   can corroborate these rows (ADR-0032 R6a). Treat the ledger as the satellite's own account.
 - **The roster and the private group are not controls here.** They decide who may send. What a rostered peer
