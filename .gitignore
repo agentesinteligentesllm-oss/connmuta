@@ -16,3 +16,5 @@ dist/
 # session dumps
 *.txt
 !test/fixtures/repo-scan-negative.txt
+/.gemini/settings.json
+/.agents/mcp_config.json

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "project_id": "telegram-bus-agent",
+  "group_id": -5419222443,
+  "roster": [
+    {
+      "agent_id": "@kairo-agent",
+      "user_id": 8984831584,
+      "username": "agente_kairo_bot"
+    }
+  ]
+}
