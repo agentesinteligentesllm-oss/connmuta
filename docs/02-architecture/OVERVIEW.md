@@ -18,7 +18,7 @@ Conmuta is "the project switchboard for human-owned coding agents". Each human d
 | D2 | One bot per (human, project); bijective binding bot ↔ group ↔ project; a `bot_id` appears in at most one active binding | [ADR-0028](../03-adr/0028-project-scoped-bijective-binding.md) |
 | D3 | One daemon per OS user = sole `getUpdates` consumer per token; thin stdio clients; loopback HTTP IPC with a challenge-response handshake | [ADR-0029](../03-adr/0029-per-user-daemon-and-thin-clients.md) |
 | D4 | Human-editable JSON registry + `node:sqlite` ledger (WAL); OS keychain for tokens; no Docker in the client product | [ADR-0030](../03-adr/0030-sqlite-ledger-and-json-registry.md) |
-| D5 | Committed id-only `conmuta.json`; id-only stdio entries merged into each detected tool's project config; launcher requires `--project` and refuses when unbound or mismatched | ADR-0028, §6 below |
+| D5 | Committed id-only `conmuta.json`; id-only stdio entries merged into each detected tool's project config; launcher binds by the nearest ancestor `conmuta.json`, with `--project` an optional assertion and a mismatch refused | [ADR-0028](../03-adr/0028-project-scoped-bijective-binding.md), [ADR-0033](../03-adr/0033-project-flag-as-assertion.md), §6 below |
 | D6 | The core (daemon + thin client) is a passive switch under v1 ADR-06 layers 1–2; the headless runner is a satellite; the Claude Code channels adapter is an optional doorbell | Constitution, §7.6 and §13 below |
 | D7 | Arena-light 2-party debates as body-marker subtypes over the existing thread model; daemon-enforced round cap; side journal in SQLite | §11 below; F5 spec |
 | D9 | Node ≥ 24, TypeScript ESM, `node:test` with strict TDD, MCP SDK + zod, `@clack/prompts`, daemon-served web panel, npm publish with compiled `dist`, never `npx` | [ADR-0031](../03-adr/0031-npm-distribution-and-license.md), §12 below |
@@ -49,8 +49,8 @@ flowchart LR
         H2["Cursor / VS Code<br/>.cursor/mcp.json, .vscode/mcp.json"]
         H3["Gemini CLI / Codex / OpenCode / Antigravity<br/>tool-specific project files"]
     end
-    subgraph client["Thin client (one per session): conmuta mcp --project ID"]
-        TC["stdio MCP server: send, fetch, status, thread<br/>binding check: --project equals nearest conmuta.json<br/>holds no token, never touches Telegram or the ledger"]
+    subgraph client["Thin client (one per session): conmuta mcp [--project ID]"]
+        TC["stdio MCP server: send, fetch, status, thread<br/>binding: nearest ancestor conmuta.json<br/>(an explicit --project must agree with it)<br/>holds no token, never touches Telegram or the ledger"]
     end
     subgraph daemon["Daemon (one per OS user, home ~/.conmuta/)"]
         IPC["Loopback HTTP 127.0.0.1:random port<br/>HMAC handshake, per-boot bearer"]
@@ -81,7 +81,7 @@ flowchart LR
 
 | Component | Responsibility | Never does | Phase | v1 seam reused (evidence) |
 |---|---|---|---|---|
-| **Agent host** (Claude Code, Cursor, VS Code, Gemini CLI, Codex, OpenCode, Antigravity, …) | Spawns `conmuta mcp --project <id>` over stdio from its project-level MCP config; runs the agent that calls the tools | Holds a token; polls Telegram | F2 (installer writes the entry) | — |
+| **Agent host** (Claude Code, Cursor, VS Code, Gemini CLI, Codex, OpenCode, Antigravity, …) | Spawns `conmuta mcp` over stdio from its MCP config (`--project <id>` is an optional assertion) and runs the agent that calls the tools | Holds a token; polls Telegram | F2 (installer writes the entry) | — |
 | **Thin client** (`conmuta mcp`) | Exposes the four-tool MCP surface; resolves and freezes the binding; talks to the daemon over IPC; returns `DAEMON_DOWN` when no daemon answers | Polls Telegram; reads the ledger; holds a token; spawns anything but the daemon (lazy spawn, §7.1) | F1 | `createServer(deps)` with injected `client`/`transport`/`homeDir` (v1 `src/index.ts:112-118`) — the deps become IPC stubs (bundle: maps[transport] reusable_as_is); structured `isError` payloads with a closed retryable allowlist (v1 `src/index.ts:45-63`) |
 | **Daemon** (`conmuta daemon`, one per OS user) | Loads the registry; resolves tokens; runs one long-poll loop per bot token; admits updates; persists the ledger; serves sends with the binding assertion; serves clients through cursors; hosts the panel; enforces Arena-light caps | Executes anything; emits on a timer; reads files outside its home; rewrites a binding from bus data | F1 (core), F3 (panel), F5 (Arena-light) | `TelegramClient` interface + typed error taxonomy (v1 `src/telegram.ts:73-80`); `Transport` port and the group/direct/dual transports (v1 `src/transport/types.ts:84-86`, `dual.ts:30-61`); classification pipeline (v1 `src/tools/fetch.ts:525-656`); `applyEnvelope` state machine (v1 `src/protocol.ts:186-333`); `state.ts` validation, quarantine and migration (v1 `src/state.ts:333-439`); doctor checks (v1 `src/doctor.ts:100-143`) |
 | **Ledger** (`node:sqlite`, WAL) | Durable inbox, per-token offsets, threads, `needs_action`, per-client cursors, per-binding audit log, debate journal | Stores tokens or rejected bodies | F1 | Retention policy and schema-version/quarantine semantics (v1 `src/state.ts:217-250, 375-379`) |
@@ -125,8 +125,8 @@ The **bijective binding** is the root decision (D2): one bot token ↔ one group
 
 **Launcher resolution (D5).** The thin client:
 
-1. Requires `--project <id>`; it never infers the binding from cwd alone (cwd inheritance is the leakage vector named in bundle: research[security-isolation] T01).
-2. Walks up from its cwd to the nearest `conmuta.json`, parses it strictly, and requires `project_id` to equal `--project`. Unbound or mismatched → refuses to start.
+1. Resolves the binding from the nearest ancestor `conmuta.json` of its cwd; it never infers a binding from anything else (cwd inheritance is the leakage vector named in bundle: research[security-isolation] T01, and the file — committed, reviewed, identifiers-only — is what closes it).
+2. Accepts `--project <id>` as an **optional assertion**: supplied, the found file's `project_id` must equal it; omitted, the file decides. Unbound, invalid, or mismatched → refuses to start ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md)).
 3. Opens a session with the daemon (§9); the daemon resolves `project_id → (bot_id, group_id, agent_id, roster)` from the registry and refuses when the project has no active binding.
 4. Freezes the binding for the life of the MCP session. `send` carries no destination; the daemon derives (bot, group, roster) from the frozen binding and asserts `chat_id === binding.group_id` before every `sendMessage` (Invariant 1). A two-binding "wrong room" test runs in CI ([THREAT-MODEL.md](THREAT-MODEL.md)).
 
@@ -213,7 +213,7 @@ The headless runner (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on n
 
 | Property | Detail |
 |---|---|
-| Invocation | `conmuta mcp --project <id>` over stdio, spawned by the host from its project-level config. The concrete spelling (global bin on PATH vs. absolute node executable + absolute script path recorded at install) is fixed in F2; **never** `npx` (D9; spawning `npx` fails on Windows, bundle: research[packaging-runtime]) |
+| Invocation | `conmuta mcp [--project <id>]` over stdio, spawned by the host from its MCP config. The id-free form is the norm and is what makes one registration correct for every session under a tree; the flag, when present, is an assertion on the nearest ancestor `conmuta.json` ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md)). The concrete spelling (global bin on PATH vs. absolute node executable + absolute script path recorded at install) is fixed in F2; **never** `npx` (D9; spawning `npx` fails on Windows, bundle: research[packaging-runtime]) |
 | Tool surface | The four tools inherited from v1 — send, fetch, status, thread (v1 `src/index.ts:128-245`); tool-name prefixes follow the final product name (B-11) |
 | Errors | Structured `isError` payloads `{code, message, retryable, retry_after_s?, new_chat_id?}` with a closed retryable allowlist (v1 `src/index.ts:45-63`); new codes at least `DAEMON_DOWN`, `WRONG_ROOM`, `UNBOUND_PROJECT` (names to be fixed in F1) |
 | Holds | Nothing secret: no token, no registry, no ledger handle; only the per-boot IPC credential in memory after the handshake |
@@ -229,12 +229,12 @@ The headless runner (`claude -p`, `codex exec`, `opencode run`, `gemini -p` on n
 sequenceDiagram
     autonumber
     participant Host as IDE host
-    participant Client as Thin client (conmuta mcp --project P)
+    participant Client as Thin client (conmuta mcp [--project P])
     participant RunFile as Run file ~/.conmuta/run/daemon.json (ACL'd)
     participant Daemon as Daemon (127.0.0.1:port)
 
     Host->>Client: spawn over stdio
-    Client->>Client: walk up from cwd to nearest conmuta.json, require project_id equals P, else refuse to start
+    Client->>Client: walk up from cwd to nearest conmuta.json; bind to it, and if P was supplied require project_id equals P, else refuse to start
     Client->>RunFile: read {port, pid, secret}
     Client->>Client: liveness pre-check with process.kill(pid, 0)
     alt run file missing, unreadable, or pid dead
@@ -289,7 +289,7 @@ The screens are the tribunal-proposed installer/panel flow (D2 "guided by the in
 
 ### 10.3 Per-tool MCP config surfaces (D5)
 
-The generated entry is the same everywhere: a stdio server launching `conmuta mcp --project <id>`, **zero `env`, zero `${VAR}`** (interpolation syntax is inconsistent across tools and several gate or block it — bundle: research[mcp-config-surfaces]).
+The generated entry is the same everywhere: a stdio server launching `conmuta mcp`, with `--project <id>` as an optional assertion on the nearest ancestor `conmuta.json` ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md)), **zero `env`, zero `${VAR}`** (interpolation syntax is inconsistent across tools and several gate or block it — bundle: research[mcp-config-surfaces]).
 
 | Tool | Project-level file | Key | Notes |
 |---|---|---|---|

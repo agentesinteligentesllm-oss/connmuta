@@ -26,7 +26,7 @@ Source of truth for **who is on this project's bus**. Decided by D5 / objection 
 | Field | Type | Required | Source of truth | Rule |
 |---|---|---|---|---|
 | `schema_version` | integer literal `1` | yes | this file | A future version is refused with an explicit upgrade message; a committed file is never renamed or rewritten by the tool |
-| `project_id` | string, opaque stable id (format fixed in F1: UUID v4 or slug `^[a-z0-9][a-z0-9-]{2,40}$`) | yes | this file (minted once by `project bind`) | Must equal the launcher's `--project`; the thin client refuses otherwise (D5) |
+| `project_id` | string, opaque stable id (format fixed in F1: UUID v4 or slug `^[a-z0-9][a-z0-9-]{2,40}$`) | yes | this file (minted once by `project bind`) | Must equal the launcher's `--project` when that flag is supplied — the thin client refuses a mismatch; with no flag, the nearest ancestor `conmuta.json` decides on its own (D5, [ADR-0033](../03-adr/0033-project-flag-as-assertion.md)) |
 | `group_id` | integer `< 0` — numeric supergroup id | yes | this file | Negativity rule inherited (v1 `src/config.ts:176-179`); bijective with `project_id` (I-1) |
 | `roster` | array of `RosterEntry`, min 1 | yes | this file (team-shared) | `agent_id` unique; `user_id` unique |
 | `roster[].agent_id` | string matching `^@[a-z0-9][a-z0-9-]{1,30}$` (v1 `src/envelope.ts:13`) | yes | — | Enforced at load — v1 did **not** enforce the wire regex on config, so a bad id was emitted and silently discarded by peers as `malformed` (bundle: maps[config-state] must_change) |

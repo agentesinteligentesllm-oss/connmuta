@@ -52,7 +52,7 @@ flowchart LR
 | Field | Content |
 |---|---|
 | Goal | The passive switch: one daemon per OS user, durable inbox, per-client cursors, thin stdio client bound per project. |
-| Deliverables | Daemon (long-poll ≤ 50 s, lock, heartbeat, idle rule); `registry.json` + `node:sqlite` ledger per [ADR-0030](../03-adr/0030-sqlite-ledger-and-json-registry.md); IPC handshake per [ADR-0029](../03-adr/0029-per-user-daemon-and-thin-clients.md); thin client with `--project` + cwd cross-check; `conmuta.json` schema (B-18); secret store + fallback (B-15); unilateral migration from `~/.agentbus` (backup `*.bak`, synthesized registry) (B-13); v1 pure modules imported as a library (D1). |
+| Deliverables | Daemon (long-poll ≤ 50 s, lock, heartbeat, idle rule); `registry.json` + `node:sqlite` ledger per [ADR-0030](../03-adr/0030-sqlite-ledger-and-json-registry.md); IPC handshake per [ADR-0029](../03-adr/0029-per-user-daemon-and-thin-clients.md); thin client with the nearest-ancestor binding walk-up (`--project` an optional assertion, [ADR-0033](../03-adr/0033-project-flag-as-assertion.md)); `conmuta.json` schema (B-18); secret store + fallback (B-15); unilateral migration from `~/.agentbus` (backup `*.bak`, synthesized registry) (B-13); v1 pure modules imported as a library (D1). |
 | Dependencies | F0 spikes B-07 and B-08 (IPC design depends on B-08; admin requirement on B-07). Director: SDD preflight. |
 | Validation | All "tests that must pin it" of ADR-0028, 0029, 0030 are green, including the two-binding wrong-room CI test; static security assertions pass over the built bundle; a v1 `~/.agentbus` fixture migrates with a `.bak` and a synthesized registry; `DAEMON_DOWN` path makes zero network calls. |
 | SDD change | `f1-daemon-registry-thin-client` (proposed) |

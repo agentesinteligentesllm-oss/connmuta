@@ -77,7 +77,7 @@ amendment (§9). Each is owned by an ADR and must be pinned by the tests listed.
 |---|---|
 | Owner | [ADR-0028](../03-adr/0028-project-scoped-bijective-binding.md) — registry invariant "one `bot_id` in at most one active binding" |
 | Defends against | T01 cross-project leakage on send, T02 on receive, T08 cross-tenant spoofing (research `security-isolation`) |
-| Tests that must pin it | the two-binding wrong-room CI test; the registry rejects a second active binding for a `bot_id`; the send path asserts `chat_id === binding.group_id` and a mismatched binding fails closed before any network call; the launcher refuses to start when `--project` and the nearest `conmuta.json` disagree (D5) |
+| Tests that must pin it | the two-binding wrong-room CI test; the registry rejects a second active binding for a `bot_id`; the send path asserts `chat_id === binding.group_id` and a mismatched binding fails closed before any network call; the launcher binds to the nearest ancestor `conmuta.json` and refuses to start when nothing is bound above its cwd, when that file is invalid, or when an explicitly supplied `--project` disagrees with it (D5; [ADR-0033](../03-adr/0033-project-flag-as-assertion.md)) |
 
 ### Invariant 2 — SECRETS NEVER LEAVE THE DAEMON
 
