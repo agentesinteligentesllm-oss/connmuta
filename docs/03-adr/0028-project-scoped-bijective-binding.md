@@ -101,3 +101,23 @@ test that can fail:
 | `conmuta.json` carries identifiers only | Schema test rejects unknown keys, local paths and any token-shaped string (`\d+:[A-Za-z0-9_-]{35}`, v1 `src/secrets.ts:16`). |
 | The launcher refuses when unbound or mismatched | Launcher test: missing `--project`, no `conmuta.json` in the walk-up, or a `project_id` mismatch each exit non-zero before any IPC call. |
 | Pending unknown senders carry no body | Test asserts the list stores `user_id` and `username` only. |
+
+## Amendment note (2026-10-01, [ADR-0033](./0033-project-flag-as-assertion.md))
+
+The Director authorized the durable fix of backlog **B-107** on 2026-10-01: `conmuta mcp --project <id>`
+becomes **optional**, and a single user-level registration with no project id serves every session under a
+tree. **Rule 4's first sentence is amended in part**: the thin client no longer *requires* the flag; supplied
+it is an assertion (a mismatch is still refused with `EXIT_PROJECT_MISMATCH` before any IPC call), omitted the
+nearest ancestor `conmuta.json` fixes the binding on its own. Rules 1, 2, 3, 5 and 6 stand unchanged, and so
+does everything in rule 4 after that sentence — including "never register the bus in a host whose global
+config overlays every project with a project-bound entry", which is now satisfied *by construction* because the
+entry carries no project at all.
+
+The launcher row of the "Tests that must pin it" table above is **left byte-unchanged** (this file is
+append-only) and its reading is **superseded in part**: the sentence "missing `--project` … exit non-zero
+before any IPC call" no longer describes the thin client, where the flag is now an assertion. Its
+amended reading is "**the launcher refuses when nothing is bound above the cwd, when the found file is
+invalid or unreadable, or when an explicit `--project` disagrees** — each exits non-zero before any IPC
+call", and it is pinned by `test/client/binding.test.ts`, `test/client/main.test.ts` and
+`test/cli/main.test.ts`. Invariant 1 itself is untouched: its two enforcement mechanisms (the walk-up and
+the daemon's `WRONG_ROOM` assertion) are both unchanged, and ADR-0033 says why in its own words.

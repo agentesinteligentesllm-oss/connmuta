@@ -52,20 +52,24 @@ where `design.md` names one; the full v1 debate list is in
 | [0026](0026-unapplied-transition-is-a-diagnostic.md) | A transition that could not be applied is a diagnostic, not news | unversioned | `inherited-valid` | — | `agentbus-orphan-transitions-001` | |
 | [0027](0027-needs-action-projects-the-waiting-turn.md) | `needs_action` describes the turn that is waiting | unversioned (v1 HEAD) | `inherited-valid` | — | `agentbus-needs-action-muestra-apertura-001` | |
 
-## New in this repository (0028–0032)
+## New in this repository (0028–0033)
 
 0028–0031 were accepted by the tribunal in `bus-v2-landing-architecture-001` (consensus after two
 rounds) and confirmed by the Director (DN-04). 0032 was accepted by the tribunal in
 `bus-v2-b104-wake-satellite-001` (Judgment Day substitute, DN-09) and stays `proposed` until the
-Director confirms.
+Director confirms. 0033 was authorized by the Director on 2026-10-01 as the durable fix of **B-107**
+(Judgment Day substitute, DN-09, debate `bus-v2-b107-optional-project-001`) and **confirmed `accepted`
+by the Director the same day**. Its audit record is the tribunal row for that debate, not a sentence
+here.
 
 | # | Title | Status | Supersedes / amends | Debate | Decision record |
 |---|---|---|---|---|---|
-| [0028](0028-project-scoped-bijective-binding.md) | Project-scoped bijective binding (bot ↔ group ↔ project) | `accepted` | re-bases the scope of 0010 | `bus-v2-landing-architecture-001` | D2, D5; invariants (1) and (4) |
+| [0028](0028-project-scoped-bijective-binding.md) | Project-scoped bijective binding (bot ↔ group ↔ project) | `accepted`, **amended in part by [0033](0033-project-flag-as-assertion.md)** | re-bases the scope of 0010 | `bus-v2-landing-architecture-001` | D2, D5; invariants (1) and (4). Rule 4's "requires `--project <id>`" sentence is amended by 0033; rules 1–3 and 5–6 stand. |
 | [0029](0029-per-user-daemon-and-thin-clients.md) | Per-user daemon + host-agnostic thin clients | `accepted` | 0003 (fully); re-bases the deployment of 0024 | `bus-v2-landing-architecture-001` | D3, D6; invariant (3) |
 | [0030](0030-sqlite-ledger-and-json-registry.md) | `node:sqlite` ledger + JSON registry + OS secret store | `accepted` | 0002 (in part); re-bases the mechanics of 0015 | `bus-v2-landing-architecture-001` | D4; invariants (2) and (3) |
 | [0031](0031-npm-distribution-and-license.md) | npm distribution and license | `accepted` | amends 0001 in part | `bus-v2-landing-architecture-001` | D9, D10 |
 | [0032](0032-wake-satellite-and-per-binding-ladder.md) | Wake satellite and the per-binding wake ladder (`off`·`notify`·`wake`·`autopilot`) | `proposed` (pending Director) | 0006 in part (phase target only); 0029 in part (same); amends CONSTITUTION §3 | `bus-v2-b104-wake-satellite-001` | Director instruction 2026-09-30; B-104, B-06; invariant (5) scope clarification |
+| [0033](0033-project-flag-as-assertion.md) | `--project` is an assertion, not a requirement: one registration serves a whole tree | `accepted` | amends 0028 rule 4 in part | `bus-v2-b107-optional-project-001` | Director authorization 2026-10-01, confirmed 2026-10-01; B-107; invariant (1) unchanged, its pinning test reshaped |
 
 ## Closed-permanently items and the two reopened ones
 

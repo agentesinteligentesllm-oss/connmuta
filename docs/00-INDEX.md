@@ -96,7 +96,9 @@ Inherited from v1 (file names as on disk, matching [`INDEX.md`](./03-adr/INDEX.m
 New in v2. ADRs 0028–0031 were accepted by the tribunal in `bus-v2-landing-architecture-001` and
 confirmed by the Director on 2026-09-16 (DN-04); 0032 was reviewed under the tribunal's documented
 substitute for an unreachable Arena (Judgment Day) in `bus-v2-b104-wake-satellite-001` and stays
-`proposed` until the Director confirms it (pending board row 21):
+`proposed` until the Director confirms it (pending board row 21); 0033 was authorized and confirmed
+`accepted` by the Director on 2026-10-01 (B-107), reviewed under the same substitute in
+`bus-v2-b107-optional-project-001`:
 
 | File | Decision | Supersedes |
 |------|----------|------------|
@@ -105,6 +107,7 @@ substitute for an unreachable Arena (Judgment Day) in `bus-v2-b104-wake-satellit
 | [`0030-sqlite-ledger-and-json-registry.md`](./03-adr/0030-sqlite-ledger-and-json-registry.md) | `node:sqlite` ledger (WAL) + human-editable JSON registry; OS keychain for secrets | v1 ADR-02 in part |
 | [`0031-npm-distribution-and-license.md`](./03-adr/0031-npm-distribution-and-license.md) | npm publish with compiled `dist`, shrinkwrap, files whitelist, never `npx`; Node >= 24; license Apache-2.0 (DN-04) | — |
 | [`0032-wake-satellite-and-per-binding-ladder.md`](./03-adr/0032-wake-satellite-and-per-binding-ladder.md) | The wake satellite outside the core + the per-binding ladder `off`·`notify`·`wake`·`autopilot`, human-only machine-local opt-in, bounds and a self-reported wake ledger (B-104; `proposed`, pending the Director — board row 21) | 0006 in part and 0029 in part (the satellite's phase target only) |
+| [`0033-project-flag-as-assertion.md`](./03-adr/0033-project-flag-as-assertion.md) | `--project` is an assertion, not a requirement: the thin client binds to the nearest ancestor `conmuta.json`, so one id-free registration serves every session under a tree (B-107; `accepted`, confirmed by the Director 2026-10-01) | 0028 rule 4 in part |
 
 ### `05-tribunal/` — debate record
 
@@ -172,7 +175,7 @@ Nothing on this board is decided by the tribunal; each row waits for the Directo
 
 | 21 | **Session 59: B-104 landed as governance — the wake satellite (ADR-0032).** The Director instructed on 2026-09-30 that the bus must wake an agent's turn by itself when a roster peer broadcasts or addresses it, and asked that the "notify a human only" shape and a "piloto automático" mode be the user's own per-binding choice. Session 59 landed the governance half and wrote no product code: CONSTITUTION §3.1 (three component classes, the layer-2 clarification that a local body-less wake is not an emission, and the per-binding ladder `off`·`notify`·`wake`·`autopilot`), [ADR-0032](./03-adr/0032-wake-satellite-and-per-binding-ladder.md), THREAT-MODEL T23–T25 + PT-34–PT-38, F7 split into **F7a** (wake satellite, **not** blocked on F6) and **F7b** (referee), and the RFC's three corrections. **Pending the Director:** (a) confirm ADR-0032 and the §3.1 amendment **and confirm its reading** — a *clarification* of invariant 5's scope (the exec clause binds the core; the capability is located outside it, no test released) rather than a weakening, which per §9.3 would instead require a superseding ADR naming invariant 5 and the tests it releases; (b) confirm the schedule (F7a next, ahead of F6's commercial blockers B-11/B-12/B-16, or after F6); (c) confirm which harnesses F7a wires first (Pi and Claude Code are the RFC's own proposal). Until (a)–(c), the function stays **off**: the `f7a-wake-satellite` SDD change has not started | ADR-0032 (`proposed`); CONSTITUTION §3.1; debate `bus-v2-b104-wake-satellite-001` | B-104, B-06 | Starting the `f7a-wake-satellite` SDD change; and, for the product, the wake function itself |
 
-The four ADRs 0028–0031 carry the status `accepted` (tribunal consensus, confirmed by the Director on 2026-09-16, DN-04); 0032 is `proposed` until the Director confirms it (row 21).
+The four ADRs 0028–0031 carry the status `accepted` (tribunal consensus, confirmed by the Director on 2026-09-16, DN-04); 0032 is `proposed` until the Director confirms it (row 21); 0033 is `accepted` (Director, 2026-10-01).
 
 ## Precedence on conflict
 
