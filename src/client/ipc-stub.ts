@@ -13,7 +13,11 @@ import { ensureDaemonRunning, type DaemonRunPayload } from "./run-state.js";
  * handshake, including `POST /session`, on every single `callTool` invocation. `POST /session` mints a
  * brand-new bearer every time (`daemon/ipc/sessions.ts`'s `SessionStore.mint`), and that store enforces
  * a hard, NEVER-SELF-EXPIRING `MAX_ACTIVE_SESSIONS` ceiling shared across every project the daemon
- * serves; nothing in this client ever calls `DELETE /session` to release one. Re-handshaking per call
+ * serves; at the time of that fix **nothing in this client ever called `DELETE /session` to release
+ * one** — true then, and false since B-106: `IpcSession.release` below does exactly that, and
+ * `client/main.ts` calls it when the transport closes. The sentence is kept because it is the historical
+ * evidence for this paragraph's argument, not a statement about today's code; `docs/06-backlog/CHECKLIST.md`'s
+ * B-106 row quotes it the same way. Re-handshaking per call
  * meant the ceiling — not a real daemon outage — would eventually make `SessionStore.mint` refuse, which
  * `client/handshake.ts`'s `performHandshake` reports as `HandshakeError("DAEMON_DOWN", retryable: true)`:
  * a false, permanent "daemon is down" for every project on that daemon, recoverable only by a full
