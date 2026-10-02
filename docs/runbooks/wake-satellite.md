@@ -19,12 +19,23 @@ and never writes to any settings or permissions file.
    runner cannot make it work either — and on Windows there is a second, harder gate: see "Windows: the four
    harnesses are `.cmd` shims" below, because for those four names a shell is the *only* thing your
    terminal has that the runner deliberately refuses.
-3. **The project's bus registration, wherever your host keeps it.** The woken turn reaches the bus with the
-   same thin client every other session uses, so the host needs a `conmuta` MCP entry bound to
-   `--project <id>`. That entry can live in the host's own **user-level** config — a Pi host keeps it in
-   `~/.pi/agent/mcp.json` — so a project-level `.mcp.json` is not required and its absence is not a symptom.
-   (Verified 2026-10-01: a woken turn with only the user-level entry called `conmuta_fetch` and read its
-   inbox.) A turn that cannot call `conmuta_fetch` will do nothing useful.
+3. **The `conmuta` MCP entry your host will load for the woken turn.** The turn reaches the bus with the
+   same thin client every other session uses. Give it **one id-free entry** — `conmuta mcp`, with no
+   `--project` — in your host's **user-level** config (a Pi host keeps it in `~/.pi/agent/mcp.json`). The
+   client then binds to the nearest ancestor `conmuta.json` of the turn's own cwd, so that single entry
+   serves every bound tree on the machine and keeps serving them when a new binding is armed
+   ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md)). Two traps this avoids, both measured on
+   2026-10-01:
+   - A **project-level** entry (`<project>/.pi/mcp.json`) is invisible to a session whose cwd is a
+     subfolder of the bound root — host config is cwd-relative, with no ancestor walk-up.
+   - A project-level entry is also **trust-gated**: the host reads it only after a trust decision for
+     that folder has been saved, and a headless run (`pi -p`, exactly what this runner starts) has
+     nobody to ask, so it resolves *not trusted* — the turn would keep its quota cost and lose every
+     `conmuta_*` tool.
+   A `--project <id>` on the entry is still accepted (it is an assertion the client checks against the
+   file it found), but it is what makes the entry wrong in every other tree: do not use it for the
+   woken turn. (Verified 2026-10-01: a woken turn with the user-level entry called `conmuta_fetch` and
+   read its inbox.) A turn that cannot call `conmuta_fetch` will do nothing useful.
 
 ## The ladder: one machine-local record per binding
 
@@ -193,6 +204,7 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 | A peer message arrives but no new `wake` row appears | The message was sent by the binding's **own** agent: the doorbell skips self-echo (`row.from_agent_id !== binding.agent_id`, `src/daemon/serve/doorbell.ts:154`), so a binding cannot wake itself. Test with **another** roster agent — a `REQUEST` to this binding's agent, or a `BROADCAST` with no `to` (a `BROADCAST` carrying `to` is refused by the wire schema). A human typing in Telegram does not work either: their `user_id` is not on the roster and ingest drops it as `unknown_sender`. |
 | `woke` but nothing appears on the bus | Two very different cases. (a) The turn ran and **legitimately decided to do nothing** — a `wake` turn may read its inbox, find nothing addressed to it, and reply-not at all; the ledger's `outcome: "exited"` is the whole truth, and a silent turn is a correct turn. (b) Something is wrong: read the turn's own output on the runner's stderr (capped), and check the reminder that the harness form and the host's MCP entry are the two things a turn needs. |
 | `unavailable` on every wake, and a `refused` row roughly every minute | The harness could not be started: on Windows, a `.cmd` shim under `shell: false` (`EINVAL`). See "Windows: the four harnesses are `.cmd` shims" in Limits. The message stays pending throughout, so nothing is lost while you fix it. |
+| The turn runs but reports no `conmuta_*` tools, or cannot read the bus | The host never loaded the `conmuta` entry. Almost always one of the two traps in "Before you begin" item 3: the entry is **project-level** (invisible from a subfolder, and trust-gated so a headless run resolves *not trusted*), or it carries a `--project <id>` that no longer matches. Use one id-free **user-level** entry. |
 | A permanent wrapper will not stop when I kill the process | A restart-loop wrapper revives it. The real switch is `ladder disable`, honoured on the running process's next ladder read. |
 | The harness exits immediately with a permission error | Your harness's own configuration refuses headless tool use. That refusal is the control working; the runner will not override it. |
 
@@ -200,6 +212,8 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 
 - [ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md) — the decision, its rules and the
   threat rows it added.
+- [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) — why one id-free registration serves every tree,
+  and what the woken turn's cwd therefore resolves to.
 - [`docs/runbooks/channel-doorbell.md`](channel-doorbell.md) — the F4 Claude Code doorbell, which is a
   different consumer of the same body-less signal (it notifies an interactive session instead of starting a
   turn).
