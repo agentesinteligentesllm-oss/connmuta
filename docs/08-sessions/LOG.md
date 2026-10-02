@@ -4,6 +4,127 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 62 — B-107 closed under ADR-0033: `--project` becomes an assertion, and one registration serves a tree
+
+- **Date**: 2026-10-01 local time (opened on "continúa con lo que haga falta, revisa, valida y continúa",
+  closed the same day).
+- **Authority**: the Director's standing authorization of 2026-10-01 for the durable fix of B-107
+  (Engram decision `b107-global-bus-registration`), re-confirmed in-session; plus, in-session, four
+  explicit decisions: confirm **ADR-0033 `accepted`**, run **Judgment Day**, **authorize the commits after
+  the audit**, and **apply the machine registration change**. Commits ran with that authorization.
+- **Preflight**: `git fetch`/`status` clean at `03b85e6`, `main` aligned with `origin/main`; suite
+  **1841/1835/0/6** and `test:static` **99/99**; `gentle-ai` 3.7.0; RDD `on (decided by global)`;
+  **Arena unreachable again** (`mcp connect arena` → *Nothing is listening at `http://127.0.0.1:8765/mcp`*),
+  which satisfies DN-09's substitute condition directly, so the audit ran under Judgment Day.
+- **Session 61's gap, closed first**: B-105(a) was already delivered (the F7a SDD artifact set written
+  and archived, commits `0ea16ef`, `3c57b0d`, `03b85e6`) but that session left no LOG entry and did not
+  update the handoff. This session wrote session 61's entry from the commits and the tree, and
+  reconciled the live documents it left stale.
+- **B-107 reproduced and fixed**: `conmuta mcp --project <id>` is now an **assertion**, not a
+  requirement; the binding comes from the nearest ancestor `conmuta.json`. `src/client/binding.ts`
+  gained an explicit `requireProjectFlag` option so `conmuta-channel` and `conmuta-runner` keep their
+  pre-amendment strict refusal byte-for-byte. Invariant 1 is untouched (the walk-up and the daemon's
+  `WRONG_ROOM` assertion both survive); only its pinning-test row changed shape, which is why
+  CONSTITUTION §2 was reconciled and not amended. Verified on this machine by resolving the binding
+  from four cwds: the repo root, `FRISCO`, `FRISCO\frisco-erp` (the B-107 case: binds to `frisco` with
+  no flag), and a deliberately wrong explicit id (refused, `EXIT_PROJECT_MISMATCH`).
+- **Governance**: **ADR-0033** (`accepted`, amending ADR-0028 rule 4 in part) + an append-only
+  reciprocal note on ADR-0028 + ADR-index, `00-INDEX` and tribunal rows + the canonical
+  `thin-client-tools` requirement rewritten + eight live documents reconciled + the wake-satellite
+  runbook's registration guidance changed to one id-free entry. **B-109** filed for the part
+  deliberately not done: the installer still writes `--project <id>`, which can silently reintroduce
+  the trust gate on any machine whose host reads both a user-level and a project-level config.
+- **Judgment Day (the DN-09 substitute), debate `bus-v2-b107-optional-project-001`**: two blind judges
+  over a frozen manifest (`sha256:18fa6423…`, 24 files, uncommitted). Both returned
+  `APPROVE_WITH_CHANGES`; **seven findings, every one re-read against the file before acceptance, all
+  real**. Round 1 produced one **CRITICAL — mine, and a documentation-integrity one**: ADR-0033 and the
+  ADR index asserted, in the past tense, an audit that had not happened, while the tribunal row forbade
+  a merge. It also produced one genuinely behavioural WARNING: `conmuta mcp --project ""` (an empty
+  value TOKEN) slipped past the parser, because `"".startsWith("--")` is false and the resolver reads
+  `""` as "no assertion", so it bound silently by walk-up — a host config interpolating an empty
+  variable would have misbound quietly. Fixed with a RED-first test (`3 !== 2` observed), and ADR-0033
+  decision 4 plus the canonical spec now name all three malformed spellings. Round 2 (scoped
+  re-judgment over the fix delta, manifest `607de61f…`): `jd-judge-a` 4/4 `verified`, `jd-judge-b` 7/7
+  `verified`, plus one fix-caused cosmetic defect in ADR-0033 (a duplicated sentence fragment) that was
+  corrected. **Independent verification** (`gentle-ai-verify`, its own commands): PASS on all ten
+  claims, zero contradictions; it also surfaced two **pre-existing** broken links on lines this change
+  does not touch (`docs/02-architecture/OVERVIEW.md:341`, `docs/08-sessions/LOG.md:164`), recorded as
+  follow-ups. **Terminal verdict `APPROVED`.**
+- **The judge-B role needed four attempts and the reason is operational, not substantive**: two attempts
+  died on HTTP `503 chat_admission_busy` from the configured provider, one on a `bash` command that
+  never returned (30-minute stall); the fourth ran on `deepseek/deepseek-flash`, configured by adding a
+  `model_profiles` entry for `jd-judge-b` in `~/.pi/agent/subagents.json` (backed up first). Judge A hit
+  the same 503s and recovered. **No partial judgment was accepted at any point** — the discipline session
+  59 set, and the reason the CRITICAL was found at all. Also disclosed: the provider's own `sync`
+  continuation had to run because its managed assets were stale, and the native review's consent binding
+  **expires after 10 minutes**, so the first START attempt went stale during that window (no lineage, no
+  mutation).
+- **Native RDD review**: `inspect` ran twice — once on the uncommitted workspace candidate, once on the
+  committed range `03b85e6..8a64413` (`base-diff`, 23 files, 809 changed lines, `risk_level: high`,
+  `risk_evidence: ["code that starts other processes in channel/main.ts"]`). START resolved to
+  **`declined_this_candidate`** — resolved by the host, not answered by this session: **no lineage was
+  created and nothing was mutated**. A decline is candidate-scoped and is not the kill switch; the
+  separate verifier re-enabled by the RDD-off fallback is exactly the independent verification above,
+  which is strictly stronger than the lens pass it replaces. If the Director wants the four lenses on
+  this candidate, that is a fresh START.
+- **Delivered**: six work-unit commits on `main`, **not pushed** (publishing was not authorized this
+  session) — `75f0b1a` (feat: the behaviour change + its tests), `224d763` (ADR-0033 + the ADR record),
+  `40f7fd9` (the live-document reconciliation), `d67b692` (the canonical requirement), `f8395d4` (the
+  runbook), `8a64413` (backlog + the feature record); plus this close-out. Tests 1841 → **1846**
+  (0 fail, 6 skip) and `test:static` 99/99, measured before and after, per-file counts verified
+  (`14→14`, `52→53`, `8→12`, `11→11`: no test dropped).
+- **Machine**: one id-free `conmuta` entry in `~/.pi/agent/mcp.json` (backed up), and
+  `FRISCO\.pi\mcp.json` retired (backed up) — the state session 60 had made project-scoped, restored to
+  a single global registration now that the entry no longer encodes a project.
+
+## Session 61 — B-105(a): the wake satellite's retrospective SDD artifact set, archived and pushed
+
+- **Date**: 2026-10-01 local time. Opened on the handoff prompt session 60 left ("Sigue B-105(a) —artefactos
+  SDD de `f7a-wake-satellite` contra el código entregado—; después B-106, B-107 y los residuales de cloud
+  sync de Engram"). **This entry was written by session 62**, because session 61's work landed and was
+  pushed without one; every figure below was re-read from the tree or the commits, not from memory.
+- **Authority**: the Director's handoff prompt above, which assigned B-105(a) as the default unit, plus the
+  in-session authorization of the durable B-107 fix (recorded as the Engram decision
+  `b107-global-bus-registration`, 2026-10-01). Commits were authorized in that session.
+- **Preflight**: `git fetch`/`status` clean; suite **1841/1835/0/6** and `test:static` **99/99** before and
+  after; **Arena unreachable again** (`mcp connect arena` → *Nothing is listening at
+  `http://127.0.0.1:8765/mcp`*), so DN-09's substitute condition was satisfied directly.
+- **B-105(a), the SDD artifact set, closed (retrospectively)**: `openspec/changes/f7a-wake-satellite/`
+  gained `proposal.md`, `design.md` and `tasks.md` (45 tasks) plus a four-capability delta spec set (34
+  requirements / 53 Given-When-Then scenarios), all written against the shipped code rather than the ADR's
+  intentions. The change was then **archived**: the four capabilities were composed as new canonical specs
+  under `openspec/specs/{wake-satellite,wake-ladder,wake-ledger,harness-execution-profile}/` and the change
+  directory moved to `openspec/changes/archive/2026-10-01-f7a-wake-satellite/` with its own
+  `archive-report.md`. Three work-unit commits, pushed to `main` (`915fb69..03b85e6`): `0ea16ef` (canonical
+  specs), `3c57b0d` (`.gitignore` gains `.pi/gentle-ai/`), `03b85e6` (the archived record). Composition was
+  purely additive and verified byte-for-byte — the archive agent's own report of "43 scenarios" was wrong
+  and was corrected.
+- **The SDD phase gates caught two real defect classes, and both were fixed by exactly one gated rerun,
+  verified by grep rather than by trusting the report**: (1) `sdd-proposal` cited three code ranges that
+  resolved to unrelated code (`runner/loop.ts:74-88` for binding resolution, which is `runner/main.ts:97`;
+  `runner/harness.ts:140-155` for the `.cmd` refusal, which is `:215-217`; `runner/ladder.ts:50-58` for the
+  `--by` rule, which is `:121,146`); (2) `sdd-tasks` **fabricated a quotation** attributed to Director Note
+  DN-10 — DN-10 is real (`docs/05-tribunal/INDEX.md:151`) but its subject is the constitutional amendment,
+  not commit authorization — and put `ask-on-risk` where the preflight said `auto-chain`, with
+  `size-exception` (not a valid value) in the chain-strategy field.
+- **The native review's candidate-size ceiling is now measured, not guessed**: the first candidate (all 12
+  files, 214 KB) was refused by the provider with `lens_context_budget_exceeded` — *"no review authority was
+  created … retrying this exact candidate cannot succeed"*, no lineage, no mutation, `next_action: stop`.
+  A reduced candidate of 58 KB (the four canonical specs plus the `.gitignore` line) passed. So on this
+  machine the reviewer budget sits between ~58 KB and ~214 KB, and a larger documentation candidate must be
+  reviewed in its **normative half**, with the historical half declared unreviewed in the commit message.
+  RDD: lineage `review-ccdcdb4d15b22ba3`, medium tier (the `.gitignore` line made it an executable change),
+  one consolidated lens `review-reliability`, approved and acknowledged
+  (`gentle-ai.review-acknowledged/v1`, authority burned).
+- **B-107 reproduced and its durable fix authorized**: Pi reads a project `.pi/mcp.json` cwd-relative with no
+  ancestor walk-up, and only after a saved trust decision — so `FRISCO\.pi\mcp.json` is invisible to a
+  session in `FRISCO\frisco-erp` and a non-UI run (`pi -p`, exactly what the satellite starts) resolves *not
+  trusted* and would lose the bus tools. The Director authorized the durable fix (make `--project` optional;
+  resolve the binding by walking up to the nearest ancestor `conmuta.json`; return to one id-free user-level
+  entry) and it was implemented in **session 62** under ADR-0033.
+- **Not done in session 61**: the HANDOFF and this LOG were not updated, and `AGENTS.md`'s status pointer was
+  not touched. Session 62 wrote this entry and reconciled the live documents that B-105(a) left stale.
+
 ## Session 60 — the operational finish: a project-scoped bus, one runner, and the machine cleaned
 
 - **Date**: 2026-10-01 local time (opened on the handoff prompt session 59 left, closed the same day).

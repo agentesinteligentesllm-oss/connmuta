@@ -22,7 +22,11 @@ consumes the already-shipped body-less doorbell and starts one bounded harness t
 (done, **not** blocked on F6) and F7b (referee), and B-105 files what is still owed (the SDD artifact set
 and a real end-to-end run). No SDD change is open; session 60 closed the operational finish (project-scoped
 bus registration, one runner verified, the `$HOME` ghost git repository removed, FRISCO pinned to Engram
-project `frisco`) — see `docs/08-sessions/HANDOFF.md` for the current state and what is owed. This field used to
+project `frisco`), session 61 closed **B-105(a)** (the F7a SDD artifact set, written against the shipped code
+and archived), and session 62 closed **B-107** under **ADR-0033**: `--project` is an assertion, the thin client
+binds to the nearest ancestor `conmuta.json`, and one id-free user-level registration serves every session
+under a tree — six work-unit commits on `main`, **not pushed**, with **B-109** filed as the installer
+follow-up. See `docs/08-sessions/HANDOFF.md` for the current state and what is owed. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,
