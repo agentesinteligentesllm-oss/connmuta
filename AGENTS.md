@@ -23,9 +23,10 @@ consumes the already-shipped body-less doorbell and starts one bounded harness t
 and a real end-to-end run). No SDD change is open; session 60 closed the operational finish (project-scoped
 bus registration, one runner verified, the `$HOME` ghost git repository removed, FRISCO pinned to Engram
 project `frisco`), session 61 closed **B-105(a)** (the F7a SDD artifact set, written against the shipped code
-and archived), and session 62 closed **B-107** under **ADR-0033**: `--project` is an assertion, the thin client
-binds to the nearest ancestor `conmuta.json`, and one id-free user-level registration serves every session
-under a tree, and closed **B-106** (the thin client now releases its daemon session slot on a real transport close); ten work-unit commits on `main`, **pushed**, with **B-109** filed as the installer
+and archived), and session 62 closed two units — **B-107** under **ADR-0033**: `--project` is an assertion, the
+thin client binds to the nearest ancestor `conmuta.json`, and one id-free user-level registration serves every
+session under a tree; and **B-106**: the thin client now releases its daemon session slot on a real transport
+close. Twelve work-unit commits on `main`, head `b81bf21`, all **pushed**, with **B-109** filed as the installer
 follow-up. See `docs/08-sessions/HANDOFF.md` for the current state and what is owed. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;

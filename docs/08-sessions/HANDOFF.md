@@ -4,21 +4,26 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 62** (2026-10-01 local). Session 60's text is preserved below; §1, §3,
-> §5, §7 and §9 carry session 62's state, and the two sections marked `DONE, session 60` still hold.
+> **Last rewritten: end of session 62** (2026-10-01 local). Sessions 59 and 60's text is preserved below;
+> §0, §1, §3, §4, §5, §6, §7, §8 and §9 carry session 62's state, and the sections marked `DONE, session 60`
+> still hold. §2 is session 59's history.
 >
-> **Session 62 in one paragraph.** Session 61 had already delivered **B-105(a)** (the F7a SDD artifact set,
-> written and archived; commits `0ea16ef`, `3c57b0d`, `03b85e6`) but left no LOG entry and did not touch this
-> file — session 62 wrote session 61's LOG entry and reconciled what it left stale. Then session 62 closed
-> **B-107** under the new **ADR-0033** (`accepted`): `conmuta mcp --project <id>` is now an **assertion**, not
-> a requirement, and the binding resolves from the nearest ancestor `conmuta.json`, so ONE id-free
-> user-level registration is correct for every session under a tree. It was audited by Judgment Day (two
-> blind judges, two rounds, seven real findings all corrected, terminal `APPROVED`) plus independent
-> verification (PASS on ten claims), committed in seven work-unit commits on `main` and **pushed**
-> (`03b85e6..0312ca3`) — and the
-> machine registration was restored to a single id-free global entry. The native RDD review of the committed
-> range was **declined for this candidate by the host** (no lineage, no mutation); §9 has the detail.
-> Follow-up filed as **B-109**. Suite **1846/1840/0/6**, `test:static` 99/99.
+> **Session 62 in one paragraph — two units, both audited, both pushed, tree clean.** Session 61 had already
+> delivered **B-105(a)** (the F7a SDD artifact set, written and archived; commits `0ea16ef`, `3c57b0d`,
+> `03b85e6`) but left no LOG entry and did not touch this file — session 62 wrote session 61's LOG entry and
+> reconciled what it left stale. Then session 62 closed **B-107** under the new **ADR-0033** (`accepted`):
+> `conmuta mcp --project <id>` is now an **assertion**, not a requirement, and the binding resolves from the
+> nearest ancestor `conmuta.json`, so ONE id-free user-level registration is correct for every session under a
+> tree (two rounds of Judgment Day, seven real findings all corrected, terminal `APPROVED`, independent
+> verification PASS). It then closed **B-106** at its source: the thin client now releases its daemon session
+> slot when its transport closes — after its **first submission was rejected on a correct CRITICAL that only
+> one of the two judges saw** (the release ran at startup, because `server.connect()` resolves when the
+> transport STARTS); the corrected design passed two rounds and an independent verification (both `APPROVED`,
+> §9). **Twelve work-unit commits** on `main`, head **`b81bf21`**, all **pushed**; the machine carries one
+> id-free global MCP entry and `FRISCO\.pi\mcp.json` is retired (both backed up). The native RDD review
+> resolved to `declined_this_candidate` for both candidates (host-resolved, no lineage, no mutation).
+> Follow-ups filed: **B-109** (the installer's entry shape) and B-106's remainder. Suite
+> **1856/1850/0/6**, `test:static` **99/99**.
 
 ---
 
@@ -40,39 +45,59 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §3, §4) y confirma Arena con una llamada real. La sesión 60 cerró lo
-operativo (bus por proyecto, un solo runner, `$HOME` sin repo fantasma, FRISCO fijado a Engram `frisco`): no lo
-rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el código entregado—; después B-106, B-107 y los residuales de cloud sync de Engram.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4) y confirma Arena con una llamada real. Estado al cerrar la
+sesión 62: B-107 cerrado bajo ADR-0033 (`--project` es una aserción; el binding se resuelve por el ancestro
+`conmuta.json` más cercano) y B-106 cerrado en su origen (el cliente delgado libera su slot de sesión al
+cerrarse el transporte). Once commits por unidad de trabajo en `main`, empujados hasta `b81bf21`, árbol limpio,
+suite 1856/1850/0/6 y `test:static` 99/99: no los rehagas. La siguiente unidad natural es B-109 (el instalador
+sigue escribiendo `--project <id>` en cada entrada que genera, y eso puede reintroducir la trampa del trust
+gate); alternativas: B-106 resto (visibilidad de ocupación en `status`/`doctor` y barrido por pid muerto),
+B-108 (higiene de `%TEMP%`) o B-105(b) (argv de los otros tres harnesses). Respeta §0.4: los commits se
+autorizan por sesión, y el consentimiento de la revisión nativa es del Director, no tuyo.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
 
 | # | Command | Expected |
 |---|---|---|
-| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; the LOG's newest entry names the head at session close |
+| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; the head is **`b81bf21`** (twelve commits past session 61's `03b85e6`) and the LOG's newest entry is session 62 |
 | 2 | `rm -rf dist` | prints nothing |
 | 3 | `ls openspec/changes/` | `archive` only |
 | 4 | `git status --short` | **empty** (the installer's two `*.bak-pre-conmuta-*` files were removed in session 60 — see §4) |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `3.7.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1841 tests, 1835 pass, 0 fail, 6 skip**; `test:static` **99/99** |
+| 7 | `npm run build && npm test` | exit 0; **1856 tests, 1850 pass, 0 fail, 6 skip**; `test:static` **99/99** |
 
 ### 0.3 Settle before any work
 
 1. **Autonomy**: confirm the opening prompt re-states it; if it does not, ask one question.
 2. **Memory**: start an Engram session (`mem_session_start`) and pass its id to `mem_save`.
 3. **Arena**: prove reachability with a real `mcp connect arena` / `bridge_send`, never `curl` alone.
-   Sessions 55–59 all found the server itself refusing to connect; if it fails again, that is DN-09's
+   Sessions 55–62 all found the server itself refusing to connect; if it fails again, that is DN-09's
    substitute condition satisfied directly, and the audit runs under Judgment Day.
 
 ### 0.4 Standing instructions from the Director
 
 - **RDD consent is asked per candidate; never answer it for the Director.** Session 59: the START of the F7a
   candidate resolved to `declined_this_candidate` (`risk_level: high`, 43 files / 4553 lines, no lineage
-  created, no mutation) — the Director had said RDD was not needed. A decline is candidate-scoped and is not
-  the kill switch.
+  created, no mutation) — the Director had said RDD was not needed. **Session 62 hit the same result twice**
+  (B-107's candidate and then the committed `03b85e6..8a64413` range) — resolved by the host, `lineage_created:
+  false`, `mutation_performed: false` each time. A decline is candidate-scoped and is not the kill switch, and
+  it never lowers the bar: the RDD-off fallback re-enables the separate verifier, which is what
+  `gentle-ai-verify` provides. **The consent binding EXPIRES AFTER 10 MINUTES**: ask the Director first, then
+  run `inspect` → START → answer inside one uninterrupted window, or the binding goes stale
+  (`next_action: restart-for-fresh-consent`).
 - **Commits are authorized when the Director says so, per session.** Session 59 was authorized explicitly and
-  the nine work-unit commits were pushed to `main` (`2aa0da0..f00e8fb`).
+  the nine work-unit commits were pushed to `main` (`2aa0da0..f00e8fb`). **Session 62 was authorized in two
+  steps** — "commits, but after the audit" and then an explicit "push" — and both were honoured literally: the
+  commits were made only once each audit closed `APPROVED`, and the push happened only after the Director said
+  so. Do not treat one authorization as the other.
+- **Never accept a partial judgment, and never accept an `APPROVE` as if it were the gate.** Session 62's
+  second unit is the counter-example that justifies both halves: `jd-judge-b` **`REJECT`ed** the first
+  submission on a CRITICAL that was right, while `jd-judge-a` returned `APPROVE_WITH_CHANGES` **and recorded
+  the false premise as CONFIRMED OK**. The parent re-read the pinned SDK before accepting either report. A
+  judge that fails or times out leaves its corner unaudited (retry it, as session 62 retried `jd-judge-b` four
+  times); an `APPROVE` from one judge is one input, not the verdict.
 - **Commit messages carry no `Co-Authored-By` and no AI attribution**; conventional commits only, by work unit.
 - **Never trust a delegated agent's own report at face value.** Session 59's two audit rounds are the
   counter-example that justifies the discipline: the judges found eleven real defects, but one of them
@@ -96,7 +121,7 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 | **B-107** | **RESOLVED — session 62**, under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `conmuta mcp --project <id>` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves every session under a tree — including a subfolder session and a headless `pi -p` turn, both of which a project-level entry loses (cwd-relative, and trust-gated so a non-UI run resolves *not trusted*). Audited (Judgment Day, two rounds, terminal `APPROVED`) and independently verified. Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`, `0312ca3` — **on `main` and pushed** | `docs/03-adr/0033-project-flag-as-assertion.md`; `docs/05-tribunal/INDEX.md` (`bus-v2-b107-optional-project-001`); `odd/tasks/b-107-optional-project-walkup.md` |
 | **B-109** | Open, filed in session 62: the installer still writes `--project <id>` into every tool-config entry it generates, and where a host reads both a user-level and a project-level config the project entry **replaces** the global one by server name — so one installer run can silently reintroduce the trust gate ADR-0033 removed. Changing a D-42 wizard artifact needs its own ADR-level decision | `docs/06-backlog/CHECKLIST.md` |
 | **B-108** | Open, filed in session 60: every `npm test` leaves one `%TEMP%\conmuta-*` scratch directory behind (242 had accumulated, 29 MB; the pile was removed) | `docs/06-backlog/CHECKLIST.md` |
-| Next SDD change | None queued; **B-109** is the natural next unit (installer entry shape) or **B-106** (the daemon session pool); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
+| Next SDD change | None queued; **B-109** is the natural next unit (the installer's entry shape — it needs an ADR-level decision because it changes a D-42 artifact), or **B-106's remainder** (occupancy visibility in `status`/`doctor` + a dead-pid sweep); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
 | Tests on `main` | `npm test` **1856/1850/0/6**; `test:static` **99/99** | — |
 
 ---
@@ -160,11 +185,11 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
    logoff. One loop now, relaunched through `start-frisco.vbs`; the hazard and its symptom are documented in
    the satellite's README (`C:\Users\LABORATORIO\conmuta-runner\README.md`).
 4. **Arm any other binding the Director names**, one signed `ladder set` per project, never a second runner
-   per binding (§4's session-pool and one-runner rules).
-5. **B-105(a)**: write the `openspec/changes/f7a-wake-satellite/` artifact set (proposal, spec, design,
-   tasks) against the shipped code, so the phase has the SDD record every other phase has. **B-106**: the
-   daemon's session pool (the thin client never releases its slot) — the one ceiling "permanently, for days"
-   runs into.
+   per binding (§4's session-pool bullet, and the one-runner property measured in §3.3).
+5. **B-105(a) and B-106's leak are BOTH DONE — do not restart them.** (a) was session 61's (the artifacts are
+   archived, §1). B-106's source leak was session 62's: the client releases its slot on a real close signal.
+   What is left of B-106 is its **remainder** — occupancy visibility in `status`/`doctor` and a dead-pid
+   sweep — and it is a fresh unit, not a continuation.
 6. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
 
 ---
@@ -187,19 +212,45 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
   so in the operator's words.
 - **The wake ledger is self-reported** (ADR-0032 R6a): the daemon cannot corroborate it.
 - **Judge and auditor citations get checked against the file** (§0.4).
-- **The daemon's session pool is bounded and is never reclaimed by the thin client.** `MAX_ACTIVE_SESSIONS = 64`
-  (`src/shared/constants.ts`), in memory, per boot, freed only by a graceful `DELETE /session` — and
-  `src/client/ipc-stub.ts:16` says in the client's own words that *nothing in this client ever calls it*. The
-  runner and the channel adapter do release theirs. Every host session that ends therefore leaves a bearer
-  behind: five or six concurrent sessions are far below the cap, but a day of opening and closing them is not,
-  and the ceiling stays invisible in `status`/`doctor` until new sessions start being refused. Filed as
-  **B-106**; restarting the daemon frees the pool meanwhile.
-- **Two ways to give a folder the bus tools, and only one of them is per project.** The designed mechanism is
-  the **project-level** MCP entry — for Pi, `.pi/mcp.json`, which `src/installer/tool-targets.ts:73` already
-  writes per project (id-only, opt-in per tool, merging never overwriting, and Pi reads it after the project
-  is trusted). A **user-level** entry (`~/.pi/agent/mcp.json`) is global: an entry bound to `--project frisco`
-  makes every Pi session on the machine load a client that refuses in any other project's folder. Use the
-  project file for a project's binding.
+- **The daemon's session pool is bounded, and the thin client now gives its slot back (session 62).**
+  `MAX_ACTIVE_SESSIONS = 64` (`src/shared/constants.ts`), in memory, per boot. Before session 62 nothing in the
+  thin client ever called `DELETE /session` (`src/client/ipc-stub.ts`'s own module doc said so), so every host
+  session that ended left a bearer behind — ~2.5 session-shapes/hour measured, surfacing as a false, permanent
+  `DAEMON_DOWN` once the cap was hit. **Fixed at the source**: `IpcSession.release()` + `awaitTransportClose`.
+  Still open and filed: occupancy visibility in `status`/`doctor`, a dead-pid sweep, a hard-killed client, and a
+  tool call that BEGINS a handshake after the release returned (§7). Restarting the daemon still frees the pool.
+- **The MCP SDK's `connect()` does NOT wait for close, and its stdio transport never reports stdin ending.**
+  Verified in the installed package (session 62, after a judge rejected a change that assumed otherwise):
+  `@modelcontextprotocol/sdk` 1.30.0's `Protocol.connect` ends at `await this._transport.start()`
+  (`dist/esm/shared/protocol.js`) and `StdioServerTransport.start()` only registers `'data'`/`'error'`
+  (`dist/esm/server/stdio.js`) — while `onclose` fires **only** from `transport.close()`. So: (a) anything
+  sequenced after `connect()` runs at STARTUP, not at shutdown; (b) a host closing the stdio pipe produces no
+  close notification, so map `stdin`'s `'end'`/`'close'` yourself; (c) `connect` CHAINS a pre-existing
+  `transport.onclose`, so installing your own handler is supported — but chain the one already there, because
+  the SDK's wrapper performs the protocol's own cleanup. `src/client/main.ts`'s `awaitTransportClose` is the
+  worked example, and its tests are the shape to copy: assert the run stays PENDING while the transport is
+  open, then resolves after `onclose`. **Read the package under `node_modules`, never the comment that asserts
+  a library's semantics** — this trap cost a full rejected review round.
+- **One registration, placed at the USER level, is now the designed shape (ADR-0033) — the older guidance
+  here said the opposite.** A user-level entry (`~/.pi/agent/mcp.json`) is read from every cwd, and since the
+  entry carries no project id the client resolves the binding from the nearest ancestor `conmuta.json`; that
+  is what reaches a subfolder session and a headless `pi -p` turn. A **project-level** entry (`.pi/mcp.json`,
+  which `src/installer/tool-targets.ts:73` writes) is cwd-relative with no ancestor walk-up AND trust-gated
+  (`~/.pi/agent/trust.json`), so a non-UI run resolves *not trusted* and silently loses the bus tools. The
+  machine now carries the user-level entry only (`FRISCO\.pi\mcp.json` retired). **The installer still writes
+  the id-carrying project entry** — filed as B-109, because where a host reads both, the project entry
+  REPLACES the global one by server name and the trust gate comes back.
+- **The review machinery has four traps of its own, all hit in session 62.** (1) `inspect`'s intended-untracked
+  round trip is resolved in ONE call by `inspect` with `untrackedScope: "select"` + `intendedUntracked`
+  (`select-intended-untracked` returned `schema-incompatible`). (2) A committed-range review needs a FULL
+  40/64-character commit id — an abbreviated one is rejected as `base-ref-unresolvable`. (3) The provider's own
+  `managed_assets_outdated` stop requires running its `sync` continuation before STATUS will advance. (4) Two
+  judges must be told NOT to run `npm test`/`build`/`node`: this suite can start a real stdio MCP server
+  inside the test process and hang forever, and concurrent `tsc -b` races on `dist/`. Also: give each judge a
+  per-file sha256 manifest (a "target moved" report is then possible) and give round 2 the fix-delta hashes.
+- **Two pre-existing broken relative links** were found by session 62's independent verification on lines that
+  change does not touch: `docs/02-architecture/OVERVIEW.md:341` and `docs/08-sessions/LOG.md:164`. Recorded
+  here as a known-broken list rather than fixed inside an unrelated candidate.
 - **PT-22's repository scan reads TRACKED files only** (`test/security/repo-scan.test.ts` over `git ls-files`),
   so a token-shaped literal inside a brand-new file is invisible to it until that file is committed — session
   59's suite was green at nine commits and turned red on the tenth, when the file carrying the fixture became
@@ -238,8 +289,8 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 
 ## §5 — Next session, exact sequence
 
-- [ ] **1. Verify the tree** (§0.2); the suite must be 1846/1840/0/6 and `test:static` 99/99. Session 62's
-      seven commits are already on `main` and pushed (`03b85e6..0312ca3`); read `git log` rather than §0.2's
+- [ ] **1. Verify the tree** (§0.2); the suite must be 1856/1850/0/6 and `test:static` 99/99. Session 62's
+      twelve commits are already on `main` and pushed, head `b81bf21`; read `git log` rather than §0.2's
       baseline before assuming the numbers.
 - [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
 - [ ] **3. The default unit is B-109** (the installer's entry still carries `--project <id>`, which can
@@ -262,13 +313,24 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 ## §6 — Do not redo
 
 - F1–F5 archives, B-98, B-99, B-100(a)(b), B-101, B-103: closed; do not re-open or re-review.
+- **B-107's and B-106's audit corrections**, each one found by a judge and each one real:
+  - **Never re-sequence the B-106 session release after `server.connect()`.** `connect` resolves when the
+    transport STARTS, so that shape releases at startup against an empty cache and closes nothing — it was
+    rejected once already. Do not drop `awaitTransportClose`'s three sources (the chained `onclose`, the
+    `stdin` end/close mapping, `beforeExit`), do not drop its listener cleanup, and do not make `release()`
+    require a handshake (it awaits one only if one is already in flight).
+  - **Do not relax `--project`'s three malformed spellings** into "no assertion": ADR-0033 decision 4 refuses
+    `--project` with no value, `--project` followed by an empty token, and `--project=`. The empty-token case
+    was the one that silently bound to the wrong tree.
+  - **Do not undo `requireProjectFlag`** on `conmuta-channel`/`conmuta-runner`: it is what keeps their refusal
+    byte-for-byte identical to the pre-amendment behaviour.
 - **F7a's eleven audit corrections**: each one exists because a judge found the defect real. In particular do
   not re-tighten `isRefusedArgument` to equality, do not drop the post-poll ladder re-read, do not commit the
   cursor for a turn that did not exit, and do not remove `runner/watermark.ts`.
 - **PT-34's allow-lists and the third `bin` wiring** in `package.json`/`tsconfig.json`/
   `test/security/pack.test.ts`/`test/cli/main.test.ts`.
-- The acknowledged RDD lineages listed in earlier sessions' §9 records, and session 59's
-  `declined_this_candidate` START (no lineage was created; nothing to chase).
+- The acknowledged RDD lineages listed in §9, and the `declined_this_candidate` STARTs (no lineage was created
+  in any of them; nothing to chase).
 
 ---
 
@@ -276,15 +338,15 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-105(a)** | the F7a SDD artifact set — the only owed item of the phase's record. (b) is satisfied for `pi`: the wake path ran live four times and the 04:22:00Z turn read a peer message and replied on the bus; (c)(d)(e) are documented design consequences, not defects | Director schedules; Kairo writes |
-| **B-106** | the daemon's session pool (measured: ≈2.5 session-shapes/hour, 13 of 64 in the current boot, and every runner restart burns one). Cheap remedy now: restart the daemon; the real fix is releasing the slot on the client's exit | Kairo (F1 follow-up) |
-| **B-106 remainder** | occupancy visibility in `status`/`doctor` (a wire-contract change: the status payload's closed key set, its PTs and two specs) and a dead-pid sweep of the bearer pool (the `pid` lives on `client_cursors`, so it is a different mechanism) | Kairo (F1 follow-up) |
+| **B-105(b)** | the wake satellite's remaining owed item: the `claude`/`codex`/`opencode` argv forms are unverified on this machine (only `pi` has run live). (a) is done; (c)(d)(e) are documented design consequences, not defects | Director schedules; Kairo verifies |
+| **B-106 remainder** | occupancy visibility in `status`/`doctor` (a wire-contract change: the status payload's closed key set, its PTs and two specs) and a dead-pid sweep of the bearer pool (the `pid` lives on `client_cursors`, so it is a different mechanism). The source leak itself is CLOSED (§1) | Kairo (F1 follow-up) |
 | **B-107** | **RESOLVED in session 62** under ADR-0033; see §1. The machine now carries one id-free user-level entry and `FRISCO\.pi\mcp.json` is retired (both backed up) | done |
 | **B-109** | the installer's launcher entry still encodes `--project <id>`: where a host reads both configs, the project entry replaces the global one by server name and the trust gate comes back. Needs its own ADR-level decision (D-42) | Kairo (F2 follow-up) |
 | **B-108** | one `%TEMP%\conmuta-*` scratch directory per full test run (test hygiene, not correctness) | Kairo |
 | **B-108** | one scratch directory per full test run under `%TEMP%` (test hygiene, not correctness); the accumulated 29 MB were removed, the row stays open until the suite stops adding new ones | Kairo |
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), and three backups to delete once nothing needs reverting | Director |
 | B-95 remainder, B-102 residuals | Carried; cheap wins at the next touch | Kairo |
+| Two pre-existing broken relative links | `docs/02-architecture/OVERVIEW.md:341` and `docs/08-sessions/LOG.md:164` — found by session 62's independent verification, on lines that change does not touch; see §4 | Kairo |
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in session 59 | Director/maintainer |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
@@ -294,8 +356,19 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 
 - Windows 11, Node v24.16.0, `gentle-ai` **3.7.0**, PowerShell primary with Bash (Git Bash) available.
 - `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`, **pushed** through
-  `f00e8fb`. `gh` commands run with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`;
-  never `gh auth switch`. Force-push and deletion of `main` are blocked.
+  `b81bf21` (session 62's twelve commits). `gh` commands run with
+  `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; never `gh auth switch`.
+  Force-push and deletion of `main` are blocked.
+- **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`, session 62).
+  `FRISCO\.pi\mcp.json` is retired; both files were backed up before being changed
+  (`mcp.json.bak-pre-project-scope-20260930-215503`, `mcp.json.bak-pre-b107-…`). If a session in a FRISCO
+  subfolder cannot see the `conmuta_*` tools, that is a regression of this state, not a missing installer
+  write — see §4.
+- **`jd-judge-b` runs on `deepseek/deepseek-flash`** via a `model_profiles` entry added to
+  `~/.pi/agent/subagents.json` (backed up as `subagents.json.bak-pre-jdjudgeb-model-…`). Before it, that role
+  failed three times in a row on `omniroute` — two HTTP `503 chat_admission_busy`, one `bash` call that stalled
+  30 minutes — while `jd-judge-a` survived the same 503s by retrying. If a judge role starts failing again,
+  check this file before suspecting the candidate.
 - v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, read-only.
 - **The local bus (conmuta) is live on this machine**: daemon home `~/.conmuta/`, two bots
   (`agente_kairo_bot`, `agent_luisgtz_bot`) and two bindings — `telegram-bus-agent` (this repository, group
@@ -319,15 +392,20 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 
 ## §9 — RDD / audit state at session close
 
-0. **Session 62, `bus-v2-b106-session-release-001`** (the B-106 session-slot release): Judgment Day, two
-   blind judges over the frozen manifest `sha256:c379c37b…` (8 files), **2 rounds, terminal `APPROVED`**.
-   `jd-judge-b` **`REJECT`ed** the first submission on a CRITICAL that was right, and `jd-judge-a`
-   `APPROVE_WITH_CHANGES` without seeing it (it recorded the false premise — `connect` resolving on close —
-   as CONFIRMED OK). The parent re-read the pinned SDK before accepting either. Round 2: A 3/3 and B 7/7
-   `verified`, no fix-caused defect. Independent verification PASS on ten claims, reproducing the
-   CRITICAL's scenario from the outside. Non-vacuity: removing the `DELETE` fails 2 tests, restoring the
-   rejected design fails 3.
-0. **Session 62, `bus-v2-b107-optional-project-001`** (ADR-0033 + the B-107 change): Judgment Day (Arena
+Newest first. Every entry below is a closed record; the reasoning for each is in the tribunal index under the
+id it names.
+
+1. **Session 62 — `bus-v2-b106-session-release-001`** (the B-106 session-slot release): Judgment Day over the
+   frozen manifest `sha256:c379c37b…` (8 files, uncommitted), **2 rounds, terminal `APPROVED`**. `jd-judge-b`
+   **`REJECT`ed** the first submission on a CRITICAL that was right, and `jd-judge-a` returned
+   `APPROVE_WITH_CHANGES` **without seeing it** — it recorded the false premise (`connect` resolving on close)
+   as CONFIRMED OK. The parent re-read the pinned SDK before accepting either. Round 2 over the fix delta
+   (`sha256:d7bc7cd3…` plus the residual disclosure): A 3/3 and B 7/7 `verified`, one fix-caused cosmetic
+   defect found (in the B-107 unit) and corrected; no fix-caused defect in this one. Independent verification
+   PASS on ten claims, reproducing the CRITICAL's scenario from the outside. Non-vacuity: removing the
+   `DELETE` fails 2 tests; **restoring the rejected design fails 3**, including the two that had passed with
+   the bug. Commits `241b455`, `869732a`, `8933984`, `b81bf21`.
+2. **Session 62 — `bus-v2-b107-optional-project-001`** (ADR-0033 + the B-107 change): Judgment Day (Arena
    unreachable — `mcp connect arena` → *nothing is listening*, DN-09's substitute satisfied directly), two
    blind judges over the frozen manifest `sha256:18fa6423…` (24 files, uncommitted), both
    `APPROVE_WITH_CHANGES`, **seven findings all real and all corrected** (one CRITICAL, documentation
@@ -336,28 +414,29 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
    fix-caused cosmetic defect corrected. Independent verification (`gentle-ai-verify`) PASS on ten claims,
    zero contradictions. **Terminal verdict `APPROVED`.** The judge-B role needed four attempts (two provider
    `503 chat_admission_busy`, one 30-minute `bash` stall; the fourth ran on `deepseek/deepseek-flash` via a new
-   `model_profiles` entry in `~/.pi/agent/subagents.json`, backed up). **No partial judgment was accepted.**
-   **RDD**: `inspect` ran twice (workspace candidate; then the committed `base-diff` range `03b85e6..8a64413`,
-   23 files / 809 changed lines, `risk_level: high`, `risk_evidence: ["code that starts other processes in
-   channel/main.ts"]`); START resolved to **`declined_this_candidate`** — resolved by the host, not answered
-   here, `lineage_created: false`, `mutation_performed: false`. A decline is candidate-scoped; the separate
-   verifier the RDD-off fallback re-enables is the independent verification above. A fresh START is the way to
-   ask for the four lenses.
-1. **`bus-v2-b104-wake-satellite-001`** (governance half): Judgment Day, 2 rounds, `APPROVED`; two CRITICAL
-   findings fixed (the missing tribunal row; a wake-audit row that could not exist outside the core — now R6a's
-   self-reported ledger).
-2. **`bus-v2-f7a-audit-001`** (implementation): Judgment Day, 2 rounds, `APPROVED`; round 1 eleven defects, all
-   fixed with tests, round 2 zero findings.
-3. **RDD native review**: `inspect` ran, the intended-untracked selection was submitted, and START resolved to
-   `declined_this_candidate` (`risk_level: high`, 43 files / 4553 lines, `lineage_created: false`,
-   `mutation_performed: false`). No lineage exists and no authority was burned; nothing to acknowledge or
-   chase. If the Director later wants the four lenses on this candidate, that is a fresh START.
-4. **This session's first candidate (session 60, the 40-line HANDOFF close-out)**: `inspect` → `start` closed it
-   at the start (`risk_tier: low`, `lenses_required: false`, `selected_lenses: []`,
+   `model_profiles` entry in `~/.pi/agent/subagents.json`, backed up — see §8). **No partial judgment was
+   accepted.** Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`, `0312ca3`, `e764743`.
+3. **RDD native review, session 62 — two candidates, two declines.** `inspect` ran on the uncommitted
+   workspace candidate and then on the committed `base-diff` range `03b85e6..8a64413` (23 files / 809 changed
+   lines, `risk_level: high`, `risk_evidence: ["code that starts other processes in channel/main.ts"]`);
+   START resolved to **`declined_this_candidate`** both times — resolved by the host, not answered here, with
+   `lineage_created: false` and `mutation_performed: false`. One earlier START attempt went stale
+   (`consent-binding-stale`) because the provider's own `sync` continuation had to run first. A decline is
+   candidate-scoped; the separate verifier the RDD-off fallback re-enables is the independent verification in
+   entries 1 and 2. A fresh START is the way to ask for the four lenses.
+4. **Session 59 — `bus-v2-b104-wake-satellite-001`** (governance half): Judgment Day, 2 rounds, `APPROVED`;
+   two CRITICAL findings fixed (the missing tribunal row; a wake-audit row that could not exist outside the
+   core — now R6a's self-reported ledger).
+5. **Session 59 — `bus-v2-f7a-audit-001`** (implementation): Judgment Day, 2 rounds, `APPROVED`; round 1
+   eleven defects, all fixed with tests, round 2 zero findings.
+6. **Session 59 — RDD native review of the F7a candidate**: `inspect` ran, the intended-untracked selection was
+   submitted, and START resolved to `declined_this_candidate` (`risk_level: high`, 43 files / 4553 lines,
+   `lineage_created: false`, `mutation_performed: false`). Nothing to acknowledge or chase.
+7. **Session 60 — RDD native review of that session's 40-line HANDOFF close-out**: `inspect` → `start` closed
+   it at the start (`risk_tier: low`, `lenses_required: false`, `selected_lenses: []`,
    `risk_reasons: [non_executable_only]`, 1 file / 40 changed lines, correction budget 20) → `status` offered
    `approved_acknowledgement_required` → `acknowledge-approved` burned authority
    (`gentle-ai.review-acknowledged/v1`, lineage `review-73e0e357217ed1c5`). No lens ran and no consent envelope
-   was raised; the durable trail is the receipt under `.git/gentle-ai/`, not a source commit. **The candidate
-   grew again after that burn** (this session added the LOG entry, these §4 bullets and B-106/B-107 to the
-   checklist), so what was delivered is a fresh candidate: its own closure is recorded in the close-out
-   commit's message, and delivery stayed ordinary repository policy.
+   was raised; the durable trail is the receipt under `.git/gentle-ai/`, not a source commit. The candidate
+   grew again after that burn, so what was delivered there was a fresh candidate whose closure is recorded in
+   its own commit message.
