@@ -67,8 +67,8 @@
   separate verifier re-enabled by the RDD-off fallback is exactly the independent verification above,
   which is strictly stronger than the lens pass it replaces. If the Director wants the four lenses on
   this candidate, that is a fresh START.
-- **Delivered**: six work-unit commits on `main`, **not pushed** (publishing was not authorized this
-  session) — `75f0b1a` (feat: the behaviour change + its tests), `224d763` (ADR-0033 + the ADR record),
+- **Delivered**: seven work-unit commits on `main`, **pushed** on the Director's authorization in the same
+  session (`03b85e6..0312ca3`) — `75f0b1a` (feat: the behaviour change + its tests), `224d763` (ADR-0033 + the ADR record),
   `40f7fd9` (the live-document reconciliation), `d67b692` (the canonical requirement), `f8395d4` (the
   runbook), `8a64413` (backlog + the feature record); plus this close-out. Tests 1841 → **1846**
   (0 fail, 6 skip) and `test:static` 99/99, measured before and after, per-file counts verified

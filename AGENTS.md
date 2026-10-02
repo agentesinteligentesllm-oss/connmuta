@@ -25,7 +25,7 @@ bus registration, one runner verified, the `$HOME` ghost git repository removed,
 project `frisco`), session 61 closed **B-105(a)** (the F7a SDD artifact set, written against the shipped code
 and archived), and session 62 closed **B-107** under **ADR-0033**: `--project` is an assertion, the thin client
 binds to the nearest ancestor `conmuta.json`, and one id-free user-level registration serves every session
-under a tree — six work-unit commits on `main`, **not pushed**, with **B-109** filed as the installer
+under a tree — seven work-unit commits on `main`, **pushed** (`03b85e6..0312ca3`), with **B-109** filed as the installer
 follow-up. See `docs/08-sessions/HANDOFF.md` for the current state and what is owed. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;

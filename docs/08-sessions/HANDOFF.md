@@ -14,7 +14,8 @@
 > a requirement, and the binding resolves from the nearest ancestor `conmuta.json`, so ONE id-free
 > user-level registration is correct for every session under a tree. It was audited by Judgment Day (two
 > blind judges, two rounds, seven real findings all corrected, terminal `APPROVED`) plus independent
-> verification (PASS on ten claims), committed in six work-unit commits on `main` — **not pushed** — and the
+> verification (PASS on ten claims), committed in seven work-unit commits on `main` and **pushed**
+> (`03b85e6..0312ca3`) — and the
 > machine registration was restored to a single id-free global entry. The native RDD review of the committed
 > range was **declined for this candidate by the host** (no lineage, no mutation); §9 has the detail.
 > Follow-up filed as **B-109**. Suite **1846/1840/0/6**, `test:static` 99/99.
@@ -27,9 +28,9 @@
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
 | What is new? | **Session 62 closed B-107** under **ADR-0033**: `--project` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, one id-free registration serves a tree, and the machine now carries exactly that (`~/.pi/agent/mcp.json`; `FRISCO\.pi\mcp.json` retired). Session 61's **B-105(a)** (the F7a SDD artifact set) is also closed and was undocumented until session 62 wrote its LOG entry. |
-| What is next? | **B-109** (the installer still writes the project id into every entry it generates — see §7), then **B-106** (the daemon session pool, measured — §7), then **B-108** and the cheap backlog residuals. The Director's calls: whether to **push** session 62's six commits, the **Engram cloud-sync bookkeeping** rows, and **F6** once B-11/B-12/B-16 are decided. **B-105(b)** remains open only for the other three harnesses' argv forms. |
+| What is next? | **B-106** (the daemon session pool, measured — §7), then **B-109** (the installer entry), **B-108** and the cheap backlog residuals. The Director's calls: the **Engram cloud-sync bookkeeping** rows and **F6** once B-11/B-12/B-16 are decided. **B-105(b)** remains open only for the other three harnesses' argv forms. |
 | What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real tool call). |
-| What is the Director's to decide? | Whether to **push** `75f0b1a..HEAD` (commits are made; publishing was not authorized this session); the order of B-109/B-106/B-108; the Engram cloud-sync bookkeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. |
+| What is the Director's to decide? | The order of B-106/B-109/B-108 (the Director delegated the choice to Kairo for this session); the Engram cloud-sync bookkeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. Session 62's commits are pushed. |
 | Where to read next | §0 first; then §3 and §7. §4 is the list of traps. |
 
 ---
@@ -92,7 +93,7 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 | **B-105** | **Open for (b) only.** **(a) IS DONE — session 61** (2026-10-01): the retrospective SDD artifact set was written against the shipped code and archived to `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`, with the four capabilities landed as canonical specs; commits `0ea16ef`, `3c57b0d`, `03b85e6`. **The native reviewer's size ceiling is now measured**: a 214 KB documentation candidate is refused with `lens_context_budget_exceeded` (no lineage), while a 58 KB normative half passes — so a larger documentation candidate must be reviewed in its normative half. What remains of (b) is the `claude`/`codex`/`opencode` argv forms. (c) the Windows `.cmd` gate is documented, with the working remedy (a real shell-free launcher on the runner process's PATH only — commit `86a26dd`); (d) `autopilot`'s profile is prompt + harness policy, not a mechanism; (e) the wake ledger is self-reported | `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` Implementation note; `docs/runbooks/wake-satellite.md` |
 | B-95 remainder, B-102 residuals | Open, low priority, "cheap win at the next touch" | §7 |
 | **B-106** | Open, **measured in session 60**: the daemon's 64-slot pool leaks ≈2.5 session-shapes per hour and stays invisible to `status`/`doctor` | `docs/06-backlog/CHECKLIST.md` |
-| **B-107** | **RESOLVED — session 62**, under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `conmuta mcp --project <id>` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves every session under a tree — including a subfolder session and a headless `pi -p` turn, both of which a project-level entry loses (cwd-relative, and trust-gated so a non-UI run resolves *not trusted*). Audited (Judgment Day, two rounds, terminal `APPROVED`) and independently verified. Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413` — **on `main`, not pushed** | `docs/03-adr/0033-project-flag-as-assertion.md`; `docs/05-tribunal/INDEX.md` (`bus-v2-b107-optional-project-001`); `odd/tasks/b-107-optional-project-walkup.md` |
+| **B-107** | **RESOLVED — session 62**, under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `conmuta mcp --project <id>` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves every session under a tree — including a subfolder session and a headless `pi -p` turn, both of which a project-level entry loses (cwd-relative, and trust-gated so a non-UI run resolves *not trusted*). Audited (Judgment Day, two rounds, terminal `APPROVED`) and independently verified. Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`, `0312ca3` — **on `main` and pushed** | `docs/03-adr/0033-project-flag-as-assertion.md`; `docs/05-tribunal/INDEX.md` (`bus-v2-b107-optional-project-001`); `odd/tasks/b-107-optional-project-walkup.md` |
 | **B-109** | Open, filed in session 62: the installer still writes `--project <id>` into every tool-config entry it generates, and where a host reads both a user-level and a project-level config the project entry **replaces** the global one by server name — so one installer run can silently reintroduce the trust gate ADR-0033 removed. Changing a D-42 wizard artifact needs its own ADR-level decision | `docs/06-backlog/CHECKLIST.md` |
 | **B-108** | Open, filed in session 60: every `npm test` leaves one `%TEMP%\conmuta-*` scratch directory behind (242 had accumulated, 29 MB; the pile was removed) | `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued; **B-109** is the natural next unit (installer entry shape) or **B-106** (the daemon session pool); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
@@ -237,9 +238,9 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 
 ## §5 — Next session, exact sequence
 
-- [ ] **1. Verify the tree** (§0.2); the suite must be 1845/1839/0/6 and `test:static` 99/99. **Session 62 left
-      six commits on `main` that are NOT pushed** (`03b85e6..8a64413`) — decide with the Director whether they
-      publish, and read `git log` rather than §0.2's baseline before assuming the numbers.
+- [ ] **1. Verify the tree** (§0.2); the suite must be 1846/1840/0/6 and `test:static` 99/99. Session 62's
+      seven commits are already on `main` and pushed (`03b85e6..0312ca3`); read `git log` rather than §0.2's
+      baseline before assuming the numbers.
 - [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
 - [ ] **3. The default unit is B-109** (the installer's entry still carries `--project <id>`, which can
       silently reintroduce the trust gate ADR-0033 removed wherever a host reads both a user-level and a
