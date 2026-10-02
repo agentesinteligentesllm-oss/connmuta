@@ -12,7 +12,9 @@ import { fetchInputSchema, sendInputBaseSchema, statusInputSchema, threadInputSc
 const PROJECT_ID = "prj-example";
 
 function fakeSession(callTool: (route: IpcToolRoute, input: unknown) => Promise<IpcToolResult>): IpcSession {
-  return { callTool };
+  // `createServer` only ever calls `callTool`; releasing the session is the process entry's job
+  // (`client/main.ts`), so the twin's fake session has nothing to release (B-106).
+  return { callTool, release: async () => {} };
 }
 
 /** Connects `createServer({ipc, projectId: PROJECT_ID})` to a real MCP `Client` over an in-memory transport, runs `run`, then tears both down — mirrors v1's own `test/index.test.ts` pattern. */

@@ -1,4 +1,4 @@
-import { IPC_REQUEST_TIMEOUT_MS } from "../shared/constants.js";
+import { IPC_REQUEST_TIMEOUT_MS, SESSION_RELEASE_TIMEOUT_MS } from "../shared/constants.js";
 import { HTTP_UNAUTHORIZED, IPC_LOOPBACK_HOST, ipcErrorSchema, toolSuccessSchema, type IpcErrorPayload } from "../shared/ipc-contract.js";
 import { performHandshake, type SessionIdentity } from "./handshake.js";
 import { ensureDaemonRunning, type DaemonRunPayload } from "./run-state.js";
@@ -25,6 +25,18 @@ import { ensureDaemonRunning, type DaemonRunPayload } from "./run-state.js";
  * their own — closing a narrower echo of the same exhaustion mechanism that would otherwise still let
  * concurrent callers each mint an extra, uncoordinated bearer.
  *
+ * **The session is released on the way out (B-106).** {@link IpcSession.release} exists because the
+ * ceiling described above is only survivable if a session's slot comes back when the session ends.
+ * `SessionStore.revoke` and the `DELETE /session` route have existed since PR-31; this client — the one
+ * component instanced once per HOST session — never called them, so every host session that ended left
+ * a slot occupied until the daemon restarted, at a measured ~2.5 session-shapes per hour on the machine
+ * where it was filed. `client/main.ts` calls `release()` after the stdio transport closes. The release
+ * is deliberately WEAKER than a tool call in three named ways: it never handshakes and never spawns a
+ * daemon (an exit path that can start a process is worse than the leak it prevents), it is bounded by
+ * {@link SESSION_RELEASE_TIMEOUT_MS} rather than the 70 s tool timeout so a hung daemon cannot hold the
+ * process open, and every failure is swallowed — the process is leaving either way, and the failure
+ * mode of a failed release is exactly the state the process was in before the call existed.
+ *
  * **Self-healing on a stale cached bearer.** A daemon restart mints a brand-new `SessionStore` (and a
  * brand-new per-boot secret, `lifecycle/run-file.ts`'s `writeRunFile`), invalidating every bearer minted
  * before it — including one this module has already cached. `callTool` detects this via the daemon's own
@@ -45,7 +57,7 @@ import { ensureDaemonRunning, type DaemonRunPayload } from "./run-state.js";
  * second spawn attempt or a second network round trip, and never repeated per tool call.
  */
 
-/** One of the four tool routes `shared/ipc-contract.ts`'s `IpcRouteKey` also names — narrowed here since `IpcSession` never dials `GET /identity`, `POST /session` or `DELETE /session` (those are `client/handshake.ts`'s job). */
+/** One of the four tool routes `shared/ipc-contract.ts`'s `IpcRouteKey` also names — narrowed here because this object never dials `GET /identity` or `POST /session` (those are `client/handshake.ts`'s job). `DELETE /session` IS dialed from here, by `IpcSession.release` (B-106); it is deliberately not a member of this union because it carries no tool input and is never routed through {@link IpcToolResult}'s classification. */
 export type IpcToolRoute = "POST /tools/send" | "POST /tools/fetch" | "POST /tools/status" | "POST /tools/thread";
 
 /** A classified tool-call outcome: the daemon's own success body, or its own `ipcErrorSchema`-shaped rejection — forwarded verbatim either way, never reinterpreted here. */
@@ -55,6 +67,13 @@ export type IpcToolResult =
 
 export interface IpcSession {
   callTool(route: IpcToolRoute, input: unknown): Promise<IpcToolResult>;
+  /**
+   * Releases this session's daemon slot (`DELETE /session`) and clears the cache. Never throws, never
+   * handshakes, never spawns a daemon, and resolves immediately when no session was ever minted — see
+   * this module's doc. Required rather than optional so an implementation cannot silently omit it: the
+   * daemon's slot ceiling is a shared resource, not a per-client detail.
+   */
+  release(): Promise<void>;
 }
 
 /** Any failure below the tool-classification layer: an unreachable daemon, a dead connection mid-call, or a response neither `toolSuccessSchema` nor `ipcErrorSchema` can parse. */
@@ -81,6 +100,28 @@ function pathFor(route: IpcToolRoute): string {
   return route.slice("POST ".length);
 }
 
+/**
+ * `promise`'s value, or `undefined` if it has not settled within `ms` (B-106). The timer is `unref`ed
+ * on purpose: it only ever BOUNDS a wait on an exit path, and it must never be the reason a process
+ * stays alive. A rejection propagates — the caller decides what an unfulfillable attempt means.
+ */
+async function settleWithin<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const expiry = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), ms);
+      if (typeof timer.unref === "function") {
+        timer.unref();
+      }
+    });
+    return await Promise.race([promise, expiry]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 /** The two fields every `callTool` invocation needs to address and authenticate a `POST /tools/*` call. */
 interface CachedSession {
   readonly port: number;
@@ -101,13 +142,25 @@ export function createIpcSession(options: CreateIpcSessionOptions): IpcSession {
   // tick already sees the first caller's in-flight promise and awaits it instead of starting its own.
   let connecting: Promise<CachedSession> | undefined;
 
+  /**
+   * The settled session, if one exists — what {@link release} revokes. Kept separate from the cached
+   * promise on purpose: `release` must be able to ask "is there a session to release?" WITHOUT calling
+   * `ensureSession()`, because that would handshake on the exit path (and could spawn a daemon).
+   */
+  let current: CachedSession | undefined;
+
   /** The one shared handshake attempt, in flight or already settled. A rejection clears itself so the next call gets a fresh attempt rather than a permanently-cached failure. */
   function ensureSession(): Promise<CachedSession> {
     if (connecting === undefined) {
-      connecting = connect().catch((err: unknown) => {
-        connecting = undefined;
-        throw err;
-      });
+      connecting = connect()
+        .then((settled) => {
+          current = settled;
+          return settled;
+        })
+        .catch((err: unknown) => {
+          connecting = undefined;
+          throw err;
+        });
     }
     return connecting;
   }
@@ -158,7 +211,10 @@ export function createIpcSession(options: CreateIpcSessionOptions): IpcSession {
         // once; a second failure of any kind falls through to the classification below, never loops.
         // Discarding `connecting` unconditionally (not just when it still resolves to `session`) is
         // deliberate: any concurrent caller sharing this same stale attempt needs a fresh one too.
+        // `current` is cleared with it so a `release()` racing this refresh can never revoke a bearer
+        // this client no longer uses.
         connecting = undefined;
+        current = undefined;
         const fresh = await ensureSession();
         res = await postOnce(fresh, route, input);
       }
@@ -182,6 +238,46 @@ export function createIpcSession(options: CreateIpcSessionOptions): IpcSession {
         }
       }
       throw new IpcTransportError("tool call returned a malformed response");
+    },
+
+    async release() {
+      // Judgment Day round-1 CRITICAL and WARNING (judge B), both verified against the source before
+      // being accepted: a handshake can be IN FLIGHT when this runs. Awaiting the attempt that already
+      // exists is not "starting" one — no spawn, no new handshake — and without it the slot that
+      // handshake is about to mint would never be revoked, which is the very leak this exists to close.
+      // Bounded by the same constant as the request itself, because an unbounded await here would let a
+      // hung handshake hold the exit path open, and one lost slot is strictly better than a client that
+      // will not quit.
+      if (current === undefined && connecting !== undefined) {
+        try {
+          current = await settleWithin(connecting, SESSION_RELEASE_TIMEOUT_MS);
+        } catch {
+          // The in-flight attempt failed, so it minted nothing: there is nothing to revoke.
+          current = undefined;
+        }
+      }
+
+      const session = current;
+      if (session === undefined) {
+        // No session was ever minted (and none is being minted): there is no slot to give back, and
+        // asking for one in order to release it would be absurd on an exit path. Return without a
+        // single network call or spawn.
+        return;
+      }
+      // Clear before the request, not after: the slot is no longer ours the moment we stop using it,
+      // and a later tool call on this session must mint a new bearer rather than reuse a revoked one.
+      current = undefined;
+      connecting = undefined;
+      try {
+        await fetchImpl(`http://${IPC_LOOPBACK_HOST}:${session.port}/session`, {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${session.bearer}` },
+          signal: AbortSignal.timeout(SESSION_RELEASE_TIMEOUT_MS),
+        });
+      } catch {
+        // Swallowed by design: the caller is exiting, nothing here is actionable, and failing to
+        // release leaves exactly the state the daemon was already in without this call.
+      }
     },
   };
 }

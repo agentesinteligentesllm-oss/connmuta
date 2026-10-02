@@ -8,7 +8,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import { runMcpClient } from "../../src/client/main.js";
+import { awaitTransportClose, runMcpClient } from "../../src/client/main.js";
+import { EventEmitter } from "node:events";
 import type { IpcSession } from "../../src/client/ipc-stub.js";
 import { createServer, type CreateServerDeps } from "../../src/client/server.js";
 import { computeRosterHash } from "../../src/shared/roster-hash.js";
@@ -49,46 +50,52 @@ test(
       writeFileSync(join(dir, "conmuta.json"), validProjectFileJson(projectId), "utf8");
 
       const callToolInvocations: unknown[] = [];
+      let releases = 0;
       const fakeIpc: IpcSession = {
         async callTool(route, input) {
           callToolInvocations.push({ route, input });
           throw new Error("callTool must never be invoked during startup");
         },
+        async release() {
+          releases += 1;
+        },
       };
 
       const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
 
-      const work = (async () => {
-        const client = new Client({ name: "test-client", version: "0.0.0" });
-        const [exitCode] = await Promise.all([
-          runMcpClient({
-            project: projectId,
-            cwd: dir,
-            transport: serverTransport,
-            createIpcSessionImpl: () => fakeIpc,
-          }),
-          client.connect(clientTransport),
-        ]);
-        try {
-          const { tools } = await client.listTools();
-          assert.deepEqual(
-            tools.map((t) => t.name).sort(),
-            ["conmuta_fetch", "conmuta_send", "conmuta_status", "conmuta_thread"],
-          );
-        } finally {
-          await client.close();
-        }
-        return exitCode;
-      })();
-
-      const timeout = new Promise<never>((_resolve, reject) => {
-        setTimeout(() => reject(new Error("did not complete within host timeout")), 1000);
+      // B-106, and the correction Judgment Day round 1 forced (judge B's CRITICAL, verified against the
+      // pinned SDK by the parent). `server.connect()` resolves when the transport STARTS, so this test
+      // may no longer assume the run finishes before the host closes: the client must stay alive while
+      // the host is connected, and only release on a real close signal. The assertions below are ordered
+      // to kill the old, wrong behaviour — a release fired at startup would make `releases` 1 here,
+      // before the close, and this test would fail.
+      const client = new Client({ name: "test-client", version: "0.0.0" });
+      const running = runMcpClient({
+        project: projectId,
+        cwd: dir,
+        transport: serverTransport,
+        closeSignals: { observeProcessSignals: false },
+        createIpcSessionImpl: () => fakeIpc,
       });
+      await client.connect(clientTransport);
+      const { tools } = await client.listTools();
+      assert.deepEqual(
+        tools.map((t) => t.name).sort(),
+        ["conmuta_fetch", "conmuta_send", "conmuta_status", "conmuta_thread"],
+      );
+      assert.equal(releases, 0, "the client must NOT release while the host is still connected");
 
-      const exitCode = await Promise.race([work, timeout]);
+      await client.close();
+      const exitCode = await Promise.race([
+        running,
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("did not complete within host timeout")), 1000);
+        }),
+      ]);
 
       assert.equal(exitCode, 0);
       assert.equal(callToolInvocations.length, 0, "starting the server and listing tools must trigger zero daemon calls");
+      assert.equal(releases, 1, "closing the transport is what releases the session, exactly once");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -109,46 +116,48 @@ test(
       writeFileSync(join(dir, "conmuta.json"), validProjectFileJson(projectId), "utf8");
 
       const callToolInvocations: unknown[] = [];
+      let releases = 0;
       const fakeIpc: IpcSession = {
         async callTool(route, input) {
           callToolInvocations.push({ route, input });
           throw new Error("callTool must never be invoked during startup");
         },
+        async release() {
+          releases += 1;
+        },
       };
 
       const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
 
-      const work = (async () => {
-        const client = new Client({ name: "test-client", version: "0.0.0" });
-        const [exitCode] = await Promise.all([
-          runMcpClient({
-            project: undefined,
-            cwd: dir,
-            transport: serverTransport,
-            createIpcSessionImpl: () => fakeIpc,
-          }),
-          client.connect(clientTransport),
-        ]);
-        try {
-          const { tools } = await client.listTools();
-          assert.deepEqual(
-            tools.map((t) => t.name).sort(),
-            ["conmuta_fetch", "conmuta_send", "conmuta_status", "conmuta_thread"],
-          );
-        } finally {
-          await client.close();
-        }
-        return exitCode;
-      })();
-
-      const timeout = new Promise<never>((_resolve, reject) => {
-        setTimeout(() => reject(new Error("did not complete within host timeout")), 1000);
+      // Same ordering discipline as the test above (B-106, judge B's round-1 CRITICAL): the release is
+      // measured on the close, not at startup.
+      const client = new Client({ name: "test-client", version: "0.0.0" });
+      const running = runMcpClient({
+        project: undefined,
+        cwd: dir,
+        transport: serverTransport,
+        closeSignals: { observeProcessSignals: false },
+        createIpcSessionImpl: () => fakeIpc,
       });
+      await client.connect(clientTransport);
+      const { tools } = await client.listTools();
+      assert.deepEqual(
+        tools.map((t) => t.name).sort(),
+        ["conmuta_fetch", "conmuta_send", "conmuta_status", "conmuta_thread"],
+      );
+      assert.equal(releases, 0, "the client must NOT release while the host is still connected");
 
-      const exitCode = await Promise.race([work, timeout]);
+      await client.close();
+      const exitCode = await Promise.race([
+        running,
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("did not complete within host timeout")), 1000);
+        }),
+      ]);
 
       assert.equal(exitCode, 0);
       assert.equal(callToolInvocations.length, 0, "starting the server must trigger zero daemon calls");
+      assert.equal(releases, 1, "the no-flag path releases its session on close too (B-106)");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -200,31 +209,30 @@ test("runMcpClient constructs the IPC session and MCP server with the exact iden
 
     let capturedIpcOptions: unknown;
     let capturedServerDeps: CreateServerDeps | undefined;
-    const fakeIpc: IpcSession = { callTool: async () => { throw new Error("callTool must not be called"); } };
+    const fakeIpc: IpcSession = { callTool: async () => { throw new Error("callTool must not be called"); }, release: async () => {} };
 
     const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
-    try {
-      const [exitCode] = await Promise.all([
-        runMcpClient({
-          project: projectId,
-          cwd: dir,
-          transport: serverTransport,
-          createIpcSessionImpl: (opts) => {
-            capturedIpcOptions = opts;
-            return fakeIpc;
-          },
-          createServerImpl: (deps) => {
-            capturedServerDeps = deps;
-            return createServer(deps);
-          },
-        }),
-        client.connect(clientTransport),
-      ]);
-      assert.equal(exitCode, 0);
-    } finally {
-      await client.close();
-    }
+    // B-106: the run now ends on the CLOSE, so it is started first, the host closes, and only then is
+    // the exit code awaited — the previous `Promise.all([run, connect])` shape would deadlock, which is
+    // exactly the signal that the old behaviour (returning at startup) was the bug.
+    const running = runMcpClient({
+      project: projectId,
+      cwd: dir,
+      transport: serverTransport,
+      closeSignals: { observeProcessSignals: false },
+      createIpcSessionImpl: (opts) => {
+        capturedIpcOptions = opts;
+        return fakeIpc;
+      },
+      createServerImpl: (deps) => {
+        capturedServerDeps = deps;
+        return createServer(deps);
+      },
+    });
+    await client.connect(clientTransport);
+    await client.close();
+    assert.equal(await running, 0);
 
     assert.deepEqual(capturedIpcOptions, {
       projectId,
@@ -244,7 +252,7 @@ test("runMcpClient constructs the IPC session and MCP server with the exact iden
   }
 });
 
-test("runMcpClient does not resolve until the transport is actually connected (server.connect is awaited, not fire-and-forget)", async () => {
+test("runMcpClient does not resolve until the transport is actually connected, and does not resolve at all until it closes (server.connect is awaited, then the close is observed)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "conmuta-main-await-connect-"));
   try {
     writeFileSync(join(dir, "conmuta.json"), validProjectFileJson("prj-example"), "utf8");
@@ -259,15 +267,28 @@ test("runMcpClient does not resolve until the transport is actually connected (s
       close: async () => {},
     };
 
-    const exitCode = await runMcpClient({
+    let resolved = false;
+    const running = runMcpClient({
       project: "prj-example",
       cwd: dir,
       transport: delayedTransport,
-      createIpcSessionImpl: () => ({ callTool: async () => { throw new Error("callTool must not be called"); } }),
+      createIpcSessionImpl: () => ({ callTool: async () => { throw new Error("callTool must not be called"); }, release: async () => {} }),
+      closeSignals: { observeProcessSignals: false },
+    }).then((code) => {
+      resolved = true;
+      return code;
     });
 
-    assert.equal(started, true, "runMcpClient resolved before transport.start() finished — server.connect must be awaited");
-    assert.equal(exitCode, 0);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal(started, true, "the run must still have been waiting when transport.start() finished — server.connect is awaited, not fire-and-forget");
+    // B-106 (Judgment Day round-1 CRITICAL, judge B): the run must NOT have finished just because the
+    // transport started. `connect()` resolves at start, so a client that returned here would have
+    // released its slot while the host was still connected — and would have released nothing at all,
+    // because no tool call has happened yet.
+    assert.equal(resolved, false, "runMcpClient must not resolve while the transport is still open");
+
+    delayedTransport.onclose?.();
+    assert.equal(await running, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -309,7 +330,14 @@ test("runMcpClient converts an unexpected startup failure into a message-only st
       cwd: dir,
       stderr: (line) => lines.push(line),
       transport: explodingTransport,
-      createIpcSessionImpl: () => ({ callTool: async () => { throw new Error("callTool must not be called"); } }),
+      createIpcSessionImpl: () => ({
+        callTool: async () => {
+          throw new Error("callTool must not be called");
+        },
+        release: async () => {
+          throw new Error("release must not be called when the transport never connected");
+        },
+      }),
     });
 
     // Judgment Day correction (session 35, Judge A CRITICAL): design.md:424/PT-08 require a startup
@@ -388,4 +416,76 @@ test("runMcpClient refuses with EXIT_NODE_FLOOR when the injected Node version i
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// --- awaitTransportClose (B-106: the close signal the SDK never reports) ---
+// Judgment Day round 1 (judge B's CRITICAL, verified against the pinned SDK by the parent): the first
+// version of this change sequenced the release after `server.connect()`, which resolves when the
+// transport STARTS. The close has to be observed from somewhere real, and no single source covers every
+// host — hence three, and hence these tests.
+
+function fakeTransport(): Transport & { onclose?: () => void } {
+  return { start: async () => {}, send: async () => {}, close: async () => {} };
+}
+
+test("awaitTransportClose resolves when the transport's own onclose fires, chaining any handler already there", async () => {
+  const transport = fakeTransport();
+  let sdkCleanupRan = 0;
+  transport.onclose = () => {
+    sdkCleanupRan += 1;
+  };
+
+  const waiting = awaitTransportClose(transport, { observeProcessSignals: false });
+  transport.onclose?.();
+
+  await waiting;
+  assert.equal(sdkCleanupRan, 1, "whatever the SDK installed must still run — dropping it would break its own cleanup");
+});
+
+test("awaitTransportClose treats stdin's end and close as close signals, because the SDK reports neither", async () => {
+  for (const event of ["end", "close"]) {
+    const transport = fakeTransport();
+    const stdin = new EventEmitter();
+    const waiting = awaitTransportClose(transport, {
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      processLike: new EventEmitter() as unknown as NodeJS.Process,
+    });
+
+    stdin.emit(event);
+    await waiting;
+  }
+});
+
+test("awaitTransportClose resolves on beforeExit as the belt, and removes every listener it installed", async () => {
+  const transport = fakeTransport();
+  const stdin = new EventEmitter();
+  const processLike = new EventEmitter();
+  const waiting = awaitTransportClose(transport, {
+    stdin: stdin as unknown as NodeJS.ReadStream,
+    processLike: processLike as unknown as NodeJS.Process,
+  });
+
+  processLike.emit("beforeExit");
+  await waiting;
+
+  assert.equal(stdin.listenerCount("end"), 0, "no stdin listener may outlive the wait");
+  assert.equal(stdin.listenerCount("close"), 0);
+  assert.equal(processLike.listenerCount("beforeExit"), 0, "the belt must not stay armed after it fires");
+});
+
+test("awaitTransportClose leaves process surfaces alone when asked to observe only the transport", async () => {
+  const transport = fakeTransport();
+  const stdin = new EventEmitter();
+  const processLike = new EventEmitter();
+  const waiting = awaitTransportClose(transport, {
+    stdin: stdin as unknown as NodeJS.ReadStream,
+    processLike: processLike as unknown as NodeJS.Process,
+    observeProcessSignals: false,
+  });
+
+  assert.equal(stdin.listenerCount("end"), 0);
+  assert.equal(processLike.listenerCount("beforeExit"), 0);
+
+  transport.onclose?.();
+  await waiting;
 });

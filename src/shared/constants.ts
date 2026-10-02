@@ -331,6 +331,19 @@ export const MAX_PENDING_HANDSHAKES = 64;
  */
 export const MAX_ACTIVE_SESSIONS = MAX_PENDING_HANDSHAKES;
 
+/**
+ * Milliseconds the thin client's `release()` waits for its own `DELETE /session` (B-106).
+ *
+ * Deliberately NOT {@link IPC_REQUEST_TIMEOUT_MS} (70 s): a release runs on the process's exit path,
+ * after the host has closed stdio, so a hanging daemon would hold the process open for the whole tool
+ * timeout and an operator would see a session that will not quit. Two seconds is generous for one
+ * loopback request to a daemon that is already serving this session, and the release is a courtesy
+ * whose only cost when it fails is the leaked slot it was trying to avoid — which is exactly what
+ * would have happened without the call at all. Bounded, not retried: see `client/ipc-stub.ts`'s
+ * `release`.
+ */
+export const SESSION_RELEASE_TIMEOUT_MS = 2_000;
+
 // --- F4: Claude Code channels adapter (design.md "Interfaces / Contracts") ---
 
 /** Rows one doorbell scan examines. Equal to MAX_BATCH so a doorbell read never does more work than one

@@ -275,3 +275,148 @@ test("callTool forwards options.homeDir to both ensureDaemonRunningImpl and perf
   await s.callTool("POST /tools/status", {});
   assert.deepEqual(seenHomeDirs, ["/custom/home", "/custom/home"]);
 });
+
+// --- release() (B-106: the leak the client's own module doc disclosed) ---
+// The daemon's SessionStore is bounded by MAX_ACTIVE_SESSIONS and never self-expires, and
+// `SessionStore.revoke` plus the `DELETE /session` route have existed since PR-31 while nothing in
+// this client ever called them. These tests pin the release obligation: it must happen, it must not
+// resurrect a daemon to do it, and it must never turn the exit path into an error path.
+
+test("release sends DELETE /session with the cached bearer to the cached port", async () => {
+  const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+  const s = session({
+    fetchImpl: (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as typeof fetch,
+  });
+
+  await s.callTool("POST /tools/status", {});
+  await s.release();
+
+  assert.equal(calls.length, 2, "exactly one tool call plus one release");
+  assert.equal(calls[0]?.url, `http://${IPC_LOOPBACK_HOST}:4123/tools/status`);
+  assert.equal(calls[1]?.url, `http://${IPC_LOOPBACK_HOST}:4123/session`);
+  assert.equal(calls[1]?.init?.method, "DELETE");
+  assert.equal(
+    (calls[1]?.init?.headers as Record<string, string> | undefined)?.authorization,
+    `Bearer ${SESSION_RESPONSE.bearer}`,
+  );
+});
+
+test("release makes zero calls and never spawns a daemon when no session was ever minted", async () => {
+  let spawns = 0;
+  let fetches = 0;
+  const s = session({
+    ensureDaemonRunningImpl: async () => {
+      spawns += 1;
+      return RUN_PAYLOAD;
+    },
+    fetchImpl: (async () => {
+      fetches += 1;
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch,
+  });
+
+  await s.release();
+
+  assert.equal(fetches, 0, "releasing an unused session must not touch the network");
+  assert.equal(spawns, 0, "releasing must never make the exit path capable of starting a daemon");
+});
+
+test("release swallows a transport failure instead of turning the exit path into an error path", async () => {
+  // Judgment Day round 1 (judge B AND judge A, independently, found this test vacuous as first written):
+  // it called `release()` on a session that had never minted one, so `release()` returned at its
+  // `current === undefined` guard and the throwing fetch was never invoked — the `try/catch` under test
+  // was dead code and deleting it would not have failed anything. The session is minted FIRST now, and
+  // the test counts the attempt.
+  let deletesAttempted = 0;
+  const s = session({
+    fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        deletesAttempted += 1;
+        throw new Error("ECONNREFUSED");
+      }
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch,
+  });
+
+  await s.callTool("POST /tools/status", {});
+  await s.release();
+
+  assert.equal(deletesAttempted, 1, "the release must actually be attempted against a minted session");
+});
+
+test("release waits for an in-flight handshake and revokes the slot it mints", async () => {
+  // Judgment Day round 1 (judge B's WARNING, corroborated by judge A): consulting only the SETTLED value
+  // meant a release that arrived while the first handshake was still resolving saw nothing to revoke —
+  // and the handshake then minted a slot that nobody ever gave back. Awaiting the attempt that already
+  // exists is not starting one, so this stays spawn-free and handshake-free by construction.
+  const deleted: string[] = [];
+  let openGate: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    openGate = resolve;
+  });
+  const s = session({
+    performHandshakeImpl: async () => {
+      await gate;
+      return SESSION_RESPONSE;
+    },
+    fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        deleted.push((init.headers as Record<string, string>).authorization);
+      }
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch,
+  });
+
+  const toolCall = s.callTool("POST /tools/status", {});
+  const releasing = s.release();
+  openGate?.();
+  await Promise.all([toolCall, releasing]);
+
+  assert.deepEqual(deleted, [`Bearer ${SESSION_RESPONSE.bearer}`], "the slot minted mid-flight must still be revoked");
+});
+
+test("release after a 401-driven re-handshake revokes the FRESH bearer, not the stale one", async () => {
+  const deleted: string[] = [];
+  let handshakes = 0;
+  const s = session({
+    performHandshakeImpl: async () => {
+      handshakes += 1;
+      return { ...SESSION_RESPONSE, bearer: `${handshakes}`.repeat(64) };
+    },
+    fetchImpl: (async (url: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        deleted.push((init.headers as Record<string, string>).authorization);
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      return new Response("{}", { status: handshakes === 1 ? 401 : 200 });
+    }) as typeof fetch,
+  });
+
+  await s.callTool("POST /tools/status", {});
+  await s.release();
+
+  assert.equal(handshakes, 2, "the 401 path re-handshakes once");
+  assert.deepEqual(deleted, [`Bearer ${"2".repeat(64)}`], "the revoked bearer is the one actually in use");
+});
+
+test("release clears the cache, so a later tool call re-handshakes instead of reusing a revoked bearer", async () => {
+  let handshakes = 0;
+  const s = session({
+    performHandshakeImpl: async () => {
+      handshakes += 1;
+      return SESSION_RESPONSE;
+    },
+    fetchImpl: (async () => new Response("{}", { status: 200 })) as typeof fetch,
+  });
+
+  await s.callTool("POST /tools/status", {});
+  await s.release();
+  await s.release();
+  assert.equal(handshakes, 1, "a second release has nothing cached to revoke");
+
+  await s.callTool("POST /tools/status", {});
+  assert.equal(handshakes, 2, "the call after a release must mint a fresh session, never reuse a revoked bearer");
+});
