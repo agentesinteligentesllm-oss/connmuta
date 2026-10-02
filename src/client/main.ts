@@ -1,7 +1,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import { EXIT_NODE_FLOOR, EXIT_USAGE, NODE_FLOOR } from "../shared/constants.js";
+import { EXIT_NODE_FLOOR, NODE_FLOOR } from "../shared/constants.js";
 import { computeRosterHash } from "../shared/roster-hash.js";
 import { resolveProjectBinding, type BindingRefusal } from "./binding.js";
 import { createIpcSession } from "./ipc-stub.js";
@@ -35,6 +35,13 @@ import { createServer } from "./server.js";
  */
 
 export interface RunMcpClientOptions {
+  /**
+   * The `--project` flag's value as `cli/main.ts` parsed it. Optional by design (ADR-0033): `undefined`
+   * means "no assertion", and the nearest ancestor `conmuta.json` fixes the binding. This is what lets
+   * one registration — `conmuta mcp`, with no id — be correct for every session inside a tree, including
+   * a session whose cwd is a subfolder and a headless harness turn that loses project-scoped MCP entries
+   * to a host's project-trust gate.
+   */
   readonly project: string | undefined;
   /** Defaults to `process.cwd()`, forwarded to {@link resolveProjectBinding}. */
   readonly cwd?: string;
@@ -107,6 +114,9 @@ const MCP_HOST_LABEL_UNKNOWN = "unknown";
 
 function refusalMessage(refusal: BindingRefusal): string {
   switch (refusal.kind) {
+    // Unreachable from this caller: `runMcpClient` never sets `requireProjectFlag`, so the walk-up never
+    // returns this kind here. Kept so the mapping stays exhaustive over `BindingRefusal` for the two bins
+    // that do opt in (`conmuta-channel`, `conmuta-runner`), whose wording this string mirrors.
     case "missing_project_flag":
       return "conmuta mcp: --project is required";
     case "no_project_file_found":
@@ -125,8 +135,9 @@ function refusalMessage(refusal: BindingRefusal): string {
  * `process.exit` — `src/cli/main.ts`'s entry point sets `process.exitCode` from the returned number,
  * matching its existing convention for `validate`/`daemon stop`.
  *
- * Order (design §11 "Startup"/"Handshake timing"): the Node-floor gate first, then `--project`
- * presence, then the synchronous project-binding walk-up, then exactly one `IpcSession` construction,
+ * Order (design §11 "Startup"/"Handshake timing"): the Node-floor gate first, then the synchronous
+ * project-binding walk-up (ADR-0033: with no `--project` there is nothing to assert, so the walk-up alone
+ * decides), then exactly one `IpcSession` construction,
  * then the MCP server construction, then `server.connect(transport)`. Every step before the final
  * connect makes zero network calls and zero daemon-spawn calls: `createIpcSession` is proven lazy
  * (its handshake runs only on the first `callTool`, cached for the session), so nothing here adds an
@@ -143,12 +154,9 @@ export async function runMcpClient(options: RunMcpClientOptions): Promise<number
     return EXIT_NODE_FLOOR;
   }
 
-  // cli/main.ts already validates --project's presence as its own usage error before ever calling
-  // this function, so no extra message is written here; this check remains as defense for any other
-  // caller, and is what test/client/main.test.ts exercises directly.
-  if (options.project === undefined) {
-    return EXIT_USAGE;
-  }
+  // ADR-0033: an absent `--project` is NOT a refusal. `cli/main.ts` no longer requires the flag, and this
+  // function's own contract is "resolve the nearest ancestor `conmuta.json`; assert an explicit id when one
+  // is given". `test/client/main.test.ts` pins the no-flag path through the real binding walk-up.
 
   try {
     const resolveBindingImpl = options.resolveProjectBindingImpl ?? resolveProjectBinding;

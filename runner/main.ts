@@ -19,7 +19,9 @@ import { watermarkPathFor } from "./watermark.js";
  * The `conmuta-runner` bin entry (`runner/main.ts`; ADR-0032 R2/R3/R10, PT-34). It owns the three things the
  * library modules deliberately do not: the project walk-up, the daemon session, and the process lifetime.
  *
- * **The startup mirrors the thin client's.** `--project` is required, the nearest `conmuta.json` decides the
+ * **The startup mirrors the thin client's.** `--project` is required and checked here with the pre-ADR-0033
+ * `requireProjectFlag` strictness — an operator or wrapper writes this argv once per binding, so the flag
+ * costs nothing and catches a mistake at startup. The nearest `conmuta.json` decides the
  * project's root directory (which becomes the woken turn's `cwd`), and a refusal exits with the binding's own
  * exit code before any daemon session exists. The runner holds no bot token: it uses the same
  * `GET /identity` challenge-response handshake every other local client uses, and it reads only the
@@ -94,7 +96,7 @@ function runTurnFor(deps: RunLoopDeps): (input: { readonly spec: HarnessSpec; re
 export async function runLoop(request: RunLoopRequest, deps: RunLoopDeps = {}): Promise<number> {
 	const report = (message: string): void => request.err(`${RUNNER_NAME}: ${message}`);
 
-	const binding = (deps.resolveProjectBindingImpl ?? resolveProjectBinding)({ project: request.project, cwd: request.cwd });
+	const binding = (deps.resolveProjectBindingImpl ?? resolveProjectBinding)({ project: request.project, cwd: request.cwd, requireProjectFlag: true });
 	if (!binding.ok) {
 		report(refusalMessage(binding.refusal));
 		return binding.refusal.exitCode;

@@ -179,7 +179,9 @@ test("registers only the claude/channel experimental capability, never a permiss
 
 test("resolves the binding with the thin client's resolver inputs and hands the link the identity derived from it", { timeout: PROMPT_BOUND_MS }, async () => {
 	const rig = await startChannel({ cwd: "some-dir" });
-	assert.deepEqual(rig.seen.bindingRequests, [{ project: PROJECT_ID, cwd: "some-dir" }]);
+	// `requireProjectFlag: true` is ADR-0033's asymmetry: this bin's argv is written per binding by the
+	// daemon, not once per tree by a host config, so it keeps the pre-amendment strict `--project`.
+	assert.deepEqual(rig.seen.bindingRequests, [{ project: PROJECT_ID, cwd: "some-dir", requireProjectFlag: true }]);
 	assert.deepEqual(rig.seen.identities, [
 		{ projectId: PROJECT_ID, groupId: GROUP_ID, rosterHash: computeRosterHash(ROSTER), host: CHANNEL_HOST_LABEL },
 	]);

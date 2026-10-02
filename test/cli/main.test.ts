@@ -183,13 +183,17 @@ test("an unreadable path is a usage error that names the path", () => {
   assert.match(captured.err.join("\n"), /absent-conmuta\.json/);
 });
 
-// `migrate-v1` is not in this loop: unlike `daemon` (needs a subcommand) and `mcp` (needs
-// `--project`), every one of its own flags is optional (`--v1-home` defaults, `--project-id`/
-// `--project-path` are an opt-in pair, D-23), so a bare invocation is a legitimate call that runs
-// against the real default homes — not a usage error. Its own dispatch is exercised below instead,
-// always against an isolated `--v1-home`.
+// `migrate-v1` is not in this loop: unlike `daemon` (needs a subcommand), every one of its own flags is
+// optional (`--v1-home` defaults, `--project-id`/`--project-path` are an opt-in pair, D-23), so a bare
+// invocation is a legitimate call that runs against the real default homes — not a usage error. Its own
+// dispatch is exercised below instead, always against an isolated `--v1-home`.
+//
+// `mcp` left this loop with ADR-0033: its `--project` is now an optional assertion, so a bare `mcp` is a
+// legitimate call too — it binds to the nearest ancestor `conmuta.json`, or refuses with
+// `EXIT_UNBOUND_PROJECT` when nothing is bound above the cwd. Its bare dispatch is exercised below, from
+// an isolated cwd, so the real stdio transport is never reached in this process.
 test("a subcommand reserved for a later slice is a usage error, not a stub that pretends to work", () => {
-  for (const reserved of ["daemon", "mcp"]) {
+  for (const reserved of ["daemon"]) {
     const captured = makeIo();
     assert.equal(runCli([reserved], captured.io), EXIT_USAGE);
     assert.match(captured.err.join("\n"), /usage:/);
@@ -213,7 +217,7 @@ test("the usage line names the one command this build wires, and only the forms 
   assert.match(text, /project bind <path>/);
   assert.match(text, /project sync-roster \[path\] \[--home <dir>\]/);
   assert.match(text, /panel \[--home <dir>\]/);
-  assert.match(text, /mcp --project <id>/);
+  assert.match(text, /mcp \[--project <id>\]/);
   assert.equal(text.includes("[<path>"), false, "the usage text must not advertise an optional target");
   // `doctor` is deliberately deferred to Unit 8 (`src/doctor/main.ts` does not exist yet) — this pins
   // the disclosure that it is not silently wired alongside `setup`/`bot`/`group`/`project`.
@@ -410,11 +414,23 @@ test("`project sync-roster [path]` invokes runSyncRosterCommand and returns its 
 
 // --- mcp subcommand dispatch ---
 
-test("`mcp` without --project is a usage error naming the missing flag", () => {
-  const captured = makeIo();
-  assert.equal(runCli(["mcp"], captured.io), EXIT_USAGE);
-  assert.match(captured.err.join("\n"), /mcp requires --project <id>/);
-  assert.match(captured.err.join("\n"), /usage:/);
+// ADR-0033 replaces the pre-amendment "`mcp` without --project is a usage error" test. A bare `mcp`
+// now dispatches into the real client module and binds by walk-up; in this isolated cwd the walk-up
+// finds no `conmuta.json`, which is the fast, real refusal this test can observe without ever reaching
+// `server.connect(new StdioServerTransport())` on the test process's own stdio.
+test("`mcp` with no --project reaches the real client module and refuses only because nothing is bound above the cwd", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-cli-mcp-noflag-"));
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(dir);
+
+    const captured = makeIo();
+    assert.equal(await runCli(["mcp"], captured.io), EXIT_UNBOUND_PROJECT);
+    assert.match(captured.err.join("\n"), /no conmuta\.json found/);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("`mcp --project` with no value is a usage error", () => {
@@ -427,6 +443,29 @@ test("`mcp --project=` with an empty value is a usage error", () => {
   const captured = makeIo();
   assert.equal(runCli(["mcp", "--project="], captured.io), EXIT_USAGE);
   assert.match(captured.err.join("\n"), /--project requires a value/);
+});
+
+// Judgment Day round 1 (session 62, `jd-judge-b` JD-B-003): the SPACE-SEPARATED empty token was the
+// third spelling of the same malformed input, and it was the only one that got through. With `""` the
+// parser took the value branch (`"".startsWith("--")` is false), and `binding.ts` reads `""` as "no
+// assertion", so `conmuta mcp --project ""` silently bound to the enclosing tree instead of refusing —
+// a host config that interpolates an empty variable would misbind quietly, which is exactly what
+// ADR-0033 decision 4 forbids. Chdir'd to an isolated directory so the RED run cannot reach the real
+// stdio transport (the pre-fix promise would otherwise bind to whatever tree the test ran in).
+test("`mcp --project ''` (an empty value token) is a usage error, exactly like `--project=`", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-cli-mcp-empty-token-"));
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(dir);
+
+    const captured = makeIo();
+    const result = await runCli(["mcp", "--project", ""], captured.io);
+    assert.equal(result, EXIT_USAGE);
+    assert.match(captured.err.join("\n"), /--project requires a value/);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("`mcp` with an unknown option is a usage error", () => {

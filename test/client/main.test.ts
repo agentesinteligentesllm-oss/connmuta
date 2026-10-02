@@ -16,7 +16,6 @@ import {
   EXIT_NODE_FLOOR,
   EXIT_PROJECT_MISMATCH,
   EXIT_UNBOUND_PROJECT,
-  EXIT_USAGE,
   NODE_FLOOR,
 } from "../../src/shared/constants.js";
 
@@ -96,26 +95,65 @@ test(
   },
 );
 
-test("runMcpClient refuses with EXIT_USAGE when project is undefined, before resolving a binding or constructing IPC/server, writing nothing to stderr", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "conmuta-main-usage-"));
-  try {
-    const lines: string[] = [];
-    const exitCode = await runMcpClient({
-      project: undefined,
-      cwd: dir,
-      stderr: (line) => lines.push(line),
-      createIpcSessionImpl: forbiddenCreateIpcSession,
-      createServerImpl: forbiddenCreateServer,
-    });
-    assert.equal(exitCode, EXIT_USAGE);
-    // Judgment Day correction (session 35, both judges independently + the verifier): pins the
-    // early-return comment's own claim ("no extra message is written here") — this is what makes
-    // disabling the check a genuinely observable (not equivalent) mutant, corrected in the record.
-    assert.deepEqual(lines, []);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
+// ADR-0033 replaces the pre-amendment `EXIT_USAGE` early return this slot used to hold. The no-flag
+// path is now the ordinary path: the nearest ancestor `conmuta.json` fixes the binding, the server
+// starts, and startup still makes zero daemon calls. The assertion semantic (`--project` given and
+// disagreeing → refusal) is covered by the two tests that follow.
+test(
+  "runMcpClient with no --project binds to the nearest ancestor conmuta.json and starts a live server " +
+    "(ADR-0033: the flag is an assertion, not a requirement)",
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), "conmuta-main-noflag-"));
+    try {
+      const projectId = "prj-example";
+      writeFileSync(join(dir, "conmuta.json"), validProjectFileJson(projectId), "utf8");
+
+      const callToolInvocations: unknown[] = [];
+      const fakeIpc: IpcSession = {
+        async callTool(route, input) {
+          callToolInvocations.push({ route, input });
+          throw new Error("callTool must never be invoked during startup");
+        },
+      };
+
+      const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
+
+      const work = (async () => {
+        const client = new Client({ name: "test-client", version: "0.0.0" });
+        const [exitCode] = await Promise.all([
+          runMcpClient({
+            project: undefined,
+            cwd: dir,
+            transport: serverTransport,
+            createIpcSessionImpl: () => fakeIpc,
+          }),
+          client.connect(clientTransport),
+        ]);
+        try {
+          const { tools } = await client.listTools();
+          assert.deepEqual(
+            tools.map((t) => t.name).sort(),
+            ["conmuta_fetch", "conmuta_send", "conmuta_status", "conmuta_thread"],
+          );
+        } finally {
+          await client.close();
+        }
+        return exitCode;
+      })();
+
+      const timeout = new Promise<never>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("did not complete within host timeout")), 1000);
+      });
+
+      const exitCode = await Promise.race([work, timeout]);
+
+      assert.equal(exitCode, 0);
+      assert.equal(callToolInvocations.length, 0, "starting the server must trigger zero daemon calls");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
 
 test("runMcpClient refuses with the binding's own exit code when no conmuta.json is found, before constructing IPC/server", async () => {
   const dir = mkdtempSync(join(tmpdir(), "conmuta-main-unbound-"));

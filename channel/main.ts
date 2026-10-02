@@ -146,7 +146,7 @@ export async function runChannel(options: RunChannelOptions): Promise<number> {
 		report(MISSING_PROJECT_MESSAGE);
 		return EXIT_USAGE;
 	}
-	const binding = (options.resolveProjectBindingImpl ?? resolveProjectBinding)({ project: options.project, cwd: options.cwd });
+	const binding = (options.resolveProjectBindingImpl ?? resolveProjectBinding)({ project: options.project, cwd: options.cwd, requireProjectFlag: true });
 	if (!binding.ok) {
 		report(refusalMessage(binding.refusal));
 		return binding.refusal.exitCode;

@@ -53,7 +53,7 @@ const USAGE_LINES = [
 	`       ${PRODUCT_NAME} group add`,
 	`       ${PRODUCT_NAME} project bind <path>`,
 	`       ${PRODUCT_NAME} project sync-roster [path] [--home <dir>]`,
-	`       ${PRODUCT_NAME} mcp --project <id>`,
+	`       ${PRODUCT_NAME} mcp [--project <id>]`,
 	`       ${PRODUCT_NAME} migrate-v1 [--v1-home <dir>] [--project-id <slug>] [--project-path <abs dir>] [--token-stdin] [--dry-run]`,
 	`  validate      refuse a project file that is not identifiers-only (PT-05, PT-06)`,
 	`  daemon start  ensure the daemon is running, spawning it if needed`,
@@ -64,7 +64,7 @@ const USAGE_LINES = [
 	`  group add     register a Telegram group id`,
 	`  project bind  bind a project directory to a bot, group and roster`,
 	`  project sync-roster  re-sync a project's roster after a confirmed conmuta.json change (roster-sync)`,
-	`  mcp           start the MCP server for an IDE host (ADR-0029)`,
+	`  mcp           start the MCP server for an IDE host; --project <id> is an optional assertion, the nearest ancestor conmuta.json binds otherwise (ADR-0029, ADR-0033)`,
 	`  migrate-v1    one-shot v1-to-v2 migration (D-24); non-interactive, refuses on any precondition failure`,
 ];
 
@@ -478,7 +478,12 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 		for (let i = 0; i < rest.length; i++) {
 			const arg = rest[i];
 			if (arg === "--project") {
-				if (i + 1 >= rest.length || rest[i + 1].startsWith("--")) {
+				// `rest[i + 1] === ""` is its own case, not a subset of the two others: `"".startsWith("--")` is
+				// false, so an empty VALUE TOKEN used to fall through and reach the resolver, which reads `""` as
+				// "no assertion" (ADR-0033) — the one malformed spelling that misbound silently instead of refusing.
+				// Judgment Day round 1 (session 62, `jd-judge-b` JD-B-003) found it; `test/cli/main.test.ts` pins all
+				// three spellings.
+				if (i + 1 >= rest.length || rest[i + 1].startsWith("--") || rest[i + 1] === "") {
 					return usageError(io, "--project requires a value");
 				}
 				project = rest[++i];
@@ -493,10 +498,12 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 				return usageError(io, `unexpected argument '${arg}'`);
 			}
 		}
-		if (project === undefined) {
-			return usageError(io, "mcp requires --project <id>");
-		}
-
+		// ADR-0033: `--project` is optional here. When present it is an assertion the binding walk-up enforces;
+		// when absent the nearest ancestor `conmuta.json` decides. The flag's own malformed forms stay usage
+		// errors: an explicitly empty assertion is malformed input, not an instruction to infer the project —
+		// and that covers ALL THREE spellings (`--project` with no token, a separate empty token, and
+		// `--project=`), because the empty token used to slip past the first two checks into the "no assertion"
+		// branch (JD-B-003).
 		return (async () => {
 			const { runMcpClient } = await import("../client/main.js");
 			return await runMcpClient({ project, stderr: io.err });
