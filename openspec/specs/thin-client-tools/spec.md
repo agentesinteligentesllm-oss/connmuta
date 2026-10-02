@@ -63,6 +63,28 @@ any binding resolution.
 Traces: ADR-0033 (amending ADR-0028 rule 4), row "The launcher resolves the nearest binding and refuses
 when unbound or mismatched"; DATA-MODEL.md §1; OVERVIEW.md §8; CONSTITUTION.md §2 inv. 1
 
+### Requirement: The client releases its session slot before exiting
+
+The thin client MUST send `DELETE /session` with its own bearer before the process exits, once a
+session has been minted, so a daemon's bounded session store does not lose one slot per host session
+(B-106). It MUST NOT handshake, spawn a daemon, or otherwise create a session in order to release one,
+and a release that cannot be delivered MUST NOT change the process's exit code or surface as an error.
+
+#### Scenario: A closed host session gives its slot back
+
+- GIVEN a thin client that minted a session on its first tool call
+- WHEN the host closes the stdio transport
+- THEN the client sends `DELETE /session` with that session's bearer before exiting zero
+
+#### Scenario: A client that never used a tool makes no release call
+
+- GIVEN a thin client that started and exited without calling a tool
+- WHEN it exits
+- THEN it makes zero network calls and starts no daemon on the way out
+
+Traces: B-106; `src/client/ipc-stub.ts` (`IpcSession.release`); `src/shared/constants.ts`
+(`MAX_ACTIVE_SESSIONS`, `SESSION_RELEASE_TIMEOUT_MS`); CONSTITUTION.md §3 layer 1
+
 ### Requirement: DAEMON_DOWN makes zero network calls
 
 When the run file is absent, unreadable, names a dead pid, or the handshake fails, and the bounded
@@ -138,6 +160,7 @@ Traces: OVERVIEW.md §7.4; CONSTITUTION.md §3 layer 1
 | Source | Requirement / Scenario |
 |---|---|
 | ADR-0033 (amending ADR-0028 rule 4) | Launcher resolves the nearest binding and refuses when unbound or mismatched |
+| B-106 (backlog) | The client releases its session slot before exiting |
 | ADR-0029 row "The client never polls Telegram" | DAEMON_DOWN makes zero network calls (PT-26 a/b) |
 | THREAT-MODEL.md PT-07 | Client-local error payload constructor |
 | PT-13, PT-14 | Fence soundness and origin labels |
