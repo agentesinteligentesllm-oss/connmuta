@@ -27,8 +27,8 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **Session 62 closed B-107** under **ADR-0033**: `--project` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, one id-free registration serves a tree, and the machine now carries exactly that (`~/.pi/agent/mcp.json`; `FRISCO\.pi\mcp.json` retired). Session 61's **B-105(a)** (the F7a SDD artifact set) is also closed and was undocumented until session 62 wrote its LOG entry. |
-| What is next? | **B-106** (the daemon session pool, measured — §7), then **B-109** (the installer entry), **B-108** and the cheap backlog residuals. The Director's calls: the **Engram cloud-sync bookkeeping** rows and **F6** once B-11/B-12/B-16 are decided. **B-105(b)** remains open only for the other three harnesses' argv forms. |
+| What is new? | **Session 62 closed two units.** **B-107** under **ADR-0033**: `--project` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, one id-free registration serves a tree, and the machine now carries exactly that (`~/.pi/agent/mcp.json`; `FRISCO\.pi\mcp.json` retired). **B-106**: the thin client now releases its daemon session slot on a real transport close, so the 64-slot ceiling stops leaking one slot per host session; its first submission was correctly rejected (the release ran at startup, not at close) and the corrected design is audited `APPROVED`. Session 61's **B-105(a)** (the F7a SDD artifact set) is also closed and was undocumented until session 62 wrote its LOG entry. |
+| What is next? | **B-109** (the installer still writes the project id into every entry it generates — see §7), then **B-108**, then the cheap backlog residuals; and **B-106's remainder** (occupancy visibility in `status`/`doctor`, a dead-pid sweep). The Director's calls: the **Engram cloud-sync bookkeeping** rows and **F6** once B-11/B-12/B-16 are decided. **B-105(b)** remains open only for the other three harnesses' argv forms. |
 | What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real tool call). |
 | What is the Director's to decide? | The order of B-106/B-109/B-108 (the Director delegated the choice to Kairo for this session); the Engram cloud-sync bookkeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. Session 62's commits are pushed. |
 | Where to read next | §0 first; then §3 and §7. §4 is the list of traps. |
@@ -92,12 +92,12 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 | **F7a** | **Implemented** (not blocked on F6); F7b (referee) still follows F6 and `bus-v2-referee-001` | `docs/07-plan/WORK-PLAN.md` |
 | **B-105** | **Open for (b) only.** **(a) IS DONE — session 61** (2026-10-01): the retrospective SDD artifact set was written against the shipped code and archived to `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`, with the four capabilities landed as canonical specs; commits `0ea16ef`, `3c57b0d`, `03b85e6`. **The native reviewer's size ceiling is now measured**: a 214 KB documentation candidate is refused with `lens_context_budget_exceeded` (no lineage), while a 58 KB normative half passes — so a larger documentation candidate must be reviewed in its normative half. What remains of (b) is the `claude`/`codex`/`opencode` argv forms. (c) the Windows `.cmd` gate is documented, with the working remedy (a real shell-free launcher on the runner process's PATH only — commit `86a26dd`); (d) `autopilot`'s profile is prompt + harness policy, not a mechanism; (e) the wake ledger is self-reported | `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` Implementation note; `docs/runbooks/wake-satellite.md` |
 | B-95 remainder, B-102 residuals | Open, low priority, "cheap win at the next touch" | §7 |
-| **B-106** | Open, **measured in session 60**: the daemon's 64-slot pool leaks ≈2.5 session-shapes per hour and stays invisible to `status`/`doctor` | `docs/06-backlog/CHECKLIST.md` |
+| **B-106** | **RESOLVED AT ITS SOURCE — session 62**: the thin client releases its daemon slot on a real transport close (`IpcSession.release` + `awaitTransportClose`), audited (Judgment Day, 2 rounds, `APPROVED`) — its first submission was REJECTED with a correct CRITICAL (the release ran at startup because `server.connect` resolves when the transport starts) and the corrected design carries a mutant-verified test for exactly that. Two halves remain open and disclosed: occupancy visibility in `status`/`doctor`, and a dead-pid sweep; plus two leak windows (hard kill; a tool call that begins a handshake after the release returned) | `docs/06-backlog/CHECKLIST.md`; `odd/tasks/b-106-client-session-release.md` |
 | **B-107** | **RESOLVED — session 62**, under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `conmuta mcp --project <id>` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves every session under a tree — including a subfolder session and a headless `pi -p` turn, both of which a project-level entry loses (cwd-relative, and trust-gated so a non-UI run resolves *not trusted*). Audited (Judgment Day, two rounds, terminal `APPROVED`) and independently verified. Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`, `0312ca3` — **on `main` and pushed** | `docs/03-adr/0033-project-flag-as-assertion.md`; `docs/05-tribunal/INDEX.md` (`bus-v2-b107-optional-project-001`); `odd/tasks/b-107-optional-project-walkup.md` |
 | **B-109** | Open, filed in session 62: the installer still writes `--project <id>` into every tool-config entry it generates, and where a host reads both a user-level and a project-level config the project entry **replaces** the global one by server name — so one installer run can silently reintroduce the trust gate ADR-0033 removed. Changing a D-42 wizard artifact needs its own ADR-level decision | `docs/06-backlog/CHECKLIST.md` |
 | **B-108** | Open, filed in session 60: every `npm test` leaves one `%TEMP%\conmuta-*` scratch directory behind (242 had accumulated, 29 MB; the pile was removed) | `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued; **B-109** is the natural next unit (installer entry shape) or **B-106** (the daemon session pool); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
-| Tests on `main` | `npm test` **1846/1840/0/6**; `test:static` **99/99** | — |
+| Tests on `main` | `npm test` **1856/1850/0/6**; `test:static` **99/99** | — |
 
 ---
 
@@ -246,9 +246,9 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
       silently reintroduce the trust gate ADR-0033 removed wherever a host reads both a user-level and a
       project-level config). It changes a D-42 wizard artifact, so it needs its own ADR-level decision and the
       four SDD preflight questions (Automatic / Both / Auto is the recorded default) before any code.
-- [ ] **4. Alternatives the Director may prefer**: B-106 (release the thin client's slot; the measurement is in
-      the backlog row), B-108 (test hygiene), or B-105(b) (the `claude`/`codex`/`opencode` argv forms for the
-      wake satellite).
+- [ ] **4. Alternatives the Director may prefer**: B-106's remainder (occupancy visibility in
+      `status`/`doctor`; a dead-pid sweep), B-108 (test hygiene), or B-105(b) (the
+      `claude`/`codex`/`opencode` argv forms for the wake satellite).
 - [ ] **5. If the live `frisco` binding needs attention**, read its ledger and
       `C:\Users\LABORATORIO\conmuta-runner\runner.log` together. Treat an `unavailable` outcome as the Windows
       `.cmd` question (§4) rather than as a code defect, and remember one legitimate result: a `wake` turn that
@@ -278,6 +278,7 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 |---|---|---|
 | **B-105(a)** | the F7a SDD artifact set — the only owed item of the phase's record. (b) is satisfied for `pi`: the wake path ran live four times and the 04:22:00Z turn read a peer message and replied on the bus; (c)(d)(e) are documented design consequences, not defects | Director schedules; Kairo writes |
 | **B-106** | the daemon's session pool (measured: ≈2.5 session-shapes/hour, 13 of 64 in the current boot, and every runner restart burns one). Cheap remedy now: restart the daemon; the real fix is releasing the slot on the client's exit | Kairo (F1 follow-up) |
+| **B-106 remainder** | occupancy visibility in `status`/`doctor` (a wire-contract change: the status payload's closed key set, its PTs and two specs) and a dead-pid sweep of the bearer pool (the `pid` lives on `client_cursors`, so it is a different mechanism) | Kairo (F1 follow-up) |
 | **B-107** | **RESOLVED in session 62** under ADR-0033; see §1. The machine now carries one id-free user-level entry and `FRISCO\.pi\mcp.json` is retired (both backed up) | done |
 | **B-109** | the installer's launcher entry still encodes `--project <id>`: where a host reads both configs, the project entry replaces the global one by server name and the trust gate comes back. Needs its own ADR-level decision (D-42) | Kairo (F2 follow-up) |
 | **B-108** | one `%TEMP%\conmuta-*` scratch directory per full test run (test hygiene, not correctness) | Kairo |
@@ -318,6 +319,14 @@ rehagas. Sigue B-105(a) —artefactos SDD de `f7a-wake-satellite` contra el cód
 
 ## §9 — RDD / audit state at session close
 
+0. **Session 62, `bus-v2-b106-session-release-001`** (the B-106 session-slot release): Judgment Day, two
+   blind judges over the frozen manifest `sha256:c379c37b…` (8 files), **2 rounds, terminal `APPROVED`**.
+   `jd-judge-b` **`REJECT`ed** the first submission on a CRITICAL that was right, and `jd-judge-a`
+   `APPROVE_WITH_CHANGES` without seeing it (it recorded the false premise — `connect` resolving on close —
+   as CONFIRMED OK). The parent re-read the pinned SDK before accepting either. Round 2: A 3/3 and B 7/7
+   `verified`, no fix-caused defect. Independent verification PASS on ten claims, reproducing the
+   CRITICAL's scenario from the outside. Non-vacuity: removing the `DELETE` fails 2 tests, restoring the
+   rejected design fails 3.
 0. **Session 62, `bus-v2-b107-optional-project-001`** (ADR-0033 + the B-107 change): Judgment Day (Arena
    unreachable — `mcp connect arena` → *nothing is listening*, DN-09's substitute satisfied directly), two
    blind judges over the frozen manifest `sha256:18fa6423…` (24 files, uncommitted), both

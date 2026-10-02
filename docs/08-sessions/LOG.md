@@ -76,6 +76,44 @@
 - **Machine**: one id-free `conmuta` entry in `~/.pi/agent/mcp.json` (backed up), and
   `FRISCO\.pi\mcp.json` retired (backed up) — the state session 60 had made project-scoped, restored to
   a single global registration now that the entry no longer encodes a project.
+- **B-106, the second unit, taken on the Director's delegation** ("toma las riendas … continúa hasta
+  terminar esta sesión"): the thin client now **releases its daemon session slot** when its transport
+  closes, closing the leak that its own module doc had disclosed. `SessionStore.revoke` and
+  `DELETE /session` existed since PR-31; nothing in the client called them, so each host session left
+  one of the daemon's 64 slots occupied until a restart (~2.5 session-shapes/hour measured), and the
+  ceiling surfaced as a false, permanent `DAEMON_DOWN` with nothing in `status`/`doctor` naming it.
+- **The first submission of that fix was REJECTED, and the rejection was correct** — the most
+  instructive event of the session. It sequenced the release after `server.connect(transport)`, which in
+  the pinned `@modelcontextprotocol/sdk` 1.30.0 resolves when the transport **starts**
+  (`shared/protocol.js`'s `connect` ends at `await this._transport.start()`), so the release ran at
+  startup against an empty lazy cache, saved nothing, and left a spec requirement the code could not
+  keep — exactly what ADR-12 exists to catch. Worse, the two tests that "pinned" it asserted
+  `releases === 1` without ever making a tool call: they proved the startup no-op path and labelled it
+  "on close". **`jd-judge-b` returned `REJECT` on that CRITICAL while `jd-judge-a` returned
+  `APPROVE_WITH_CHANGES` and recorded the false premise as CONFIRMED OK.** The parent re-read the SDK
+  before accepting either report, which is why a single judge's CRITICAL was corrected. Two standing
+  rules came out of it: never accept a partial judgment, and **never accept an APPROVE as if it were the
+  gate**; and a load-bearing claim about a library's semantics is verified by reading the library, not
+  the comment that asserts it.
+- **The corrected design** adds an exported `awaitTransportClose`, which races three close sources
+  because no single one covers every host: the transport's own `onclose` (chained, so the SDK's cleanup
+  still runs), `stdin`'s `end`/`close` (the real host signal, which the SDK never reports — its stdio
+  transport registers only `'data'` and `'error'`), and `process.beforeExit` as the belt; every listener
+  it installs is removed when it fires. `release()` also awaits a handshake already in flight (bounded by
+  a new unref'd `SESSION_RELEASE_TIMEOUT_MS = 2_000`, not the 70 s tool timeout) so a slot minted
+  mid-flight is revoked too; it never handshakes, never spawns a daemon and never throws.
+- **B-106's audit**: Judgment Day, 2 rounds, terminal **`APPROVED`** — round 2 resolved A 3/3 and B 7/7
+  `verified` with no fix-caused defect, and independent verification PASS on ten claims, reproducing the
+  CRITICAL's own scenario from the outside (the run stays pending before `onclose`, then resolves 0 with
+  exactly one release). Non-vacuity measured with two mutants: removing the `DELETE` fails 2 tests, and
+  **restoring the rejected design fails 3 — including the two that had passed with the bug**. Residual,
+  stated exactly rather than left implicit: a hard-killed client still leaks, and a tool call that
+  BEGINS a handshake after `release()` returned can still mint an unreleased slot, because the release is
+  a best-effort on the exit path and not a barrier.
+- **Delivered for B-106**: three work-unit commits (`241b455` fix, `869732a` spec, `8933984` backlog +
+  feature record) plus the close-out. Suite 1846 → **1856**, 0 fail, 6 skip; `test:static` 99/99.
+
+---
 
 ## Session 61 — B-105(a): the wake satellite's retrospective SDD artifact set, archived and pushed
 
