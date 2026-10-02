@@ -19,7 +19,8 @@
 > slot when its transport closes — after its **first submission was rejected on a correct CRITICAL that only
 > one of the two judges saw** (the release ran at startup, because `server.connect()` resolves when the
 > transport STARTS); the corrected design passed two rounds and an independent verification (both `APPROVED`,
-> §9). **Twelve work-unit commits** on `main`, head **`b81bf21`**, all **pushed**; the machine carries one
+> §9). **Twelve work-unit commits** on `main` — the last of them `b81bf21`, all **pushed**, with this
+> close-out's own `docs:` commits on top of it; the machine carries one
 > id-free global MCP entry and `FRISCO\.pi\mcp.json` is retired (both backed up). The native RDD review
 > resolved to `declined_this_candidate` for both candidates (host-resolved, no lineage, no mutation).
 > Follow-ups filed: **B-109** (the installer's entry shape) and B-106's remainder. Suite
@@ -48,7 +49,7 @@
 Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4) y confirma Arena con una llamada real. Estado al cerrar la
 sesión 62: B-107 cerrado bajo ADR-0033 (`--project` es una aserción; el binding se resuelve por el ancestro
 `conmuta.json` más cercano) y B-106 cerrado en su origen (el cliente delgado libera su slot de sesión al
-cerrarse el transporte). Once commits por unidad de trabajo en `main`, empujados hasta `b81bf21`, árbol limpio,
+cerrarse el transporte). Doce commits por unidad de trabajo en `main`, el último `b81bf21`, empujados, árbol limpio,
 suite 1856/1850/0/6 y `test:static` 99/99: no los rehagas. La siguiente unidad natural es B-109 (el instalador
 sigue escribiendo `--project <id>` en cada entrada que genera, y eso puede reintroducir la trampa del trust
 gate); alternativas: B-106 resto (visibilidad de ocupación en `status`/`doctor` y barrido por pid muerto),
@@ -60,7 +61,7 @@ autorizan por sesión, y el consentimiento de la revisión nativa es del Directo
 
 | # | Command | Expected |
 |---|---|---|
-| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; the head is **`b81bf21`** (twelve commits past session 61's `03b85e6`) and the LOG's newest entry is session 62 |
+| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; the last work-unit commit is **`b81bf21`** (twelve past session 61's `03b85e6`) with session 62's close-out `docs:` commits on top, and the LOG's newest entry is session 62. `git log --oneline -13` should name them |
 | 2 | `rm -rf dist` | prints nothing |
 | 3 | `ls openspec/changes/` | `archive` only |
 | 4 | `git status --short` | **empty** (the installer's two `*.bak-pre-conmuta-*` files were removed in session 60 — see §4) |
@@ -290,7 +291,8 @@ autorizan por sesión, y el consentimiento de la revisión nativa es del Directo
 ## §5 — Next session, exact sequence
 
 - [ ] **1. Verify the tree** (§0.2); the suite must be 1856/1850/0/6 and `test:static` 99/99. Session 62's
-      twelve commits are already on `main` and pushed, head `b81bf21`; read `git log` rather than §0.2's
+      twelve commits are already on `main` and pushed (`b81bf21` is the last work-unit one, with the close-out
+      docs on top); read `git log` rather than §0.2's
       baseline before assuming the numbers.
 - [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
 - [ ] **3. The default unit is B-109** (the installer's entry still carries `--project <id>`, which can
@@ -356,7 +358,8 @@ autorizan por sesión, y el consentimiento de la revisión nativa es del Directo
 
 - Windows 11, Node v24.16.0, `gentle-ai` **3.7.0**, PowerShell primary with Bash (Git Bash) available.
 - `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`, **pushed** through
-  `b81bf21` (session 62's twelve commits). `gh` commands run with
+  `b81bf21` (session 62's twelve work-unit commits, plus that session's close-out docs on top of it). `gh`
+  commands run with
   `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; never `gh auth switch`.
   Force-push and deletion of `main` are blocked.
 - **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`, session 62).
