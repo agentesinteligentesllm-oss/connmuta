@@ -23,27 +23,45 @@ unchanged, so hosts see the same tool surface.
 
 Traces: ADR-0028 rule 4; OVERVIEW.md §8; exploration.md Q3
 
-### Requirement: Launcher requires --project and refuses when unbound or mismatched
+### Requirement: Launcher resolves the nearest binding and refuses when unbound or mismatched
 
-The thin client MUST require `--project <id>`, walk up from its cwd to the nearest `conmuta.json`,
-and refuse to start — exiting non-zero before any IPC call — when `--project` is missing, no
-`conmuta.json` is found in the walk-up, or the found file's `project_id` disagrees with
-`--project`.
+The thin client MUST resolve its binding by walking up from its cwd to the nearest `conmuta.json`, and
+MUST refuse to start — exiting non-zero before any IPC call — when no such file is found, when the file
+it finds is invalid or unreadable, or when an explicitly supplied `--project <id>` disagrees with that
+file's `project_id`. An optional `--project <id>` flag is an assertion on that resolution, never a
+requirement: omitted, the nearest file fixes the binding on its own. The client MUST NOT infer a binding
+from any source other than that file (ADR-0033, amending ADR-0028 rule 4).
 
-#### Scenario: Missing --project exits before any IPC call
+A malformed `--project` is a usage error, never an instruction to infer the project: `--project` with no
+value, `--project` followed by an empty token, and `--project=` all MUST exit with the usage code before
+any binding resolution.
 
-- GIVEN the thin client is invoked with no `--project` flag
-- WHEN it starts
+#### Scenario: No conmuta.json in the walk-up exits before any IPC call
+
+- GIVEN a cwd with no `conmuta.json` anywhere in the walk-up
+- WHEN the thin client starts, with or without `--project`
 - THEN it exits non-zero and makes zero IPC calls
 
-#### Scenario: project_id mismatch is UNBOUND_PROJECT
+#### Scenario: An omitted --project binds to the nearest ancestor conmuta.json
+
+- GIVEN a cwd nested inside a tree whose bound root holds a valid `conmuta.json`
+- WHEN the client starts with no `--project` flag
+- THEN it binds to that file's `project_id` and serves that project's tools
+
+#### Scenario: An explicit --project that disagrees is refused
 
 - GIVEN a cwd whose nearest `conmuta.json` has `project_id: "prj-other"` and `--project prj-example`
 - WHEN the client starts
-- THEN it refuses with `UNBOUND_PROJECT` before any IPC call
+- THEN it refuses before any IPC call, with the mismatch exit code that names that situation
 
-Traces: ADR-0028 rule 4, row "The launcher refuses when unbound or mismatched"; DATA-MODEL.md §6
-"Launcher resolution"; CONSTITUTION.md §2 inv. 1
+#### Scenario: A malformed --project is a usage error
+
+- GIVEN any cwd, and `--project` written with no value, with an empty value token, or as `--project=`
+- WHEN the client starts
+- THEN it exits with the usage code before resolving any binding
+
+Traces: ADR-0033 (amending ADR-0028 rule 4), row "The launcher resolves the nearest binding and refuses
+when unbound or mismatched"; DATA-MODEL.md §1; OVERVIEW.md §8; CONSTITUTION.md §2 inv. 1
 
 ### Requirement: DAEMON_DOWN makes zero network calls
 
@@ -119,7 +137,7 @@ Traces: OVERVIEW.md §7.4; CONSTITUTION.md §3 layer 1
 
 | Source | Requirement / Scenario |
 |---|---|
-| ADR-0028 row "The launcher refuses when unbound or mismatched" | Launcher requires --project and refuses when unbound or mismatched |
+| ADR-0033 (amending ADR-0028 rule 4) | Launcher resolves the nearest binding and refuses when unbound or mismatched |
 | ADR-0029 row "The client never polls Telegram" | DAEMON_DOWN makes zero network calls (PT-26 a/b) |
 | THREAT-MODEL.md PT-07 | Client-local error payload constructor |
 | PT-13, PT-14 | Fence soundness and origin labels |
