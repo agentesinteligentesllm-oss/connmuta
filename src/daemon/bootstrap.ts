@@ -231,6 +231,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
       bindings: reconciler,
       doctorClientFor,
       db: ledger.db,
+      sessionStore,
       now: options?.now ? (): Date => new Date(options.now!()) : undefined,
     });
 

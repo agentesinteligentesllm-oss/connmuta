@@ -26,6 +26,7 @@ import {
 	type DoctorHandlerDeps,
 	type DoctorTelegramClient,
 } from "../../../src/daemon/ipc/doctor.js";
+import { SessionStore, computeSessionProof } from "../../../src/daemon/ipc/sessions.js";
 import { PendingHandshakeStore } from "../../../src/daemon/ipc/handshake.js";
 import type { IpcRequest } from "../../../src/daemon/ipc/server.js";
 import type { ManagedBinding } from "../../../src/daemon/bindings.js";
@@ -600,3 +601,116 @@ test("a binding with no room guard wired fails the dm-probe finding defensively,
 		assert.equal(h.doctorProbeRows().length, 0, "no audit row when the probe never attempted a send");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Session pool occupancy checks (B-106 remainder)
+// ---------------------------------------------------------------------------
+
+test("online doctor surfaces session-pool pass when active sessions are below 80%", async () => {
+	await withHarness(async (h) => {
+		h.bindings.set(managedBindingFixture());
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+		const sessionStore = new SessionStore(h.secret);
+
+		// Mint 5 sessions (5/64 is ~7.8%, well below 80%)
+		for (let i = 0; i < 5; i++) {
+			const nonce = `nonce-${i}`.padEnd(32, "0");
+			sessionStore.mint(nonce, computeSessionProof(h.secret, nonce));
+		}
+		assert.equal(sessionStore.size, 5);
+
+		const deps: DoctorHandlerDeps = {
+			...h.buildDeps(client),
+			sessionStore,
+		};
+		const handler = createDoctorHandler(deps);
+		const nonce = h.store.issue()!;
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: false,
+			}),
+		);
+		assert.equal(res.status, HTTP_OK);
+		const body = doctorResponseSchema.parse(res.body);
+		const poolCheck = body.bindings[0]!.checks.find((c) => c.id === "session-pool");
+		assert.ok(poolCheck, "session-pool check must be present when sessionStore is wired");
+		assert.equal(poolCheck.status, "pass");
+		assert.equal(poolCheck.detail, "5/64 active sessions");
+	});
+});
+
+test("online doctor surfaces session-pool warn when active sessions reach 80% capacity", async () => {
+	await withHarness(async (h) => {
+		h.bindings.set(managedBindingFixture());
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+		const sessionStore = new SessionStore(h.secret);
+
+		// Mint 52 sessions (52 >= Math.floor(64 * 0.8) = 51)
+		for (let i = 0; i < 52; i++) {
+			const nonce = `nonce-${i}`.padEnd(32, "0");
+			sessionStore.mint(nonce, computeSessionProof(h.secret, nonce));
+		}
+		assert.equal(sessionStore.size, 52);
+
+		const deps: DoctorHandlerDeps = {
+			...h.buildDeps(client),
+			sessionStore,
+		};
+		const handler = createDoctorHandler(deps);
+		const nonce = h.store.issue()!;
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: false,
+			}),
+		);
+		assert.equal(res.status, HTTP_OK);
+		const body = doctorResponseSchema.parse(res.body);
+		const poolCheck = body.bindings[0]!.checks.find((c) => c.id === "session-pool");
+		assert.ok(poolCheck);
+		assert.equal(poolCheck.status, "warn");
+		assert.equal(poolCheck.detail, "52/64 active sessions (pool near capacity)");
+	});
+});
+
+test("online doctor surfaces session-pool fail when active sessions reach maximum capacity", async () => {
+	await withHarness(async (h) => {
+		h.bindings.set(managedBindingFixture());
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+		const sessionStore = new SessionStore(h.secret);
+
+		// Mint all 64 sessions
+		for (let i = 0; i < 64; i++) {
+			const nonce = `nonce-${i}`.padEnd(32, "0");
+			sessionStore.mint(nonce, computeSessionProof(h.secret, nonce));
+		}
+		assert.equal(sessionStore.size, 64);
+
+		const deps: DoctorHandlerDeps = {
+			...h.buildDeps(client),
+			sessionStore,
+		};
+		const handler = createDoctorHandler(deps);
+		const nonce = h.store.issue()!;
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: false,
+			}),
+		);
+		assert.equal(res.status, HTTP_OK);
+		const body = doctorResponseSchema.parse(res.body);
+		const poolCheck = body.bindings[0]!.checks.find((c) => c.id === "session-pool");
+		assert.ok(poolCheck);
+		assert.equal(poolCheck.status, "fail");
+		assert.equal(poolCheck.detail, "64/64 active sessions (pool exhausted)");
+	});
+});
+

@@ -106,6 +106,7 @@ import { appendAuditRow } from "../../ledger/audit.js";
 import type { RegistryBinding } from "../../registry/schema.js";
 import { redactTokenShapes } from "../../secret-store/redaction.js";
 import type { ProjectRosterEntry } from "../../shared/project-file.js";
+import { MAX_ACTIVE_SESSIONS } from "../../shared/constants.js";
 import {
 	doctorRequestSchema,
 	HTTP_BAD_REQUEST,
@@ -121,6 +122,7 @@ import type { ManagedBinding } from "../bindings.js";
 import type { TelegramChat, TelegramChatMember, TelegramUser } from "../telegram.js";
 import type { PendingHandshakeStore } from "./handshake.js";
 import type { IpcHandler, IpcRequest, IpcResponse } from "./server.js";
+import type { SessionStore } from "./sessions.js";
 
 /** D-14's domain-separation label for the doctor proof — see the module doc's correction to this PR's brief. */
 const DOCTOR_PROOF_LABEL = "doctor:";
@@ -189,6 +191,10 @@ export interface DoctorHandlerDeps {
 	readonly doctorClientFor: (botId: number) => Promise<DoctorTelegramClient> | DoctorTelegramClient;
 	readonly db: DatabaseSync;
 	readonly now?: () => Date;
+	/** Injected session store for checking active session pool occupancy (B-106 remainder). */
+	readonly sessionStore?: SessionStore;
+	/** Optional sweep function to reclaim dead-PID slots before measuring occupancy. */
+	readonly sweepSessions?: () => number;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +271,35 @@ async function checkRosterMembership(
 	}
 }
 
+/**
+ * Evaluates the daemon's active session pool occupancy against {@link MAX_ACTIVE_SESSIONS} (B-106 remainder).
+ * Reports `pass` when occupancy is healthy (<80%), `warn` when near capacity (>=80%), and `fail`
+ * when at or exceeding capacity.
+ */
+function checkSessionPool(store: SessionStore): DoctorCheckFinding {
+	const active = store.size;
+	const max = MAX_ACTIVE_SESSIONS;
+	if (active >= max) {
+		return {
+			id: "session-pool",
+			status: "fail",
+			detail: `${active}/${max} active sessions (pool exhausted)`,
+		};
+	}
+	if (active >= Math.floor(max * 0.8)) {
+		return {
+			id: "session-pool",
+			status: "warn",
+			detail: `${active}/${max} active sessions (pool near capacity)`,
+		};
+	}
+	return {
+		id: "session-pool",
+		status: "pass",
+		detail: `${active}/${max} active sessions`,
+	};
+}
+
 async function runOnlineChecksFor(managed: ManagedBinding, deps: DoctorHandlerDeps): Promise<DoctorCheckFinding[]> {
 	let client: DoctorTelegramClient;
 	try {
@@ -285,6 +320,9 @@ async function runOnlineChecksFor(managed: ManagedBinding, deps: DoctorHandlerDe
 	];
 	for (const entry of managed.binding.roster_snapshot) {
 		findings.push(await checkRosterMembership(client, managed.binding.group_id, entry));
+	}
+	if (deps.sessionStore !== undefined) {
+		findings.push(checkSessionPool(deps.sessionStore));
 	}
 	return findings;
 }
@@ -395,6 +433,7 @@ export function createDoctorHandler(deps: DoctorHandlerDeps): IpcHandler {
 		}
 
 		const now = deps.now ?? ((): Date => new Date());
+		deps.sweepSessions?.();
 		const bindings: DoctorResponse["bindings"] = [];
 		for (const managed of targets) {
 			const findings = await runOnlineChecksFor(managed, deps);
