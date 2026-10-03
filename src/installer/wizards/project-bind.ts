@@ -13,7 +13,7 @@ import { editFile, type EditFileOutcome, type FormatAdapter } from "../file-edit
 import { ensureGitignored, type GitignoreCheckResult } from "../gitignore.js";
 import { jsoncAdapter } from "../formats/jsonc.js";
 import { tomlAdapter } from "../formats/toml.js";
-import { writeInstructionFiles, printTrustSteps, type InstructionFilesOutcome, type TrustStepIo } from "../instructions.js";
+import { writeInstructionFiles, printTrustSteps, printRegistrationGuidance, type InstructionFilesOutcome, type TrustStepIo } from "../instructions.js";
 import { buildLauncherEntry } from "../launcher.js";
 import { commitRegistryChange, type RegistryCommitOutcome } from "../registry-commit.js";
 import { resolveSelectedTargets, resolveToolConfigPath, toolConfigEntryPath, type ToolId } from "../tool-targets.js";
@@ -247,7 +247,7 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 		return { outcome: "registry-commit-failed", detail: commit as ProjectBindRegistryFailure };
 	}
 
-	const launcher = buildLauncherEntry(projectId);
+	const launcher = buildLauncherEntry();
 	const existingSharedMcpJsonEntry = readExistingMcpJsonEntry(options.targetDir);
 	const targets = resolveSelectedTargets(options.selectedToolIds, launcher, existingSharedMcpJsonEntry);
 	const toolConfigResults = new Map<ToolId, EditFileOutcome>();
@@ -275,6 +275,7 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 
 	const instructionFiles = writeInstructionFiles(options.targetDir);
 	printTrustSteps([...options.selectedToolIds], options.trustStepIo);
+	printRegistrationGuidance(options.trustStepIo);
 
 	return { outcome: "bound", project_id: projectId, toolConfigResults, gitignoreResults, instructionFiles };
 }

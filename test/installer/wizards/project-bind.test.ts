@@ -8,6 +8,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { openLedger } from "../../../src/ledger/open.js";
 import { MCP_SERVER_NAME } from "../../../src/installer/constants.js";
 import { runProjectBind } from "../../../src/installer/wizards/project-bind.js";
+import { USER_LEVEL_REGISTRATION_GUIDANCE } from "../../../src/installer/instructions.js";
 import { parseRegistryDocument, type Registry } from "../../../src/registry/schema.js";
 import { serializeRegistry } from "../../../src/registry/writer.js";
 import { PROJECT_FILE_SCHEMA_VERSION, PROJECT_ID_PATTERN, REGISTRY_VERSION } from "../../../src/shared/constants.js";
@@ -186,7 +187,11 @@ test("a selected tool's config entry and the instruction files are written for a
 		assert.equal(existsSync(mcpJsonPath), true);
 		const mcpJson = JSON.parse(readFileSync(mcpJsonPath, "utf8"));
 		assert.ok(mcpJson.mcpServers?.[MCP_SERVER_NAME]);
-		assert.deepEqual(mcpJson.mcpServers[MCP_SERVER_NAME].args.slice(-3), ["mcp", "--project", outcome.project_id]);
+		assert.deepEqual(mcpJson.mcpServers[MCP_SERVER_NAME].args.slice(1), ["mcp"]);
+		assert.ok(
+			!mcpJson.mcpServers[MCP_SERVER_NAME].args.includes("--project"),
+			"ADR-0034: the written entry carries no project id — the binding comes from the conmuta.json this bind just wrote",
+		);
 
 		assert.equal(existsSync(join(targetDir, "AGENTS.md")), true);
 		assert.equal(outcome.instructionFiles.agentsMd, "created");
@@ -285,3 +290,32 @@ test(
 		});
 	},
 );
+
+// Judgment Day round 1 (JD-B-003): the guidance is written by the wizard, so a test that only calls
+// `printRegistrationGuidance` directly cannot tell whether the wizard still calls it — deleting that
+// call left the suite green. This pins the call site: the recommendation must be the LAST line the
+// wizard emits, after the selected tools' own trust steps.
+test("a successful bind emits the id-free registration recommendation through the injected sink (B-109, ADR-0034)", async () => {
+	await withProjectBindFixture(async ({ db, registryPath, targetDir }) => {
+		const written: string[] = [];
+		const outcome = await runProjectBind({
+			db,
+			registryPath,
+			targetDir,
+			botId: BOT_ID,
+			groupId: GROUP_ID,
+			agentId: AGENT_ID,
+			roster: ROSTER,
+			selectedToolIds: new Set(["claude-code"]),
+			now: () => NOW,
+			trustStepIo: { write: (line) => written.push(line) },
+		});
+
+		assert.equal(outcome.outcome, "bound");
+		assert.ok(
+			written.some((line) => line.includes("Claude Code")),
+			"the selected tool's own trust step is still printed",
+		);
+		assert.equal(written.at(-1), USER_LEVEL_REGISTRATION_GUIDANCE, "the guidance is the last line the wizard prints");
+	});
+});

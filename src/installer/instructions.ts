@@ -93,3 +93,21 @@ export function printTrustSteps(toolIds: readonly ToolId[], io: TrustStepIo = DE
 		}
 	}
 }
+
+/**
+ * The one-line registration guidance `project bind` prints once per run (B-109; ADR-0034).
+ *
+ * The entries this run writes are project-level, which is the right shape for most hosts, but Pi also
+ * reads a user-level config and the design's recommended shape is a single id-free entry there
+ * (ADR-0033): one entry then serves every session under the bound tree, including a subfolder session
+ * and a headless turn, neither of which inherits a cwd-relative project entry. It says *recommended*
+ * rather than doing it, because writing a user-level file is outside D-42's per-project matrix.
+ */
+export const USER_LEVEL_REGISTRATION_GUIDANCE =
+	`${PRODUCT_NAME}: recommended — register once at the user level as "${PRODUCT_NAME} mcp" (no --project); ` +
+	`every session under this tree then resolves the binding from the nearest ancestor conmuta.json.`;
+
+/** Prints {@link USER_LEVEL_REGISTRATION_GUIDANCE} once. */
+export function printRegistrationGuidance(io: TrustStepIo = DEFAULT_TRUST_STEP_IO): void {
+	io.write(USER_LEVEL_REGISTRATION_GUIDANCE);
+}

@@ -47,7 +47,7 @@ type FixtureName = "populated" | "conflict" | "malformed";
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const FIXTURES_ROOT = join(REPO_ROOT, "test/fixtures/tool-configs");
 
-const LAUNCHER = buildLauncherEntry("test-project");
+const LAUNCHER = buildLauncherEntry();
 
 function adapterFor(target: ToolConfigTarget) {
 	return target.id === "codex-cli" ? tomlAdapter : jsoncAdapter;

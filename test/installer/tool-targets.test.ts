@@ -16,7 +16,7 @@ import { MCP_SERVER_NAME } from "../../src/installer/constants.js";
 /** `installer/tool-targets.ts` (design.md §7.2, §7.3, D-33, D-34, D-42, D-43; tasks.md PR-04 sub-task 4.3). */
 
 const PROJECT_DIR = join("C:", "projects", "example");
-const LAUNCHER: LauncherEntry = buildLauncherEntry("project-alpha");
+const LAUNCHER: LauncherEntry = buildLauncherEntry();
 
 function targetById(id: ToolId) {
 	const target = TOOL_CONFIG_TARGETS.find((candidate) => candidate.id === id);
@@ -64,7 +64,7 @@ test("every row's relative path and container key match design.md §7.2", () => 
 	assert.equal(targetById("pi").containerKey, "mcpServers");
 });
 
-test("the standard mcpServers-family entry is id-only stdio with zero env", () => {
+test("the standard mcpServers-family entry is id-free stdio with zero env", () => {
 	for (const id of ["claude-code", "cursor", "gemini-cli", "codex-cli", "antigravity"] as const) {
 		const entry = targetById(id).buildEntry(LAUNCHER);
 		assert.deepEqual(entry, { command: LAUNCHER.command, args: [...LAUNCHER.args] });

@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { AGENTS_MD_MAX_LINES } from "../../src/installer/constants.js";
 import { CLAUDE_MD_IMPORT_LINE } from "../../src/installer/formats/markdown.js";
-import { printTrustSteps, trustStepFor, writeInstructionFiles } from "../../src/installer/instructions.js";
+import { printRegistrationGuidance, printTrustSteps, trustStepFor, USER_LEVEL_REGISTRATION_GUIDANCE, writeInstructionFiles } from "../../src/installer/instructions.js";
 import type { ToolId } from "../../src/installer/tool-targets.js";
 
 /**
@@ -82,4 +82,19 @@ test("printTrustSteps emits one line per selected tool that has a defined trust 
 	assert.equal(written.length, 2);
 	assert.equal(written[0], trustStepFor("claude-code"));
 	assert.equal(written[1], trustStepFor("vscode"));
+});
+
+// B-109 / ADR-0034: the installer keeps writing project-level entries, so it must say once per run
+// that the recommended registration is the single id-free user-level one — otherwise the project
+// entry reads as *the* registration and a later removal of the user-level entry trades a working
+// headless turn for a trust-gated one.
+test("printRegistrationGuidance emits exactly one line, and it recommends the id-free user-level entry", () => {
+	const written: string[] = [];
+
+	printRegistrationGuidance({ write: (line) => written.push(line) });
+
+	assert.deepEqual(written, [USER_LEVEL_REGISTRATION_GUIDANCE]);
+	assert.match(USER_LEVEL_REGISTRATION_GUIDANCE, /user level/);
+	assert.match(USER_LEVEL_REGISTRATION_GUIDANCE, /no --project/);
+	assert.match(USER_LEVEL_REGISTRATION_GUIDANCE, /conmuta\.json/);
 });
