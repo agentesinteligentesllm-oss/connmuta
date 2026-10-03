@@ -15,13 +15,20 @@ automatically.
 
 ## Status
 
-**F0 closed; F1 `apply` in progress — PR-01a (scaffold, CI, static gates), PR-01b (`shared/constants.ts`), PR-02 (provenance mechanism, `shared/envelope.ts` AS-IS), PR-03 (`shared/secrets.ts` SEAM), PR-04 (`shared/thread-record.ts` SEAM), PR-05 (`shared/protocol-apply.ts` SEAM, D-05), the two PR-06 slices (`shared/fence.ts` SEAM D-15, `shared/protocol-select.ts` SEAM), PR-07a (`shared/tool-schemas.ts` SEAM, `shared/error-payload.ts` SEAM), PR-07b (`shared/tool-output.ts` SEAM) and the two PR-08 slices (`shared/token-shape.ts`, `shared/project-file.ts`, `shared/roster-hash.ts`, the CLI `cli/{main,validate}.ts`) and PR-09a (`src/registry/{schema,invariants}.ts` + the shared roster-entry and roster-uniqueness exports), PR-09b (`src/registry/loader.ts` + its twin), PR-10 (`src/ledger/{schema,transaction}.ts`: the version-1 DDL from design §5.2 and the `node:sqlite` write-ahead transaction spike), PR-11 (`src/ledger/{open,migrations}.ts`: the open sequence with corruption/future-version quarantine and the forward-only migrations, D-21), PR-12 (`src/ledger/{inbox,threads,cursors}.ts`: the write-ahead poll-batch transaction with the offset advance last, the `ThreadRecord` adapter and the per-client cursors with D-19's catch-up window, PT-10 + PT-11), PR-13 (`src/ledger/{audit,unknown-senders,conditions-store,retention}.ts`: the unit's single bodiless `audit_log` writer with the token guard, the pending unknown-sender upsert, the `(scope, name)` condition store and the retention sweep with the open-thread backlog, PT-20) and PR-14 (`src/secret-store/{types,keyring,file-fallback,redaction,index}.ts`: the OS keyring, the ACL'd fallback file and the shared redactor; PT-09, PT-19) merged; **499 tests, 82/210 tasks**; next slice **PR-15** — 26 of the 45 PR blocks remain (19 blocks / 14 row ids merged; rows PR-09, PR-10, PR-11, PR-12, PR-13 and PR-14 closed) (`src/daemon/{node-floor,home,log}.ts`, `src/daemon/lifecycle/{lock,run-file}.ts` with 6 twins; PT-12) in [`openspec/changes/f1-daemon-registry-thin-client/tasks.md`](./openspec/changes/f1-daemon-registry-thin-client/tasks.md).**
+**F1–F5 are archived; no SDD change is open.** The daemon (registry, SQLite ledger, authenticated
+loopback IPC), the thin per-project MCP client, the installer and `doctor`, the web panel and the wake
+satellite (`conmuta-runner`) are implemented, tested and documented; **F6** awaits three Director
+decisions (B-11 trademark clearance, B-12 macOS scope, B-16 the open-source files), and **F7b** (the
+group referee) follows it. **Current position, open traps and next steps live in
+[`docs/08-sessions/HANDOFF.md`](./docs/08-sessions/HANDOFF.md)** — that file, not this paragraph, is
+where the running state lives; [`docs/00-INDEX.md`](./docs/00-INDEX.md) is the map.
 
-This repository currently holds the constitution, the architecture landed by the tribunal in debate
+This repository holds the constitution, the architecture landed by the tribunal in debate
 `bus-v2-landing-architecture-001` (consensus after two rounds), the decision records, the backlog and
-the work plan, and the first F1 code: the package scaffold, the CI workflow, the static security
-gates (PT-21, PT-22), the twin rule and `src/shared/constants.ts`. Every pull request is audited by
-the tribunal before it opens; open Director decisions are on the
+the work plan, and the shipped code with its strict-TDD twins. The two commands that must stay green
+are `npm test` (build + the full suite) and `npm run test:static` (the security and static gates); a
+stale `dist/` fakes results, so remove it before a clean run. Every unit is audited by the tribunal
+before it is delivered; open Director decisions are on the
 [pending-decisions board](./docs/00-INDEX.md#pending-director-decisions).
 
 ## Start here
