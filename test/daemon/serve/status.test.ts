@@ -209,6 +209,14 @@ test("daemon uptime is whole seconds since started_at, and never negative when s
 		assert.equal(result.daemon.pid, 1234);
 		assert.equal(result.daemon.started_at, NOW);
 		assert.equal(result.daemon.uptime_seconds, 90, "90.5s elapsed floors to 90 whole seconds");
+		assert.deepEqual(result.daemon.sessions, { active: 0, max: 64 }, "omitted active_sessions defaults to 0");
+
+		const withActive = sampleDaemon({ active_sessions: 7 });
+		const statusWithActive = await serveStatus(
+			{},
+			{ db, binding: sampleBinding(), session: { client_id: "client-a" }, daemon: withActive, now: () => new Date(NOW) },
+		);
+		assert.deepEqual(statusWithActive.daemon.sessions, { active: 7, max: 64 });
 
 		const future = sampleDaemon({ started_at: LATER });
 		const clamped = await serveStatus(

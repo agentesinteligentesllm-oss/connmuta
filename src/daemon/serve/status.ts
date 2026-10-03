@@ -34,6 +34,7 @@ import {
 	BOT_API_RETENTION_HOURS,
 	FLOOR_NEW,
 	FLOOR_REMINDER,
+	MAX_ACTIVE_SESSIONS,
 	MAX_SURFACED_THREADS,
 	PROTOCOL_SENTINEL,
 	RETENTION_WARNING_HOURS,
@@ -73,6 +74,7 @@ export interface StatusDaemonFacts {
 	readonly pid: number;
 	readonly started_at: string;
 	readonly secret_store_kind: SecretStore["kind"];
+	readonly active_sessions?: number;
 }
 
 /** What {@link serveStatus} needs. */
@@ -153,7 +155,12 @@ export interface StatusToolOutput {
 	 */
 	conditions: Conditions;
 	/** Facts about the daemon process itself — new in v2, since v1 had no separate daemon process. */
-	daemon: { pid: number; started_at: string; uptime_seconds: number };
+	daemon: {
+		pid: number;
+		started_at: string;
+		uptime_seconds: number;
+		sessions: { active: number; max: number };
+	};
 	/** The binding this session is served under — new in v2 (design §12 Change (2)). */
 	binding: { project_id: string; bot_id: number; group_id: number; agent_id: string; roster_hash: string };
 	/** Which secret-store backend is active (design §6) — new in v2. */
@@ -317,6 +324,10 @@ export async function serveStatus(_input: Record<string, never>, deps: ServeStat
 			pid: daemon.pid,
 			started_at: daemon.started_at,
 			uptime_seconds: computeUptimeSeconds(daemon.started_at, nowDate),
+			sessions: {
+				active: daemon.active_sessions ?? 0,
+				max: MAX_ACTIVE_SESSIONS,
+			},
 		},
 		binding: {
 			project_id: binding.project_id,
