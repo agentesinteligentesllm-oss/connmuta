@@ -15,12 +15,11 @@ tested and documented; **F6** awaits three Director decisions (B-11 trademark, B
 open-source files) and **F7b** (group referee) follows it. Session 62 closed **B-107** under **ADR-0033**
 (`--project` is an assertion, the client binds to the nearest ancestor `conmuta.json`, one id-free
 user-level registration serves a whole tree) and **B-106** at its source (the thin client releases its
-daemon session slot on a real transport close). Session 63 closed **B-109** under **ADR-0034** (the
-installer writes id-free launcher entries) and **B-108** (the suite's one systematic `%TEMP%` leak, fixed
-at its cause: the installer CLI never closed its ledger), and filed **B-110** (the archive-move
-relative-link artifact). Built under **Organic Driven Development**: explore before writing, track
-substantial work in `odd/tasks/`, test-first with observed RED, one work-unit commit per unit. This field
-used to
+daemon session slot on a real transport close). Session 63 closed **B-109** under **ADR-0034** (the installer writes id-free launcher entries) and
+**B-108** (the suite's one systematic `%TEMP%` leak, fixed at its cause). Session 64 closed **B-110**
+(relative Markdown link static gate in `test:static`, 38 archive links repaired). Built under **Organic
+Driven Development**: explore before writing, track substantial work in `odd/tasks/`, test-first with
+observed RED, one work-unit commit per unit. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,

@@ -4,6 +4,38 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 64 — B-110 closed; relative Markdown link static gate and archive link repairs
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's explicit instruction and standing authorization — *"A estas alturas tú ya tienes
+  el contexto al cien por ciento no quiero que me preguntes absolutamente nada, quiero que tomes las riendas y
+  tome las decisiones. Tienes toda mi autorización para que hagas todo ello, así que hazlo con maestría."*
+- **Preflight**: `git fetch`/`status` clean; suite **1862/1856/0/6** and `test:static` **99/99** from a removed
+  `dist/`; `gentle-ai` 4.0.0; RDD `on (decided by global)`; **Arena unreachable** — `pi mcp list` registers no
+  `arena` server and a TCP connect to `127.0.0.1:8765` is refused — confirming DN-09's substitute condition.
+- **B-110 closed under Organic Driven Development**:
+  1. **ODD tracking**: `odd/tasks/b-110-markdown-link-check.md` opened before implementation and mirrored to
+     Engram topic `odd/b-110/tasks`.
+  2. **Strict TDD with observed RED**: Created non-vacuous negative fixture `test/fixtures/markdown-links-negative.md`
+     and static security gate `test/security/markdown-links.test.ts`. First test run observed genuine RED: the
+     clean-tree scan failed catching all 38 broken links in `openspec/changes/archive/**`, while the non-vacuous
+     assertion passed on the seeded negative fixture.
+  3. **38 broken links repaired**: Re-rooted all 38 broken links across 8 files in `openspec/changes/archive/**`
+     (F1: 19 links, F2: 11 links, F7a: 8 links) to resolve to the true targets under `docs/`.
+  4. **Documentation and backlog reconciled**: Updated `docs/01-constitution/GOVERNANCE.md` §5 (archive on
+     completion requires adjusting relative link depth, enforced by `test:static`) and §6 (added Relative link
+     integrity row to engineering rules table); marked B-110 `done` in `docs/06-backlog/CHECKLIST.md`.
+- **RDD native review**: `inspect` on candidate → START resolved to **`declined_this_candidate`** (host-resolved,
+  `lineage_created: false`, `mutation_performed: false`, `risk_level: high`, `risk_evidence: ["security in test/security/markdown-links.test.ts"]`),
+  the fourth session in a row (59, 62, 63, 64).
+- **Verification**: Clean `dist/` build; `npm run test:static` **101/101 pass** (up from 99/99); `npm test`
+  **1864/1858/0/6 pass** (up from 1862/1856/0/6); 0 temp directory growth under `%TEMP%`.
+- **Commits on `main`**:
+  1. `88bec3c` `test(security): add relative markdown link static gate and negative fixture (B-110)`
+  2. `11b2b57` `docs(archive): repair 38 broken relative links across archived SDD changes (B-110)`
+  3. `4dcbf7b` `docs: record relative link integrity rule and close B-110 (B-110)`
+  4. `90bf773` `docs(odd): record task 3 commit identity in B-110 feature document`
+
 ## Session 63 — B-109 and B-108 closed; the open backlog validated before anything was written
 
 - **Date**: 2026-10-02 local time (opened on "continúa con lo que sigue, valida que lo que falta por hacer para no
