@@ -17,7 +17,8 @@ open-source files) and **F7b** (group referee) follows it. Session 62 closed **B
 user-level registration serves a whole tree) and **B-106** at its source (the thin client releases its
 daemon session slot on a real transport close). Session 63 closed **B-109** under **ADR-0034** (the installer writes id-free launcher entries) and
 **B-108** (the suite's one systematic `%TEMP%` leak, fixed at its cause). Session 64 closed **B-110**
-(relative Markdown link static gate in `test:static`, 38 archive links repaired). Built under **Organic
+(relative Markdown link static gate in `test:static`, 38 archive links repaired). Session 65 closed **B-106 remainder**
+(dead-PID session sweep in `routes.ts` and occupancy visibility in `status`/`doctor`). Built under **Organic
 Driven Development**: explore before writing, track substantial work in `odd/tasks/`, test-first with
 observed RED, one work-unit commit per unit. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's

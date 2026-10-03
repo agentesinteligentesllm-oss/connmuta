@@ -4,7 +4,47 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
-## Session 64 — B-110 closed; relative Markdown link static gate and archive link repairs
+## Session 65 — B-106 remainder closed (dead-PID sweep + occupancy visibility in status/doctor)
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's explicit instruction and standing authorization — *"te comento que no quiero que me hagas
+  ninguna pregunta, quiero que tomes las riendas y que decidas por mí confío plenamente en tu criterio y en tus habilidades,
+  así que tienes toda mi autorización para que puedas continuar sin preguntarme adicional a ello, te comento que la arena Orión
+  no está disponible, por lo que todo tendrá que pasar por esta sesión."*
+- **Preflight**: `git fetch`/`status` clean; suite **1864/1858/0/6** and `test:static` **101/101** from a removed
+  `dist/`; `gentle-ai` 4.0.0; RDD `on (decided by global)`; **Arena unreachable** — TCP probe to `127.0.0.1:8765`
+  answered `Connection refused` (exit code 1), confirming DN-09's substitute condition.
+- **B-106 remainder closed under Organic Driven Development**:
+  1. **ODD tracking**: `odd/tasks/b-106-occupancy-and-dead-pid-sweep.md` opened and mirrored to Engram topic
+     `odd/b-106-occupancy-and-dead-pid-sweep/tasks`.
+  2. **Strict TDD with observed RED**:
+     - **Dead-PID sweep**: Implemented `sweepDeadSessions(deps, sessions)` in `src/daemon/ipc/routes.ts` using
+       `isProcessAlive(pid)` (with test injection support via `RoutesDeps.isProcessAlive`). Automatically reclaims
+       defunct session slots in `SessionStore` and deletes their in-memory records on `POST /session` and
+       `POST /tools/status`. Pinned by tests in `test/daemon/ipc/routes.test.ts` (observed RED before GREEN).
+     - **Occupancy in status**: Extended `StatusToolOutput.daemon` with `sessions: { active, max }` and `StatusDaemonFacts`
+       with `active_sessions?: number` (`src/daemon/serve/status.ts`), wired from `deps.sessionStore.size` in `routes.ts`.
+       Pinned by tests in `test/daemon/serve/status.test.ts` and `test/daemon/ipc/routes.test.ts`.
+     - **Occupancy in doctor**: Added `checkSessionPool(store)` to online doctor checks in `src/daemon/ipc/doctor.ts`,
+       reporting `session-pool` findings (`pass` <80%, `warn` >=80%, `fail` at capacity), wired in `src/daemon/bootstrap.ts`.
+       Pinned by tests in `test/daemon/ipc/doctor.test.ts`.
+     - **Canonical specs**: Updated `openspec/specs/thin-client-tools/spec.md` and `openspec/specs/doctor/spec.md` with the
+       new occupancy guarantees and traceability rows.
+     - **Backlog**: Marked row B-106 in `docs/06-backlog/CHECKLIST.md` `done`.
+  3. **RDD native review**: `inspect` on candidate -> START resolved to **`declined_this_candidate`** (host-resolved,
+     `lineage_created: false`, `mutation_performed: false`, `risk_level: medium`, 11 changed files / 386 changed lines,
+     `outcome: consent-declined-this-candidate`), fifth session in a row.
+  4. **Independent verification**: `gentle-ai-verify` subagent (task `muspv372-1-plm7`) verified all 5 claims with
+     exact file and line citations (`Verification Summary: PASS`).
+  5. **Verification**: Clean `dist/` build; `npm test` **1869/1863/0/6 pass** (+5 tests); `npm run test:static`
+     **101/101 pass**; 0 temp directory growth under `%TEMP%`.
+  6. **Commits on `main`**:
+     1. `30b574c` `feat(daemon): sweep dead-PID sessions on open and status to reclaim bearer slots (B-106)`
+     2. `bb81a4e` `feat(status): surface session pool occupancy in daemon facts (B-106)`
+     3. `c10f939` `feat(doctor): surface online session pool occupancy check (B-106)`
+     4. `ec69802` `docs(specs): record session pool occupancy in thin-client-tools and doctor specs (B-106)`
+     5. `a7bd812` `docs(backlog): close B-106 remainder and record feature tasks (B-106)`
+
 
 - **Date**: 2026-10-03 local time.
 - **Authority**: the Director's explicit instruction and standing authorization — *"A estas alturas tú ya tienes
