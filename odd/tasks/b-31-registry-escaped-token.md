@@ -56,3 +56,21 @@ exempt from R5: a registry carrying one loads" is this change's regression guard
   `sha256:<64 hex>` registry must still load, and a token *completed into* a masked hex run must still be
   caught (`test/registry/loader.test.ts`'s existing `JD-A-001` boundary test).
 - `npm test`, `npm run test:static`, and the `%TEMP%\conmuta-*` count unchanged.
+
+## Verification actually performed
+
+- **The depth bound cannot hide a token in an ACCEPTED file — checked against the schema, not assumed.**
+  `src/registry/schema.ts` contains only `z.strictObject` constructions: no `z.record`, no `z.lazy`/recursive
+  shape, no `passthrough` and no `z.unknown` field. An accepted document is therefore shallow (document →
+  arrays → entries → scalars), which is what makes `MAX_CONTENT_WALK_DEPTH = 32` safe: a document deep enough
+  for the bound to matter is refused by the schema regardless of the walk.
+- **No new false refusals is provable, not merely observed.** For a **non-escaped** string the raw file text
+  contains that string literally, so if the gate fires on it the pre-parse scan over the whole text fired
+  already: gate-refusals ⊆ raw-scan-refusals for every document that carries no JSON escape. The gate can
+  therefore only add refusals in exactly the case it exists for. The roster-hash mask behaves identically in
+  both passes because the mask's trailing-character lookahead sees a quote or a value boundary in either one.
+- **Observed RED → GREEN:** 4 tests failed before the gate existed; 29/29 pass after.
+- **Non-vacuity by mutation:** disabling the gate (`if (false && …)`) fails exactly those 4 behaviour tests,
+  while the depth guard continues to pass — correct, since that guard protects code which then no longer runs.
+- **Full suite:** `npm test` **1907 / 1901 / 0 / 6** (+5 over the 1902 baseline); `test:static` **101 / 101**;
+  `%TEMP%\conmuta-*` 0 → 0.

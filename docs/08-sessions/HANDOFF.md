@@ -149,7 +149,26 @@ elige la clase de backlog a atacar, o espera a que el Director decida B-11/B-12/
 
 ---
 
-## §5 — Audit state for session 68's candidate (COMPLETED in session 69; APPROVED)
+## §5 — Audit state (B-102 CLOSED in session 69; all three session-70 candidates DECLINED)
+
+**RDD state for session 70: every candidate was host-resolved as `consent-declined-this-candidate`, so no native
+review exists for this session's work and the separate independent verifier was the only independent pass.** The
+host resolved two: the B-95/B-97 accumulated target (`sha256:2cd5fa16…`, 19 files / 1314 lines) and the B-31
+accumulated target (`sha256:8937c6f2…`, 23 files / 1653 lines). Both returned `lineage_created: false`,
+`mutation_performed: false`. **A decline is candidate-scoped, is not the kill switch, and is not the Director
+declining the work** — it means no native review exists and the bar does not move, so the independent verifier ran
+instead. **Do not re-inspect or re-drive START on either target.** They are recorded here rather than given their
+own commit for the reason session 68 gave: the projection is a committed-only base diff from `8ee3ddf`, so any new
+commit mints a new `target_identity` and with it another prompt for a Director who has now declined three
+accumulated candidates in a row. That pattern is the signal worth acting on: **the accumulated target keeps growing
+across sessions, and a Director asked to consent to 1600+ lines spanning three sessions' work will keep saying no.**
+The next session that wants a native review should narrow the candidate to a single work-unit commit with an
+explicit `baseRef` plus `committedOnly: true`, which is also what ODD's own close-out rule asks for (a work-unit
+commit or a PR slice, never the accumulated feature branch).
+
+---
+
+## §5b — Judgment Day audit for B-102 (COMPLETED in session 69; APPROVED)
 
 **Judgment Day dual review (`bus-v2-b102-residuals-001`) is now COMPLETE.** In session 68, the audit was partial because runtime subagent tool execution failed for `jd-judge-a`. In session 69, subagent tool execution was verified healthy and `jd-judge-a` completed a full read-only sweep over the candidate `aa7fbd8^..5bf647a`.
 
