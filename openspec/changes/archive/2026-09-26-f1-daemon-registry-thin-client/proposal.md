@@ -4,8 +4,8 @@
 |---|---|
 | Change | `f1-daemon-registry-thin-client` |
 | Status | proposed — pre-proposal handoff confirmed 2026-09-16; research lane unselected by the Director |
-| Implements | [ADR-0028](../../../docs/03-adr/0028-project-scoped-bijective-binding.md), [ADR-0029](../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md), [ADR-0030](../../../docs/03-adr/0030-sqlite-ledger-and-json-registry.md) in full; the packaging part of [ADR-0031](../../../docs/03-adr/0031-npm-distribution-and-license.md) |
-| Scope authority | [WORK-PLAN.md](../../../docs/07-plan/WORK-PLAN.md) section F1; backlog B-13, B-15, B-18 |
+| Implements | [ADR-0028](../../../../docs/03-adr/0028-project-scoped-bijective-binding.md), [ADR-0029](../../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md), [ADR-0030](../../../../docs/03-adr/0030-sqlite-ledger-and-json-registry.md) in full; the packaging part of [ADR-0031](../../../../docs/03-adr/0031-npm-distribution-and-license.md) |
+| Scope authority | [WORK-PLAN.md](../../../../docs/07-plan/WORK-PLAN.md) section F1; backlog B-13, B-15, B-18 |
 | Inputs | [exploration.md](./exploration.md) (Engram `sdd/f1-daemon-registry-thin-client/explore`); tribunal `bus-v2-landing-architecture-001` (CONSENSUS); Director notes DN-01..DN-03 |
 | Binding rules | Strict TDD from the first commit; PRs <= 400 lines, auto-chained; artifacts in English; no v1 production identifiers anywhere |
 

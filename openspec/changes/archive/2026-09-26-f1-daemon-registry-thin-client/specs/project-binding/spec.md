@@ -10,7 +10,7 @@ Schema, validation and hot-reload for the committed `conmuta.json` project file 
 ### Requirement: Committed project file schema
 
 The system MUST validate `conmuta.json` with a strict zod schema per
-[DATA-MODEL.md §1](../../../../../docs/02-architecture/DATA-MODEL.md#1-conmutajson-committed-project-file):
+[DATA-MODEL.md §1](../../../../../../docs/02-architecture/DATA-MODEL.md#1-conmutajson-committed-project-file):
 reject unknown keys instead of stripping them; require `schema_version` literal `1`; require
 `project_id` matching the slug pattern `^[a-z0-9][a-z0-9-]{2,40}$` (D-06 closes DATA-MODEL §8's
 open point in favor of a slug, not a UUID v4); require `group_id` a negative integer; require
@@ -72,7 +72,7 @@ Traces: ADR-0028 §"Committed project file"; DATA-MODEL.md §1 "Must never conta
 ### Requirement: Machine registry schema and invariants
 
 The daemon MUST validate `~/.conmuta/registry.json` with a strict schema per
-[DATA-MODEL.md §2](../../../../../docs/02-architecture/DATA-MODEL.md#2-conmutaregistryjson-machine-registry)
+[DATA-MODEL.md §2](../../../../../../docs/02-architecture/DATA-MODEL.md#2-conmutaregistryjson-machine-registry)
 and MUST enforce invariants R1-R6 at every load: R1 at most one active binding per `bot_id`; R2 at
 most one active binding per `group_id` and per `project_id`; R3 `binding.agent_id` is a roster
 member whose `user_id` equals `binding.bot_id`; R4 `binding.group_id` equals the bound project's

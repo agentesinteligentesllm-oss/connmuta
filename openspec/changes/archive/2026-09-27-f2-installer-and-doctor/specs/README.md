@@ -2,10 +2,10 @@
 
 Change: `f2-installer-and-doctor`. Four new capabilities, two modified. Sources:
 [proposal.md](../proposal.md) · [exploration.md](../exploration.md) (including its Addendum) ·
-[ADR-0031](../../../../docs/03-adr/0031-npm-distribution-and-license.md) ·
-[OVERVIEW.md §10](../../../../docs/02-architecture/OVERVIEW.md#10-installer-doctor-and-control-panel-f2--f3) ·
-[THREAT-MODEL.md §5.6](../../../../docs/02-architecture/THREAT-MODEL.md#56-inherited-static-assertions-re-scoped-for-two-bundles-t17) ·
-[DATA-MODEL.md §2.5](../../../../docs/02-architecture/DATA-MODEL.md).
+[ADR-0031](../../../../../docs/03-adr/0031-npm-distribution-and-license.md) ·
+[OVERVIEW.md §10](../../../../../docs/02-architecture/OVERVIEW.md#10-installer-doctor-and-control-panel-f2--f3) ·
+[THREAT-MODEL.md §5.6](../../../../../docs/02-architecture/THREAT-MODEL.md#56-inherited-static-assertions-re-scoped-for-two-bundles-t17) ·
+[DATA-MODEL.md §2.5](../../../../../docs/02-architecture/DATA-MODEL.md).
 
 ## Decisions (D-31..D-40) coverage
 

@@ -2,12 +2,12 @@
 
 Change: `f1-daemon-registry-thin-client`. Nine new capabilities, greenfield (`openspec/specs/` is
 empty): every requirement below is `## ADDED Requirements`. Sources:
-[proposal.md](../proposal.md) · [ADR-0028](../../../../docs/03-adr/0028-project-scoped-bijective-binding.md) ·
-[ADR-0029](../../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md) ·
-[ADR-0030](../../../../docs/03-adr/0030-sqlite-ledger-and-json-registry.md) ·
-[ADR-0031](../../../../docs/03-adr/0031-npm-distribution-and-license.md) ·
-[THREAT-MODEL.md §4](../../../../docs/02-architecture/THREAT-MODEL.md#4-pinning-test-register) ·
-[DATA-MODEL.md](../../../../docs/02-architecture/DATA-MODEL.md).
+[proposal.md](../proposal.md) · [ADR-0028](../../../../../docs/03-adr/0028-project-scoped-bijective-binding.md) ·
+[ADR-0029](../../../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md) ·
+[ADR-0030](../../../../../docs/03-adr/0030-sqlite-ledger-and-json-registry.md) ·
+[ADR-0031](../../../../../docs/03-adr/0031-npm-distribution-and-license.md) ·
+[THREAT-MODEL.md §4](../../../../../docs/02-architecture/THREAT-MODEL.md#4-pinning-test-register) ·
+[DATA-MODEL.md](../../../../../docs/02-architecture/DATA-MODEL.md).
 
 ## ADR "Tests that must pin it" coverage (22/22)
 

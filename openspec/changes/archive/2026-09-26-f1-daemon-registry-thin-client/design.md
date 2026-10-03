@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Change | `f1-daemon-registry-thin-client` |
-| Implements | [ADR-0028](../../../docs/03-adr/0028-project-scoped-bijective-binding.md), [ADR-0029](../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md), [ADR-0030](../../../docs/03-adr/0030-sqlite-ledger-and-json-registry.md) in full; the packaging rules of [ADR-0031](../../../docs/03-adr/0031-npm-distribution-and-license.md). No ADR amendment is needed (the proposal states none; every choice below elaborates a delegated point). |
+| Implements | [ADR-0028](../../../../docs/03-adr/0028-project-scoped-bijective-binding.md), [ADR-0029](../../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md), [ADR-0030](../../../../docs/03-adr/0030-sqlite-ledger-and-json-registry.md) in full; the packaging rules of [ADR-0031](../../../../docs/03-adr/0031-npm-distribution-and-license.md). No ADR amendment is needed (the proposal states none; every choice below elaborates a delegated point). |
 | Inputs | [proposal.md](./proposal.md) (D-01..D-10); tribunal `bus-v2-f1-proposal-001` rulings (a)–(e), not reopened here; [exploration.md](./exploration.md) §Q1–Q4; v1 checkout `telegram-agent-bus` at `bf8f365` (read-only evidence, cited `v1:path:lines`) |
 | Status | design — pending tribunal audit (Alpha) and reconciliation with the parallel `sdd-spec` output |
 | Binding rules | Strict TDD from the first commit; PRs ≤ `review_budget_lines` (400), auto-chained; English artifacts; placeholders only; no bare numeric constant |
@@ -75,7 +75,7 @@ CI (`.github/workflows/ci.yml`): `windows-latest` × Node `24.15` and `26`; step
 
 ## 3. Named constants (`src/shared/constants.ts`)
 
-Every value below is a named export with the reasoning in its doc comment; derived values are derived in code (CONSTITUTION §5). "v1" = [DATA-MODEL §7](../../../docs/02-architecture/DATA-MODEL.md#7-named-constants-inherited-values-to-confirm-in-f1) value.
+Every value below is a named export with the reasoning in its doc comment; derived values are derived in code (CONSTITUTION §5). "v1" = [DATA-MODEL §7](../../../../docs/02-architecture/DATA-MODEL.md#7-named-constants-inherited-values-to-confirm-in-f1) value.
 
 | Constant | Value | Status | Reasoning |
 |---|---|---|---|
@@ -133,7 +133,7 @@ Values marked "tuning" pin the invariant they serve, never the number (CONSTITUT
 
 ## 4. Registry (`~/.conmuta/registry.json`)
 
-**Schema** (`registry/schema.ts`, `z.strictObject` at every level): [DATA-MODEL §2](../../../docs/02-architecture/DATA-MODEL.md#2-conmutaregistryjson-machine-registry) finalized as follows: `roster_snapshot` and `roster_hash` are **required** on every binding (D-07 makes the snapshot the admission source); `bindings[].settings` is an optional `{ reminder_window_hours?, secret_markers? }` (DATA-MODEL §6 draft location, defaults from constants); `projects[].path` stays required. `registry_version` must equal `REGISTRY_VERSION`.
+**Schema** (`registry/schema.ts`, `z.strictObject` at every level): [DATA-MODEL §2](../../../../docs/02-architecture/DATA-MODEL.md#2-conmutaregistryjson-machine-registry) finalized as follows: `roster_snapshot` and `roster_hash` are **required** on every binding (D-07 makes the snapshot the admission source); `bindings[].settings` is an optional `{ reminder_window_hours?, secret_markers? }` (DATA-MODEL §6 draft location, defaults from constants); `projects[].path` stays required. `registry_version` must equal `REGISTRY_VERSION`.
 
 | Invariant | Where enforced | Failure |
 |---|---|---|

@@ -9,11 +9,11 @@ shipped in `runner/` (10 files), `test/runner/` (8 files), and `test/security/ru
 
 **Authority and decision basis.** Authorized by the Director under backlog item **B-104**
 (`docs/02-architecture/RFC-DESPERTADOR-TRIGGER-AUTOMATICO.md`), formulated in
-[`docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md`](../../docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md),
+[`docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md`](../../../../docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md),
 audited under Judgment Day (`jd-judge-a`, `jd-judge-b`, plus independent verification), enacted via amendment to
-[`docs/01-constitution/CONSTITUTION.md` §3.1](../../docs/01-constitution/CONSTITUTION.md), and superseding in part
-(the phase-target sentence only) [ADR-0006](../../docs/03-adr/0006-autonomy-boundary.md) and
-[ADR-0029](../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md).
+[`docs/01-constitution/CONSTITUTION.md` §3.1](../../../../docs/01-constitution/CONSTITUTION.md), and superseding in part
+(the phase-target sentence only) [ADR-0006](../../../../docs/03-adr/0006-autonomy-boundary.md) and
+[ADR-0029](../../../../docs/03-adr/0029-per-user-daemon-and-thin-clients.md).
 
 ---
 

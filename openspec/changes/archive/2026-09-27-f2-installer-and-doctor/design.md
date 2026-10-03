@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Change | `f2-installer-and-doctor` |
-| Implements | [ADR-0031](../../../docs/03-adr/0031-npm-distribution-and-license.md) rules 2, 3, 5 and its installer tests; the "Add bot / Add group / Assign project" flow of [ADR-0028](../../../docs/03-adr/0028-project-scoped-bijective-binding.md); [OVERVIEW §7.1](../../../docs/02-architecture/OVERVIEW.md) (start at login) and §10 (F2 rows). No ADR amendment: every choice below elaborates a point the proposal or the ADRs delegated. Two documentation corrections follow from it (§12, §15 D-49, D-50) and are made in the docs slice, not by a new ADR |
+| Implements | [ADR-0031](../../../../docs/03-adr/0031-npm-distribution-and-license.md) rules 2, 3, 5 and its installer tests; the "Add bot / Add group / Assign project" flow of [ADR-0028](../../../../docs/03-adr/0028-project-scoped-bijective-binding.md); [OVERVIEW §7.1](../../../../docs/02-architecture/OVERVIEW.md) (start at login) and §10 (F2 rows). No ADR amendment: every choice below elaborates a point the proposal or the ADRs delegated. Two documentation corrections follow from it (§12, §15 D-49, D-50) and are made in the docs slice, not by a new ADR |
 | Inputs | [proposal.md](./proposal.md) (D-31..D-40, not reopened); [exploration.md](./exploration.md) and its Addendum; the merged F1 code (read, cited `path:line`); `pi-mcp-adapter/config.ts` as installed on the development machine (read-only evidence, §7.3) |
 | Status | design — pending Alpha audit (DN-09) and reconciliation with the parallel `sdd-spec` output |
 | Binding rules | Strict TDD; PRs ≤ 400 authored lines, auto-chained; English artifacts; placeholders only; every number a named constant |

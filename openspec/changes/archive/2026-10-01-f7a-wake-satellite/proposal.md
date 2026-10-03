@@ -9,9 +9,9 @@ those refinements are recorded here as authoritative decisions.
 
 **Authority and decision basis.** Authorized by the Director under backlog item **B-104**
 (request document `docs/02-architecture/RFC-DESPERTADOR-TRIGGER-AUTOMATICO.md`), formulated in
-[ADR-0032](../../docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md), audited under
+[ADR-0032](../../../../docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md), audited under
 Judgment Day debate `bus-v2-b104-wake-satellite-001`, and enacted via amendment to
-[CONSTITUTION §3.1](../../docs/01-constitution/CONSTITUTION.md).
+[CONSTITUTION §3.1](../../../../docs/01-constitution/CONSTITUTION.md).
 
 ---
 

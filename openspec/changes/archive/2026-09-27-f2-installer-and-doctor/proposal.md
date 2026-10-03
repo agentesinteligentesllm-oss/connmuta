@@ -4,8 +4,8 @@
 |---|---|
 | Change | `f2-installer-and-doctor` |
 | Status | proposed — pre-proposal decisions locked 2026-09-26 (tribunal `bus-v2-f2-explore-decisions-001`, CONSENSUS); D-40 (start-at-login) added same day by direct Director decision after the subagent flagged the F1-vs-WORK-PLAN gap |
-| Implements | [ADR-0031](../../../docs/03-adr/0031-npm-distribution-and-license.md) installer rules 2, 3, 5 and its installer tests; the "Add bot / Add group / Assign project" flow of [ADR-0028](../../../docs/03-adr/0028-project-scoped-bijective-binding.md); [OVERVIEW §10](../../../docs/02-architecture/OVERVIEW.md) (F2 rows) |
-| Scope authority | [WORK-PLAN.md](../../../docs/07-plan/WORK-PLAN.md) section F2; backlog B-05 (closes here), B-17 |
+| Implements | [ADR-0031](../../../../docs/03-adr/0031-npm-distribution-and-license.md) installer rules 2, 3, 5 and its installer tests; the "Add bot / Add group / Assign project" flow of [ADR-0028](../../../../docs/03-adr/0028-project-scoped-bijective-binding.md); [OVERVIEW §10](../../../../docs/02-architecture/OVERVIEW.md) (F2 rows) |
+| Scope authority | [WORK-PLAN.md](../../../../docs/07-plan/WORK-PLAN.md) section F2; backlog B-05 (closes here), B-17 |
 | Inputs | [exploration.md](./exploration.md) including its Addendum (Engram `sdd/f2-installer-and-doctor/explore`) |
 | Binding rules | Strict TDD; PRs <= 400 authored lines, auto-chained; artifacts in English; placeholders only, no v1 production identifiers |
 
