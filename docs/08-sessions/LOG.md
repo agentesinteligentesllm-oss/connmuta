@@ -4,6 +4,41 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 66 — B-105 closed completely (wake satellite harness argv forms verified live)
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's explicit instruction and standing authorization — *"Te comento que a estas alturas
+  tú ya tienes el contexto al cien por ciento de esta herramienta y no quiero que me preguntes absolutamente nada,
+  quiero que tome las riendas, tienes toda autorización para que apliques todo lo que consideres necesario. Confío
+  plenamente en tu criterio, así que hazlo con maestría... De acuerdo, toma las riendas y aplica todo lo que
+  consideres necesario y continúa con la tarea hasta culminar."*
+- **Preflight**: `git fetch`/`status` clean; suite **1869/1863/0/6** and `test:static` **101/101** from a removed
+  `dist/`; `gentle-ai` 4.0.0; RDD `on (decided by global)`; **Arena unreachable** — TCP probe to `127.0.0.1:8765`
+  answered `Connection refused` (exit code 1) and `pi mcp list` has no `arena` registered, confirming DN-09's
+  substitute condition.
+- **B-105 closed completely (harness argv forms live verification)**:
+  1. **Empirical live measurement** against real installed binaries under `spawn(bin, argv, { shell: false })`:
+     - `pi`: `pi -p` (Pi 0.99.2 / 1.0.1; verified end to end on the bus in session 60 via `conmuta-runner/bin/pi.exe`).
+     - `claude`: `claude -p` (Claude Code 2.1.283; verified via PE binary `~/.local/bin/claude.exe` in user PATH,
+       ran `-p` and processed headless prompt directly without auxiliary launcher).
+     - `codex`: `codex exec` (Codex CLI 0.152.1; verified via PE binary `@openai/codex-win32-x64/.../codex.exe` with
+       `stdio: ["ignore", "pipe", "pipe"]`, parsed `exec` and processed headless prompt).
+     - `opencode`: `opencode run` (Opencode 1.18.31; verified via PE binary `opencode-windows-x64/.../opencode.exe`
+       with `stdio: ["ignore", "pipe", "pipe"]`, parsed `run` and processed headless prompt).
+  2. **Windows `.cmd` shim vs `shell: false` rule confirmed**:
+     - `claude` ships a native `.exe` binary in `~/.local/bin/` so it starts without a shell.
+     - `codex` and `opencode` ship native `.exe` binaries inside their npm platform packages (`@openai/codex-win32-x64`
+       and `opencode-windows-x64`), requiring a shell-free launcher (like `pi.exe`) or exposing the `.exe` to the
+       runner's private `PATH`.
+     - `codex exec` waits on stdin unless stdin is closed/ignored, which `runner/harness.ts`'s
+       `stdio: ["ignore", "pipe", "pipe"]` already guarantees by design.
+  3. **Documentation and artifact updates**:
+     - `docs/06-backlog/CHECKLIST.md`: row B-105 marked `done` with full evidence.
+     - `docs/runbooks/wake-satellite.md`: limits updated to reflect live verification of all four harnesses.
+     - `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md`: appendix added recording resolution of B-105.
+     - `docs/07-plan/WORK-PLAN.md`: F7a backlog row updated to B-105 `done`.
+  4. **Verification**: `npm run test:static` **101/101 pass**; suite **1869/1863/0/6 pass**; zero temp leaks.
+
 ## Session 65 — B-106 remainder closed (dead-PID sweep + occupancy visibility in status/doctor)
 
 - **Date**: 2026-10-03 local time.
