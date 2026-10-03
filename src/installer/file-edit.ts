@@ -79,6 +79,52 @@ export interface EditFileOptions {
 
 export type EditFileOutcome = "created" | "noop" | "written";
 
+/** What {@link checkFileEdit} evaluated would happen on write. */
+export type CheckFileEditOutcome = "created" | "noop" | "will-write";
+
+/**
+ * Pre-validates that {@link editFile} will not refuse on symlink, parse error or entry conflict.
+ *
+ * Runs steps 1-4 of the edit pipeline (read-only): refuses if target or parent is a symlink,
+ * if an existing file cannot be parsed, or if a different entry is already installed at `entryPath`.
+ * Returns what the write would do ("created" if absent, "noop" if identical entry already present,
+ * or "will-write" if absent entry in existing file).
+ *
+ * Throws {@link FileEditRefusal} if any step refuses. Makes ZERO writes, creates no files/directories,
+ * and takes no backup.
+ */
+export function checkFileEdit(options: Omit<EditFileOptions, "now">): CheckFileEditOutcome {
+	const { path, adapter, entryPath, entry } = options;
+
+	const parent = dirname(path);
+	if (isSymlink(parent)) {
+		throw new FileEditRefusal("symlink", `refusing to edit: parent directory is a symlink: ${parent}`);
+	}
+	if (isSymlink(path)) {
+		throw new FileEditRefusal("symlink", `refusing to edit: target is a symlink: ${path}`);
+	}
+
+	if (!existsSync(path)) {
+		return "created";
+	}
+
+	const currentText = readFileSync(path, "utf8");
+	const before = adapter.parse(currentText);
+
+	const existing = readEntryAtPath(before, entryPath);
+	if (existing !== undefined) {
+		if (isDeepStrictEqual(existing, entry)) {
+			return "noop";
+		}
+		throw new FileEditRefusal(
+			"conflict",
+			`refusing to overwrite a different entry already present at "${entryPath.join(".")}":\n${diffEntries(existing, entry)}`,
+		);
+	}
+
+	return "will-write";
+}
+
 /** Runs the seven-step edit pipeline (design.md §4.1) and returns what happened. */
 export function editFile(options: EditFileOptions): EditFileOutcome {
 	const { path, adapter, entryPath, entry } = options;

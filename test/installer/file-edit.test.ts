@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { editFile, FileEditRefusal, formatBackupTimestamp, type FormatAdapter } from "../../src/installer/file-edit.js";
+import { checkFileEdit, editFile, FileEditRefusal, formatBackupTimestamp, type FormatAdapter } from "../../src/installer/file-edit.js";
 import { BACKUP_SUFFIX_PREFIX } from "../../src/installer/constants.js";
 
 /**
@@ -277,3 +277,121 @@ test("step 7 removes a newly-created file when the written content fails to re-p
 		assert.equal(existsSync(target), false);
 	});
 });
+
+test("checkFileEdit returns 'created' without creating files or directories when target is absent", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "nested", "config.json");
+		const result = checkFileEdit({
+			path: target,
+			adapter: fakeAdapter,
+			entryPath: ENTRY_PATH,
+			entry: { command: "node" },
+		});
+		assert.equal(result, "created");
+		assert.equal(existsSync(target), false, "target file must not be created");
+		assert.equal(existsSync(join(dir, "nested")), false, "parent directory must not be created");
+	});
+});
+
+test("checkFileEdit returns 'noop' when identical entry already exists, making zero writes", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.json");
+		const original = JSON.stringify({ mcpServers: { conmuta: { command: "node" } } }, null, 2);
+		writeFileSync(target, original, "utf8");
+
+		const result = checkFileEdit({
+			path: target,
+			adapter: fakeAdapter,
+			entryPath: ENTRY_PATH,
+			entry: { command: "node" },
+		});
+		assert.equal(result, "noop");
+		assert.equal(readFileSync(target, "utf8"), original, "target must remain byte-identical");
+		assert.equal(backupFilesFor(dir, "config.json").length, 0, "no backup must be taken");
+	});
+});
+
+test("checkFileEdit returns 'will-write' when entry is absent in existing file, making zero writes", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.json");
+		const original = JSON.stringify({ mcpServers: { other: { command: "python" } } }, null, 2);
+		writeFileSync(target, original, "utf8");
+
+		const result = checkFileEdit({
+			path: target,
+			adapter: fakeAdapter,
+			entryPath: ENTRY_PATH,
+			entry: { command: "node" },
+		});
+		assert.equal(result, "will-write");
+		assert.equal(readFileSync(target, "utf8"), original, "target must remain byte-identical");
+		assert.equal(backupFilesFor(dir, "config.json").length, 0, "no backup must be taken");
+	});
+});
+
+test("checkFileEdit throws FileEditRefusal('conflict') when a differing entry is already present, making zero writes", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.json");
+		const original = JSON.stringify({ mcpServers: { conmuta: { command: "old-command" } } }, null, 2);
+		writeFileSync(target, original, "utf8");
+
+		assert.throws(
+			() =>
+				checkFileEdit({
+					path: target,
+					adapter: fakeAdapter,
+					entryPath: ENTRY_PATH,
+					entry: { command: "new-command" },
+				}),
+			(error: unknown) =>
+				error instanceof FileEditRefusal &&
+				error.reason === "conflict" &&
+				error.message.includes("old-command") &&
+				error.message.includes("new-command"),
+		);
+		assert.equal(readFileSync(target, "utf8"), original, "target must remain byte-identical");
+		assert.equal(backupFilesFor(dir, "config.json").length, 0, "no backup must be taken");
+	});
+});
+
+test("checkFileEdit throws FileEditRefusal('parse-error') when file contains syntax errors, making zero writes", () => {
+	withTempDir((dir) => {
+		const target = join(dir, "config.json");
+		const malformed = "BROKEN content";
+		writeFileSync(target, malformed, "utf8");
+
+		assert.throws(
+			() =>
+				checkFileEdit({
+					path: target,
+					adapter: fakeAdapter,
+					entryPath: ENTRY_PATH,
+					entry: { command: "node" },
+				}),
+			(error: unknown) => error instanceof FileEditRefusal && error.reason === "parse-error",
+		);
+		assert.equal(readFileSync(target, "utf8"), malformed, "target must remain byte-identical");
+		assert.equal(backupFilesFor(dir, "config.json").length, 0, "no backup must be taken");
+	});
+});
+
+test("checkFileEdit throws FileEditRefusal('symlink') when target is a symlink", () => {
+	withTempDir((dir) => {
+		const realDir = join(dir, "real");
+		mkdirSync(realDir);
+		const target = join(dir, "config.json");
+		linkDirectory(realDir, target);
+
+		assert.throws(
+			() =>
+				checkFileEdit({
+					path: target,
+					adapter: fakeAdapter,
+					entryPath: ENTRY_PATH,
+					entry: { command: "node" },
+				}),
+			(error: unknown) => error instanceof FileEditRefusal && error.reason === "symlink",
+		);
+	});
+});
+
