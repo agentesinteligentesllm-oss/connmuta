@@ -9,7 +9,7 @@ import type { ProjectRosterEntry } from "../../shared/project-file.js";
 import { writeProjectFile, type ProjectFileDisagreement } from "../../shared/project-file-writer.js";
 import { computeRosterHash } from "../../shared/roster-hash.js";
 import { MCP_SERVER_NAME } from "../constants.js";
-import { editFile, type EditFileOutcome, type FormatAdapter } from "../file-edit.js";
+import { checkFileEdit, editFile, FileEditRefusal, type EditFileOutcome, type FileEditRefusalReason, type FormatAdapter } from "../file-edit.js";
 import { ensureGitignored, type GitignoreCheckResult } from "../gitignore.js";
 import { jsoncAdapter } from "../formats/jsonc.js";
 import { tomlAdapter } from "../formats/toml.js";
@@ -51,7 +51,14 @@ export type ProjectBindOutcome =
 	  }
 	| { readonly outcome: "invariant-violated"; readonly invariant: RegistryInvariant }
 	| { readonly outcome: "project-file-refused"; readonly disagreements: readonly ProjectFileDisagreement[] }
-	| { readonly outcome: "registry-commit-failed"; readonly detail: ProjectBindRegistryFailure };
+	| { readonly outcome: "registry-commit-failed"; readonly detail: ProjectBindRegistryFailure }
+	| {
+			readonly outcome: "tool-config-refused";
+			readonly toolId: ToolId;
+			readonly path: string;
+			readonly reason: FileEditRefusalReason;
+			readonly message: string;
+	  };
 
 /** What {@link runProjectBind} needs. */
 export interface RunProjectBindOptions {
@@ -200,6 +207,34 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 		return { outcome: "invariant-violated", invariant: "R3" };
 	}
 
+	const launcher = buildLauncherEntry();
+	const existingSharedMcpJsonEntry = readExistingMcpJsonEntry(options.targetDir);
+	const targets = resolveSelectedTargets(options.selectedToolIds, launcher, existingSharedMcpJsonEntry);
+
+	// Pre-validate all selected tool-config merges before writing anything (B-111, ADR-0035).
+	// A conflict, parse-error, or symlink refusal must be caught here so that neither conmuta.json
+	// nor the registry binding is committed, preventing a dead end under bijective invariants R1/R2.
+	for (const target of targets) {
+		const targetPath = resolveToolConfigPath(options.targetDir, target);
+		const adapter = adapterFor(target.relativePath);
+		const entryPath = toolConfigEntryPath(target, MCP_SERVER_NAME);
+		const entry = target.buildEntry(launcher);
+		try {
+			checkFileEdit({ path: targetPath, adapter, entryPath, entry });
+		} catch (error) {
+			if (error instanceof FileEditRefusal) {
+				return {
+					outcome: "tool-config-refused",
+					toolId: target.id,
+					path: targetPath,
+					reason: error.reason,
+					message: error.message,
+				};
+			}
+			throw error;
+		}
+	}
+
 	const writeResult = writeProjectFile({
 		path: join(options.targetDir, "conmuta.json"),
 		intended: { project_id: projectId, group_id: options.groupId, roster: options.roster },
@@ -247,9 +282,6 @@ export async function runProjectBind(options: RunProjectBindOptions): Promise<Pr
 		return { outcome: "registry-commit-failed", detail: commit as ProjectBindRegistryFailure };
 	}
 
-	const launcher = buildLauncherEntry();
-	const existingSharedMcpJsonEntry = readExistingMcpJsonEntry(options.targetDir);
-	const targets = resolveSelectedTargets(options.selectedToolIds, launcher, existingSharedMcpJsonEntry);
 	const toolConfigResults = new Map<ToolId, EditFileOutcome>();
 	const gitignoreResults = new Map<ToolId, GitignoreCheckResult>();
 	for (const target of targets) {

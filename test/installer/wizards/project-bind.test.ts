@@ -319,3 +319,89 @@ test("a successful bind emits the id-free registration recommendation through th
 		assert.equal(written.at(-1), USER_LEVEL_REGISTRATION_GUIDANCE, "the guidance is the last line the wizard prints");
 	});
 });
+
+test("a tool-config conflict is refused before writing conmuta.json or registry, and retry succeeds (B-111)", async () => {
+	await withProjectBindFixture(async ({ db, registryPath, targetDir }) => {
+		const registryBefore = readFileSync(registryPath, "utf8");
+		const mcpJsonPath = join(targetDir, ".mcp.json");
+		const conflictingContent = JSON.stringify({
+			mcpServers: { [MCP_SERVER_NAME]: { command: "old-pre-existing-command", args: ["old"] } },
+		});
+		writeFileSync(mcpJsonPath, conflictingContent, "utf8");
+
+		const outcome = await runProjectBind({
+			db,
+			registryPath,
+			targetDir,
+			botId: BOT_ID,
+			groupId: GROUP_ID,
+			agentId: AGENT_ID,
+			roster: ROSTER,
+			selectedToolIds: new Set(["claude-code"]),
+			now: () => NOW,
+		});
+
+		assert.equal(outcome.outcome, "tool-config-refused");
+		if (outcome.outcome !== "tool-config-refused") return;
+		assert.equal(outcome.toolId, "claude-code");
+		assert.equal(outcome.reason, "conflict");
+		assert.ok(outcome.message.includes("old-pre-existing-command"));
+
+		// ZERO writes occurred
+		assert.equal(existsSync(join(targetDir, "conmuta.json")), false, "conmuta.json must not be created on refusal");
+		assert.equal(readFileSync(registryPath, "utf8"), registryBefore, "registry.json must be untouched on refusal");
+		assert.equal(readFileSync(mcpJsonPath, "utf8"), conflictingContent, ".mcp.json must remain unchanged");
+		assert.equal(existsSync(join(targetDir, "AGENTS.md")), false, "AGENTS.md must not be created");
+
+		// Fix the conflict by removing the conflicting file (or replacing it with a clean one)
+		rmSync(mcpJsonPath);
+
+		// Re-run the bind: must succeed cleanly without tripping R1 or R2
+		const retry = await runProjectBind({
+			db,
+			registryPath,
+			targetDir,
+			botId: BOT_ID,
+			groupId: GROUP_ID,
+			agentId: AGENT_ID,
+			roster: ROSTER,
+			selectedToolIds: new Set(["claude-code"]),
+			now: () => NOW,
+		});
+
+		assert.equal(retry.outcome, "bound", "retry after resolving conflict must succeed and not trip R1/R2");
+		assert.equal(existsSync(join(targetDir, "conmuta.json")), true, "conmuta.json is written on retry");
+	});
+});
+
+test("a malformed tool-config file is refused with parse-error before any write (B-111)", async () => {
+	await withProjectBindFixture(async ({ db, registryPath, targetDir }) => {
+		const registryBefore = readFileSync(registryPath, "utf8");
+		const mcpJsonPath = join(targetDir, ".mcp.json");
+		const malformedContent = "{ invalid jsonc content :::: ";
+		writeFileSync(mcpJsonPath, malformedContent, "utf8");
+
+		const outcome = await runProjectBind({
+			db,
+			registryPath,
+			targetDir,
+			botId: BOT_ID,
+			groupId: GROUP_ID,
+			agentId: AGENT_ID,
+			roster: ROSTER,
+			selectedToolIds: new Set(["claude-code"]),
+			now: () => NOW,
+		});
+
+		assert.equal(outcome.outcome, "tool-config-refused");
+		if (outcome.outcome !== "tool-config-refused") return;
+		assert.equal(outcome.toolId, "claude-code");
+		assert.equal(outcome.reason, "parse-error");
+
+		// ZERO writes occurred
+		assert.equal(existsSync(join(targetDir, "conmuta.json")), false, "conmuta.json must not be created");
+		assert.equal(readFileSync(registryPath, "utf8"), registryBefore, "registry.json must be untouched");
+		assert.equal(readFileSync(mcpJsonPath, "utf8"), malformedContent, ".mcp.json must remain untouched");
+	});
+});
+
