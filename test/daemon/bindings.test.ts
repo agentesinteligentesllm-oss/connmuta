@@ -289,6 +289,107 @@ describe("BindingsReconciler (registry hot-reload, poller lifecycle, BINDING_CHA
     );
   });
 
+  it("stopAll() before reconcile() starts no transport and no poller at all — the latch is checked before the work, not only after it (B-102f)", async () => {
+    const db = createTestDatabase();
+    let transportBuilt = 0;
+    let pollerCreated = 0;
+
+    const reconciler = new BindingsReconciler({
+      db,
+      createTransport: async () => {
+        transportBuilt += 1;
+        return {} as never;
+      },
+      createPoller: async () => {
+        pollerCreated += 1;
+        return { stop: async () => {} };
+      },
+    });
+
+    // Terminal shutdown first: this is the window B-98's timeout-then-late-resolve path leaves open —
+    // the daemon has already closed its database by the time a stalled tick finally resumes.
+    await reconciler.stopAll();
+
+    const result = await reconciler.reconcile(baseRegistry);
+
+    assert.equal(
+      transportBuilt,
+      0,
+      "a reconciler that has been stopped must not start building a transport — the check cannot wait until after createPoller resolves (B-102f)",
+    );
+    assert.equal(pollerCreated, 0, "and it must not create a poller either");
+    assert.equal(result.changed, false, "a reconcile after terminal shutdown changes nothing");
+    assert.equal(result.added.length, 0);
+    assert.equal(reconciler.getActiveBindings().length, 0);
+  });
+
+  it("an update racing stopAll() stops the poller it started and registers nothing (B-102a, update-existing-binding branch)", async () => {
+    const db = createTestDatabase();
+    const stops = new Map<string, number>();
+    let pollerCreated = 0;
+    let releaseCreatePoller: (() => void) | undefined;
+    const createPollerGate = new Promise<void>((resolve) => {
+      releaseCreatePoller = resolve;
+    });
+    let signalSecondPoller: (() => void) | undefined;
+    const secondPollerStarted = new Promise<void>((resolve) => {
+      signalSecondPoller = resolve;
+    });
+
+    const reconciler = new BindingsReconciler({
+      db,
+      createPoller: async () => {
+        const index = ++pollerCreated;
+        const id = `poller-${index}`;
+        if (index === 2) {
+          signalSecondPoller?.();
+          // The window B-98 names, reached through the UPDATE branch this time (B-102a): stopAll() runs
+          // while the replacement poller factory is still in flight.
+          await createPollerGate;
+        }
+        return {
+          stop: async () => {
+            stops.set(id, (stops.get(id) ?? 0) + 1);
+          },
+        };
+      },
+    });
+
+    // 1. The binding is managed.
+    await reconciler.reconcile(baseRegistry);
+    assert.equal(reconciler.getActiveBindings().length, 1);
+    assert.equal(pollerCreated, 1);
+
+    // 2. A config change forces the update-existing-binding branch on the next reconcile.
+    const updatedRegistry: Registry = {
+      ...baseRegistry,
+      bindings: [
+        {
+          ...sampleBinding,
+          roster_hash: "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+        },
+      ],
+    };
+
+    const reconcilePromise = reconciler.reconcile(updatedRegistry);
+    await secondPollerStarted;
+
+    await reconciler.stopAll();
+
+    releaseCreatePoller?.();
+    const result = await reconcilePromise;
+
+    assert.equal(pollerCreated, 2, "the update branch did reach its own createPoller, so this is the update window");
+    assert.ok(stops.has("poller-1"), "the replaced poller must be stopped");
+    assert.equal(
+      stops.get("poller-2"),
+      1,
+      "the replacement poller — the update branch's own guard, B-102a — must be stopped exactly once, not leaked",
+    );
+    assert.equal(result.updated.length, 0, "an update that loses the race to stopAll() registers nothing");
+    assert.equal(reconciler.getActiveBindings().length, 0);
+  });
+
   it("reconciles from loader.current() when loader was already synced before reconciler creation (JD-A-001)", async () => {
     const db = createTestDatabase();
     const mockLoader: RegistryLoader = {

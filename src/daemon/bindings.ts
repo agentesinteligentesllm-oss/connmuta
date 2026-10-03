@@ -113,10 +113,14 @@ export class BindingsReconciler {
   private readonly createTelegramClient?: (bot: RegistryBot) => TelegramClient | Promise<TelegramClient>;
   private readonly managedBindings = new Map<string, ManagedBinding>();
   /**
-   * Set by `stopAll()` and never cleared — once shutdown has begun, a binding add/update still in
-   * flight (`reconcile()`'s own async `createPoller` call, racing a concurrent `stopAll()`) must not
-   * register its poller, only stop it (B-98). Defense in depth independent of any caller's own
-   * discipline about not overlapping `reconcile()` with `stopAll()`.
+   * Set by `stopAll()` and never cleared: shutdown is terminal and once-per-process in this daemon's
+   * lifecycle, so a reconciler that has been stopped must start nothing again — `reconcile()` becomes a
+   * no-op rather than a restart. Two windows need this latch, and they are different windows (B-98,
+   * B-102f): a `reconcile()` that BEGINS after `stopAll()` (checked up front, before any transport or
+   * poller factory call, because by then the ledger is already closed) and a binding add/update already
+   * in flight when `stopAll()` runs (checked after `createPoller` resolves, where the poller just started
+   * is stopped instead of registered). Defense in depth independent of any caller's own discipline about
+   * not overlapping `reconcile()` with `stopAll()`.
    */
   private stopping = false;
 
@@ -188,6 +192,20 @@ export class BindingsReconciler {
   }
 
   async reconcile(registry?: Registry): Promise<ReconcileResult> {
+    if (this.stopping) {
+      // The "before the work starts" half of the B-98 guard (B-102f): the checks after `createPoller`
+      // below only cover a reconcile already in flight when `stopAll()` runs. A reconcile that begins
+      // after shutdown must not build a transport at all — `stop()` has already closed the ledger, and
+      // B-98's timeout-then-late-resolve path is exactly reachable from here.
+      return {
+        changed: false,
+        added: [],
+        removed: [],
+        updated: [],
+        active: this.getActiveBindings(),
+      };
+    }
+
     let targetRegistry = registry;
 
     if (!targetRegistry && this.loader) {
