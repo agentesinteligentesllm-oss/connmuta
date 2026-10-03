@@ -146,3 +146,12 @@ Strict (`CONSTITUTION.md` §6, `GOVERNANCE.md` §6): red before green, every `sr
 Implemented, documented and verified; Judgment Day round 1 done (both judges `APPROVE_WITH_CHANGES`,
 seven real findings, all corrected above); committed in work units after round 2 and independent
 verification. See the "Review-round corrections" table for what round 1 changed.
+
+## Follow-up (2026-10-02, session 63) — item 4 is no longer true
+
+Item 4 above ("**Installer untouched.** `buildLauncherEntry(projectId)` keeps emitting
+`mcp --project <id>`") described the deliberately deferred half of this unit. It was closed the next
+session: **B-109** landed under **ADR-0034**, `buildLauncherEntry()` now takes no project and emits
+`args: [CLI_ENTRY, "mcp"]`, and the canonical `tool-config-merge` requirement reads *"Written entries are
+id-free stdio, zero env, never npx"*. This file is left as the plan of record for B-107 and is not
+rewritten; the amendment is this note plus ADR-0034.

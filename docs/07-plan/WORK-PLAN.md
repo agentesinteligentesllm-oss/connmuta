@@ -65,7 +65,7 @@ flowchart LR
 | Field | Content |
 |---|---|
 | Goal | A guided install through the six screens of [OVERVIEW §10.2](../02-architecture/OVERVIEW.md): Installation validator, Control panel, Add bot, Add group, Assign project, Overview table. |
-| Deliverables | `@clack/prompts` wizard; Node ≥ 24 gate first (B-17); detection of installed tools and their config paths; id-only stdio entry merged (never overwritten) into each detected tool's project config, opt-in per tool; `AGENTS.md` + `CLAUDE.md` pointer written into the project; `doctor` with offline checks (no token), online checks per binding, opt-in DM probe; global-only tools documented as best-effort; never global in OpenCode. |
+| Deliverables | `@clack/prompts` wizard; Node ≥ 24 gate first (B-17); detection of installed tools and their config paths; id-free stdio entry (naming no project id; [ADR-0034](../03-adr/0034-id-free-installer-entry.md)) merged (never overwritten) into each detected tool's project config, opt-in per tool; `AGENTS.md` + `CLAUDE.md` pointer written into the project; `doctor` with offline checks (no token), online checks per binding, opt-in DM probe; global-only tools documented as best-effort; never global in OpenCode. |
 | Dependencies | F1. Spike B-05 result (config matrix). |
 | Validation | Installer tests of ADR-0031 (no `npx`, gate first, zero writes on failure); merge tests per config format; `doctor` offline mode makes no network call; wrong-room test still green after an install into two projects. |
 | SDD change | `f2-installer-and-doctor` (proposed) |
