@@ -91,3 +91,18 @@ The name `agentbus` is taken on npm (by another maintainer), on PyPI and as a Gi
 | Install without scripts | CI job installs the packed tarball with `--ignore-scripts` on a clean Node 24 and starts the thin client within the MCP timeout; the timeout value is a named constant. |
 | No secret-shaped string in the repository | Release checklist and CI secret scan with the bot-token regex over the tree and the tarball. |
 | Windows-first claim | CI matrix runs on `windows-latest`; the macOS job is added only when B-12 is done. |
+
+## Amendment note (2026-10-02, [ADR-0034](./0034-id-free-installer-entry.md))
+
+Rule 2's substance — an installed binary, never `npx`, resolved to an absolute interpreter path — stands
+unchanged, and so does the row of the pinning table above that asserts every written entry is free of
+`npx`. **Rule 2's parenthetical spelling is amended in part**: the entry is `conmuta mcp`, not
+`conmuta mcp --project <id>`. ADR-0033 made the project id an assertion the client resolves against the
+nearest ancestor `conmuta.json`, so an id inside the written entry is a second copy of an identity that
+travels with the project directory and goes stale on a copy or a re-bind; ADR-0034 removes it from the
+installer's output. **The phrase `an id-only stdio command` in the same sentence is superseded in reading
+as well, not only in its parenthetical**: the canonical requirement is now *"Written entries are id-free
+stdio, zero env, never npx"* (`openspec/specs/tool-config-merge/spec.md`), because the entry names no
+project at all. The rule's actual content — an installed binary resolved by absolute path, never `npx` —
+is untouched. This file is append-only, so rule 2's sentence above is left byte-unchanged and its reading
+is this note.

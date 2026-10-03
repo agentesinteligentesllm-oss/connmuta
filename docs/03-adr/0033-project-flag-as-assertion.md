@@ -118,3 +118,21 @@ the case that matters (posting into another group).
 | Explicit flag, mismatch → `EXIT_PROJECT_MISMATCH` | `test/client/binding.test.ts`; `test/client/main.test.ts` |
 | `requireProjectFlag: true`, absent/empty → `EXIT_USAGE` (the two bins' unchanged behaviour) | `test/client/binding.test.ts` (both cases); `test/channel/main.test.ts` (the resolver inputs it passes); `test/runner/main.test.ts` |
 | The flag's malformed forms stay usage errors (all three spellings) | `test/cli/main.test.ts` |
+
+## Follow-up note (2026-10-02, [ADR-0034](./0034-id-free-installer-entry.md))
+
+The disclosed open end in "Consequences" above — *"The installer's per-project entry
+(`buildLauncherEntry`) still emits `--project <id>` … Making the installer emit an id-free entry is
+therefore the natural follow-up, and it is **not** done here"* — is now done. **ADR-0034** closes backlog
+**B-109**: `buildLauncherEntry()` takes no project and writes `args: [CLI_ENTRY, "mcp"]`, the canonical
+`tool-config-merge` requirement is restated as *"Written entries are id-free stdio, zero env, never
+npx"*, and `project bind` prints one line recommending the single id-free user-level registration. Nothing
+in this ADR's own decisions changes: `--project` is still an optional assertion, the walk-up still fixes
+the binding, and the two operator-spawned bins still require the flag.
+
+**One sentence of decision 2 is superseded in reading, and this file is append-only so it is left
+byte-unchanged**: *"An installer-written project entry keeps working unchanged — with its `--project <id>`
+it is still a valid assertion."* Such an entry still works where it already exists, but the installer no
+longer writes one, and "keeps working" needs its own qualifier — ADR-0034 discloses the copied or re-bound
+case in its Consequences. The rest of decision 2 (the recommended registration is ONE id-free user-level
+entry) is exactly what ADR-0034 now makes the installer agree with.

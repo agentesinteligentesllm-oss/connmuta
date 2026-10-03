@@ -56,3 +56,14 @@ passive switch, layers 1-2 are untouched, the runner is still never inside the c
 default" still holds (`off` is the default overall; `wake` is the default when a human enables the ladder).
 Only this section's **phase sentence** is superseded — the satellite is F7a, not post-F6. The boundary's new
 text is CONSTITUTION.md §3.1.
+
+## Amendment note (2026-10-02, [ADR-0034](./0034-id-free-installer-entry.md))
+
+The layer-3 paragraph above describes the D5 installer as writing "an id-only stdio entry" into a
+detected tool's project-level MCP config. **That phrase's `id-only` is superseded in reading, not in
+text** (this file is append-only): since ADR-0033 an explicitly passed `--project <id>` is an assertion
+the client checks against the nearest ancestor `conmuta.json`, never the binding's source, and since
+ADR-0034 the installer writes the entry **without any project id** — `conmuta mcp`, zero `env`, never
+`npx`. What the paragraph's *rule* protects is unchanged and still enforced: the installer writes only
+an MCP registration entry, merges never overwriting, opt-in per tool, and touches no IDE settings or
+permissions file.

@@ -60,7 +60,10 @@ rounds) and confirmed by the Director (DN-04). 0032 was accepted by the tribunal
 Director confirms. 0033 was authorized by the Director on 2026-10-01 as the durable fix of **B-107**
 (Judgment Day substitute, DN-09, debate `bus-v2-b107-optional-project-001`) and **confirmed `accepted`
 by the Director the same day**. Its audit record is the tribunal row for that debate, not a sentence
-here.
+here. 0034 was **applied on 2026-10-02 under that session's standing Director authorization** (the
+authorization is quoted in the ADR itself; no separate per-decision confirmation was requested, because
+the session's instruction was that none be asked). Its audit record is the tribunal row for debate
+`bus-v2-b109-id-free-installer-entry-001`, and nothing here claims an outcome on its behalf.
 
 | # | Title | Status | Supersedes / amends | Debate | Decision record |
 |---|---|---|---|---|---|
@@ -70,6 +73,7 @@ here.
 | [0031](0031-npm-distribution-and-license.md) | npm distribution and license | `accepted` | amends 0001 in part | `bus-v2-landing-architecture-001` | D9, D10 |
 | [0032](0032-wake-satellite-and-per-binding-ladder.md) | Wake satellite and the per-binding wake ladder (`off`·`notify`·`wake`·`autopilot`) | `proposed` (pending Director) | 0006 in part (phase target only); 0029 in part (same); amends CONSTITUTION §3 | `bus-v2-b104-wake-satellite-001` | Director instruction 2026-09-30; B-104, B-06; invariant (5) scope clarification |
 | [0033](0033-project-flag-as-assertion.md) | `--project` is an assertion, not a requirement: one registration serves a whole tree | `accepted` | amends 0028 rule 4 in part | `bus-v2-b107-optional-project-001` | Director authorization 2026-10-01, confirmed 2026-10-01; B-107; invariant (1) unchanged, its pinning test reshaped |
+| [0034](0034-id-free-installer-entry.md) | The installer writes id-free launcher entries: the project file is the binding, the entry is a launch recipe | `accepted` | amends 0031 rule 2 in part; states the open end ADR-0033 filed; closes B-109 | `bus-v2-b109-id-free-installer-entry-001` (Judgment Day) | Director's standing authorization for the 2026-10-02 session, quoted in the ADR; B-109; invariant (1) unchanged |
 
 ## Closed-permanently items and the two reopened ones
 
