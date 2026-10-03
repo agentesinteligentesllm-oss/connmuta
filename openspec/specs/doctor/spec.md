@@ -98,7 +98,8 @@ than that entry's literal wording, disclosed above and in `registry.ts`'s own do
 The online tier MUST run inside the daemon (it needs the token) and, per bound binding, MUST
 check: `getMe` matches the recorded bot, `getChat(group_id)` is reachable, my `agent_id` is present
 in the roster with my `bot_id`, `bot_id` is unique across bindings, and every roster bot is a
-member of the bound group and is not an administrator or creator. The online tier MUST print
+member of the bound group and is not an administrator or creator. When a session store is wired,
+the online tier MUST also report daemon session pool occupancy. The online tier MUST print
 `bot_id` only, never a token.
 
 #### Scenario: getMe mismatch is reported per binding
@@ -114,7 +115,14 @@ member of the bound group and is not an administrator or creator. The online tie
 - WHEN the online tier's membership check runs
 - THEN it flags that bot as holding elevated status in the group
 
-Traces: OVERVIEW §10.4; THREAT-MODEL.md T07, T21, PT-32; B-28 (membership-check ownership)
+#### Scenario: Session pool occupancy is reported
+
+- GIVEN a running daemon with an active session store
+- WHEN the online tier checks a bound project
+- THEN it reports a `session-pool` check with pass, warn (>=80%), or fail (at capacity) status
+  and active/max session counts
+
+Traces: OVERVIEW §10.4; THREAT-MODEL.md T07, T21, PT-32; B-28 (membership-check ownership); B-106 (session pool check)
 
 ### Requirement: DM probe is opt-in and confined to the binding being validated
 
@@ -146,5 +154,6 @@ Traces: OVERVIEW §10.4; v1 `src/doctor.ts:132-137` (the v1 defect being correct
 | design.md D-52; D-50 | Registry tier warns on a tool-config file not covered by .gitignore |
 | PT-32; THREAT-MODEL.md T21 | Online tier membership/admin check |
 | B-28 | Online tier membership-check ownership |
+| B-106 (backlog remainder) | Online tier session pool occupancy check |
 | B-30 | Registry tier R5 tension surfaced here |
 | v1 `src/doctor.ts:132-137` | DM probe confined to the binding being validated |

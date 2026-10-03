@@ -143,14 +143,16 @@ Traces: THREAT-MODEL.md T06, PT-13, PT-14; CONSTITUTION.md §2 inv. 5; §3 layer
 ### Requirement: status and thread are local, no-network reads
 
 `agentbus_status` and `agentbus_thread` MUST read only the ledger through the daemon (via IPC) and
-MUST make no Telegram call; `status` MUST report daemon uptime, last poll per bot, and binding
+MUST make no Telegram call; `status` MUST report daemon uptime, session pool occupancy
+(`daemon.sessions.active` and `daemon.sessions.max`), last poll per bot, and binding
 identity.
 
 #### Scenario: status makes no Telegram call
 
 - GIVEN a live daemon with an open binding
 - WHEN `agentbus_status` is called
-- THEN the response includes daemon uptime and last-poll-per-bot, and a network recorder shows no
+- THEN the response includes daemon uptime, session pool occupancy (`daemon.sessions.active` and
+  `daemon.sessions.max`) and last-poll-per-bot, and a network recorder shows no
   Telegram call
 
 Traces: OVERVIEW.md §7.4; CONSTITUTION.md §3 layer 1
@@ -161,6 +163,7 @@ Traces: OVERVIEW.md §7.4; CONSTITUTION.md §3 layer 1
 |---|---|
 | ADR-0033 (amending ADR-0028 rule 4) | Launcher resolves the nearest binding and refuses when unbound or mismatched |
 | B-106 (backlog) | The client releases its session slot before exiting |
+| B-106 (backlog remainder) | Status reports session pool occupancy (`daemon.sessions`) and dead-PID sessions are swept |
 | ADR-0029 row "The client never polls Telegram" | DAEMON_DOWN makes zero network calls (PT-26 a/b) |
 | THREAT-MODEL.md PT-07 | Client-local error payload constructor |
 | PT-13, PT-14 | Fence soundness and origin labels |
