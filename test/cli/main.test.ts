@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { reportProjectBindOutcome, runCli, type CliIo } from "../../src/cli/main.js";
+import { closeSetupOutcomeLedger, reportProjectBindOutcome, reportSetupOutcome, runCli, withInstallerLedger, type CliIo } from "../../src/cli/main.js";
+import { openInstallerLedger } from "../../src/installer/ledger-access.js";
+import type { SetupOutcome } from "../../src/installer/wizards/setup.js";
 import { RUNNER_NAME } from "../../runner/constants.js";
 import type { EditFileOutcome } from "../../src/installer/file-edit.js";
 import type { GitignoreCheckResult } from "../../src/installer/gitignore.js";
@@ -399,16 +401,14 @@ test("`project sync-roster [path]` invokes runSyncRosterCommand and returns its 
     assert.equal(result, EXIT_UNBOUND_PROJECT);
     assert.match(captured.err.join("\n"), /no active binding/i);
   } finally {
-    // `openInstallerLedgerOrFail` leaves the ledger connection open (the same pre-existing behavior
-    // `bot add`/`group add`/`project bind` already have, out of this PR's own scope): on Windows the
-    // still-open `ledger.db` file keeps the directory locked, so cleanup tolerates EPERM the same way
-    // `test/daemon/bootstrap.test.ts`'s own `cleanupTempHome` does.
-    try {
-      rmSync(dir, { recursive: true, force: true });
-    } catch {
-      // Ignore cleanup failure in tests
-    }
-    rmSync(targetDir, { recursive: true, force: true });
+    // B-108: this cleanup is a REAL assertion, not best-effort. `openInstallerLedgerOrFail` used to
+    // leave its `ledger.db` connection open for the process's lifetime, which on Windows kept `dir`
+    // locked and made every run of this suite leave one `%TEMP%\conmuta-cli-sync-roster-*` directory
+    // behind — the suite's one measured, systematic leak. `maxRetries` because Windows can briefly hold
+    // a directory after a legitimate close; a genuinely open handle still fails the test instead of
+    // being swallowed.
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    rmSync(targetDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -712,3 +712,62 @@ test("reportProjectBindOutcome reports a failed gitignore update on stderr witho
   assert.deepEqual(captured.err, [`${PRODUCT_NAME}: could not update .gitignore for claude-code: EACCES`]);
 });
 
+
+// --- B-108: the installer's ledger is released on every path ------------------
+
+// These three pin the mechanism directly instead of only through one end-to-end run. The strict
+// `rmSync` (no catch, bounded retries) is what makes them real: while a WAL connection is open its
+// `-shm` mapping keeps the directory undeletable on Windows, so a leaked handle turns this into an
+// `EPERM` failure rather than a silent `%TEMP%` growth.
+
+test("withInstallerLedger hands the body a live ledger and releases it before returning (B-108)", async () => {
+  const home = mkdtempSync(join(tmpdir(), "conmuta-cli-with-ledger-"));
+  let sawLiveLedger = false;
+
+  const value = await withInstallerLedger(home, async ({ db, registryPath }) => {
+    assert.ok(db.prepare("SELECT 1 AS one").get() !== undefined, "the body must hold an open, usable connection");
+    assert.equal(registryPath, join(home, "registry.json"));
+    sawLiveLedger = true;
+    return "body-result";
+  });
+
+  assert.equal(value, "body-result");
+  assert.equal(sawLiveLedger, true);
+  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
+
+test("withInstallerLedger releases the ledger even when the body throws (B-108)", async () => {
+  const home = mkdtempSync(join(tmpdir(), "conmuta-cli-with-ledger-throw-"));
+
+  await assert.rejects(
+    withInstallerLedger(home, async () => {
+      throw new Error("body failed");
+    }),
+    /body failed/,
+  );
+
+  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
+
+test("closeSetupOutcomeLedger closes the ledger a completed setup handed back, so reporting it frees the home (B-108)", () => {
+  const home = mkdtempSync(join(tmpdir(), "conmuta-cli-setup-close-"));
+  const opened = openInstallerLedger({ homeDir: home });
+  assert.equal(opened.status, "opened");
+  if (opened.status !== "opened") return;
+
+  const captured = makeIo();
+  const outcome: SetupOutcome = {
+    outcome: "completed",
+    homeDir: home,
+    registryPath: join(home, "registry.json"),
+    registryScaffolded: true,
+    db: opened.db,
+    autostart: "cancelled",
+  };
+
+  // The close happens before the outcome is reported, which is why reporting it is safe here.
+  assert.equal(closeSetupOutcomeLedger(outcome), outcome);
+  assert.equal(reportSetupOutcome(captured.io, outcome), 0);
+  assert.match(captured.out.join("\n"), /setup completed/);
+  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});

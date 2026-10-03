@@ -196,3 +196,21 @@ test("runDoctor is invoked exactly once, as the final step of a completed run", 
 		assert.deepEqual(calls, ["confirm", "runDoctor"]);
 	});
 });
+
+// Judgment Day round 2 (B-108): `runSetup` opens the ledger and hands it back only on the success path,
+// so a failure after the open left the handle — and therefore the home directory — to nobody. The
+// strict `rmSync` below is the assertion: an open WAL `-shm` mapping makes it fail on Windows.
+test("runSetup releases the ledger it opened when the run fails after the open, so the home stays removable (B-108)", async () => {
+	await withSetupFixture(async ({ homeDir, autostartOptions }) => {
+		const throwingPrompter: Prompter = {
+			...confirmPrompter(false),
+			async confirm() {
+				throw new Error("prompt failed");
+			},
+		};
+
+		await assert.rejects(runSetup({ homeDir, prompter: throwingPrompter, autostartOptions }), /prompt failed/);
+
+		rmSync(homeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+	});
+});

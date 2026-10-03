@@ -127,19 +127,29 @@ export async function runSetup(options: RunSetupOptions): Promise<SetupOutcome> 
 		return { outcome: "ledger-refused", reason: ledgerResult.reason, path: ledgerResult.path, foundVersion: ledgerResult.foundVersion };
 	}
 
-	hardenHomeAcl({ homeDir, execImpl: options.execImpl });
+	try {
+		hardenHomeAcl({ homeDir, execImpl: options.execImpl });
 
-	const startAtLoginAnswer = await options.prompter.confirm({
-		message: "Start conmuta automatically when you log in?",
-		initialValue: false,
-	});
-	// A cancelled prompt carries no human decision to act on; any existing entry is left exactly as
-	// it was, matching every other cancel path in this codebase (never a silent enable or disable).
-	const autostart = options.prompter.isCancel(startAtLoginAnswer)
-		? "cancelled"
-		: applyAutostartAnswer(startAtLoginAnswer as boolean, options.autostartOptions);
+		const startAtLoginAnswer = await options.prompter.confirm({
+			message: "Start conmuta automatically when you log in?",
+			initialValue: false,
+		});
+		// A cancelled prompt carries no human decision to act on; any existing entry is left exactly as
+		// it was, matching every other cancel path in this codebase (never a silent enable or disable).
+		const autostart = options.prompter.isCancel(startAtLoginAnswer)
+			? "cancelled"
+			: applyAutostartAnswer(startAtLoginAnswer as boolean, options.autostartOptions);
 
-	await options.runDoctor?.();
+		await options.runDoctor?.();
 
-	return { outcome: "completed", homeDir, registryPath, registryScaffolded, db: ledgerResult.db, autostart };
+		return { outcome: "completed", homeDir, registryPath, registryScaffolded, db: ledgerResult.db, autostart };
+	} catch (err) {
+		// B-108, Judgment Day round 2: this wizard hands its handle back only on the success path, so a
+		// failure after the open — a throwing prompt, an autostart write, an injected doctor run — has to
+		// release it here, because the caller never receives the handle and cannot close it. Leaving it
+		// open keeps the WAL `-shm` mapping alive, which is what makes the home directory undeletable on
+		// Windows; that is the same defect B-108 closed on the callers' side of this call.
+		ledgerResult.db.close();
+		throw err;
+	}
 }

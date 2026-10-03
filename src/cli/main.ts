@@ -89,16 +89,50 @@ function usageError(io: CliIo, reason?: string): number {
  */
 class InstallerDependencyFailure extends Error {}
 
-/** Opens the installer's ledger view once per invocation, or throws {@link InstallerDependencyFailure}. */
-async function openInstallerLedgerOrFail(homeDir: string): Promise<{ readonly db: DatabaseSync; readonly registryPath: string }> {
+/**
+ * Runs `body` with the installer's ledger view, and closes the connection afterwards.
+ *
+ * **B-108.** This is the only place in this file that opens the installer's ledger, because the close
+ * must not be optional: the ledger is WAL (`ledger/open.ts`'s `PRAGMA journal_mode = WAL`), and while a
+ * connection is open its `-shm` mapping keeps the home directory pinned — on Windows a mapped file cannot
+ * be deleted, which is what left exactly one `%TEMP%\conmuta-*` directory behind on every test run that
+ * drove an installer path. The `finally` releases it on a refusal, a cancelled prompt and a thrown error
+ * too, so an embedder that outlives the call is not left holding a connection either. The open sits
+ * OUTSIDE the `try` on purpose: `openInstallerLedger` closes its own handle on the one refusal path, and a
+ * throw before the open means nothing was ever opened.
+ */
+export async function withInstallerLedger<T>(
+	homeDir: string,
+	body: (deps: { readonly db: DatabaseSync; readonly registryPath: string }) => Promise<T>,
+): Promise<T> {
 	const { openInstallerLedger } = await import("../installer/ledger-access.js");
-	const result = openInstallerLedger({ homeDir });
-	if (result.status === "refused") {
+	const opened = openInstallerLedger({ homeDir });
+	if (opened.status === "refused") {
 		throw new InstallerDependencyFailure(
-			`ledger refused (${result.reason}) at ${result.path}: found schema version ${result.foundVersion}`,
+			`ledger refused (${opened.reason}) at ${opened.path}: found schema version ${opened.foundVersion}`,
 		);
 	}
-	return { db: result.db, registryPath: join(homeDir, "registry.json") };
+	try {
+		return await body({ db: opened.db, registryPath: join(homeDir, "registry.json") });
+	} finally {
+		opened.db.close();
+	}
+}
+
+/**
+ * Closes the ledger a completed `setup` handed back, and returns the same outcome.
+ *
+ * `runSetup` cannot close it itself — a chaining caller continues against that handle (see
+ * `test/security/two-install-wrong-room.test.ts`) — so closing it is the caller's obligation, and the CLI,
+ * which only reports and exits, is exactly such a caller. **B-108**: without this, `setup` was the one
+ * installer path that still left its home directory pinned on Windows. Exported so the close has its own
+ * test instead of depending on an end-to-end `setup` run, which would need an interactive prompter.
+ */
+export function closeSetupOutcomeLedger(outcome: SetupOutcome): SetupOutcome {
+	if (outcome.outcome === "completed") {
+		outcome.db.close();
+	}
+	return outcome;
 }
 
 /**
@@ -215,7 +249,7 @@ function reportInstallerOutcome(io: CliIo, outcome: InstallerCliOutcome): number
 	}
 }
 
-function reportSetupOutcome(io: CliIo, result: SetupOutcome): number {
+export function reportSetupOutcome(io: CliIo, result: SetupOutcome): number {
 	if (result.outcome === "ledger-refused") {
 		io.err(`${PRODUCT_NAME}: ledger refused (${result.reason}) at ${result.path}: found schema version ${result.foundVersion}`);
 		return 1;
@@ -440,16 +474,17 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 			const homeDir = resolveHomeDir(explicitHome);
 			const resolvedTargetDir = resolve(targetDir ?? process.cwd());
 			try {
-				const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
-				const { runSyncRosterCommand } = await import("./project-sync-roster.js");
-				const result = await runSyncRosterCommand({
-					db,
-					registryPath,
-					targetDir: resolvedTargetDir,
-					prompter: createPrompter(),
-					io: { out: io.out, err: io.err },
+				return await withInstallerLedger(homeDir, async ({ db, registryPath }) => {
+					const { runSyncRosterCommand } = await import("./project-sync-roster.js");
+					const result = await runSyncRosterCommand({
+						db,
+						registryPath,
+						targetDir: resolvedTargetDir,
+						prompter: createPrompter(),
+						io: { out: io.out, err: io.err },
+					});
+					return result.exitCode;
 				});
-				return result.exitCode;
 			} catch (err) {
 				if (err instanceof InstallerDependencyFailure) {
 					io.err(`${PRODUCT_NAME}: ${err.message}`);
@@ -592,8 +627,9 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 	// `setup | bot add | group add | project bind <path>` dispatch through the installer's own verb
 	// parser (`installer/cli.ts`'s `runInstallerCli`), which this branch hands real, closed-over
 	// dependencies (a real `Prompter`, an opened ledger connection, the registry path). `doctor` is the
-	// fifth verb tasks.md's own PR-13 task text names, but it is deliberately left unwired here:
-	// `src/doctor/main.ts` does not exist yet (Unit 8, a later PR) — see the "Only ..." comment below.
+	// fifth verb tasks.md's own PR-13 task text names, and it is deliberately left unwired here: the
+	// module (`src/doctor/main.ts`) has existed since PR-14 and owns its own disclosure of that deferral,
+	// so this comment states the deferral only — see the "Only ..." comment below.
 	if (command === "setup" || command === "bot" || command === "group" || command === "project") {
 		// Same Judgment Day correction as `mcp`/`migrate-v1`: the gate is this branch's literal first
 		// action, before this dispatcher even looks at `rest` — `installer/cli.ts` does its own verb/argv
@@ -615,24 +651,27 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 			const prompter = createPrompter();
 
 			const deps: InstallerCliDeps = {
-				setup: () => runSetup({ homeDir, prompter }),
-				botAdd: async () => {
-					const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
-					const { runBotAdd } = await import("../installer/wizards/bot-add.js");
-					return runBotAdd({ db, registryPath, homeDir, prompter });
-				},
-				groupAdd: async () => {
-					const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
-					const { groupId, title } = await collectGroupAddInputs(prompter);
-					const { runGroupAdd } = await import("../installer/wizards/group-add.js");
-					return runGroupAdd({ db, registryPath, groupId, title });
-				},
-				projectBind: async (targetDir) => {
-					const { db, registryPath } = await openInstallerLedgerOrFail(homeDir);
-					const inputs = await collectProjectBindInputs(prompter, registryPath);
-					const { runProjectBind } = await import("../installer/wizards/project-bind.js");
-					return runProjectBind({ db, registryPath, targetDir, ...inputs });
-				},
+				setup: async () => closeSetupOutcomeLedger(await runSetup({ homeDir, prompter })),
+				botAdd: () =>
+					withInstallerLedger(homeDir, async ({ db, registryPath }) => {
+						const { runBotAdd } = await import("../installer/wizards/bot-add.js");
+						return runBotAdd({ db, registryPath, homeDir, prompter });
+					}),
+				groupAdd: () =>
+					withInstallerLedger(homeDir, async ({ db, registryPath }) => {
+						const { groupId, title } = await collectGroupAddInputs(prompter);
+						const { runGroupAdd } = await import("../installer/wizards/group-add.js");
+						return runGroupAdd({ db, registryPath, groupId, title });
+					}),
+				projectBind: (targetDir) =>
+					withInstallerLedger(homeDir, async ({ db, registryPath }) => {
+						const inputs = await collectProjectBindInputs(prompter, registryPath);
+						const { runProjectBind } = await import("../installer/wizards/project-bind.js");
+						// The wizard's own operator-facing lines (trust steps, the id-free registration
+						// recommendation) go through the same injected `CliIo` sink as every other line this
+						// command reports, instead of the default `console.log` (JD-B-009).
+						return runProjectBind({ db, registryPath, targetDir, ...inputs, trustStepIo: { write: io.out } });
+					}),
 			};
 
 			try {
@@ -649,8 +688,10 @@ export function runCli(argv: readonly string[], io: CliIo): number | Promise<num
 	}
 
 	// `validate`, `daemon start`/`stop`, `setup`, `bot add`, `group add`, `project bind`, `mcp` and
-	// `migrate-v1` are wired in this CLI slice. `doctor` is deliberately NOT wired: `doctor/main.ts`
-	// does not exist yet (Unit 8, a later PR — see tasks.md's own PR-13 scope note). Any other
+	// `migrate-v1` are wired in this CLI slice. `doctor` is deliberately NOT wired: its module exists
+	// (`src/doctor/main.ts`, PR-14) but its verb dispatch is a disclosed deferral in that module's own
+	// doc (tasks.md PR-13's scope note), so this dispatcher would otherwise have to re-shape its
+	// `{ exitCode }` result. Any other
 	// subcommand is named so a caller that tries one gets a usage error instead of a stub that
 	// pretends to work.
 	if (command !== "validate") {
