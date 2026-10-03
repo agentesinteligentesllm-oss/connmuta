@@ -36,6 +36,46 @@ function cleanupTempHome(dir: string): void {
   }
 }
 
+/**
+ * Waits out a bounded observation window and fails as soon as `read()` moves away from its baseline.
+ *
+ * A negative claim ("this genuinely stopped") cannot be a condition wait with success as its exit —
+ * nothing becomes true. What it must not be either is a single blind `sleep(windowMs)`, the fixed-sleep
+ * pattern B-99 documents replacing: with a bounded, named window that fails fast and reports the value
+ * it actually saw, a leaked poller reports `baseline -> advanced` instead of a bare inequality, and a
+ * regression cannot hide behind a duration nobody reasoned about (B-102b).
+ */
+async function assertStableFor(label: string, read: () => number, windowMs: number): Promise<void> {
+  const baseline = read();
+  const deadline = Date.now() + windowMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, STABILITY_POLL_MS));
+    const observed = read();
+    if (observed !== baseline) {
+      assert.fail(
+        `${label}: expected the counter to stay at ${baseline} for ${windowMs}ms, but it advanced to ` +
+          `${observed} — the work this waits on is still running`,
+      );
+    }
+  }
+}
+
+/** Poll granularity for {@link assertStableFor}; small enough that a live counter is caught in one step. */
+const STABILITY_POLL_MS = 5;
+
+/**
+ * Observation window for {@link assertStableFor}. The fake Telegram client returns immediately, so a
+ * live poller accumulates many `getUpdates()` calls per millisecond; 60ms is a large multiple of that
+ * iteration, so a poller that was not actually stopped cannot slip through the window unseen.
+ */
+const STOPPED_POLLER_OBSERVATION_MS = 60;
+
+/** Directory holding the daemon's own log inside a test home. */
+function readDaemonLog(homeDir: string): string {
+  const logPath = join(homeDir, "run", "daemon.log");
+  return existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+}
+
 test("bootstrap: full boot sequence and clean shutdown", async () => {
   const homeDir = createTempHome();
 
@@ -528,10 +568,8 @@ test("bootstrap: reconciles an active registry binding at boot and again on the 
     await daemon.stop();
 
     // stop() must call reconciler.stopAll(): the poller loop must actually terminate, not merely have its
-    // handle discarded — proven by the call count going quiet after a grace period.
-    const callCountAtStop = getUpdatesCalls;
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    assert.equal(getUpdatesCalls, callCountAtStop, "poller must stop calling getUpdates() once stop() resolves");
+    // handle discarded — proven by the call count staying quiet across a bounded observation window.
+    await assertStableFor("poller must stop calling getUpdates() once stop() resolves", () => getUpdatesCalls, STOPPED_POLLER_OBSERVATION_MS);
   } finally {
     // See the previous test's comment: stop unconditionally so a RED assertion never leaves a dangling
     // listening server (or a still-running poller loop) hanging the test process.
@@ -776,11 +814,15 @@ test("bootstrap: stop() awaits an in-flight heartbeat tick before stopping bindi
     );
 
     const callCountAtStop = getUpdatesCalls;
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await assertStableFor(
+      "the poller a mid-flight tick started must actually be stopped by stop(), not leaked",
+      () => getUpdatesCalls,
+      STOPPED_POLLER_OBSERVATION_MS,
+    );
     assert.equal(
       getUpdatesCalls,
       callCountAtStop,
-      "the poller a mid-flight tick started must actually be stopped by stop(), not leaked",
+      "the observation window itself must not have advanced the counter",
     );
   } finally {
     await daemon?.stop().catch(() => {});
@@ -876,6 +918,100 @@ test("bootstrap: stop() does not hang forever when an in-flight tick stalls (B-9
       readRunFile(daemon.dirs.runDir),
       null,
       "shutdown must complete (run file deleted) even though the stalled tick's factory call never settled",
+    );
+    assert.match(
+      readDaemonLog(homeDir),
+      /stop\(\) gave up waiting \d+ms for an in-flight heartbeat tick/,
+      "stop() must record the tick it gave up on in daemon.log — otherwise an operator debugging a slow " +
+        "shutdown has no trace that the timeout branch was taken at all (B-102g)",
+    );
+  } finally {
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
+test("bootstrap: stop() records no give-up line when the in-flight tick settles inside the bound (B-102g precision)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  const emptyRegistry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [],
+    groups: [],
+    projects: [],
+    bindings: [],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(emptyRegistry));
+
+  let factoriesInFlight = 0;
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 5,
+      // A bound far above the 30ms factory delay, so this tick settles long before the timeout: the
+      // give-up line must be a real timeout, never a hedge that also fires on the ordinary path.
+      stopTickTimeoutMs: 5_000,
+      telegramClientFactory: async (): Promise<TelegramClient> => {
+        factoriesInFlight++;
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          return {
+            getUpdates: async () => ({ ok: true as const, updates: [] }),
+            sendMessage: async () => ({ ok: true as const }),
+          } as unknown as TelegramClient;
+        } finally {
+          factoriesInFlight--;
+        }
+      },
+    });
+
+    const registryWithBinding: Registry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [
+        {
+          bot_id: 444333224,
+          username: "test_bot_settles",
+          token_ref: { store: "keychain", account: "bot:444333224" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [{ group_id: -1004443332223, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [{ project_id: "prj-b98-settles", path: homeDir }],
+      bindings: [
+        {
+          project_id: "prj-b98-settles",
+          bot_id: 444333224,
+          group_id: -1004443332223,
+          agent_id: "@b98-settles-agent",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@b98-settles-agent", user_id: 444333224, username: "test_bot_settles" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithBinding));
+
+    const deadline = Date.now() + 30_000;
+    while (factoriesInFlight === 0) {
+      assert.ok(Date.now() < deadline, "no tick ever started the factory call");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    await daemon.stop();
+
+    assert.doesNotMatch(
+      readDaemonLog(homeDir),
+      /gave up waiting/,
+      "a tick that settles within the bound must never produce a give-up line — the log records a timeout, not a hedge",
     );
   } finally {
     await daemon?.stop().catch(() => {});

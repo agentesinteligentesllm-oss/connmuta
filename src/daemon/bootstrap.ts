@@ -257,7 +257,27 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
         heartbeat.stop();
         if (currentTick) {
           const tickTimeoutMs = options?.stopTickTimeoutMs ?? STOP_TICK_TIMEOUT_MS;
-          await raceAgainstTimeout(currentTick.catch(() => {}), tickTimeoutMs);
+          // `raceAgainstTimeout` is deliberately silent about which side won — its own contract says a
+          // caller that must know whether it timed out checks its own state — so this call observes the
+          // tick's settlement itself. Without the log line below, an operator has no trace at all that
+          // shutdown gave up on a stalled tick, which is exactly the case worth diagnosing (B-102g).
+          let tickSettled = false;
+          const observedTick = currentTick.then(
+            () => {
+              tickSettled = true;
+            },
+            () => {
+              tickSettled = true;
+            },
+          );
+          await raceAgainstTimeout(observedTick, tickTimeoutMs);
+          if (!tickSettled) {
+            writeDaemonLog(
+              dirs.runDir,
+              `stop() gave up waiting ${tickTimeoutMs}ms for an in-flight heartbeat tick; the tick is still ` +
+                `running and any binding work it has left may fail against the ledger this shutdown is closing`,
+            );
+          }
         }
         await reconciler!.stopAll();
         await ipcServer!.close();
