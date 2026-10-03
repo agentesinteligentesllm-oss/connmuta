@@ -39,12 +39,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4, §5) y confirma Arena con una llamada real. Estado al cerrar la
-sesión 68: B-102 cerrado, con (f) corregido tras el rechazo de un juez independiente (tres ventanas: llamada nueva,
-reconcile en vuelo, y señal de aborto al factory del poller). Suite 1885/1879/0/6, test:static 101/101. La auditoría
-de esa sesión es PARCIAL (el runtime de subagentes no ejecutaba herramientas): si esta sesión tiene subagentes sanos,
-primero corre el segundo juez ciego sobre los commits aa7fbd8..5bf647a antes de seguir. Residuales siguientes: B-95,
-B-97, B-99.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4, §5) y confirma Arena con una llamada real. Continúa la sesión 68:
+B-102 cerrado y (f) corregido en `5bf647a`, pero la auditoría es PARCIAL (el runtime de subagentes no ejecutaba
+herramientas). Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y luego toma B-95, B-97, B-99 o B-101.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
@@ -220,6 +217,16 @@ converted here.
 blind review over `aa7fbd8..5bf647a` before starting new work, and record the verdict here and in
 `docs/05-tribunal/INDEX.md`. Until then this candidate has been **self-verified plus one adversarial pass**, and
 that limitation should travel with it.
+
+**Both of session 68's candidates were declined by the consent prompt, and that is the whole record of its RDD
+involvement.** The first (`sha256:6f94b8d9…`, 6 files / 415 lines) and the second (`sha256:5977c01d…`, 10 files /
+1008 lines, which added the corrective commit) each resolved to `consent-declined-this-candidate` with no lineage
+created. A decline is candidate-scoped and is not the kill switch, so neither one blocks delivery or lowers the bar:
+it means no native review exists for this work and the separate verifier above was the only independent pass. **Do
+not re-inspect or re-drive START on either target.** The second decline was deliberately *not* given its own commit:
+the projection is a committed-only base diff from `8ee3ddf`, so any new commit mints a new `target_identity` — and
+with it another prompt for a Director who had already declined twice. This note is folded into a real work commit
+instead, which is where such a record belongs.
 
 ## §6 — Do not redo
 
