@@ -133,4 +133,11 @@ stays confined (`test/security/daemon-bundle.test.ts`).
 | `6118cd8` | `fix(daemon): bound and record the shutdown wait on an in-flight tick (B-102b, B-102g)` — `src/daemon/bootstrap.ts` + `test/daemon/bootstrap.test.ts` ((g), (b)) |
 | `5bf647a` | `fix(daemon): close B-102f in the window it actually names` — the corrective work unit (T6) |
 
+## Audit (Judgment Day `bus-v2-b102-residuals-001`)
+
+- **Round 1 (session 68)**: `jd-judge-b` returned **`REJECT`** with 1 CRITICAL finding (JD-B-001: the latch check at the top of `reconcile()` only covered fresh calls, leaving in-flight reconciles past `STOP_TICK_TIMEOUT_MS` to crash on the closed ledger) and 1 SUGGESTION (JD-B-002: bare 60ms sleep in `bootstrap.test.ts:517`, filed to B-99). `jd-judge-a` was blocked due to subagent tool failure.
+- **Correction**: Commit `5bf647a` closed the in-flight window across three points (in-loop top check, post-`buildTransport` discard, and poller factory `AbortSignal`), pinned by tests in `bindings.test.ts`, `poller.test.ts`, and `bootstrap.test.ts`.
+- **Round 2 (session 69)**: `jd-judge-a` ran over the complete candidate `aa7fbd8^..5bf647a` with a clean suite (1885/1879/0/6, `test:static` 101/101), returning **zero findings**.
+- **Terminal verdict**: **`APPROVED`** (recorded in `docs/05-tribunal/INDEX.md`).
+
 Backlog row `B-102` is marked `done` in `docs/06-backlog/CHECKLIST.md`.
