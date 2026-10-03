@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Per-format, non-destructive merge of one id-only stdio MCP entry into a tool's project-level
+Per-format, non-destructive merge of one id-free stdio MCP entry into a tool's project-level
 config file, opt-in per tool, across the 8 surfaces in the proposal's tool-config matrix
 (OVERVIEW §10.3 plus Pi), including `.mcp.json`'s multi-reader status (D-34).
 
@@ -79,19 +79,23 @@ pre-existing entries, non-MCP keys, comments, key order, and formatting MUST be 
 
 Traces: D-36; D-31 (Alpha condition: fixtures start from a non-empty, realistic file)
 
-### Requirement: Written entries are id-only stdio, zero env, never npx
+### Requirement: Written entries are id-free stdio, zero env, never npx
 
-Every written entry MUST launch `conmuta mcp --project <id>` as an installed-binary stdio command,
-MUST carry zero `env` block, and MUST NOT resolve through `npx` in any form.
+Every written entry MUST launch `conmuta mcp` — carrying **no** `--project <id>` — as an installed-binary
+stdio command, MUST carry zero `env` block, and MUST NOT resolve through `npx` in any form. The binding
+comes from the nearest ancestor `conmuta.json` (ADR-0033); repeating the id inside the entry duplicates
+the project file and outlives it, so a copied or re-bound directory would carry an entry asserting a
+stale id and refuse to start (ADR-0034). An explicit `--project <id>` remains available to a human who
+wants the assertion, but the installer never writes one.
 
-#### Scenario: Written entry has no env and no npx
+#### Scenario: Written entry is id-free, with no env and no npx
 
 - GIVEN a completed merge into any of the 8 surfaces
 - WHEN the written entry is inspected
-- THEN it carries no `env` key and its `command`/equivalent is never `npx` or an `npx`-resolving
-  form
+- THEN it carries no `--project` argument, no `env` key, and its `command`/equivalent is never `npx` or
+  an `npx`-resolving form
 
-Traces: ADR-0031 rule 2; OVERVIEW §10.3
+Traces: ADR-0031 rule 2; ADR-0034; OVERVIEW §10.3
 
 ### Requirement: VS Code's differently-named key is used, not the shared convention
 
@@ -149,6 +153,6 @@ Traces: OVERVIEW §10.3
 | D-32; exploration.md Addendum item 2 | Strict per-format parse, JSONC-tolerant / TOML |
 | D-32; D-31 | Merge is refuse-and-diff on ambiguity |
 | D-36; D-31 | Every merge takes a pre-edit backup and preserves surrounding bytes |
-| ADR-0031 rule 2 | Written entries are id-only stdio, zero env, never npx |
+| ADR-0031 rule 2; ADR-0034 | Written entries are id-free stdio, zero env, never npx |
 | OVERVIEW §10.3 | VS Code key; OpenCode project-only |
 | D-34 | .mcp.json shared-surface handling |
