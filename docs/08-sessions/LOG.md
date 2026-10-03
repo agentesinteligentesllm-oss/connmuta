@@ -4,6 +4,129 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 63 — B-109 and B-108 closed; the open backlog validated before anything was written
+
+- **Date**: 2026-10-02 local time (opened on "continúa con lo que sigue, valida que lo que falta por hacer para no
+  generar segundas o terceras capas de código basura", closed the same day).
+- **Authority**: the Director's standing authorization for the session — *"tienes toda mi autorización para que
+  apliques todo lo que consideres necesario y prudente"*, paired with an explicit *"no quiero que me preguntes
+  nada"*. **Disclosed reading**: unlike session 62, whose "commits, but after the audit" and "push" were two
+  separate words, this single grant was read as covering the work-unit commits **and** the push, which the
+  machine-level `AGENTS.md` already makes the default on this machine. No per-decision confirmation was invented,
+  and none was asked for.
+- **Preflight**: `git fetch`/`status` clean; suite **1856/1850/0/6** and `test:static` **99/99** from a removed
+  `dist/`; `gentle-ai` 3.7.0; RDD `on (decided by global)`; **Arena unreachable** — `pi mcp list` registers no
+  `arena` server and a TCP connect to `127.0.0.1:8765` is refused — which satisfies DN-09's substitute condition
+  directly, so the audit ran under Judgment Day.
+- **The validation pass came first and it changed the plan.** Every open backlog row was re-measured against the
+  tree instead of re-read, and three results changed the work: (1) **B-108's premise was still true but much
+  narrower than its own fix shape** — the 242-directory pile had already been removed in session 60, and a fresh
+  before/after measurement showed exactly ONE new directory per full run, so a sweep of the suite's ~260
+  `mkdtempSync` sites would have been churn; (2) **B-105(b) is no longer a spike** — all four harnesses (`pi`,
+  `claude`, `codex`, `opencode`) are installed on this machine, so verifying the other three harnesses' argv forms
+  is now a measurement; (3) **the documentation was dirtier than the handoff's "two pre-existing broken links"** —
+  a full-tree relative-link sweep found three more live ones.
+- **B-109 closed under [ADR-0034](../03-adr/0034-id-free-installer-entry.md)** (`accepted`; authorized by the
+  session's standing grant, quoted in the ADR, with no separate per-decision confirmation — disclosed there in
+  those words). `buildLauncherEntry()` takes no project and emits `args: [CLI_ENTRY, "mcp"]`: ADR-0033 had already
+  made an explicit `--project <id>` an assertion against the nearest ancestor `conmuta.json`, so the id in the
+  written entry was a second copy of an identity that travels with the directory and goes stale the moment it is
+  copied or re-bound — and the client then refuses to start with `EXIT_PROJECT_MISMATCH`, with the bus silently
+  gone from the host. `project bind` now prints one line recommending the single id-free user-level registration,
+  through the command's own injected `CliIo` sink (a round-1 correction); the strict assertion stays available to
+  a human who passes the flag by hand; the 8-row tool matrix, the refuse-and-diff merge, the pre-edit backup and
+  the `.gitignore` coverage are untouched. The canonical `tool-config-merge` requirement is restated as *"Written
+  entries are id-free stdio, zero env, never npx"* with its scenario extended to assert the absence of the flag.
+  ADR-0006, ADR-0031 and ADR-0033 each gained an **append-only** note (no ADR was rewritten); `CONSTITUTION.md` §3
+  layer 3's descriptive phrase, `OVERVIEW.md` (the D5 row, the Assign-project row, §10.3), `WORK-PLAN.md` F2, the
+  tribunal's D5 row, the ADR indexes and the six-phases-stale `README.md` status were reconciled. **Deliberately
+  still out of scope and disclosed**: the installer keeps writing project-level entries and never writes a
+  user-level config — D-42's matrix is per-project by design.
+- **B-108 closed at its cause, with RED observed before GREEN.** The row's plan ("one pass over every
+  `mkdtempSync`") was replaced by measurement: the suite's one systematic leak was exactly one
+  `%TEMP%\conmuta-cli-sync-roster-*` per run, and the three `main-*` survivors carried mtimes from session 62's
+  *interrupted* runs, not from a clean one. The leak had a real cause: `runCli`'s installer paths opened the
+  ledger and never closed it, so on Windows the open WAL connection's `-shm` mapping kept the whole `--home`
+  directory undeletable while `test/cli/main.test.ts`'s `try { rmSync } catch {}` swallowed the `EPERM`. **RED
+  first**: with the swallow removed and the old code in place, the test failed with `EPERM, Permission denied:
+  …\conmuta-cli-sync-roster-V5meG3` and left TWO directories. **Then the fix**: the open was collapsed into one
+  exported `withInstallerLedger(homeDir, body)` (so no path in that file can open the installer ledger without
+  the close), and the test cleanup is strict now (no swallow, bounded `maxRetries`/`retryDelay`). Round 1 found
+  the fifth path — `setup`, which `runSetup` cannot close itself because a chaining caller continues against the
+  returned handle — and it now closes through `closeSetupOutcomeLedger`. **Measured after the fix**: a full run
+  leaves no new directory, and the 33 accumulated ones were removed. **No sweep of the other `mkdtempSync` sites
+  was justified by the evidence.**
+- **Three live broken links fixed, and a new defect class filed.** The handoff's known-broken list named two; a
+  full-tree sweep found three more: `openspec/specs/project-binding/spec.md:13` and `:75` (the canonical spec
+  inherited the removed F1 delta's `../../../../../docs/...` links verbatim during composition — one directory too
+  deep) and `README.md`'s status paragraph, which pointed at the pre-archive F1 tasks file **and was six phases
+  stale** ("F0 closed; F1 `apply` in progress … 499 tests"), rewritten to describe the real position and to point
+  at the handoff. The same sweep found **38** broken links inside `openspec/changes/archive/**` (F1: 19, F2: 11,
+  F7a: 8), all one missing `../` from the archive move: filed as **B-110** with its root class and the cheap
+  systemic fix (a link check in `test:static` plus a re-rooting step in the archive procedure). The 38 archived
+  ones were left unfixed on purpose, the same call session 62 made for its two.
+- **RDD native review**: `inspect` on the uncommitted workspace candidate, after resolving the intended-untracked
+  selection **in one call** (`untrackedScope: "select"` + `intendedUntracked`), then START resolved to
+  **`declined_this_candidate`** — resolved by the host, `lineage_created: false`, `mutation_performed: false`,
+  `risk_level: high`, 21 files / 379 changed lines, `risk_evidence: ["code that starts other processes in
+  src/cli/main.ts"]`. The **third** session in a row with that shape (59, 62, 63). A decline is candidate-scoped
+  and is not the kill switch, and it never lowers the bar: the RDD-off fallback re-enables the separate verifier.
+- **Judgment Day (`bus-v2-b109-id-free-installer-entry-001`) — round 1, and the round-1 findings are the useful
+  part.** `jd-judge-a` returned **`APPROVE`** with one SUGGESTION (a test title that still said "id-only" after the
+  requirement was renamed). `jd-judge-b` returned **`REJECT`** with **2 CRITICAL, 5 WARNING, 3 SUGGESTION**, and
+  nine of its ten findings were confirmed against the tree before acceptance; the tenth (the handoff still saying
+  B-109/B-108 were open) was true of the freeze it read and was already being fixed. The two CRITICALs are worth
+  recording exactly: **a documentation-integrity one** — ADR-0034 pointed at an audit record that did not exist
+  yet, the identical class session 62's own CRITICAL belonged to, one session earlier — and **a process one** —
+  the manifest handed to the judge listed 21 files while the workspace held 26, because four documentation files
+  were written while the judge swept it, so the candidate it judged was neither complete nor stable. Also real
+  and corrected: the wizard-level guidance was un-pinned (deleting the call left the suite green); ADR-0034's
+  disclosed remedy for a stale entry was contradicted by the refuse-and-diff merge, which aborts a re-bind *after*
+  the registry commit and leaves a partial bind (filed as **B-111**); `setup` was a fifth, unconverted
+  ledger-open path that still pinned its home directory; the close was pinned at one of four call sites; the
+  guidance reached `console.log` instead of the injected `CliIo`; and "an open `ledger.db` keeps its whole
+  directory locked" was imprecise — the ledger is WAL and it is the connection's `-shm` mapping Windows cannot
+  delete. **Non-vacuity was measured by mutation, not asserted**: removing the close fails 4 tests, removing the
+  setup close fails its test, and removing the guidance call fails the new wizard test. Round 2 (scoped
+  re-judgment for `jd-judge-b`; a fresh full blind review for `jd-judge-a`, whose round-1 `APPROVE` could not
+  cover code written after it) and the independent verification are recorded in the tribunal row for this debate.
+- **Delivered**: 1. feat(installer): write id-free launcher entries (B-109, ADR-0034)
+   - src/installer/launcher.ts, src/installer/instructions.ts, src/installer/wizards/project-bind.ts
+   - test/installer/launcher.test.ts, test/installer/instructions.test.ts,
+     test/installer/wizards/project-bind.test.ts, test/installer/tool-config-merge.test.ts,
+     test/installer/tool-targets.test.ts
+
+2. fix(cli): close the installer's ledger on every path (B-108)
+   - src/cli/main.ts, src/installer/wizards/setup.ts
+   - test/cli/main.test.ts, test/installer/wizards/setup.test.ts
+
+3. docs(openspec): restate the written-entry requirement as id-free (B-109, ADR-0034)
+   - openspec/specs/tool-config-merge/spec.md
+
+4. docs(adr): add ADR-0034 and amend ADR-0006, ADR-0031 and ADR-0033 in part (B-109)
+   - docs/03-adr/0034-id-free-installer-entry.md, docs/03-adr/0006-autonomy-boundary.md,
+     docs/03-adr/0031-npm-distribution-and-license.md, docs/03-adr/0033-project-flag-as-assertion.md,
+     docs/03-adr/INDEX.md
+
+5. docs: reconcile every live document that described the written entry (B-109)
+   - docs/01-constitution/CONSTITUTION.md, docs/02-architecture/OVERVIEW.md,
+     docs/07-plan/WORK-PLAN.md, docs/05-tribunal/INDEX.md (D5 row), README.md,
+     odd/tasks/b-107-optional-project-walkup.md, odd/tasks/b-109-id-free-installer-entry.md,
+     odd/tasks/b-108-installer-ledger-release.md
+
+6. docs: repair three live broken links and file B-110 (B-110)
+   - docs/02-architecture/OVERVIEW.md, docs/08-sessions/LOG.md,
+     openspec/specs/project-binding/spec.md, README.md
+
+7. docs(backlog): close B-109 and B-108, file B-110 and B-111
+   - docs/06-backlog/CHECKLIST.md
+
+8. docs(tribunal): record the session-63 Judgment Day (bus-v2-b109-id-free-installer-entry-001)
+   - docs/05-tribunal/INDEX.md
+
+9. docs: close session 63 and rewrite the handoff
+   - docs/08-sessions/HANDOFF.md, docs/08-sessions/LOG.md, docs/00-INDEX.md, AGENTS.md
+
 ## Session 62 — B-107 closed under ADR-0033: `--project` becomes an assertion, and one registration serves a tree
 
 - **Date**: 2026-10-01 local time (opened on "continúa con lo que haga falta, revisa, valida y continúa",
@@ -1886,7 +2009,7 @@
 
 **Pointers**
 
-- [`apply-progress.md`](../../openspec/changes/f1-daemon-registry-thin-client/apply-progress.md) §PR-12 — the
+- [`apply-progress.md`](../../openspec/changes/archive/2026-09-26-f1-daemon-registry-thin-client/apply-progress.md) §PR-12 — the
   budget table, the frozen verification with all six `sha256` values, the 26-row mutant matrix with its four
   reported survivors, the round-1 ledger and its correction batch, both re-judgments, the terminal verdict,
   the native review, and every boundary the modules state.

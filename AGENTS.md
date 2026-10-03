@@ -9,31 +9,24 @@ project (decision D5 of the landing debate, phase F2) is a different document, p
 template. v1's equivalent of that end-user document is `docs/AGENT-GUIDE-using-the-bus.md` in the
 `telegram-agent-bus` repository.
 
-**Status.** F1, F2, F3, F4 and F5 are all archived; F4 (`f4-claude-channels-adapter`) closed in
-session 55 (PR-01 to PR-07, `#95`-`#105`, verified PASS, archived to
-`openspec/changes/archive/2026-09-29-f4-claude-channels-adapter/`); session 56 closed B-98 (daemon
-shutdown-ordering race, `54f7d56`) and B-100(a) (`599e984`); session 57 closed B-100(b) for the
-daemon, client and channel bundles and filed B-103 for two more `computeClosure` consumers sharing
-the same gap; session 58 closed B-103 for both remaining consumers (installer/doctor and
-session-exchange), all five entry points now evidenced and enforced; session 59 landed the **wake
-satellite**: ADR-0032 + CONSTITUTION §3.1 sanction a per-binding, machine-local, human-signed ladder
-(`off`·`notify`·`wake`·`autopilot`) and implement it as a third bin, `conmuta-runner` (`runner/`), which
-consumes the already-shipped body-less doorbell and starts one bounded harness turn; F7 splits into F7a
-(done, **not** blocked on F6) and F7b (referee), and B-105 files what is still owed (the SDD artifact set
-and a real end-to-end run). No SDD change is open; session 60 closed the operational finish (project-scoped
-bus registration, one runner verified, the `$HOME` ghost git repository removed, FRISCO pinned to Engram
-project `frisco`), session 61 closed **B-105(a)** (the F7a SDD artifact set, written against the shipped code
-and archived), and session 62 closed two units — **B-107** under **ADR-0033**: `--project` is an assertion, the
-thin client binds to the nearest ancestor `conmuta.json`, and one id-free user-level registration serves every
-session under a tree; and **B-106**: the thin client now releases its daemon session slot on a real transport
-close. Twelve work-unit commits on `main`, head `b81bf21`, all **pushed**, with **B-109** filed as the installer
-follow-up. See `docs/08-sessions/HANDOFF.md` for the current state and what is owed. This field used to
+**Status.** F1–F5 are archived and no SDD change is open. The daemon, the thin per-project MCP client,
+the installer and `doctor`, the web panel and the wake satellite (`conmuta-runner`) are implemented,
+tested and documented; **F6** awaits three Director decisions (B-11 trademark, B-12 macOS scope, B-16 the
+open-source files) and **F7b** (group referee) follows it. Session 62 closed **B-107** under **ADR-0033**
+(`--project` is an assertion, the client binds to the nearest ancestor `conmuta.json`, one id-free
+user-level registration serves a whole tree) and **B-106** at its source (the thin client releases its
+daemon session slot on a real transport close). Session 63 closed **B-109** under **ADR-0034** (the
+installer writes id-free launcher entries) and **B-108** (the suite's one systematic `%TEMP%` leak, fixed
+at its cause: the installer CLI never closed its ledger), and filed **B-110** (the archive-move
+relative-link artifact). Built under **Organic Driven Development**: explore before writing, track
+substantial work in `odd/tasks/`, test-first with observed RED, one work-unit commit per unit. This field
+used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's
 ~89.7k total) and pushed the harness's combined instruction-file budget over its 150k-char limit;
 it was trimmed here on 2026-09-28 to a pointer, and the exact removed text is preserved verbatim,
 unedited, in
 [`docs/08-sessions/STATUS-ARCHIVE-2026-09-28.md`](./docs/08-sessions/STATUS-ARCHIVE-2026-09-28.md).
-Current state, open traps and next steps live in
+**Keep this field a pointer.** Current state, open traps and next steps live in
 [`docs/08-sessions/HANDOFF.md`](./docs/08-sessions/HANDOFF.md); full per-session history (every PR,
 audit and correction since session 1) lives in
 [`docs/08-sessions/LOG.md`](./docs/08-sessions/LOG.md). The audit-routing rule (DN-09: Arena/Alpha

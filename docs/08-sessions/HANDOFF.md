@@ -4,27 +4,33 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 62** (2026-10-01 local). Sessions 59 and 60's text is preserved below;
-> §0, §1, §3, §4, §5, §6, §7, §8 and §9 carry session 62's state, and the sections marked `DONE, session 60`
-> still hold. §2 is session 59's history.
+> **Last rewritten: end of session 63** (2026-10-02 local). Session 62's and the 2026-10-02 handoff
+> coherence pass's text is preserved in §2 and §4 where it still holds; every § carries session 63's state
+> unless a line says otherwise.
 >
-> **Session 62 in one paragraph — two units, both audited, both pushed, tree clean.** Session 61 had already
-> delivered **B-105(a)** (the F7a SDD artifact set, written and archived; commits `0ea16ef`, `3c57b0d`,
-> `03b85e6`) but left no LOG entry and did not touch this file — session 62 wrote session 61's LOG entry and
-> reconciled what it left stale. Then session 62 closed **B-107** under the new **ADR-0033** (`accepted`):
-> `conmuta mcp --project <id>` is now an **assertion**, not a requirement, and the binding resolves from the
-> nearest ancestor `conmuta.json`, so ONE id-free user-level registration is correct for every session under a
-> tree (two rounds of Judgment Day, seven real findings all corrected, terminal `APPROVED`, independent
-> verification PASS). It then closed **B-106** at its source: the thin client now releases its daemon session
-> slot when its transport closes — after its **first submission was rejected on a correct CRITICAL that only
-> one of the two judges saw** (the release ran at startup, because `server.connect()` resolves when the
-> transport STARTS); the corrected design passed two rounds and an independent verification (both `APPROVED`,
-> §9). **Twelve work-unit commits** on `main` — the last of them `b81bf21`, all **pushed**, with this
-> close-out's own `docs:` commits on top of it; the machine carries one
-> id-free global MCP entry and `FRISCO\.pi\mcp.json` is retired (both backed up). The native RDD review
-> resolved to `declined_this_candidate` for both candidates (host-resolved, no lineage, no mutation).
-> Follow-ups filed: **B-109** (the installer's entry shape) and B-106's remainder. Suite
-> **1856/1850/0/6**, `test:static` **99/99**.
+> **Session 63 in one paragraph — two backlog rows closed, three live links repaired, and a validated open
+> list.** The instruction was open-ended ("continúa con lo que sigue, valida que lo que falta por hacer
+> para no generar segundas o terceras capas de código basura") under a standing authorization for the
+> session, with no question to be put back to the Director. **The validation came first and it changed the
+> plan**: the two units landed are the two whose evidence still stood when re-measured against the tree,
+> and three items the backlog described as real work were re-scoped rather than swept. **B-109** closed
+> under **[ADR-0034](../03-adr/0034-id-free-installer-entry.md)** — the installer no longer writes a
+> project id into the entries it generates (`buildLauncherEntry()` → `args: [CLI_ENTRY, "mcp"]`), because
+> an id in a config that travels with the directory goes stale on a copy or a re-bind and the client then
+> refuses to start with `EXIT_PROJECT_MISMATCH`; `project bind` prints one line recommending the single
+> id-free user-level registration. **B-108** closed at its cause, not by sweeping 260 `mkdtempSync` sites:
+> the measured leak was exactly one `%TEMP%\conmuta-cli-sync-roster-*` per suite run, caused by the
+> installer CLI opening the ledger and never closing it (on Windows the open `ledger.db` locks the whole
+> `--home` directory, and the test's `catch {}` hid the `EPERM`); `src/cli/main.ts` gained
+> `withInstallerLedger`, used at all four installer call sites, and the test cleanup is now strict — RED
+> reproduced first (`EPERM, Permission denied: …conmuta-cli-sync-roster-V5meG3`), GREEN after. A full-tree
+> link sweep found **three live broken links nobody had recorded** (the canonical
+> `openspec/specs/project-binding/spec.md`, twice, and the `README.md` status paragraph, which was also
+> six phases stale); all three are fixed, and the 38-link artifact inside `openspec/changes/archive/**` is
+> filed as **B-110** with its root cause rather than churned. **Suite 1862/1856/0/6**, `test:static`
+> **99/99**. Native RDD resolved to `declined_this_candidate` (host-resolved, no lineage, no mutation),
+> the third session in a row; the audit is the Judgment Day record in §9. Commits and push status: see §1
+> and §8 — read `git log` rather than this line.
 
 ---
 
@@ -33,10 +39,10 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **Session 62 closed two units.** **B-107** under **ADR-0033**: `--project` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, one id-free registration serves a tree, and the machine now carries exactly that (`~/.pi/agent/mcp.json`; `FRISCO\.pi\mcp.json` retired). **B-106**: the thin client now releases its daemon session slot on a real transport close, so the 64-slot ceiling stops leaking one slot per host session; its first submission was correctly rejected (the release ran at startup, not at close) and the corrected design is audited `APPROVED`. Session 61's **B-105(a)** (the F7a SDD artifact set) is also closed and was undocumented until session 62 wrote its LOG entry. |
-| What is next? | **B-109** (the installer still writes the project id into every entry it generates — see §7), then **B-108**, then the cheap backlog residuals; and **B-106's remainder** (occupancy visibility in `status`/`doctor`, a dead-pid sweep). The Director's calls: the **Engram cloud-sync bookkeeping** rows and **F6** once B-11/B-12/B-16 are decided. **B-105(b)** remains open only for the other three harnesses' argv forms. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real tool call). |
-| What is the Director's to decide? | The order of B-106/B-109/B-108 (the Director delegated the choice to Kairo for this session); the Engram cloud-sync bookkeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. Session 62's commits are pushed. |
+| What is new? | **Session 63 closed B-109 and B-108.** B-109: the installer's written entry is **id-free** now (ADR-0034), closing the arc ADR-0033 opened. B-108: the suite's one systematic `%TEMP%` leak is fixed at its cause (the installer CLI's unclosed ledger), with a RED-first pin. Three previously unrecorded live broken links fixed. **B-110** filed for the archive-move link artifact. |
+| What is next? | **B-106's remainder** (occupancy visibility in `status`/`doctor` — a wire-contract change; and a dead-pid sweep) is the substantive next unit. **B-105(b)** is now cheap: all four harnesses (`pi`, `claude`, `codex`, `opencode`) ARE installed on this machine, so the other three argv forms can be verified live. **B-110** is the cheap systemic win (a link check in `test:static`). Residuals: B-95(d) + `fetch.ts`'s unguarded parse, B-102(a)(b)(c)(f)(g). **F6** still blocked on B-11/B-12/B-16. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). |
+| What is the Director's to decide? | The order of B-106's remainder / B-105(b) / B-110; the Engram housekeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. |
 | Where to read next | §0 first; then §3 and §7. §4 is the list of traps. |
 
 ---
@@ -47,64 +53,67 @@
 
 ```text
 Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4) y confirma Arena con una llamada real. Estado al cerrar la
-sesión 62: B-107 cerrado bajo ADR-0033 (`--project` es una aserción; el binding se resuelve por el ancestro
-`conmuta.json` más cercano) y B-106 cerrado en su origen (el cliente delgado libera su slot de sesión al
-cerrarse el transporte). Doce commits por unidad de trabajo en `main`, el último `b81bf21`, empujados, árbol limpio,
-suite 1856/1850/0/6 y `test:static` 99/99: no los rehagas. La siguiente unidad natural es B-109 (el instalador
-sigue escribiendo `--project <id>` en cada entrada que genera, y eso puede reintroducir la trampa del trust
-gate); alternativas: B-106 resto (visibilidad de ocupación en `status`/`doctor` y barrido por pid muerto),
-B-108 (higiene de `%TEMP%`) o B-105(b) (argv de los otros tres harnesses). Respeta §0.4: los commits se
-autorizan por sesión, y el consentimiento de la revisión nativa es del Director, no tuyo.
+sesión 63: B-109 cerrado bajo ADR-0034 (el instalador ya no escribe el id del proyecto en las entradas que
+genera: `buildLauncherEntry()` devuelve `[CLI_ENTRY, "mcp"]`) y B-108 cerrado en su causa (el CLI instalador
+abría el ledger y nunca lo cerraba, y en Windows eso bloqueaba el directorio `--home`: un `%TEMP%\conmuta-*`
+por corrida). Suite 1862/1856/0/6, `test:static` 99/99. La siguiente unidad natural es B-106 resto
+(visibilidad de ocupación en `status`/`doctor` — cambio de contrato de cable — y barrido por pid muerto);
+alternativas: B-105(b) (los argv de `claude`/`codex`/`opencode`, que SÍ están instalados en esta máquina, así
+que ya es verificable), B-110 (un chequeo de links en `test:static` y el re-anclaje de los 38 links dentro de
+`openspec/changes/archive/**`) o los residuales B-95(d)/B-102. Respeta §0.4: los commits se autorizan por
+sesión, y el consentimiento de la revisión nativa es del Director, no tuyo.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
 
 | # | Command | Expected |
 |---|---|---|
-| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence; the last work-unit commit is **`b81bf21`** (twelve past session 61's `03b85e6`) with session 62's close-out `docs:` commits on top, and the LOG's newest entry is session 62. `git log --oneline -13` should name them |
+| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence, and a clean tree. Read `git log --oneline -12` rather than trusting a SHA written here: session 63's work-unit commits sit on top of session 62's close-out, which itself sits on top of `b81bf21` (the last B-106 work-unit commit) and, three further back, `239eb18` (the handoff-coherence pass). **Do not treat the commit base as a fixed number** — take it from `git log` |
 | 2 | `rm -rf dist` | prints nothing |
 | 3 | `ls openspec/changes/` | `archive` only |
-| 4 | `git status --short` | **empty** (the installer's two `*.bak-pre-conmuta-*` files were removed in session 60 — see §4) |
+| 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `3.7.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1856 tests, 1850 pass, 0 fail, 6 skip**; `test:static` **99/99** |
+| 7 | `npm run build && npm test` | exit 0; **1857 tests, 1851 pass, 0 fail, 6 skip**; `test:static` **99/99** |
+| 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Before session 63 it grew by exactly one every run |
 
 ### 0.3 Settle before any work
 
 1. **Autonomy**: confirm the opening prompt re-states it; if it does not, ask one question.
-2. **Memory**: start an Engram session (`mem_session_start`) and pass its id to `mem_save`.
-3. **Arena**: prove reachability with a real `mcp connect arena` / `bridge_send`, never `curl` alone.
-   Sessions 55–62 all found the server itself refusing to connect; if it fails again, that is DN-09's
-   substitute condition satisfied directly, and the audit runs under Judgment Day.
+2. **Memory**: start an Engram session (`mem_session_start`) and pass its id to `mem_save`. This
+   repository's Engram project is **`connmuta`** (§8).
+3. **Arena**: prove reachability with a real tool call, never `curl` alone. Session 63's evidence:
+   `pi mcp list` shows **no `arena` server registered**, and a TCP connect to the documented endpoint
+   (`timeout 5 bash -c '</dev/tcp/127.0.0.1/8765'`) answers **connection refused**. That satisfies DN-09's
+   substitute condition directly, and the audit runs under Judgment Day.
 
 ### 0.4 Standing instructions from the Director
 
-- **RDD consent is asked per candidate; never answer it for the Director.** Session 59: the START of the F7a
-  candidate resolved to `declined_this_candidate` (`risk_level: high`, 43 files / 4553 lines, no lineage
-  created, no mutation) — the Director had said RDD was not needed. **Session 62 hit the same result twice**
-  (B-107's candidate and then the committed `03b85e6..8a64413` range) — resolved by the host, `lineage_created:
-  false`, `mutation_performed: false` each time. A decline is candidate-scoped and is not the kill switch, and
-  it never lowers the bar: the RDD-off fallback re-enables the separate verifier, which is what
-  `gentle-ai-verify` provides. **The consent binding EXPIRES AFTER 10 MINUTES**: ask the Director first, then
-  run `inspect` → START → answer inside one uninterrupted window, or the binding goes stale
-  (`next_action: restart-for-fresh-consent`).
-- **Commits are authorized when the Director says so, per session.** Session 59 was authorized explicitly and
-  the nine work-unit commits were pushed to `main` (`2aa0da0..f00e8fb`). **Session 62 was authorized in two
-  steps** — "commits, but after the audit" and then an explicit "push" — and both were honoured literally: the
-  commits were made only once each audit closed `APPROVED`, and the push happened only after the Director said
-  so. Do not treat one authorization as the other.
+- **RDD consent is asked per candidate; never answer it for the Director.** Session 63's START resolved to
+  **`declined_this_candidate`** — resolved by the host, `lineage_created: false`, `mutation_performed:
+  false`, `risk_level: high`, 21 files / 379 changed lines, `risk_evidence: ["code that starts other
+  processes in src/cli/main.ts"]` — the **third** session in a row (59, 62, 63). A decline is
+  candidate-scoped and is not the kill switch, and it never lowers the bar: the RDD-off fallback re-enables
+  the separate verifier, which is what `gentle-ai-verify` provides. **The consent binding EXPIRES AFTER 10
+  MINUTES**, so `inspect` → START → answer must fit in one uninterrupted window.
+- **Commits and push are authorized per session, and the two are not the same authorization.** Session 62
+  required two separate words ("commits, but after the audit", then "push"). **Session 63's authorization
+  was a single blanket one** — *"tienes toda mi autorización para que apliques todo lo que consideres
+  necesario y prudente"*, with an explicit instruction that no question be put back — and it was read as
+  covering the work-unit commits and the push (the machine-level `AGENTS.md` makes publishing the default).
+  **Disclose this reading in the LOG entry; if a future Director wants the stricter two-step, say so.**
 - **Never accept a partial judgment, and never accept an `APPROVE` as if it were the gate.** Session 62's
-  second unit is the counter-example that justifies both halves: `jd-judge-b` **`REJECT`ed** the first
-  submission on a CRITICAL that was right, while `jd-judge-a` returned `APPROVE_WITH_CHANGES` **and recorded
-  the false premise as CONFIRMED OK**. The parent re-read the pinned SDK before accepting either report. A
-  judge that fails or times out leaves its corner unaudited (retry it, as session 62 retried `jd-judge-b` four
-  times); an `APPROVE` from one judge is one input, not the verdict.
-- **Commit messages carry no `Co-Authored-By` and no AI attribution**; conventional commits only, by work unit.
-- **Never trust a delegated agent's own report at face value.** Session 59's two audit rounds are the
-  counter-example that justifies the discipline: the judges found eleven real defects, but one of them
-  mis-cited `src/shared/constants.ts:86,94` (verified by hand: line 86 is `MAX_LONGPOLL_SECONDS`, line 94 is
-  `FETCH_LONGPOLL_MAX_SECONDS`), so every judge citation is re-read against the file before being accepted.
-- **The `frisco` binding is the next real test** (see §8): project id `frisco`, root `...\ORION OCG\FRISCO`.
+  counter-example stands: `jd-judge-b` `REJECT`ed a submission on a CRITICAL that was right while
+  `jd-judge-a` recorded the false premise as CONFIRMED OK. A judge that fails or times out leaves its
+  corner unaudited (retry it); an `APPROVE` from one judge is one input, not the verdict.
+- **A judge's citations get checked against the file** (session 59 mis-cited `constants.ts:86,94`).
+- **Commit messages carry no `Co-Authored-By` and no AI attribution**; conventional commits only, by work
+  unit.
+- **Never trust a delegated agent's own report at face value.**
+- **The `frisco` binding is live and must not be re-armed** (§3).
+- **Do not enter RDD `inspect` while a candidate is still moving** if you intend the audit to cover it;
+  session 63's audit covered a frozen 21-file set and three documentation files were fixed afterwards,
+  which is disclosed in §9 rather than hidden.
 
 ---
 
@@ -113,226 +122,178 @@ autorizan por sesión, y el consentimiento de la revisión nativa es del Directo
 | Item | State | Pointer |
 |---|---|---|
 | F1–F5 | **Archived**, unchanged since session 55 | `openspec/changes/archive/` |
-| B-98, B-99, B-100(a)(b), B-101, B-103 | Closed (sessions 55–58) | `docs/06-backlog/CHECKLIST.md` |
-| **B-104** | **Done, session 59**: the wake satellite is implemented, tested, audited and pushed | `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md`; `docs/runbooks/wake-satellite.md` |
-| **F7a** | **Implemented** (not blocked on F6); F7b (referee) still follows F6 and `bus-v2-referee-001` | `docs/07-plan/WORK-PLAN.md` |
-| **B-105** | **Open for (b) only.** **(a) IS DONE — session 61** (2026-10-01): the retrospective SDD artifact set was written against the shipped code and archived to `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`, with the four capabilities landed as canonical specs; commits `0ea16ef`, `3c57b0d`, `03b85e6`. **The native reviewer's size ceiling is now measured**: a 214 KB documentation candidate is refused with `lens_context_budget_exceeded` (no lineage), while a 58 KB normative half passes — so a larger documentation candidate must be reviewed in its normative half. What remains of (b) is the `claude`/`codex`/`opencode` argv forms. (c) the Windows `.cmd` gate is documented, with the working remedy (a real shell-free launcher on the runner process's PATH only — commit `86a26dd`); (d) `autopilot`'s profile is prompt + harness policy, not a mechanism; (e) the wake ledger is self-reported | `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` Implementation note; `docs/runbooks/wake-satellite.md` |
-| B-95 remainder, B-102 residuals | Open, low priority, "cheap win at the next touch" | §7 |
-| **B-106** | **RESOLVED AT ITS SOURCE — session 62**: the thin client releases its daemon slot on a real transport close (`IpcSession.release` + `awaitTransportClose`), audited (Judgment Day, 2 rounds, `APPROVED`) — its first submission was REJECTED with a correct CRITICAL (the release ran at startup because `server.connect` resolves when the transport starts) and the corrected design carries a mutant-verified test for exactly that. Two halves remain open and disclosed: occupancy visibility in `status`/`doctor`, and a dead-pid sweep; plus two leak windows (hard kill; a tool call that begins a handshake after the release returned) | `docs/06-backlog/CHECKLIST.md`; `odd/tasks/b-106-client-session-release.md` |
-| **B-107** | **RESOLVED — session 62**, under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `conmuta mcp --project <id>` is an assertion, the binding resolves from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves every session under a tree — including a subfolder session and a headless `pi -p` turn, both of which a project-level entry loses (cwd-relative, and trust-gated so a non-UI run resolves *not trusted*). Audited (Judgment Day, two rounds, terminal `APPROVED`) and independently verified. Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`, `0312ca3` — **on `main` and pushed** | `docs/03-adr/0033-project-flag-as-assertion.md`; `docs/05-tribunal/INDEX.md` (`bus-v2-b107-optional-project-001`); `odd/tasks/b-107-optional-project-walkup.md` |
-| **B-109** | Open, filed in session 62: the installer still writes `--project <id>` into every tool-config entry it generates, and where a host reads both a user-level and a project-level config the project entry **replaces** the global one by server name — so one installer run can silently reintroduce the trust gate ADR-0033 removed. Changing a D-42 wizard artifact needs its own ADR-level decision | `docs/06-backlog/CHECKLIST.md` |
-| **B-108** | Open, filed in session 60: every `npm test` leaves one `%TEMP%\conmuta-*` scratch directory behind (242 had accumulated, 29 MB; the pile was removed) | `docs/06-backlog/CHECKLIST.md` |
-| Next SDD change | None queued; **B-109** is the natural next unit (the installer's entry shape — it needs an ADR-level decision because it changes a D-42 artifact), or **B-106's remainder** (occupancy visibility in `status`/`doctor` + a dead-pid sweep); F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
-| Tests on `main` | `npm test` **1856/1850/0/6**; `test:static` **99/99** | — |
+| B-98, B-99, B-100(a)(b), B-101, B-103, B-104, B-105(a) | Closed (sessions 55–61) | `docs/06-backlog/CHECKLIST.md` |
+| **B-106** | **RESOLVED AT ITS SOURCE — session 62** (the thin client releases its daemon slot on a real transport close). **Remainder open and disclosed**: (a) occupancy visibility in `status`/`doctor` — a wire-contract change over `shared/ipc-contract.ts`'s closed key set, its PTs and two canonical specs; (b) a dead-pid sweep (the `pid` lives on `client_cursors`, a different mechanism); plus two leak windows (a client killed without a graceful exit; a tool call that BEGINS a handshake after the release returned) | `docs/06-backlog/CHECKLIST.md`; `odd/tasks/b-106-client-session-release.md` |
+| **B-107** | **RESOLVED — session 62** under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `--project` is an assertion, the binding comes from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves a whole tree. Audited (Judgment Day, 2 rounds, terminal `APPROVED`), independently verified, pushed | `docs/03-adr/0033-project-flag-as-assertion.md` |
+| **B-108** | **CLOSED — session 63.** Not by sweeping the suite's 260 `mkdtempSync` sites: re-measured, the only systematic leak was **one `%TEMP%\conmuta-cli-sync-roster-*` per full run**, from `test/cli/main.test.ts`'s `project sync-roster` case, whose cause is a real defect — `runCli` opened the installer ledger through `openInstallerLedgerOrFail` and never closed it, so on Windows the open `ledger.db` locked the whole `--home` directory and the test's `try { rmSync } catch {}` swallowed the `EPERM`. Fixed with `withInstallerLedger(homeDir, body)` in `src/cli/main.ts` (**closes in a `finally`**, used at all four installer call sites), and the test cleanup is strict now. **RED observed before GREEN** | `docs/06-backlog/CHECKLIST.md`; `src/cli/main.ts`; `test/cli/main.test.ts` |
+| **B-109** | **CLOSED — session 63** under [ADR-0034](../03-adr/0034-id-free-installer-entry.md) (`accepted`): `buildLauncherEntry()` takes no project and emits `args: [CLI_ENTRY, "mcp"]`; `project bind` prints one line recommending the id-free user-level registration; the canonical `tool-config-merge` requirement is restated as *"Written entries are id-free stdio, zero env, never npx"*; ADR-0031, ADR-0033 and ADR-0006 each gained an append-only note; `CONSTITUTION.md` §3 layer 3, `OVERVIEW.md` (D5, Assign-project, §10.3), `WORK-PLAN.md` F2 and the tribunal's D5 row are reconciled. **Deliberately still out of scope**: the installer keeps writing project-level entries and never writes a user-level config (D-42's matrix) | `docs/03-adr/0034-id-free-installer-entry.md`; `src/installer/launcher.ts`; `openspec/specs/tool-config-merge/spec.md` |
+| **B-110** | **NEW — session 63.** A full-tree relative-link sweep found **38** broken links inside `openspec/changes/archive/**` (F1: 19, F2: 11, F7a: 8) and **3 live ones** nobody had recorded: `openspec/specs/project-binding/spec.md:13` and `:75` (the canonical spec inherited the F1 delta's `../../../../../docs/...` links verbatim during composition, one directory too deep) and `README.md`'s status paragraph pointing at the pre-archive path. **Root class**: `openspec archive` moves a change one level deeper and every link keeps its old `../` count; composition then copies those links into the canonical spec. The three live ones are **fixed**; the 38 archive ones are **left on purpose** (frozen records, mechanical but churny, session 62's own call) with the cheap systemic fix proposed: a link check in `test:static` plus a re-rooting step in the archive procedure | `docs/06-backlog/CHECKLIST.md` (B-110) |
+| **B-111** | **NEW — session 63, from the audit.** `conmuta project bind` can leave a *partially applied* bind: the tool-config loop runs after `conmuta.json` is written and the registry is committed, and `editFile` is refuse-and-diff, so a differing same-named entry throws `FileEditRefusal("conflict")`, uncaught in the wizard and uncaught by the CLI, and the run stops with the project already bound. Pre-existing, not introduced by ADR-0034 — but ADR-0034's change is what makes a stale entry likely enough to hit it. Fix shapes named in the row: dry-validate before the commit, roll back, or surface a resumable partial outcome | `docs/06-backlog/CHECKLIST.md` (B-111) |
+| **B-105** | **(a) done (session 61).** **(b) now cheaply doable**: all four harnesses are installed on this machine — `pi` (`%APPDATA%\npm\pi`), `claude` (`~/.local/bin/claude`, a real binary), `codex` and `opencode` (`%APPDATA%\npm\codex` / `opencode`, both with `.cmd` shims, so B-105(c)'s shell-free-launcher question applies). What remains of (b) is verifying their argv forms live. (c)(d)(e) are documented design consequences, not defects | `docs/06-backlog/CHECKLIST.md`; `docs/runbooks/wake-satellite.md` |
+| **B-95 remainder, B-102 residuals** | Open, low priority, "cheap win at the next touch". B-95: (d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded `JSON.parse` needs its own decision; plus three non-blocking notes (R2-1, R3-1, the silent skip). B-102: (a)(b)(c)(f)(g) — (f) is the one that keeps resurfacing | `docs/06-backlog/CHECKLIST.md` |
+| Next SDD change | None queued. **B-106's remainder**, **B-105(b)** and **B-110** are the three candidates; F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
+| Tests on `main` | `npm test` **1862/1856/0/6**; `test:static` **99/99** | — |
 
 ---
 
-## §2 — What session 59 did (context, not to redo)
+## §2 — What earlier sessions did (context, not to redo)
 
-1. **Governance half**: ADR-0032 + CONSTITUTION §3.1 (three component classes; a local body-less wake is not an
-   emission; the ladder `off`·`notify`·`wake`·`autopilot`, per binding, machine-local, human-signed; bounds; one
-   ledger row per accepted wake), THREAT-MODEL T23–T25 + PT-34–PT-38, F7 split into F7a/F7b, reciprocal in-part
-   supersession notes on ADR-0006/0029, the RFC's three corrections, B-104 decided. Audited
-   (`bus-v2-b104-wake-satellite-001`, `APPROVED`).
-2. **Implementation half**: `runner/{constants,ladder,ledger,prompt,harness,loop,cli,main,watermark}.ts`, eight
-   test files, PT-34 in the security suite, a third `bin`, the operator runbook. **No `src/` file changed.**
-3. **Audit**: `bus-v2-f7a-audit-001`, Judgment Day, two rounds — round 1 eleven real defects (four CRITICAL),
-   all fixed with a regression test each; round 2 **zero findings** from both judges.
-4. **Delivery**: nine work-unit commits + the close-out, pushed to `main`.
+1. **Session 62** closed B-107 under ADR-0033 and B-106 at its source, twelve work-unit commits, both units
+   `APPROVED` under Judgment Day (B-106's first submission was correctly `REJECT`ed: the release ran at
+   startup because `server.connect()` resolves when the transport STARTS).
+2. **Session 61** closed B-105(a) (the F7a SDD artifact set, archived) and measured the native reviewer's
+   candidate-size ceiling (a 214 KB documentation candidate is refused `lens_context_budget_exceeded`; a
+   58 KB normative half passes).
+3. **Sessions 59–60** landed the wake satellite (ADR-0032, `runner/`, PT-34–PT-38, the runbook) and the
+   operational finish (project-scoped registration at the time, the `$HOME` ghost git repository removed,
+   Engram pruned 108 → 85 projects, FRISCO pinned to Engram `frisco`, one runner verified).
+4. **A handoff coherence pass** ran after session 62 (three `docs:` commits, `ce976ad`/`1484b25`/`239eb18`)
+   and fixed 12 stale or ambiguous items, including an **inverted** registration instruction and a source
+   docstring that contradicted the code.
 
 ---
 
 ## §3 — What's next
 
-1. **The `frisco` binding is already armed and running — do not re-arm it.** Level `wake`, harness `pi`, since
-   2026-10-01T01:49:43Z; it auto-starts at logon from the per-user Startup folder and a restart-loop wrapper
-   keeps it alive (`C:\Users\LABORATORIO\conmuta-runner\README.md` documents what is installed and the order in
-   which to stop it). The wake path is **proven live**: a new BROADCAST from `@rodrigo-agent` produced one
-   `wake` row with `outcome: exited` and moved the watermark 24→25. To inspect it, read
-   `~/.conmuta/runner/wake-ledger.jsonl` and that wrapper's `runner.log`; the real switch is
-   `ladder disable`, not killing the process.
-2. **Make the bus registration project-scoped, not global.** Pi reads project servers from
-   `.pi/mcp.json` and user servers from `~/.pi/agent/mcp.json`, and the installer already writes the
-   project file for its `pi` tool target (`src/installer/tool-targets.ts:73`, id-only, merging never
-   overwriting). A **user-level** entry that hardcodes `--project <id>` is global: it makes every Pi session
-   on the machine load a client that refuses in any other project's folder. Fix: register the bus in each
-   project's `.pi/mcp.json`, and leave the user-level file without a project-bound bus entry.
-   **DONE, session 60:** `FRISCO/.pi/mcp.json` carries `conmuta --project frisco`; the global entry is gone
-   (backup `~/.pi/agent/mcp.json.bak-pre-project-scope-20260930-215503`). Verified: `pi mcp list` in FRISCO →
-   `conmuta: connected, 4 tools (codemode, project)`; in an unrelated folder → no `conmuta`. **Caveat, measured
-   with Pi's own code:** a project `.pi/mcp.json` is read only with a saved trust decision
-   (`~/.pi/agent/trust.json`), and a non-UI run (`pi -p`, i.e. the woken turn) resolves *not trusted* without
-   one — the turn would keep its quota cost and lose the bus tools. FRISCO's decision was recorded on the
-   Director's explicit instruction. Sessions whose cwd is a FRISCO subfolder (`frisco-erp`, `frisco-caseta`, …)
-   do **not** inherit the entry: project config is cwd-relative, with no ancestor walk-up. The project file
-   carries the bus only; the Engram project for that root is pinned by `FRISCO\.engram\config.json` instead
-   (see §4), so no global server definition is duplicated per project.
-   **SUPERSEDED, session 62:** the Director authorized the durable fix of **B-107**, and it is the opposite
-   shape — one **id-free** entry at the user level (`conmuta mcp`, no `--project`), because the client now
-   resolves the binding from the nearest ancestor `conmuta.json` (ADR-0033). That closes both halves of the
-   caveat above at once: a subfolder session resolves the enclosing tree, and a headless `pi -p` turn no
-   longer depends on a project-trust decision because the entry it loads is not project-scoped.
-   `FRISCO\.pi\mcp.json` was retired (backup `mcp.json.bak-pre-b107-…`).
-3. **Verify the "N sessions, one runner" property on the machine.** Open a second session in `FRISCO` and
-   confirm the four `conmuta_*` tools appear there; confirm with
-   `Get-CimInstance Win32_Process` that exactly **one** `dist\runner\main.js` serves that binding, and that
-   the ladder is still `wake`. This is the check that turns the Director's requirement ("any number of
-   sessions in one folder, permanently") into evidence rather than an intention.
-   **DONE, session 60:** the four `conmuta_*` tools were confirmed in a FRISCO session and by a real headless
-   turn that read the bus and posted a reply; exactly one `cmd /c run-frisco.cmd` and one
-   `node dist\runner\main.js` serve the binding; the ladder is still `frisco: wake (pi)`. A **duplicate restart
-   loop** was found and removed: the autostart wrapper had been left reading a hot-edited `run-frisco.cmd`, so
-   it only pinged and started no runner, while the live runner hung off a manually started loop that dies at
-   logoff. One loop now, relaunched through `start-frisco.vbs`; the hazard and its symptom are documented in
-   the satellite's README (`C:\Users\LABORATORIO\conmuta-runner\README.md`).
-4. **Arm any other binding the Director names**, one signed `ladder set` per project, never a second runner
-   per binding (§4's session-pool bullet, and the one-runner property measured in §3.3).
-5. **B-105(a) and B-106's leak are BOTH DONE — do not restart them.** (a) was session 61's (the artifacts are
-   archived, §1). B-106's source leak was session 62's: the client releases its slot on a real close signal.
-   What is left of B-106 is its **remainder** — occupancy visibility in `status`/`doctor` and a dead-pid
-   sweep — and it is a fresh unit, not a continuation.
-6. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
+1. **The `frisco` binding is armed and running — do not re-arm it.** Level `wake`, harness `pi`, since
+   2026-10-01T01:49:43Z; it auto-starts at logon from the per-user Startup folder with a restart-loop
+   wrapper (`C:\Users\LABORATORIO\conmuta-runner\README.md` documents what is installed and how to stop
+   it). The wake path is **proven live** (one `wake` row, `outcome: exited`, watermark 24→25, and a later
+   turn that posted a reply). To inspect: `~/.conmuta/runner/wake-ledger.jsonl` and that wrapper's
+   `runner.log`. The real switch is `ladder disable`, not killing the process.
+2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033;
+   `FRISCO\.pi\mcp.json` is retired. Verified: `pi mcp list` here shows
+   `conmuta: connected, 4 tools` running `<repo>\dist\src\cli\main.js mcp` — **with no `--project`**, which
+   is itself session 63's ADR-0034 shape visible in the live machine state. A session in a subfolder or a
+   headless `pi -p` turn resolves the enclosing tree.
+3. **Pick from three units** (the Director may name the order; the previous sessions' pattern is that the
+   parent chooses when the Director delegates):
+   - **B-106's remainder** — the substantive one. (a) is a wire-contract change: the status payload's
+     closed key set in `src/shared/ipc-contract.ts`, its PTs and two canonical specs. (b) the dead-pid
+     sweep is a different mechanism (`pid` on `client_cursors`).
+   - **B-105(b)** — verify `claude`/`codex`/`opencode` argv forms live. **All four are installed**, so this
+     is now a measurement, not a spike; expect the Windows `.cmd` question for `codex`/`opencode` and not
+     for `claude` (`~/.local/bin/claude` is a real binary).
+   - **B-110** — the cheap systemic win: a relative-link check in `test:static` over tracked Markdown (it
+     would have caught all three live links session 63 found by hand) and a re-rooting step in the archive
+     procedure, which then lets the 38 archived links be fixed by machine instead of by hand.
+4. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
+5. **Do not restart B-108 or B-109** — both are closed with evidence (§1).
 
 ---
 
 ## §4 — Facts that will bite you
 
+- **The installer CLI's ledger handle is closed now — do not "simplify" `withInstallerLedger` away.**
+  `openInstallerLedgerOrFail` is called exactly once, inside `withInstallerLedger`, whose `finally` closes
+  the connection. Reverting to bare `openInstallerLedgerOrFail` calls at the four sites brings back
+  `%TEMP%` growth on Windows **and** the red test, because `test/cli/main.test.ts`'s `project sync-roster`
+  cleanup no longer swallows `EPERM`.
+- **`openInstallerLedgerOrFail` throws before the `try`.** `withInstallerLedger` calls it *outside* its own
+  `try`/`finally`, which is correct: nothing was opened, so nothing must be closed. Do not move the open
+  inside the `try` and then `db.close()` in the `finally` — that would need a null guard, and the guard is
+  what the helper exists to avoid.
+- **The written tool-config entry is id-free (ADR-0034).** `buildLauncherEntry()` takes no argument and
+  returns `[CLI_ENTRY, "mcp"]`. `conmuta-channel` and `conmuta-runner` still REQUIRE `--project`
+  (`requireProjectFlag: true`); the thin client does not; a human may still pass `--project` by hand as an
+  assertion against the nearest ancestor `conmuta.json` (ADR-0033).
+- **Two identifiers must not be mixed.** This repository's Engram project is **`connmuta`** (from its own
+  remote); the FRISCO work has Engram **`frisco-erp`** (remote `consultores-orion/frisco-erp`) and bus
+  **`frisco`** (the `FRISCO` parent folder). A session can only write memory into its **own** project.
 - **The daemon keys `client_cursors` by the IPC session id** and seeds a new session at its catch-up window
-  (`SESSION_CATCHUP_HOURS`, `src/ledger/cursors.ts`). Any satellite that only read the daemon's cursor would
-  re-wake that whole window on every restart; `runner/watermark.ts` exists for exactly that reason and must not
-  be "simplified" away.
+  (`SESSION_CATCHUP_HOURS`, `src/ledger/cursors.ts`). Any satellite that only read the daemon's cursor
+  would re-wake that whole window on every restart; `runner/watermark.ts` exists for exactly that reason and
+  must not be "simplified" away.
 - **The doorbell answers immediately (count 0) when the inbox holds rows that are not relevant to this
   binding.** A loop that neither sleeps nor advances its own watermark on that answer spins at full speed.
-- **Argument refusal must match three shapes**: exact, `--flag=value`, and the attached short form. Equality
-  alone let `--command=sh` and `--dangerously-skip-permissions=true` through.
-- **On Windows a harness `.cmd` shim is refused (`unavailable`)**, never shell-wrapped: the shell fallback is
-  the RCE path the design exists to prevent.
-- **`autopilot` is bounded where a bound can be enforced** (one spawn site, closed executable set, literal argv,
-  allow-listed environment, project cwd, bounded turn) **and instructed where it cannot** (no push/merge/tag,
-  no settings writes, no secret reads). The harness's own configuration is the real boundary; the runbook says
-  so in the operator's words.
-- **The wake ledger is self-reported** (ADR-0032 R6a): the daemon cannot corroborate it.
-- **Judge and auditor citations get checked against the file** (§0.4).
-- **The daemon's session pool is bounded, and the thin client now gives its slot back (session 62).**
-  `MAX_ACTIVE_SESSIONS = 64` (`src/shared/constants.ts`), in memory, per boot. Before session 62 nothing in the
-  thin client ever called `DELETE /session` (`src/client/ipc-stub.ts`'s own module doc said so), so every host
-  session that ended left a bearer behind — ~2.5 session-shapes/hour measured, surfacing as a false, permanent
-  `DAEMON_DOWN` once the cap was hit. **Fixed at the source**: `IpcSession.release()` + `awaitTransportClose`.
-  Still open and filed: occupancy visibility in `status`/`doctor`, a dead-pid sweep, a hard-killed client, and a
-  tool call that BEGINS a handshake after the release returned (§7). Restarting the daemon still frees the pool.
-- **The MCP SDK's `connect()` does NOT wait for close, and its stdio transport never reports stdin ending.**
-  Verified in the installed package (session 62, after a judge rejected a change that assumed otherwise):
-  `@modelcontextprotocol/sdk` 1.30.0's `Protocol.connect` ends at `await this._transport.start()`
-  (`dist/esm/shared/protocol.js`) and `StdioServerTransport.start()` only registers `'data'`/`'error'`
-  (`dist/esm/server/stdio.js`) — while `onclose` fires **only** from `transport.close()`. So: (a) anything
-  sequenced after `connect()` runs at STARTUP, not at shutdown; (b) a host closing the stdio pipe produces no
-  close notification, so map `stdin`'s `'end'`/`'close'` yourself; (c) `connect` CHAINS a pre-existing
-  `transport.onclose`, so installing your own handler is supported — but chain the one already there, because
-  the SDK's wrapper performs the protocol's own cleanup. `src/client/main.ts`'s `awaitTransportClose` is the
-  worked example, and its tests are the shape to copy: assert the run stays PENDING while the transport is
-  open, then resolves after `onclose`. **Read the package under `node_modules`, never the comment that asserts
-  a library's semantics** — this trap cost a full rejected review round.
-- **One registration, placed at the USER level, is now the designed shape (ADR-0033) — the older guidance
-  here said the opposite.** A user-level entry (`~/.pi/agent/mcp.json`) is read from every cwd, and since the
-  entry carries no project id the client resolves the binding from the nearest ancestor `conmuta.json`; that
-  is what reaches a subfolder session and a headless `pi -p` turn. A **project-level** entry (`.pi/mcp.json`,
-  which `src/installer/tool-targets.ts:73` writes) is cwd-relative with no ancestor walk-up AND trust-gated
-  (`~/.pi/agent/trust.json`), so a non-UI run resolves *not trusted* and silently loses the bus tools. The
-  machine now carries the user-level entry only (`FRISCO\.pi\mcp.json` retired). **The installer still writes
-  the id-carrying project entry** — filed as B-109, because where a host reads both, the project entry
-  REPLACES the global one by server name and the trust gate comes back.
-- **The review machinery has four traps of its own, all hit in session 62.** (1) `inspect`'s intended-untracked
-  round trip is resolved in ONE call by `inspect` with `untrackedScope: "select"` + `intendedUntracked`
-  (`select-intended-untracked` returned `schema-incompatible`). (2) A committed-range review needs a FULL
-  40/64-character commit id — an abbreviated one is rejected as `base-ref-unresolvable`. (3) The provider's own
-  `managed_assets_outdated` stop requires running its `sync` continuation before STATUS will advance. (4) Two
-  judges must be told NOT to run `npm test`/`build`/`node`: this suite can start a real stdio MCP server
-  inside the test process and hang forever, and concurrent `tsc -b` races on `dist/`. Also: give each judge a
-  per-file sha256 manifest (a "target moved" report is then possible) and give round 2 the fix-delta hashes.
-- **Two pre-existing broken relative links** were found by session 62's independent verification on lines that
-  change does not touch: `docs/02-architecture/OVERVIEW.md:341` and `docs/08-sessions/LOG.md:164`. Recorded
-  here as a known-broken list rather than fixed inside an unrelated candidate.
-- **PT-22's repository scan reads TRACKED files only** (`test/security/repo-scan.test.ts` over `git ls-files`),
-  so a token-shaped literal inside a brand-new file is invisible to it until that file is committed — session
-  59's suite was green at nine commits and turned red on the tenth, when the file carrying the fixture became
-  tracked. Run the full suite **after** `git add`, or keep fixtures' values non-token-shaped from the start.
-- **The RDD reviewer lens routing did not exist until session 60**, and it now lives at
-  `~/.pi/gentle-ai/models.json` (`review-risk`, `review-resilience`, `review-readability`, `review-reliability`
-  → `{"model": "omniroute/agy/gemini-3.8-flash-high", "thinking": "high"}`). Without that file the host relay
-  refuses every lens-requiring candidate (*no model is configured for …*), which is why earlier sessions only
-  ever saw low-tier closures or declines. Do not point a lens at `anthropic/…` on this machine: `pi auth check
-  --provider anthropic` answers `ready` and completions still fail with
-  `403 oauth_not_allowed_for_organization`.
-- **The installer's two `*.bak-pre-conmuta-*` files were removed (session 60)** after checking what each
-  held: `AGENTS.md`'s conmuta block is committed (`git show HEAD:AGENTS.md`), and the `.mcp.json` backup
-  carried nothing the live file lacks (same arena bearer, no extra server). The tree is now clean, so §0.2's
-  row 4 expects **no** `git status --short` output.
-- **`$HOME`'s ghost git repository was removed (session 60).** `C:\Users\LABORATORIO\.git` existed (created
-  2026-09-23), held **0 commits, 0 objects, no refs/index/stash**, and made every folder under `$HOME` that
-  has no repo of its own — including `…\ORION OCG\FRISCO`, the binding root — report `C:/Users/LABORATORIO` as
-  its toplevel, so `git status`/`git add` there operated against a zero-commit home repo. A copy of the only
-  file with information (`engram-project-identity.json`) sits in `.git-ghost-backup-20260930T2245\`. The
-  machine `AGENTS.md` guardrail that caught it is unchanged and still applies.
-- **Engram project attribution changed with it.** Delete-the-ghost-repo made Engram's cwd detection explicit:
-  a folder is `ambiguous` when several repos live inside it, and `FRISCO` (whose real work is in
-  `frisco-erp`) was previously attributed to `laboratorio` through that ghost root. `FRISCO\.engram\config.json`
-  now pins it (`{"project_name":"frisco"}`, detection `source=config`), while descendants keep their own
-  projects (`frisco-erp` via remote, `frisco-caseta` via its own root). `$HOME` and `Downloads` stay explicitly
-  ambiguous; a memory write from there needs `--project`/`ENGRAM_PROJECT`. Same session, `engram projects prune`
-  removed 21 zero-observation projects and `projects consolidate --all` merged the two case duplicates
-  (`Vannar`→`vannar`, `alexa-claudeCode`→`alexa-claudecode`); 108 → 85 projects, no observation lost.
-- **`conmuta.json` is now committed** (it is the D5 project file the installer wrote).
-- **MSYS/Windows shell**, PowerShell default, Bash available; `rm -rf`/`grep` work there only. `npm test`
-  output lines start with `ℹ`; `dist/` staleness fakes results — remove it first. `npm run test:static` prints
+- **Argument refusal must match three shapes**: exact, `--flag=value`, and the attached short form.
+- **On Windows a harness `.cmd` shim is refused (`unavailable`)**, never shell-wrapped: the shell fallback
+  is the RCE path the design exists to prevent. A real shell-free launcher delivered **only to the runner
+  process's PATH** is the working remedy (B-105(c), `docs/runbooks/wake-satellite.md`).
+- **`autopilot` is bounded where a bound can be enforced and instructed where it cannot**; the harness's own
+  configuration is the real boundary. **The wake ledger is self-reported** (ADR-0032 R6a).
+- **The daemon's session pool is bounded at `MAX_ACTIVE_SESSIONS = 64`** (`src/shared/constants.ts`), in
+  memory, per boot. The thin client gives its slot back on a real transport close (B-106, session 62);
+  occupancy is still not visible in `status`/`doctor`, and restarting the daemon frees the pool.
+- **The MCP SDK's `connect()` does NOT wait for close, and its stdio transport never reports stdin
+  ending.** Verified in the installed package: `@modelcontextprotocol/sdk` 1.30.0's `Protocol.connect` ends
+  at `await this._transport.start()`, and `onclose` fires only from `transport.close()`. So anything
+  sequenced after `connect()` runs at STARTUP, a host closing the pipe produces no notification (map
+  `stdin`'s `'end'`/`'close'` yourself), and `connect` CHAINS a pre-existing `transport.onclose` (chain the
+  one already there — the SDK's wrapper does the protocol's own cleanup). `src/client/main.ts`'s
+  `awaitTransportClose` is the worked example. **Read `node_modules`, never the comment that asserts a
+  library's semantics.**
+- **One registration, placed at the USER level, is the designed shape (ADR-0033).** A user-level entry
+  (`~/.pi/agent/mcp.json`) is read from every cwd and, since ADR-0034, carries no project id. A
+  **project-level** entry (`.pi/mcp.json`) is cwd-relative with no ancestor walk-up AND trust-gated
+  (`~/.pi/agent/trust.json`), so a non-UI run resolves *not trusted* and silently loses the bus tools — and
+  it REPLACES a same-named user-level entry wherever it applies.
+- **Relative links inside `openspec/changes/archive/**` are broken by construction (B-110).** `openspec
+  archive` moves the change one level deeper and every link keeps its old `../` count; composition copies
+  those links into the canonical spec too. Verified count at session 63: 38 inside the archive, 3 live. A
+  link check is not part of `test:static` yet, so nothing will tell you.
+- **`README.md` was six phases stale until session 63** ("F0 closed; F1 `apply` in progress … 499 tests").
+  It now states F1–F5 archived and points at this file. Do not let it drift again — it is the front door.
+- **The review machinery's four traps** (all hit in session 62): (1) `inspect`'s intended-untracked round
+  trip is resolved in ONE call by `inspect` with `untrackedScope: "select"` + `intendedUntracked`
+  (`select-intended-untracked` returned `schema-incompatible`); (2) a committed-range review needs a FULL
+  40/64-character commit id; (3) the provider's `managed_assets_outdated` stop requires running its `sync`
+  continuation before STATUS advances; (4) **judges must be told NOT to run `npm test`/`build`/`node`** —
+  this suite can start a real stdio MCP server inside the test process and hang forever, and concurrent
+  `tsc -b` races on `dist/`. Give each judge a per-file sha256 manifest (a "target moved" report is then
+  possible) and give round 2 the fix-delta hashes.
+- **PT-22's repository scan reads TRACKED files only** (`test/security/repo-scan.test.ts` over
+  `git ls-files`), so a token-shaped literal inside a brand-new file is invisible until that file is
+  committed. Run the full suite **after** `git add`.
+- **The RDD reviewer lens routing lives at `~/.pi/gentle-ai/models.json`**; without it the host relay
+  refuses every lens-requiring candidate. Do not point a lens at `anthropic/…` on this machine.
+- **`jd-judge-b` runs on `deepseek/deepseek-flash`** via a `model_profiles` entry in
+  `~/.pi/agent/subagents.json`. If a judge role starts failing, check that file before suspecting the
+  candidate.
+- **MSYS/Windows shell**, PowerShell default, Bash available; `rm -rf`/`grep` work there. `npm test` output
+  lines start with `ℹ`; `dist/` staleness fakes results — remove it first. `npm run test:static` prints
   benign Windows `reg.exe` stderr noise; read the summary.
 
 ---
 
 ## §5 — Next session, exact sequence
 
-- [ ] **1. Verify the tree** (§0.2); the suite must be 1856/1850/0/6 and `test:static` 99/99. Session 62's
-      twelve commits are already on `main` and pushed (`b81bf21` is the last work-unit one, with the close-out
-      docs on top); read `git log` rather than §0.2's
-      baseline before assuming the numbers.
+- [ ] **1. Verify the tree** (§0.2); the suite must be 1862/1856/0/6 and `test:static` 99/99.
 - [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
-- [ ] **3. The default unit is B-109** (the installer's entry still carries `--project <id>`, which can
-      silently reintroduce the trust gate ADR-0033 removed wherever a host reads both a user-level and a
-      project-level config). It changes a D-42 wizard artifact, so it needs its own ADR-level decision and the
-      four SDD preflight questions (Automatic / Both / Auto is the recorded default) before any code.
-- [ ] **4. Alternatives the Director may prefer**: B-106's remainder (occupancy visibility in
-      `status`/`doctor`; a dead-pid sweep), B-108 (test hygiene), or B-105(b) (the
-      `claude`/`codex`/`opencode` argv forms for the wake satellite).
+- [ ] **3. Choose the unit** (§3.3): B-106's remainder, B-105(b) or B-110. If the Director delegated the
+      choice, prefer **B-110 first** — it is small, systemic and unblocks a machine fix for 38 links — then
+      **B-106's remainder**, the substantive one.
+- [ ] **4. If a unit changes behavior**, follow the ODD flow this project enforces: explore, resolve
+      uncertainty, classify, track in `odd/tasks/<feature>.md` **before the first write**, test-first with
+      observed RED, work-unit commits with Conventional messages and **no AI attribution**, then the audit
+      (§0.4) and §6's close-out.
 - [ ] **5. If the live `frisco` binding needs attention**, read its ledger and
-      `C:\Users\LABORATORIO\conmuta-runner\runner.log` together. Treat an `unavailable` outcome as the Windows
-      `.cmd` question (§4) rather than as a code defect, and remember one legitimate result: a `wake` turn that
-      reads, finds nothing addressed to its agent and stays silent is **correct**.
-- [ ] **6. Close the session**: overwrite this file, add the LOG entry at the top, update `AGENTS.md`'s Status
-      pointer, the tribunal index if an audit ran, and the backlog rows touched. The RDD preflight runs per
-      candidate, and the reviewer lens routing now exists at `~/.pi/gentle-ai/models.json` (§4).
+      `C:\Users\LABORATORIO\conmuta-runner\runner.log` together. Treat an `unavailable` outcome as the
+      Windows `.cmd` question (§4), and remember one legitimate result: a `wake` turn that reads, finds
+      nothing addressed to its agent and stays silent is **correct**.
+- [ ] **6. Close the session**: overwrite this file, add the LOG entry at the top, update `AGENTS.md`'s
+      Status pointer, the tribunal index if an audit ran, and the backlog rows touched.
 
 ---
 
 ## §6 — Do not redo
 
-- F1–F5 archives, B-98, B-99, B-100(a)(b), B-101, B-103: closed; do not re-open or re-review.
-- **B-107's and B-106's audit corrections**, each one found by a judge and each one real:
-  - **Never re-sequence the B-106 session release after `server.connect()`.** `connect` resolves when the
-    transport STARTS, so that shape releases at startup against an empty cache and closes nothing — it was
-    rejected once already. Do not drop `awaitTransportClose`'s three sources (the chained `onclose`, the
-    `stdin` end/close mapping, `beforeExit`), do not drop its listener cleanup, and do not make `release()`
-    require a handshake (it awaits one only if one is already in flight).
-  - **Do not relax `--project`'s three malformed spellings** into "no assertion": ADR-0033 decision 4 refuses
-    `--project` with no value, `--project` followed by an empty token, and `--project=`. The empty-token case
-    was the one that silently bound to the wrong tree.
-  - **Do not undo `requireProjectFlag`** on `conmuta-channel`/`conmuta-runner`: it is what keeps their refusal
-    byte-for-byte identical to the pre-amendment behaviour.
-- **F7a's eleven audit corrections**: each one exists because a judge found the defect real. In particular do
-  not re-tighten `isRefusedArgument` to equality, do not drop the post-poll ladder re-read, do not commit the
-  cursor for a turn that did not exit, and do not remove `runner/watermark.ts`.
+- F1–F5 archives, B-98, B-99, B-100(a)(b), B-101, B-103, B-104, B-105(a), B-107, B-108, B-109: closed; do
+  not re-open or re-review.
+- **ADR-0033's and ADR-0034's settled points**: do not re-add `--project` to the installer's written entry;
+  do not re-sequence the B-106 session release after `server.connect()`; do not relax `--project`'s three
+  malformed spellings; do not undo `requireProjectFlag` on `conmuta-channel`/`conmuta-runner`.
+- **B-108's fix**: do not replace `withInstallerLedger` with bare `openInstallerLedgerOrFail` calls, and do
+  not put the `catch {}` back around `test/cli/main.test.ts`'s temp-dir cleanup.
+- **F7a's and B-107's audit corrections**: each exists because a judge found the defect real. Do not
+  re-tighten `isRefusedArgument` to equality, do not drop the post-poll ladder re-read, do not commit the
+  cursor for a turn that did not exit, do not remove `runner/watermark.ts`.
 - **PT-34's allow-lists and the third `bin` wiring** in `package.json`/`tsconfig.json`/
   `test/security/pack.test.ts`/`test/cli/main.test.ts`.
-- The acknowledged RDD lineages listed in §9, and the `declined_this_candidate` STARTs (no lineage was created
-  in any of them; nothing to chase).
+- The acknowledged RDD lineages in §9 and the `declined_this_candidate` STARTs (no lineage was created in
+  any of them; nothing to chase).
+- **The 38 archived relative links (B-110) are deliberately unfixed.** Do not "fix them inline" inside an
+  unrelated candidate; do it with a machine (the link check + the archive re-rooting step).
 
 ---
 
@@ -340,16 +301,14 @@ autorizan por sesión, y el consentimiento de la revisión nativa es del Directo
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-105(b)** | the wake satellite's remaining owed item: the `claude`/`codex`/`opencode` argv forms are unverified on this machine (only `pi` has run live). (a) is done; (c)(d)(e) are documented design consequences, not defects | Director schedules; Kairo verifies |
-| **B-106 remainder** | occupancy visibility in `status`/`doctor` (a wire-contract change: the status payload's closed key set, its PTs and two specs) and a dead-pid sweep of the bearer pool (the `pid` lives on `client_cursors`, so it is a different mechanism). The source leak itself is CLOSED (§1) | Kairo (F1 follow-up) |
-| **B-107** | **RESOLVED in session 62** under ADR-0033; see §1. The machine now carries one id-free user-level entry and `FRISCO\.pi\mcp.json` is retired (both backed up) | done |
-| **B-109** | the installer's launcher entry still encodes `--project <id>`: where a host reads both configs, the project entry replaces the global one by server name and the trust gate comes back. Needs its own ADR-level decision (D-42) | Kairo (F2 follow-up) |
-| **B-108** | one `%TEMP%\conmuta-*` scratch directory per full test run (test hygiene, not correctness) | Kairo |
-| **B-108** | one scratch directory per full test run under `%TEMP%` (test hygiene, not correctness); the accumulated 29 MB were removed, the row stays open until the suite stops adding new ones | Kairo |
-| Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), and three backups to delete once nothing needs reverting | Director |
-| B-95 remainder, B-102 residuals | Carried; cheap wins at the next touch | Kairo |
-| Two pre-existing broken relative links | `docs/02-architecture/OVERVIEW.md:341` and `docs/08-sessions/LOG.md:164` — found by session 62's independent verification, on lines that change does not touch; see §4 | Kairo |
-| The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in session 59 | Director/maintainer |
+| **B-106 remainder** | (a) occupancy visibility in `status`/`doctor` — a wire-contract change over `src/shared/ipc-contract.ts`'s closed key set, its PTs and two canonical specs; (b) a dead-pid sweep of the bearer pool (`pid` lives on `client_cursors`, a different mechanism). Two leak windows stay disclosed: a hard-killed client, and a tool call that begins a handshake after the release returned | Kairo (F1 follow-up) |
+| **B-105(b)** | the other three harnesses' argv forms unverified. **All four are installed** (§1), so this is a measurement now; expect the `.cmd`/shell-free-launcher question for `codex`/`opencode` | Kairo (F7a follow-up) |
+| **B-110** | 38 broken relative links inside `openspec/changes/archive/**`, plus the missing link check. The three live ones are fixed | Kairo (docs hygiene) |
+| **B-111** | `project bind` aborts *after* the registry commit and the `conmuta.json` write when a tool-config merge refuses, leaving a partially applied bind whose re-run can trip the bijective invariants. Found by Judgment Day round 1 of session 63; needs a decision (it touches the bind wizard's ordering guarantee and the `installer-wizard` spec) | Kairo (F2 follow-up) |
+| **B-95 remainder / B-102 residuals** | B-95(d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded parse needs its own decision; three non-blocking notes. B-102 (a)(b)(c)(f)(g); (f) keeps resurfacing | Kairo, "cheap at the next touch" |
+| Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), three backups to delete once nothing needs reverting | Director |
+| The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–63. **Also undispositioned**: session 63's candidate left no lineage (the host declined it), so there is nothing to abandon | Director/maintainer |
+| ADR-0032 | still `proposed` (pending the Director's confirmation and its three sub-questions, board row 21) — the wake satellite has been shipped, running and audited since session 59, so this is a bookkeeping gap, not a functional one | Director |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
 ---
@@ -357,89 +316,88 @@ autorizan por sesión, y el consentimiento de la revisión nativa es del Directo
 ## §8 — Environment facts not to re-measure
 
 - Windows 11, Node v24.16.0, `gentle-ai` **3.7.0**, PowerShell primary with Bash (Git Bash) available.
-- `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`, **pushed** through
-  `b81bf21` (session 62's twelve work-unit commits, plus that session's close-out docs on top of it). `gh`
-  commands run with
-  `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; never `gh auth switch`.
-  Force-push and deletion of `main` are blocked.
-- **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`, session 62).
-  `FRISCO\.pi\mcp.json` is retired; both files were backed up before being changed
-  (`mcp.json.bak-pre-project-scope-20260930-215503`, `mcp.json.bak-pre-b107-…`). If a session in a FRISCO
-  subfolder cannot see the `conmuta_*` tools, that is a regression of this state, not a missing installer
-  write — see §4.
-- **`jd-judge-b` runs on `deepseek/deepseek-flash`** via a `model_profiles` entry added to
-  `~/.pi/agent/subagents.json` (backed up as `subagents.json.bak-pre-jdjudgeb-model-…`). Before it, that role
-  failed three times in a row on `omniroute` — two HTTP `503 chat_admission_busy`, one `bash` call that stalled
-  30 minutes — while `jd-judge-a` survived the same 503s by retrying. If a judge role starts failing again,
-  check this file before suspecting the candidate.
+- `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`. `gh` commands run
+  with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; **never run `gh auth
+  switch`**. Force-push and deletion of `main` are blocked.
+- **Session 63's commits and push status: read `git log` and `git status -sb`** (§0.2 row 1) rather than
+  trusting a SHA written here; the handoff's own earlier version hardcoded one and went stale twice.
+- **The four harnesses ARE installed**: `pi` and `pi.cmd` (`%APPDATA%\npm`), `claude`
+  (`~/.local/bin/claude`), `codex`/`codex.cmd` and `opencode`/`opencode.cmd` (`%APPDATA%\npm`).
+- **The bus is registered once, id-free, at the user level**: `pi mcp list` here shows
+  `conmuta: connected, 4 tools` running `<repo>\dist\src\cli\main.js mcp`. `FRISCO\.pi\mcp.json` is
+  retired. Both files were backed up before being changed
+  (`mcp.json.bak-pre-project-scope-20260930-215503`, `mcp.json.bak-pre-b107-…`).
+- **Arena**: no `arena` MCP server is registered for Pi, and `127.0.0.1:8765` refuses connections
+  (session 63). `.mcp.json` still holds the (gitignored) bridge credential; never commit or quote it.
 - v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, read-only.
 - **The local bus (conmuta) is live on this machine**: daemon home `~/.conmuta/`, two bots
   (`agente_kairo_bot`, `agent_luisgtz_bot`) and two bindings — `telegram-bus-agent` (this repository, group
-  `-5419222443`, roster only `@kairo-agent`) and **`frisco`** (root `...\ORION OCG\FRISCO`, group `-5457758012`,
-  roster `@luisgtz-agent`, `@rodrigo-agent`, `@jomata-agent`, `@luisrey-agent`, `@coordinador-frisco`).
-  A session bound to one project **cannot** address another binding's agents: the bus is per-binding and the
-  roster gates addressing.
+  `-5419222443`, roster only `@kairo-agent`) and **`frisco`** (root `...\ORION OCG\FRISCO`, group
+  `-5457758012`, roster `@luisgtz-agent`, `@rodrigo-agent`, `@jomata-agent`, `@luisrey-agent`,
+  `@coordinador-frisco`). A session bound to one project **cannot** address another binding's agents.
 - The SDD preflight for this project is Automatic / Both (hybrid) / Auto (`stacked-to-main`), asked again
   whenever a *new* SDD change starts.
-- **Two identifiers must not be mixed.** This repository's Engram project is **`connmuta`** (from its own
-  remote), while the FRISCO work has **Engram `frisco-erp`** (remote `consultores-orion/frisco-erp`) and
-  **bus `frisco`** (the `FRISCO` parent folder). A session can only write memory into its **own** project —
-  the provider refuses otherwise — so cross-project knowledge goes in a session of that project, in a
-  `global`-scope note, or by message.
-- **A Pi session-to-session message needs an explicit recipient id** when many sessions are advertised
-  (45 on 2026-10-01), and acceptance is an enqueue, never a read receipt; identity is confirmed only by the
-  peer's own reply.
-- **CodeGraph**: present and usable, `codegraph_explore` directly — do not re-init.
+- **CodeGraph**: present and usable, `codegraph explore` directly — do not re-init.
+- **Engram's own tool surface is 19 tools** (`mem_*`), registered globally; `mem_context` on project
+  `connmuta` is the entry point for a resumed session.
 
 ---
 
 ## §9 — RDD / audit state at session close
 
-Newest first. Every entry below is a closed record; the reasoning for each is in the tribunal index under the
-id it names.
+Newest first. Every entry is a closed record; the reasoning lives in the tribunal index under the id it
+names.
 
-1. **Session 62 — `bus-v2-b106-session-release-001`** (the B-106 session-slot release): Judgment Day over the
-   frozen manifest `sha256:c379c37b…` (8 files, uncommitted), **2 rounds, terminal `APPROVED`**. `jd-judge-b`
-   **`REJECT`ed** the first submission on a CRITICAL that was right, and `jd-judge-a` returned
-   `APPROVE_WITH_CHANGES` **without seeing it** — it recorded the false premise (`connect` resolving on close)
-   as CONFIRMED OK. The parent re-read the pinned SDK before accepting either. Round 2 over the fix delta
-   (`sha256:d7bc7cd3…` plus the residual disclosure): A 3/3 and B 7/7 `verified`, one fix-caused cosmetic
-   defect found (in the B-107 unit) and corrected; no fix-caused defect in this one. Independent verification
-   PASS on ten claims, reproducing the CRITICAL's scenario from the outside. Non-vacuity: removing the
-   `DELETE` fails 2 tests; **restoring the rejected design fails 3**, including the two that had passed with
-   the bug. Commits `241b455`, `869732a`, `8933984`, `b81bf21`.
-2. **Session 62 — `bus-v2-b107-optional-project-001`** (ADR-0033 + the B-107 change): Judgment Day (Arena
-   unreachable — `mcp connect arena` → *nothing is listening*, DN-09's substitute satisfied directly), two
-   blind judges over the frozen manifest `sha256:18fa6423…` (24 files, uncommitted), both
-   `APPROVE_WITH_CHANGES`, **seven findings all real and all corrected** (one CRITICAL, documentation
+1. **Session 63 — `bus-v2-b109-id-free-installer-entry-001`** (ADR-0034 + the B-108 fix + three live link
+   repairs): RDD `inspect` on the uncommitted workspace candidate → START resolved to
+   **`declined_this_candidate`** (host-resolved, `lineage_created: false`, `mutation_performed: false`,
+   `risk_level: high`, 21 files / 379 changed lines, `risk_evidence: ["code that starts other processes in
+   src/cli/main.ts"]`) — the third session in a row. **Judgment Day, two blind judges, round 1** over the
+   frozen manifest `sha256:a348ba75…` (21 files, uncommitted): `jd-judge-a` returned **`APPROVE`** with ONE
+   SUGGESTION; `jd-judge-b` returned **`REJECT`** with **2 CRITICAL, 5 WARNING, 3 SUGGESTION**, and nine of
+   its ten findings were confirmed against the tree before acceptance. The two CRITICALs are the ones to
+   remember: **documentation integrity** — ADR-0034 pointed at a Judgment Day record that did not exist yet,
+   the identical class session 62's own CRITICAL belonged to — and **process integrity** — the manifest the
+   judge was handed listed 21 files while the workspace held 26, because four documentation files were
+   written *while it swept*, so the candidate it judged was neither complete nor stable (all 21 listed
+   hashes still matched; the finding is accepted as an accurate description of a real defect in how the
+   freeze was declared). Also real and corrected: the wizard-level guidance was un-pinned (deleting
+   `printRegistrationGuidance(...)` left the suite green); ADR-0034's disclosed remedy for a stale entry was
+   contradicted by the refuse-and-diff merge, which aborts a re-bind *after* the registry commit and leaves a
+   partially applied bind (**filed as B-111**); `setup` was a fifth, unconverted ledger-open path that still
+   pinned its home directory; the close was pinned at one of four call sites; the guidance reached
+   `console.log` instead of the injected `CliIo`; and "an open `ledger.db` keeps its whole directory locked"
+   was imprecise — the ledger is WAL and it is the connection's `-shm` mapping Windows cannot delete.
+   **Non-vacuity measured by mutation, not asserted**: removing the close fails 4 tests, removing the setup
+   close fails its test, removing the guidance call fails the new wizard test. **Round 2** (scoped
+   re-judgment for `jd-judge-b` over its own frozen rows plus the fix delta; a fresh full blind review for
+   `jd-judge-a`, because its round-1 `APPROVE` could not cover code written after it): Round 2: `jd-judge-a` returned **`APPROVE`** with **zero findings** on a fresh full review of the re-frozen 28-path manifest — and it re-ran the three mutations itself (removing `opened.db.close()`, removing `outcome.db.close()`, removing the wizard's `printRegistrationGuidance(...)` call), confirming each fails the expected test. `jd-judge-b` returned **`APPROVE_WITH_CHANGES`**: **seven of its ten frozen rows `RESOLVED`**, no CRITICAL and no code defect remaining, but `JD-B-004` only **`PARTIAL`** — the corrected remedy still told the operator to re-run the bind, which the wizard refuses with `invariant-violated` R2 before the merge ever runs, so the ADR contradicted its own new B-111 row — plus one **fix-caused** WARNING (the handoff named a stale commit base for the next session) and one **NEW** WARNING (the ADR and the B-109 row claimed "a re-bind of an already-configured directory is a `noop`", which the same R2 refusal forbids). Three new SUGGESTIONs were accepted too: the CLI's `trustStepIo` wiring is unpinned (now stated in the ADR's pinning table as a **known gap** rather than implied); `runSetup` could reject *after* its own open and leave the handle to nobody (fixed, with a new pin in `test/installer/wizards/setup.test.ts`); and a pre-existing comment in `src/cli/main.ts` claimed `src/doctor/main.ts` did not exist when it has since PR-14 (corrected).
+   **Independent verification**: A returned APPROVE with zero findings after re-running the mutations itself; B returned APPROVE_WITH_CHANGES with seven rows RESOLVED, one PARTIAL (JD-B-004: the remedy still recommended a re-bind that R2 refuses), and six further findings all corrected in the round-2 batch **Terminal verdict:** **`APPROVED`** — terminal, with an explicit disclosure: the round-2 correction batch was applied after round 2 and was therefore **not** re-judged (the process allows two rounds), and it includes one 12-line `src/` change (`runSetup` now closes the ledger it opened when its own run fails after the open) pinned by a new test. Everything else in the batch is documentation. No third round was run, and that is stated rather than hidden.
+   The full round-by-round record, including the re-freeze and the round-2 sentence appended after round 2
+   completed, is the tribunal row for this debate.
+
+2. **Session 62 — `bus-v2-b106-session-release-001`** (the B-106 session-slot release): Judgment Day over the
+   frozen manifest (8 files, uncommitted), **2 rounds, terminal `APPROVED`**. `jd-judge-b` **`REJECT`ed** the
+   first submission on a CRITICAL that was right, while `jd-judge-a` returned `APPROVE_WITH_CHANGES` without
+   seeing it (it recorded the false premise that `connect` resolves on close as CONFIRMED OK). The parent
+   re-read the pinned SDK before accepting either. Round 2 over the fix delta: A 3/3 and B 7/7 `verified`.
+   Independent verification PASS on ten claims. Non-vacuity: removing the `DELETE` fails 2 tests;
+   **restoring the rejected design fails 3**. Commits `241b455`, `869732a`, `8933984`, `b81bf21`.
+3. **Session 62 — `bus-v2-b107-optional-project-001`** (ADR-0033 + the B-107 change): Judgment Day (Arena
+   unreachable — DN-09's substitute satisfied directly), two blind judges over a frozen manifest (24 files),
+   both `APPROVE_WITH_CHANGES`, **seven findings all real and all corrected** (one CRITICAL, documentation
    integrity: the ADR asserted an audit that had not happened; one behavioural WARNING: `--project ""` bound
-   silently by walk-up). Round 2 over the fix delta (`sha256:607de61f…`): A 4/4 and B 7/7 `verified`, one
-   fix-caused cosmetic defect corrected. Independent verification (`gentle-ai-verify`) PASS on ten claims,
-   zero contradictions. **Terminal verdict `APPROVED`.** The judge-B role needed four attempts (two provider
-   `503 chat_admission_busy`, one 30-minute `bash` stall; the fourth ran on `deepseek/deepseek-flash` via a new
-   `model_profiles` entry in `~/.pi/agent/subagents.json`, backed up — see §8). **No partial judgment was
-   accepted.** Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`, `0312ca3`, `e764743`.
-3. **RDD native review, session 62 — two candidates, two declines.** `inspect` ran on the uncommitted
-   workspace candidate and then on the committed `base-diff` range `03b85e6..8a64413` (23 files / 809 changed
-   lines, `risk_level: high`, `risk_evidence: ["code that starts other processes in channel/main.ts"]`);
-   START resolved to **`declined_this_candidate`** both times — resolved by the host, not answered here, with
-   `lineage_created: false` and `mutation_performed: false`. One earlier START attempt went stale
-   (`consent-binding-stale`) because the provider's own `sync` continuation had to run first. A decline is
-   candidate-scoped; the separate verifier the RDD-off fallback re-enables is the independent verification in
-   entries 1 and 2. A fresh START is the way to ask for the four lenses.
-4. **Session 59 — `bus-v2-b104-wake-satellite-001`** (governance half): Judgment Day, 2 rounds, `APPROVED`;
-   two CRITICAL findings fixed (the missing tribunal row; a wake-audit row that could not exist outside the
-   core — now R6a's self-reported ledger).
-5. **Session 59 — `bus-v2-f7a-audit-001`** (implementation): Judgment Day, 2 rounds, `APPROVED`; round 1
+   silently by walk-up). Round 2: A 4/4 and B 7/7 `verified`. Independent verification PASS on ten claims.
+   **Terminal verdict `APPROVED`.** Commits `75f0b1a`, `224d763`, `40f7fd9`, `d67b692`, `f8395d4`, `8a64413`,
+   `0312ca3`, `e764743`.
+4. **RDD native review, session 62 — two candidates, two declines** (host-resolved, no lineage, no
+   mutation). Same shape as sessions 59 and 63.
+5. **Session 59 — `bus-v2-b104-wake-satellite-001`** (governance half): Judgment Day, 2 rounds, `APPROVED`;
+   two CRITICAL findings fixed.
+6. **Session 59 — `bus-v2-f7a-audit-001`** (implementation): Judgment Day, 2 rounds, `APPROVED`; round 1
    eleven defects, all fixed with tests, round 2 zero findings.
-6. **Session 59 — RDD native review of the F7a candidate**: `inspect` ran, the intended-untracked selection was
-   submitted, and START resolved to `declined_this_candidate` (`risk_level: high`, 43 files / 4553 lines,
-   `lineage_created: false`, `mutation_performed: false`). Nothing to acknowledge or chase.
-7. **Session 60 — RDD native review of that session's 40-line HANDOFF close-out**: `inspect` → `start` closed
-   it at the start (`risk_tier: low`, `lenses_required: false`, `selected_lenses: []`,
-   `risk_reasons: [non_executable_only]`, 1 file / 40 changed lines, correction budget 20) → `status` offered
-   `approved_acknowledgement_required` → `acknowledge-approved` burned authority
-   (`gentle-ai.review-acknowledged/v1`, lineage `review-73e0e357217ed1c5`). No lens ran and no consent envelope
-   was raised; the durable trail is the receipt under `.git/gentle-ai/`, not a source commit. The candidate
-   grew again after that burn, so what was delivered there was a fresh candidate whose closure is recorded in
-   its own commit message.
+7. **Session 60 — RDD native review of that session's 40-line HANDOFF close-out**: `inspect` → START closed it
+   at the start (`risk_tier: low`, `lenses_required: false`, 1 file / 40 changed lines) → `status` offered
+   `approved_acknowledgement_required` → `acknowledge-approved` burned authority (lineage
+   `review-73e0e357217ed1c5`). The candidate grew again after that burn, so what was delivered there is a
+   fresh candidate whose closure is recorded in its own commit message.
