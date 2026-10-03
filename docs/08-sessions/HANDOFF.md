@@ -4,20 +4,9 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 68** (2026-10-03 local). Every § carries session 68's state unless a line says otherwise.
+> **Last rewritten: end of session 69** (2026-10-03 local). Every § carries session 69's state unless a line says otherwise.
 >
-> **Session 68 in one paragraph — B-102 closed, and its finding (f) corrected after an independent judge rejected the
-> first fix. suite 1885/1879/0/6, test:static 101/101, zero temp leaks.** B-102 carried five open residuals of B-98's
-> shutdown work. (f) — re-confirmed CRITICAL by independent review passes in sessions 56 and 57 — is that a reconcile
-> **already in flight** when `STOP_TICK_TIMEOUT_MS` expires keeps working against the ledger `stop()` has closed. The
-> session's first attempt fixed the wrong window (a fresh reconcile after `stopAll()`, which no production caller can
-> produce); the independent judge caught it and supplied the verification, and the defect was reproduced end to end:
-> `heartbeat tick failed: database is not open`. `5bf647a` closes it with three checks over three windows — the fresh
-> call, the in-flight loop (before and after `buildTransport`), and an `AbortController` signal handed to the poller
-> factory so an already-entered factory yields a poller that touches no ledger. (g) `stop()` records the tick it gave
-> up on; (a) the untested update-existing-binding branch is pinned; (c) the latch's terminal contract is stated;
-> (b) two fixed-sleep stability assertions became a bounded observation window.
-> **The audit of this candidate is PARTIAL — §5 is the most important section to read.**
+> **Session 69 in one paragraph — B-102 dual audit completed (APPROVED) and B-99 closed completely. suite 1885/1879/0/6, test:static 101/101, zero temp leaks.** Session 68's partial audit of B-102 was completed by running `jd-judge-a` over `aa7fbd8^..5bf647a`, returning 0 findings and closing `bus-v2-b102-residuals-001` APPROVED. B-99 was then closed completely under ODD (`odd/tasks/b-99-timer-tests.md`): the remaining fixed sleeps in `heartbeat.test.ts` became `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517`'s bare `setTimeout(60)` (JD-B-002) was replaced by a positive observation of live ticks executing via `readLockFile(lockPath)?.heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; and boot/hot-reload waits became condition polls with deadlines.
 
 ---
 
@@ -26,11 +15,11 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **Session 68 closed B-102** (a, b, c, f, g), after an independent judge rejected the first attempt at (f); the corrected fix is `5bf647a`. Row B-102 marked `done`. |
-| What is next? | Residuals: **B-95 remainder**, **B-97** (POSIX symlinked-bin entry guard), **B-99** (now four members: three timer-based tests plus `bootstrap.test.ts:517`), **B-101**'s relocation question. **F6** still blocked on B-11/B-12/B-16. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Plus **subagent health** (§0.2 row 9): session 68's runtime could not execute tools, so most of its work was self-verified. |
-| What is the Director's to decide? | The Engram housekeeping classification; **B-11/B-12/B-16** for F6; and whether to complete the **partial** audit of session 68's candidate (§5). |
-| Where to read next | §0 first; then §3, §4 and **§5** (the audit limitation). |
+| What is new? | **B-102 dual audit complete & APPROVED** (`bus-v2-b102-residuals-001`); **B-99 CLOSED COMPLETELY** (all timer tests converted to condition waits, bounded observation and live tick checks). Row B-99 marked `done`. |
+| What is next? | Residuals: **B-95 remainder**, **B-97** (POSIX symlinked-bin entry guard), **B-101**'s relocation question. **F6** still blocked on B-11/B-12/B-16. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health was verified working in session 69. |
+| What is the Director's to decide? | The Engram housekeeping classification; **B-11/B-12/B-16** for F6. |
+| Where to read next | §0 first; then §1, §3, and §4. |
 
 ---
 
@@ -39,9 +28,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4, §5) y confirma Arena con una llamada real. Continúa la sesión 68:
-B-102 cerrado y (f) corregido en `5bf647a`, pero la auditoría es PARCIAL (el runtime de subagentes no ejecutaba
-herramientas). Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y luego toma B-95, B-97, B-99 o B-101.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. B-102 y B-99 están cerrados y
+auditados (1885 pruebas, test:static 101/101). Continúa con B-95 remainder (política de fila corrupta en fetch.ts),
+B-97 (guard symlink POSIX en cli/main.ts) o la reubicación de B-101.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
@@ -97,9 +86,9 @@ herramientas). Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y l
 | **B-109** | **CLOSED — session 63** under [ADR-0034](../03-adr/0034-id-free-installer-entry.md) | `docs/03-adr/0034-id-free-installer-entry.md` |
 | **B-110** | **CLOSED — session 64** (relative Markdown link gate in `test:static`) | `test/security/markdown-links.test.ts` |
 | **B-111** | **CLOSED COMPLETELY — session 67** under [ADR-0035](../03-adr/0035-pre-validate-tool-configs-in-project-bind.md) | `docs/03-adr/0035-pre-validate-tool-configs-in-project-bind.md` |
-| **B-102** | **CLOSED — session 68** (residuals a, b, c, f, g; d and e were closed in sessions 56/57). Three checks over three windows: a reconcile that begins after `stopAll()` returns unchanged; an in-flight reconcile re-checks the latch at the top of each remaining binding and again after `buildTransport` resolves, so the poller factory is never reached; and the factory receives an abort signal `stopAll()` aborts, so a poller created after the latch flipped touches no ledger. Plus: the update-existing-binding branch pinned, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability proofs replaced. The first attempt at (f) was **rejected by an independent judge** and corrected in `5bf647a` — see §5 | `odd/tasks/b-102-residuals.md`; `docs/06-backlog/CHECKLIST.md` |
+| **B-102** | **CLOSED & AUDITED — sessions 68–69** (residuals a, b, c, f, g; d and e were closed in sessions 56/57). Three checks over three windows: a reconcile that begins after `stopAll()` returns unchanged; an in-flight reconcile re-checks the latch at the top of each remaining binding and again after `buildTransport` resolves, so the poller factory is never reached; and the factory receives an abort signal `stopAll()` aborts, so a poller created after the latch flipped touches no ledger. Plus: the update-existing-binding branch pinned, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability proofs replaced. The first attempt at (f) was rejected by `jd-judge-b` in session 68 and corrected in `5bf647a`; `jd-judge-a` completed in session 69 with zero findings, closing Judgment Day audit `bus-v2-b102-residuals-001` with terminal verdict **`APPROVED`** | `odd/tasks/b-102-residuals.md`; `docs/06-backlog/CHECKLIST.md`; `docs/05-tribunal/INDEX.md` |
 | **B-95 remainder** | Open, low priority, "cheap win at the next touch": (d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded parse needs its own decision; three non-blocking review notes | `docs/06-backlog/CHECKLIST.md` |
-| **B-99** | Open, and now **four** members: the three timer-based tests plus `test/daemon/bootstrap.test.ts:517`, added by session 68's review (JD-B-002) | `docs/06-backlog/CHECKLIST.md` |
+| **B-99** | **CLOSED COMPLETELY — sessions 55 & 69** (commit `dd464a7` converted the three original tests to `waitForCondition`; session 69 closed the remaining fixed sleeps in `heartbeat.test.ts` and converted `bootstrap.test.ts:517` to positively observe live ticks with stable audit rows, plus converting boot/add waits to condition waits) | `odd/tasks/b-99-timer-tests.md`; `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
 | Tests on `main` | `npm test` **1885/1879/0/6**; `test:static` **101/101** | — |
 
@@ -107,12 +96,13 @@ herramientas). Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y l
 
 ## §2 — What earlier sessions did (context, not to redo)
 
-1. **Session 68** closed B-102: three shutdown-latch checks over three windows, the update-existing-binding guard branch pinned by test and mutation, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability assertions replaced by `assertStableFor`. Its first attempt at (f) was rejected by an independent judge and corrected in `5bf647a`.
-2. **Session 67** closed B-111 completely: `checkFileEdit` pre-flight validation in `project bind` before any write, `tool-config-refused` reported cleanly, ADR-0035 authored.
-3. **Session 66** closed B-105 completely: argv forms of all four harnesses verified live with `shell: false`.
-4. **Session 65** closed B-106 remainder: dead-PID sweep in `routes.ts`, session occupancy in `status` and `doctor`.
-5. **Session 64** closed B-110: relative Markdown link gate in `test:static`, 38 archive links repaired.
-6. **Sessions 62–63** closed B-107 (ADR-0033), B-106's source, B-109 (ADR-0034) and B-108.
+1. **Session 69** completed the missing second blind review for B-102 (`jd-judge-a` returned 0 findings, closing `bus-v2-b102-residuals-001` APPROVED); and closed **B-99 completely** under ODD (fixed sleeps in `heartbeat.test.ts` converted to `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517` converted to positively observe live ticks via `daemon.lock`'s `heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; boot and hot-reload waits converted to condition polls).
+2. **Session 68** closed B-102: three shutdown-latch checks over three windows, the update-existing-binding guard branch pinned by test and mutation, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability assertions replaced by `assertStableFor`. Its first attempt at (f) was rejected by an independent judge and corrected in `5bf647a`.
+3. **Session 67** closed B-111 completely: `checkFileEdit` pre-flight validation in `project bind` before any write, `tool-config-refused` reported cleanly, ADR-0035 authored.
+4. **Session 66** closed B-105 completely: argv forms of all four harnesses verified live with `shell: false`.
+5. **Session 65** closed B-106 remainder: dead-PID sweep in `routes.ts`, session occupancy in `status` and `doctor`.
+6. **Session 64** closed B-110: relative Markdown link gate in `test:static`, 38 archive links repaired.
+7. **Sessions 62–63** closed B-107 (ADR-0033), B-106's source, B-109 (ADR-0034) and B-108.
 
 ---
 
@@ -120,17 +110,12 @@ herramientas). Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y l
 
 1. **The `frisco` binding is armed and running — do not re-arm it.**
 2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
-3. **If this session's subagents can use tools (§0.2 row 9), run the missing second blind review over
-   `aa7fbd8..5bf647a` first** (§5) — session 68 got one judge, not the two a Judgment Day needs.
-4. **Pick from the remaining units**:
+3. **Pick from the remaining units**:
    - **B-95 remainder** (the `fetch.ts` corrupt-row decision is the substantive one; the rest are notes),
    - **B-97** (POSIX symlinked-bin entry guard; needs Linux/macOS, so it also touches B-12's scope),
-   - **B-99** (now four members: three timer-based tests plus `test/daemon/bootstrap.test.ts:517`, whose honest
-     fix needs a positive observation of live ticks inside the window — `assertStableFor` in the same file is the
-     reusable starting point),
    - **B-101**'s remaining question (where the Judgment Day operating detail should live).
-5. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
-6. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111 or B-102** — all are closed with evidence (§1).
+4. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
+5. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111, B-102 or B-99** — all are closed with evidence (§1).
 
 ---
 
@@ -152,71 +137,18 @@ herramientas). Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y l
 
 ---
 
-## §5 — Audit state for session 68's candidate (PARTIAL; read before trusting it)
+## §5 — Audit state for session 68's candidate (COMPLETED in session 69; APPROVED)
 
-**The RDD provider outcome**: `inspect` offered `review.start` for target `sha256:6f94b8d9…` (6 files / 415
-changed lines, risk `medium`); START resolved to **`consent-declined-this-candidate`** — `lineage_created:
-false`, `mutation_performed: false`, `correction_budget: 0`. The host resolved the consent prompt; the decline is
-candidate-scoped and is not the kill switch, so the RDD-off plan applied (writer self-verifies, separate verifier
-runs). START was **not** re-driven against the same, already-disposed candidate: repeating it would ask the
-Director to re-answer a question they had already answered.
+**Judgment Day dual review (`bus-v2-b102-residuals-001`) is now COMPLETE.** In session 68, the audit was partial because runtime subagent tool execution failed for `jd-judge-a`. In session 69, subagent tool execution was verified healthy and `jd-judge-a` completed a full read-only sweep over the candidate `aa7fbd8^..5bf647a`.
 
-**Independent verification by subagent was mostly unavailable, and the reason matters.** The runtime could not
-execute *tools* for most of the session: text-only tasks of the same agents succeeded, while every tool-using task
-failed. The failures, in order:
-
-| Attempt | Agent | Outcome |
-|---|---|---|
-| 1 | `gentle-ai-verify` | failed — `assistant reported an error` (task included reproducing the full suite) |
-| 2 | `gentle-ai-verify` | failed, same outcome (task excluded the suite) |
-| 3 | `gentle-ai-verify` | failed, same outcome (task reduced to reading one file, three questions) |
-| 4 | `jd-judge-a` | failed, same outcome |
-| 5 | `gentle-ai-explore` | failed, same outcome (read one file, report its line count) |
-| 6 | `gentle-ai-verify` | succeeded — a text-only task, no tools |
-| 7 | `jd-judge-b` | **succeeded** — a read-only review that did use tools |
-
-So the Judgment Day fallback (DN-09's substitute for an unreachable Arena) ran **partially**: one judge, not the
-two a Judgment Day needs. **That one judge found a CRITICAL this session had missed**, which is the most useful
-result of the whole session and the reason this section is honest rather than reassuring.
-
-### JD-B-001 — CRITICAL, accepted and corrected (`5bf647a`)
-
-The first fix for (f) put the `stopping` check at the top of `reconcile()` only. That covers a reconcile that
-*begins* after `stopAll()`, which no production caller can produce. The window (f) actually names is a reconcile
-**already in flight** when `STOP_TICK_TIMEOUT_MS` expires — past that check — which still reached
-`buildTransport` and then `createPoller`, whose first statement prepares a statement against the ledger `stop()`
-had closed. The judge also supplied the exact verification, which reproduced the real symptom end to end:
-`heartbeat tick failed: database is not open` in `daemon.log`. The correction adds the in-flight loop checks and
-the abort signal described in §4; all three windows are now pinned, and mutation-measured (removing the
-post-`buildTransport` check fails the in-flight test; removing it *and* the abort fails the end-to-end test).
-
-**Why the self-verification missed it, which is a reusable lesson**: it asked *whether any caller reconciles after
-`stopAll()`* and correctly answered no. That answer was true, and it was also the proof that the check could not
-be the fix — the check's own reachability was never the point. Verifying a fix's premise is not verifying that
-the fix addresses the finding.
-
-### JD-B-002 — SUGGESTION, accepted and filed to B-99
-
-`test/daemon/bootstrap.test.ts:517` still proves a negative ("an unchanged registry must not re-fire
-BINDING_CHANGED on every tick") with a bare 60 ms sleep — the same B-99 family this session removed two
-members of. It is outside the stop path, and its honest fix needs a *positive* observation of live ticks inside
-the window (the neighbouring `getUpdatesCalls` counter provides one), so it was filed to row B-99 rather than
-converted here.
-
-### What is NOT established
-
-- **No second judge.** `jd-judge-a` never ran, so correctness was reviewed by one independent reader, not two.
-- **The end-to-end test's path is the injected-factory path.** It exercises `startPoller`'s aborted-signal
-  behaviour through the real `createPoller` wiring in `bootstrap.ts`, but the Telegram client is a fake. The
-  guarantee rests on `startPoller`'s `while (!signal.aborted)` loop head, which is real code with its own
-  direct test (`test/daemon/poller.test.ts`, the aborted-signal pin).
-- **The final numbers were measured by the session's own tooling**, not by the judge: `npm test` 1885/1879/0/6,
-  `test:static` 101/101, zero `%TEMP%\conmuta-*` growth.
-
-**What the next session should do**: if its subagents can use tools (§0.2 row 9), run the missing second
-blind review over `aa7fbd8..5bf647a` before starting new work, and record the verdict here and in
-`docs/05-tribunal/INDEX.md`. Until then this candidate has been **self-verified plus one adversarial pass**, and
-that limitation should travel with it.
+- **Judge B (`jd-judge-b`, session 68)**:
+  - **JD-B-001 — CRITICAL, accepted and corrected (`5bf647a`)**: Caught that the fresh-call latch check alone failed to cover an in-flight reconcile when `STOP_TICK_TIMEOUT_MS` expires, which still reproduced `heartbeat tick failed: database is not open`. Corrected in `5bf647a` with the 3-window design (top-of-loop break, post-`buildTransport` discard, and `AbortSignal` handed to the poller factory).
+  - **JD-B-002 — SUGGESTION, accepted and filed to B-99**: `test/daemon/bootstrap.test.ts:517` bare 60ms sleep.
+- **Judge A (`jd-judge-a`, session 69)**:
+  - Swept `aa7fbd8^..5bf647a` (all 7 files: `src/daemon/{bindings,bootstrap}.ts`, `test/daemon/{bindings,bootstrap,poller}.test.ts`, `odd/tasks/b-102-residuals.md`, `docs/06-backlog/CHECKLIST.md`).
+  - Executed tests independently: `npm test` 1885 tests (1879 pass, 0 fail, 6 skip), `npm run test:static` 101/101.
+  - Returned **zero findings** (`findings: []`).
+- **Terminal verdict**: **`APPROVED`** (recorded in `docs/05-tribunal/INDEX.md`).
 
 **Both of session 68's candidates were declined by the consent prompt, and that is the whole record of its RDD
 involvement.** The first (`sha256:6f94b8d9…`, 6 files / 415 lines) and the second (`sha256:5977c01d…`, 10 files /

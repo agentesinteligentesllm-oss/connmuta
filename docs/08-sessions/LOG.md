@@ -4,6 +4,19 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 69 — B-102 dual audit completed (APPROVED) and B-99 closed completely
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's instruction — *"Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4, §5) y confirma Arena con una llamada real. Continúa la sesión 68: B-102 cerrado y (f) corregido en `5bf647a`, pero la auditoría es PARCIAL ... Corre primero el segundo juez ciego sobre `aa7fbd8..5bf647a`, y luego toma B-95, B-97, B-99 o B-101."*
+- **Preflight**: `git fetch`/`status` clean at `63557aa`; baseline suite **1885/1879/0/6** and `test:static` **101/101** from a removed `dist/`; `gentle-ai` 4.0.0; RDD `on (decided by global)`; **Arena unreachable** — TCP probe to `127.0.0.1:8765` answered `Connection refused` (exit 1), satisfying DN-09's substitute condition. Subagent tool execution verified healthy via `gentle-ai-explore` reading `package.json` (42 lines). Engram session started (`session-69`, project `connmuta`).
+- **B-102 Judgment Day audit completed (`bus-v2-b102-residuals-001`)**: `jd-judge-a` executed a full read-only sweep over the range `aa7fbd8^..5bf647a` (all 7 files, reproducing `npm test` 1885/1879/0/6 and `test:static` 101/101), returning **zero findings** (`findings: []`). Combined with session 68's `jd-judge-b` (which caught JD-B-001 and verified JD-B-002), the dual blind review is complete with terminal verdict **`APPROVED`**. Recorded in `docs/05-tribunal/INDEX.md`, `odd/tasks/b-102-residuals.md` and `HANDOFF.md`. Documentation review acknowledged natively (`review-14124c5181326e2a`, authority burned).
+- **B-99 closed completely under ODD (`odd/tasks/b-99-timer-tests.md`)**:
+  1. Converted remaining fixed-sleep tests in `test/daemon/lifecycle/heartbeat.test.ts` (`stops cleanly on .stop()`, `updates heartbeat on lock`, `handles error in onTick`) to `waitForCondition` and `assertStableFor`.
+  2. Converted `test/daemon/bootstrap.test.ts:517` (JD-B-002) from a bare `setTimeout(60)` (which proved a negative vacuously under CPU contention) to **positive observation of live ticks**: actively verifies that `readLockFile(lockPath)?.heartbeat_at` advances across >= 2 ticks and `getUpdatesCalls` advances, while continuously asserting that `BINDING_CHANGED` audit rows remain exactly 1.
+  3. Converted boot poller start wait (:504) and hot-reload add wait (:557) in `bootstrap.test.ts` to condition polls with 5000ms deadline.
+  4. Backlog row `B-99` marked `done` in `docs/06-backlog/CHECKLIST.md`.
+- **Verification**: `npm test` **1885 / 1879 / 0 / 6**, `test:static` **101 / 101**, `%TEMP%\conmuta-*` count unchanged (0 → 0).
+
 ## Session 68 — B-102 residuals closed, and (f) corrected after an independent judge rejected the first fix
 
 - **Date**: 2026-10-03 local time.

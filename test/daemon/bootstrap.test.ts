@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getLastSessionSeenAt, startDaemon } from "../../src/daemon/bootstrap.js";
-import { LockHeldError, readLockFile } from "../../src/daemon/lifecycle/lock.js";
+import { LockHeldError, readLockFile, resolveLockPath } from "../../src/daemon/lifecycle/lock.js";
 import { readRunFile } from "../../src/daemon/lifecycle/run-file.js";
 import { readPanelRunFile } from "../../src/daemon/panel/panel-run-file.js";
 import { computeDoctorProof } from "../../src/daemon/ipc/doctor.js";
@@ -501,7 +501,10 @@ test("bootstrap: reconciles an active registry binding at boot and again on the 
     // Reconciled at boot: BindingsReconciler.reconcile() writes one BINDING_CHANGED audit row per
     // newly-active binding, and the poller's first getUpdates() call proves the poller actually started
     // (not merely constructed).
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    const bootDeadline = Date.now() + 5000;
+    while (getUpdatesCalls === 0 && Date.now() < bootDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     const bootCallCount = getUpdatesCalls;
     assert.ok(bootCallCount > 0, "poller must have started and called getUpdates() at least once by boot");
 
@@ -514,11 +517,30 @@ test("bootstrap: reconciles an active registry binding at boot and again on the 
     // Reconciled again on the heartbeat tick: an unchanged registry reconciles to a no-op (matches
     // BindingsReconciler's own "does nothing when active bindings are unchanged" contract), so the audit
     // row count must stay at 1 rather than grow on every tick.
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    const auditRowsAfterTicks = daemon.ledger.db
-      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
-      .all() as Record<string, unknown>[];
-    assert.equal(auditRowsAfterTicks.length, 1, "an unchanged registry must not re-fire BINDING_CHANGED on every tick");
+    //
+    // A bare setTimeout(60) tests a negative vacuously under CPU contention: if no ticks execute inside
+    // the window, the count stays at 1 without proving anything (JD-B-002, B-99). The honest assertion
+    // requires a POSITIVE observation of live ticks executing: we verify that the lock file's
+    // heartbeat_at advances across at least 2 ticks and getUpdatesCalls advances, while asserting
+    // that the BINDING_CHANGED audit rows remain exactly 1.
+    const lockPath = resolveLockPath(daemon.dirs.homeDir);
+    let ticksObserved = 0;
+    let lastHeartbeat = readLockFile(lockPath)?.heartbeat_at;
+    const tickDeadline = Date.now() + 5000;
+    while (ticksObserved < 2 && Date.now() < tickDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const currentHeartbeat = readLockFile(lockPath)?.heartbeat_at;
+      if (currentHeartbeat !== undefined && currentHeartbeat !== lastHeartbeat) {
+        ticksObserved++;
+        lastHeartbeat = currentHeartbeat;
+      }
+      const auditRowsNow = daemon.ledger.db
+        .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
+        .all() as Record<string, unknown>[];
+      assert.equal(auditRowsNow.length, 1, "an unchanged registry must not re-fire BINDING_CHANGED on every tick");
+    }
+    assert.ok(ticksObserved >= 2, `expected at least 2 heartbeat ticks to execute, observed ${ticksObserved}`);
+    assert.ok(getUpdatesCalls > bootCallCount, "poller must continue polling while heartbeat ticks execute");
 
     // Real hot-reload (D-12): a mutant that disables tick-driven reconciliation entirely would still
     // pass every assertion above (an unchanged registry stays a no-op either way), so this is the one
@@ -554,10 +576,15 @@ test("bootstrap: reconciles an active registry binding at boot and again on the 
     };
     writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithSecondBinding));
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    const auditRowsAfterAdd = daemon.ledger.db
-      .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
-      .all() as Record<string, unknown>[];
+    const addDeadline = Date.now() + 5000;
+    let auditRowsAfterAdd: Record<string, unknown>[] = [];
+    while (Date.now() < addDeadline) {
+      auditRowsAfterAdd = daemon.ledger.db
+        .prepare("SELECT * FROM audit_log WHERE reason = 'BINDING_CHANGED'")
+        .all() as Record<string, unknown>[];
+      if (auditRowsAfterAdd.length === 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     assert.equal(
       auditRowsAfterAdd.length,
       2,

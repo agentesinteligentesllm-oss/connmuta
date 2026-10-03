@@ -20,6 +20,28 @@ async function waitForCondition(
   return false;
 }
 
+/**
+ * Asserts that a numeric metric does not change over a bounded observation window (B-99, B-102b).
+ */
+async function assertStableFor(
+  label: string,
+  read: () => number,
+  windowMs = 40,
+  intervalMs = 5,
+): Promise<void> {
+  const baseline = read();
+  const deadline = Date.now() + windowMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    const observed = read();
+    if (observed !== baseline) {
+      assert.fail(
+        `${label}: expected counter to stay at ${baseline} for ${windowMs}ms, but it advanced to ${observed}`,
+      );
+    }
+  }
+}
+
 test("heartbeat: ticks at periodMs", async () => {
   let tickCount = 0;
   const handle = startHeartbeat({
@@ -59,11 +81,12 @@ test("heartbeat: stops cleanly on .stop()", async () => {
     },
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 35));
+  const reachedTick = await waitForCondition(() => tickCount >= 1);
+  assert.ok(reachedTick, `expected at least 1 tick before stop within the deadline, got ${tickCount}`);
   handle.stop();
   const countAfterStop = tickCount;
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await assertStableFor("no more ticks should occur after stop()", () => tickCount, 40);
   assert.equal(tickCount, countAfterStop, "no more ticks should occur after stop()");
 });
 
@@ -81,10 +104,11 @@ test("heartbeat: updates heartbeat on lock if lock update function provided", as
     },
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  const reachedTicks = await waitForCondition(() => tickCount >= 2);
   handle.stop();
 
-  assert.ok(lockUpdateCount >= 1, `expected lock update, got ${lockUpdateCount}`);
+  assert.ok(reachedTicks, `expected at least 2 ticks within the deadline, got ${tickCount}`);
+  assert.ok(lockUpdateCount >= 2, `expected lock update on every tick, got ${lockUpdateCount}`);
   assert.equal(lockUpdateCount, tickCount, "lock update should be called on every tick");
 });
 
@@ -102,10 +126,10 @@ test("heartbeat: handles error in onTick via onError callback", async () => {
     },
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 35));
+  const receivedError = await waitForCondition(() => errors.length >= 1);
   handle.stop();
 
-  assert.ok(errors.length >= 1, "expected onError to be invoked");
+  assert.ok(receivedError, "expected onError to be invoked within the deadline");
   assert.equal(errors[0], expectedError);
 });
 
