@@ -42,7 +42,7 @@ import type { EventEmitter } from "node:events";
 import type { z } from "zod";
 
 import { DOORBELL_SCAN_DEPTH } from "../../shared/constants.js";
-import { ENVELOPE_TYPES, THREAD_PATTERN } from "../../shared/envelope.js";
+import { AGENT_ID_PATTERN, ENVELOPE_TYPES, THREAD_PATTERN } from "../../shared/envelope.js";
 import type { doorbellRequestSchema, doorbellResponseSchema } from "../../shared/ipc-contract.js";
 import type { ProjectRosterEntry } from "../../shared/project-file.js";
 import { reverseRosterLookup } from "../admission.js";
@@ -115,7 +115,7 @@ function parseScannedEnvelope(envelopeJson: string): ScannedEnvelope | null {
 	if (!isEnvelopeType(type) || typeof thread !== "string" || !THREAD_PATTERN.test(thread)) {
 		return null;
 	}
-	if (to !== undefined && to !== null && typeof to !== "string") {
+	if (to !== undefined && to !== null && (typeof to !== "string" || !AGENT_ID_PATTERN.test(to))) {
 		return null;
 	}
 	return { type, to: to ?? null, thread };

@@ -325,6 +325,8 @@ const UNREADABLE_ENVELOPES: ReadonlyArray<readonly [name: string, envelopeJson: 
 	["a thread violating THREAD_PATTERN", JSON.stringify({ type: "REQUEST", to: AGENT_ID, thread: "NOT-A-THREAD" })],
 	["a non-string thread", JSON.stringify({ type: "REQUEST", to: AGENT_ID, thread: 2 })],
 	["a non-string to", JSON.stringify({ type: "REQUEST", to: 2, thread: hexId(2) })],
+	["an empty string to", JSON.stringify({ type: "REQUEST", to: "", thread: hexId(2) })],
+	["an invalid to agent id pattern", JSON.stringify({ type: "REQUEST", to: "not-an-agent-id", thread: hexId(2) })],
 ];
 
 for (const [name, envelopeJson] of UNREADABLE_ENVELOPES) {

@@ -107,6 +107,7 @@ import {
 	MAX_SURFACED_THREADS,
 } from "../../shared/constants.js";
 import { wrapUntrusted, type FenceOrigin } from "../../shared/fence.js";
+import { AGENT_ID_PATTERN, ENVELOPE_TYPES, THREAD_PATTERN } from "../../shared/envelope.js";
 import type { ProjectRosterEntry } from "../../shared/project-file.js";
 import type { RejectionReason } from "../../shared/protocol-apply.js";
 import {
@@ -235,14 +236,51 @@ interface UpdateRow {
 
 /** The envelope fields this module reads out of `updates.envelope_json` (the body key is absent, D-20). */
 interface StoredEnvelopeShape {
-	readonly type: string;
+	readonly type: (typeof ENVELOPE_TYPES)[number];
 	readonly to: string | null;
 	readonly thread: string;
 	readonly basis?: string;
 }
 
-function parseStoredEnvelope(envelopeJson: string): StoredEnvelopeShape {
-	return JSON.parse(envelopeJson) as StoredEnvelopeShape;
+const isEnvelopeType = (value: unknown): value is (typeof ENVELOPE_TYPES)[number] =>
+	typeof value === "string" && (ENVELOPE_TYPES as readonly string[]).includes(value);
+
+/**
+ * Safely parses the stored envelope from `updates.envelope_json`.
+ *
+ * Returns `null` when the JSON is malformed or the resulting object violates the envelope structure
+ * (corrupt row in SQLite updates). The caller skips rows that return `null` while still advancing
+ * its cursor past them, so database corruption cannot crash `serveFetch` or stall the client (B-95).
+ */
+function parseStoredEnvelope(envelopeJson: string): StoredEnvelopeShape | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(envelopeJson);
+	} catch {
+		return null;
+	}
+	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+		return null;
+	}
+	const { type, to, thread, basis } = parsed as Record<string, unknown>;
+	if (!isEnvelopeType(type)) {
+		return null;
+	}
+	if (typeof thread !== "string" || thread.trim().length === 0) {
+		return null;
+	}
+	if (to !== undefined && to !== null && (typeof to !== "string" || to.trim().length === 0)) {
+		return null;
+	}
+	if (basis !== undefined && (typeof basis !== "string" || basis.length === 0)) {
+		return null;
+	}
+	return {
+		type,
+		to: to ?? null,
+		thread,
+		...(basis !== undefined ? { basis } : {}),
+	};
 }
 
 function readUpdateRows(db: DatabaseSync, projectId: string, afterSeq: number, limit: number): UpdateRow[] {
@@ -493,6 +531,12 @@ export async function serveFetch(input: FetchToolInput, deps: ServeFetchDeps): P
 
 	for (const row of rows) {
 		const envelope = parseStoredEnvelope(row.envelope_json);
+		if (envelope === null) {
+			// A row whose stored envelope is malformed or unparseable violates the storage invariant
+			// (admission.ts validates before write). Just as with null body (D-20) below, the corrupt row
+			// is skipped rather than failing the entire fetch query and stalling the client cursor (B-95).
+			continue;
+		}
 
 		if (row.apply_outcome === "rejected") {
 			const reason = readRejectionReason(db, binding.project_id, row.eid);

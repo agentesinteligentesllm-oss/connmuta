@@ -71,8 +71,8 @@ const ALLOWED_SPECIFIERS: readonly RegExp[] = [
 ];
 const FORBIDDEN_SPECIFIER = /client\/(?:main|run-state|spawn|handshake|ipc-stub)|daemon\//;
 /**
- * Floor for the import scan, below the module's real import count (11 when this was written) so dropping an
- * import does not break the test, yet above what a scan whose pattern stopped matching would still find.
+ * Floor for the import scan, bounded safely below the module's real import count so dropping an
+ * import does not break the test, yet safely above zero so a scan whose pattern stopped matching still fails (B-95 R2-1).
  */
 const MIN_SCANNED_SPECIFIERS = 8;
 

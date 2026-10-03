@@ -4,9 +4,9 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 69** (2026-10-03 local). Every § carries session 69's state unless a line says otherwise.
+> **Last rewritten: end of session 70** (2026-10-03 local). Every § carries session 70's state unless a line says otherwise.
 >
-> **Session 69 in one paragraph — B-102 dual audit completed (APPROVED) and B-99 closed completely. suite 1885/1879/0/6, test:static 101/101, zero temp leaks.** Session 68's partial audit of B-102 was completed by running `jd-judge-a` over `aa7fbd8^..5bf647a`, returning 0 findings and closing `bus-v2-b102-residuals-001` APPROVED. B-99 was then closed completely under ODD (`odd/tasks/b-99-timer-tests.md`): the remaining fixed sleeps in `heartbeat.test.ts` became `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517`'s bare `setTimeout(60)` (JD-B-002) was replaced by a positive observation of live ticks executing via `readLockFile(lockPath)?.heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; and boot/hot-reload waits became condition polls with deadlines.
+> **Session 70 in one paragraph — B-95 remainder closed completely under ODD; B-102 and B-99 commits landed. Suite 1901/1895/0/6, test:static 101/101, zero temp leaks.** B-95 remainder was closed at its source under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe corrupt-row handling in `src/daemon/serve/fetch.ts:244-246` (`parseStoredEnvelope` defensively validates object structure, envelope types, non-empty threads, and `to`/`basis`, returning `null` on corruption and skipping the row without throwing, while `lastRowSeq` still advances the client cursor past damaged rows), pinned by 14 test cases in `test/daemon/serve/fetch.test.ts` (observed RED before GREEN, non-vacuity proven by mutation); review note R3-1 addressed in `src/daemon/serve/doorbell.ts` (non-null `to` tightened with `AGENT_ID_PATTERN`); review note R2-1 addressed in `test/channel/main.test.ts` (drift-prone count comment removed). Backlog row B-95 marked `done`.
 
 ---
 
@@ -15,9 +15,9 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **B-102 dual audit complete & APPROVED** (`bus-v2-b102-residuals-001`); **B-99 CLOSED COMPLETELY** (all timer tests converted to condition waits, bounded observation and live tick checks). Row B-99 marked `done`. |
-| What is next? | Residuals: **B-95 remainder**, **B-97** (POSIX symlinked-bin entry guard), **B-101**'s relocation question. **F6** still blocked on B-11/B-12/B-16. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health was verified working in session 69. |
+| What is new? | **B-95 remainder CLOSED COMPLETELY** (safe corrupt-row policy in `fetch.ts`, cursor advances, R3-1/R2-1 review notes resolved); **B-102 and B-99 commits landed** on `main`. Rows B-95, B-99, B-102 marked `done`. |
+| What is next? | Residuals: **B-97** (POSIX symlinked-bin entry guard, needs Linux/macOS / B-12), **B-101**'s relocation question. **F6** still blocked on B-11/B-12/B-16. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health was verified working in sessions 69 and 70. |
 | What is the Director's to decide? | The Engram housekeeping classification; **B-11/B-12/B-16** for F6. |
 | Where to read next | §0 first; then §1, §3, and §4. |
 
@@ -28,9 +28,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. B-102 y B-99 están cerrados y
-auditados (1885 pruebas, test:static 101/101). Continúa con B-95 remainder (política de fila corrupta en fetch.ts),
-B-97 (guard symlink POSIX en cli/main.ts) o la reubicación de B-101.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. B-95, B-99 y B-102 están cerrados y
+auditados (1901 pruebas, test:static 101/101). Evalúa B-97 (guard symlink POSIX en cli/main.ts, adyacente a B-12)
+o la reubicación de B-101.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
@@ -43,9 +43,9 @@ B-97 (guard symlink POSIX en cli/main.ts) o la reubicación de B-101.
 | 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1885 tests, 1879 pass, 0 fail, 6 skip**; `test:static` **101/101** |
+| 7 | `npm run build && npm test` | exit 0; **1901 tests, 1895 pass, 0 fail, 6 skip**; `test:static` **101/101** |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
-| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Session 68 could not: every tool-using subagent task failed while a text-only one succeeded. See §5 |
+| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70. See §5 |
 
 ### 0.3 Settle before any work
 
@@ -87,22 +87,23 @@ B-97 (guard symlink POSIX en cli/main.ts) o la reubicación de B-101.
 | **B-110** | **CLOSED — session 64** (relative Markdown link gate in `test:static`) | `test/security/markdown-links.test.ts` |
 | **B-111** | **CLOSED COMPLETELY — session 67** under [ADR-0035](../03-adr/0035-pre-validate-tool-configs-in-project-bind.md) | `docs/03-adr/0035-pre-validate-tool-configs-in-project-bind.md` |
 | **B-102** | **CLOSED & AUDITED — sessions 68–69** (residuals a, b, c, f, g; d and e were closed in sessions 56/57). Three checks over three windows: a reconcile that begins after `stopAll()` returns unchanged; an in-flight reconcile re-checks the latch at the top of each remaining binding and again after `buildTransport` resolves, so the poller factory is never reached; and the factory receives an abort signal `stopAll()` aborts, so a poller created after the latch flipped touches no ledger. Plus: the update-existing-binding branch pinned, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability proofs replaced. The first attempt at (f) was rejected by `jd-judge-b` in session 68 and corrected in `5bf647a`; `jd-judge-a` completed in session 69 with zero findings, closing Judgment Day audit `bus-v2-b102-residuals-001` with terminal verdict **`APPROVED`** | `odd/tasks/b-102-residuals.md`; `docs/06-backlog/CHECKLIST.md`; `docs/05-tribunal/INDEX.md` |
-| **B-95 remainder** | Open, low priority, "cheap win at the next touch": (d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded parse needs its own decision; three non-blocking review notes | `docs/06-backlog/CHECKLIST.md` |
+| **B-95 remainder** | **CLOSED COMPLETELY — session 70** under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`). Safe corrupt-row policy in `src/daemon/serve/fetch.ts:244-246` (skips corrupt/unparseable rows without failing, cursor advances past them); review notes R3-1 (doorbell.ts to check) and R2-1 (comment drift) resolved. | `src/daemon/serve/fetch.ts`; `docs/06-backlog/CHECKLIST.md` |
 | **B-99** | **CLOSED COMPLETELY — sessions 55 & 69** (commit `dd464a7` converted the three original tests to `waitForCondition`; session 69 closed the remaining fixed sleeps in `heartbeat.test.ts` and converted `bootstrap.test.ts:517` to positively observe live ticks with stable audit rows, plus converting boot/add waits to condition waits) | `odd/tasks/b-99-timer-tests.md`; `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
-| Tests on `main` | `npm test` **1885/1879/0/6**; `test:static` **101/101** | — |
+| Tests on `main` | `npm test` **1901/1895/0/6**; `test:static` **101/101** | — |
 
 ---
 
 ## §2 — What earlier sessions did (context, not to redo)
 
-1. **Session 69** completed the missing second blind review for B-102 (`jd-judge-a` returned 0 findings, closing `bus-v2-b102-residuals-001` APPROVED); and closed **B-99 completely** under ODD (fixed sleeps in `heartbeat.test.ts` converted to `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517` converted to positively observe live ticks via `daemon.lock`'s `heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; boot and hot-reload waits converted to condition polls).
-2. **Session 68** closed B-102: three shutdown-latch checks over three windows, the update-existing-binding guard branch pinned by test and mutation, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability assertions replaced by `assertStableFor`. Its first attempt at (f) was rejected by an independent judge and corrected in `5bf647a`.
-3. **Session 67** closed B-111 completely: `checkFileEdit` pre-flight validation in `project bind` before any write, `tool-config-refused` reported cleanly, ADR-0035 authored.
-4. **Session 66** closed B-105 completely: argv forms of all four harnesses verified live with `shell: false`.
-5. **Session 65** closed B-106 remainder: dead-PID sweep in `routes.ts`, session occupancy in `status` and `doctor`.
-6. **Session 64** closed B-110: relative Markdown link gate in `test:static`, 38 archive links repaired.
-7. **Sessions 62–63** closed B-107 (ADR-0033), B-106's source, B-109 (ADR-0034) and B-108.
+1. **Session 70** closed **B-95 remainder completely** under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe `parseStoredEnvelope` in `src/daemon/serve/fetch.ts` skips corrupt/malformed `envelope_json` rows without throwing, allowing `lastRowSeq` to advance `cursor.next_update_id` past damaged rows so the client never stalls; review note R3-1 addressed in `doorbell.ts` (tightened `to` check) and R2-1 in `test/channel/main.test.ts` (drift comment removed); 14 test cases added in `fetch.test.ts` (RED before GREEN observed, non-vacuity proven by mutation); landed session 69's B-102 and B-99 commits.
+2. **Session 69** completed the missing second blind review for B-102 (`jd-judge-a` returned 0 findings, closing `bus-v2-b102-residuals-001` APPROVED); and closed **B-99 completely** under ODD (fixed sleeps in `heartbeat.test.ts` converted to `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517` converted to positively observe live ticks via `daemon.lock`'s `heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; boot and hot-reload waits converted to condition polls).
+3. **Session 68** closed B-102: three shutdown-latch checks over three windows, the update-existing-binding guard branch pinned by test and mutation, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability assertions replaced by `assertStableFor`. Its first attempt at (f) was rejected by an independent judge and corrected in `5bf647a`.
+4. **Session 67** closed B-111 completely: `checkFileEdit` pre-flight validation in `project bind` before any write, `tool-config-refused` reported cleanly, ADR-0035 authored.
+5. **Session 66** closed B-105 completely: argv forms of all four harnesses verified live with `shell: false`.
+6. **Session 65** closed B-106 remainder: dead-PID sweep in `routes.ts`, session occupancy in `status` and `doctor`.
+7. **Session 64** closed B-110: relative Markdown link gate in `test:static`, 38 archive links repaired.
+8. **Sessions 62–63** closed B-107 (ADR-0033), B-106's source, B-109 (ADR-0034) and B-108.
 
 ---
 
@@ -111,11 +112,10 @@ B-97 (guard symlink POSIX en cli/main.ts) o la reubicación de B-101.
 1. **The `frisco` binding is armed and running — do not re-arm it.**
 2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
 3. **Pick from the remaining units**:
-   - **B-95 remainder** (the `fetch.ts` corrupt-row decision is the substantive one; the rest are notes),
    - **B-97** (POSIX symlinked-bin entry guard; needs Linux/macOS, so it also touches B-12's scope),
    - **B-101**'s remaining question (where the Judgment Day operating detail should live).
 4. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
-5. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111, B-102 or B-99** — all are closed with evidence (§1).
+5. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111, B-102, B-99 or B-95** — all are closed with evidence (§1).
 
 ---
 
@@ -163,7 +163,9 @@ instead, which is where such a record belongs.
 ## §6 — Do not redo
 
 - F1–F5 archives, B-98, B-100(a)(b), B-101, B-103, B-104, B-105, B-106, B-107, B-108, B-109, B-110, B-111,
-  **B-102**: closed; do not re-open or re-review.
+  **B-102, B-99, B-95**: closed; do not re-open or re-review.
+- **B-95 is closed completely**: safe `parseStoredEnvelope` handles corrupt rows in `fetch.ts`, cursor advances.
+- **B-99 is closed completely**: timer tests converted to condition waits and positive live tick checks.
 - **B-105 is closed completely**: do not re-verify the harness argv forms or re-open the satellite SDD set.
 - **B-106 is closed completely**: do not re-implement the transport close release or the dead-PID sweep.
 - **B-111 is closed completely**: do not re-implement tool config pre-validation.
@@ -180,9 +182,7 @@ instead, which is where such a record belongs.
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-95 remainder** | (d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded `JSON.parse` needs its own corrupt-row decision; three non-blocking notes (a drifting specifier-count comment, a permissive `to` in `parseStoredEnvelope`, and the silent skip of an unreadable doorbell row) | Kairo, "cheap at the next touch" |
 | **B-97** | `src/cli/main.ts`'s `isDirectlyExecuted()` guard may silently do nothing behind a POSIX symlinked npm bin; needs Linux/macOS to confirm, so it is adjacent to B-12 | Director + Kairo |
-| **B-99** | **Four** members now: the three timer-based tests (two in `test/daemon/lifecycle/heartbeat.test.ts`, one in `test/daemon/no-emission.test.ts`) plus `test/daemon/bootstrap.test.ts:517`, whose "an unchanged registry must not re-fire BINDING_CHANGED on every tick" is a negative proven by a bare 60 ms sleep. The honest fix needs a positive observation of live ticks inside the window (the neighbouring `getUpdatesCalls` counter provides one); `assertStableFor` in the same file is the reusable starting point | Kairo (Director schedules) |
 | **B-101 (relocation)** | Whether the Judgment Day operating detail should move out of the overwritten `HANDOFF.md` into `GOVERNANCE` or a durable runbook | Director |
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), three backups to delete once nothing needs reverting | Director |
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–68. Candidates left no lineage (the host declined them). The `2aa0da0`-era base that kept re-surfacing B-102(f) now points at fixed code, so this is expected to stay quiet | Director/maintainer |

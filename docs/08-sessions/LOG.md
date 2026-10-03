@@ -4,6 +4,20 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 70 — B-95 remainder closed completely under ODD; B-102 and B-99 committed
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's explicit instruction — *"Sí, adelante con tus recomendaciones, toma las riendas, tienes toda Mi autorización para que puedas aplicar todo lo que consideres prudente necesario y puedas continuar a pasos agigantados."*
+- **Preflight**: Baseline suite 1885/1879/0/6 and `test:static` 101/101; `gentle-ai` 4.0.0; RDD `on (decided by global)`; Arena unreachable — TCP probe to `127.0.0.1:8765` answered `Connection refused` (exit 1), satisfying DN-09. Subagent tool execution verified healthy (`muszhwo7-1-h4a9`). Engram session started (`connmuta-session-70`, project `connmuta`).
+- **Commits from session 69 landed**: `f2adff2` (`docs(tribunal): record Judgment Day approval for B-102 residuals`) and `83b9373` (`test(daemon): convert timer-based tests to condition waits and live tick observation (B-99)`).
+- **B-95 remainder closed completely under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`)**:
+  1. **Corrupt row policy in `serveFetch` (`src/daemon/serve/fetch.ts:244-246`)**: Replaced bare `JSON.parse` with safe `parseStoredEnvelope(envelopeJson): StoredEnvelopeShape | null`, defensively validating object structure, `type` in `ENVELOPE_TYPES`, non-empty `thread`, valid `to` (or null), and non-empty `basis`. Corrupt/unparseable rows return `null` and are skipped (`continue`) without throwing, avoiding crashing `serveFetch` with 500 `SyntaxError`. `lastRowSeq = rows[rows.length - 1].seq` still covers the batch, allowing `cursor.next_update_id` to advance past the corrupt row so the client never stalls.
+  2. **Test-first TDD**: 14 new test cases in `test/daemon/serve/fetch.test.ts` testing unparseable JSON text, non-object JSON, empty/invalid types, empty threads, invalid `to` types, corrupt rejected/ignored rows, and an all-unreadable window. Observed RED (13 tests failed with `SyntaxError`, `TypeError`, or 3 !== 2) before GREEN (all 45 tests pass). Non-vacuity proven by mutation: reverting `parseStoredEnvelope` to bare `JSON.parse` failed 13 tests.
+  3. **Review note R3-1**: In `src/daemon/serve/doorbell.ts:120`, tightened `to` check in `parseScannedEnvelope` to require `AGENT_ID_PATTERN` when non-null; added tests in `test/daemon/serve/doorbell.test.ts`.
+  4. **Review note R2-1**: In `test/channel/main.test.ts:74`, eliminated drift-prone count comment on `MIN_SCANNED_SPECIFIERS`.
+  5. Backlog row `B-95` marked `done` in `docs/06-backlog/CHECKLIST.md`.
+- **Verification**: `npm test` **1901 / 1895 / 0 / 6** (+16 tests), `test:static` **101 / 101**, `%TEMP%\conmuta-*` count unchanged (0 → 0).
+
 ## Session 69 — B-102 dual audit completed (APPROVED) and B-99 closed completely
 
 - **Date**: 2026-10-03 local time.

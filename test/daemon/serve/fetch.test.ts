@@ -103,6 +103,8 @@ interface SeedUpdateOptions {
 	readonly body?: string | null;
 	readonly apply_outcome?: InboxApplyOutcome;
 	readonly received_at: string;
+	/** The stored `envelope_json` text verbatim, overriding `type`/`to`/`thread`; how a corrupt row is planted. */
+	readonly envelope_json?: string;
 }
 
 /** Writes one admitted `updates` row directly, bypassing `daemon/admission.ts` (see the module doc). */
@@ -117,7 +119,9 @@ function seedUpdateRow(db: DatabaseSync, opts: SeedUpdateOptions): number {
 		from_user_id: opts.from_user_id ?? PEER_USER_ID,
 		from_agent_id: opts.from_agent_id ?? PEER_AGENT_ID,
 		eid: opts.eid,
-		envelope_json: envelopeJson({ type: opts.type ?? "REQUEST", to: opts.to ?? null, thread: opts.thread, basis: opts.basis }),
+		envelope_json:
+			opts.envelope_json ??
+			envelopeJson({ type: opts.type ?? "REQUEST", to: opts.to ?? null, thread: opts.thread, basis: opts.basis }),
 		body: opts.body === undefined ? `body of ${opts.eid}` : opts.body,
 		apply_outcome: opts.apply_outcome ?? "opened",
 		received_at: opts.received_at,
@@ -944,3 +948,110 @@ test("an active gap_warning always breaks the compact tick, even when the digest
 		assert.equal(result.unchanged, false, "a possible gap is news, so the full form is mandatory");
 	});
 });
+
+/**
+ * Stored `envelope_json` texts that cannot be parsed into a valid stored envelope shape.
+ * B-95 remainder: a corrupt row in SQLite updates must be skipped rather than failing serveFetch.
+ */
+const UNREADABLE_ENVELOPES: ReadonlyArray<readonly [name: string, envelopeJson: string]> = [
+	["malformed JSON text", "{not json"],
+	["the JSON number 123", "123"],
+	["the JSON null", "null"],
+	["a JSON array", "[]"],
+	["an object with no fields", "{}"],
+	["a type outside ENVELOPE_TYPES", JSON.stringify({ type: "SHOUT", to: AGENT_ID, thread: "0123456789ab" })],
+	["a non-string type", JSON.stringify({ type: 7, to: AGENT_ID, thread: "0123456789ab" })],
+	["an empty string thread", JSON.stringify({ type: "REQUEST", to: AGENT_ID, thread: "" })],
+	["a non-string thread", JSON.stringify({ type: "REQUEST", to: AGENT_ID, thread: 2 })],
+	["a non-string to", JSON.stringify({ type: "REQUEST", to: 2, thread: "0123456789ab" })],
+	["an empty string to", JSON.stringify({ type: "REQUEST", to: "", thread: "0123456789ab" })],
+	["a non-string basis", JSON.stringify({ type: "RESOLVED", to: null, thread: "0123456789ab", basis: 123 })],
+];
+
+for (const [name, envelopeJsonText] of UNREADABLE_ENVELOPES) {
+	test(`a stored envelope with ${name} is skipped, not thrown on: only readable rows enter log and cursor advances`, async () => {
+		await withLedger(async (db) => {
+			seedUpdateRow(db, { update_id: 1, eid: "000000000001", thread: "012345678901", type: "REQUEST", received_at: NOW });
+			seedUpdateRow(db, { update_id: 2, eid: "000000000002", thread: "012345678902", envelope_json: envelopeJsonText, received_at: LATER });
+			const seq3 = seedUpdateRow(db, { update_id: 3, eid: "000000000003", thread: "012345678903", type: "REPLY", received_at: LATER2 });
+
+			const result = await serveFetch(
+				{ mark_seen: true },
+				{ db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(NOW) },
+			);
+
+			assert.equal(result.log.length, 2, "only the two readable rows enter the log");
+			assert.equal(result.log[0].eid, "000000000001");
+			assert.equal(result.log[1].eid, "000000000003");
+			assert.equal(result.cursor.next_update_id, seq3, "cursor must advance through the full examined batch past the corrupt row");
+			assert.equal(result.cursor.advanced, true);
+		});
+	});
+}
+
+test("a window of nothing but unreadable rows returns empty log and advances next_update_id so the client cannot stall", async () => {
+	await withLedger(async (db) => {
+		let lastSeq = 0;
+		for (let i = 0; i < UNREADABLE_ENVELOPES.length; i++) {
+			const [, envJson] = UNREADABLE_ENVELOPES[i];
+			lastSeq = seedUpdateRow(db, {
+				update_id: i + 1,
+				eid: String(i + 1).padStart(12, "0"),
+				thread: "012345678901",
+				envelope_json: envJson,
+				received_at: NOW,
+			});
+		}
+
+		const result = await serveFetch(
+			{ mark_seen: true },
+			{ db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(NOW) },
+		);
+
+		assert.equal(result.log.length, 0, "no rows enter log");
+		assert.equal(result.cursor.next_update_id, lastSeq, "cursor must advance to the last examined row");
+		assert.equal(result.cursor.advanced, true);
+	});
+});
+
+test("corrupt stored envelope on rejected or ignored rows is skipped cleanly without throwing", async () => {
+	await withLedger(async (db) => {
+		const seq1 = seedUpdateRow(db, {
+			update_id: 1,
+			eid: "000000000001",
+			thread: "012345678901",
+			apply_outcome: "rejected",
+			body: null,
+			envelope_json: "{corrupt",
+			received_at: NOW,
+		});
+		const seq2 = seedUpdateRow(db, {
+			update_id: 2,
+			eid: "000000000002",
+			thread: "012345678902",
+			apply_outcome: "ignored",
+			body: null,
+			envelope_json: "null",
+			received_at: LATER,
+		});
+		const seq3 = seedUpdateRow(db, {
+			update_id: 3,
+			eid: "000000000003",
+			thread: "012345678903",
+			type: "REQUEST",
+			received_at: LATER2,
+		});
+
+		const result = await serveFetch(
+			{ mark_seen: true },
+			{ db, binding: sampleBinding(), session: sampleSession("client-a"), now: () => new Date(NOW) },
+		);
+
+		assert.equal(result.rejected.length, 0, "corrupt rejected row must be skipped");
+		assert.equal(result.unapplied.length, 0, "corrupt ignored row must be skipped");
+		assert.equal(result.log.length, 1, "only valid row enters log");
+		assert.equal(result.log[0].eid, "000000000003");
+		assert.equal(result.cursor.next_update_id, seq3, "cursor must advance past corrupt rows to valid row");
+	});
+});
+
