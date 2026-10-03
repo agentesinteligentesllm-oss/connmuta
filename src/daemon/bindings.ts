@@ -19,7 +19,13 @@ export interface PollerHandle {
 export type PollerFactory = (
   binding: RegistryBinding,
   config: BindingConfig,
-  transport?: Transport
+  transport?: Transport,
+  /**
+   * Aborted by `stopAll()`. A poller whose signal is already aborted must do no ledger work at all, so a
+   * factory that was entered before shutdown — and is still awaiting a secret-store read when it begins
+   * (B-102f) — cannot prepare a statement against a ledger `stop()` has closed.
+   */
+  signal?: AbortSignal
 ) => Promise<PollerHandle> | PollerHandle;
 
 export type TransportFactory = (
@@ -114,15 +120,23 @@ export class BindingsReconciler {
   private readonly managedBindings = new Map<string, ManagedBinding>();
   /**
    * Set by `stopAll()` and never cleared: shutdown is terminal and once-per-process in this daemon's
-   * lifecycle, so a reconciler that has been stopped must start nothing again — `reconcile()` becomes a
-   * no-op rather than a restart. Two windows need this latch, and they are different windows (B-98,
-   * B-102f): a `reconcile()` that BEGINS after `stopAll()` (checked up front, before any transport or
-   * poller factory call, because by then the ledger is already closed) and a binding add/update already
-   * in flight when `stopAll()` runs (checked after `createPoller` resolves, where the poller just started
-   * is stopped instead of registered). Defense in depth independent of any caller's own discipline about
-   * not overlapping `reconcile()` with `stopAll()`.
+   * lifecycle, so a reconciler that has been stopped must start nothing again. Three checks make that true,
+   * and they cover three different windows (B-98, B-102f): a `reconcile()` that BEGINS after `stopAll()`
+   * returns unchanged at once; a reconcile already IN FLIGHT when `stopAll()` runs re-checks the latch at the
+   * top of each binding it has still to process and again after `buildTransport` resolves, before the poller
+   * factory is reached — that factory is the one that prepares a statement against the ledger, which
+   * `stop()` has already closed; and the poller factory is handed `abortController`'s signal, so a poller
+   * created before the latch flipped but *after* shutdown began still does no ledger work. The
+   * post-`createPoller` guard remains the last line for a poller that was already running.
    */
   private stopping = false;
+
+  /**
+   * Aborted by `stopAll()` and handed to every poller factory (B-102f). `startPoller` skips its whole loop
+   * body for an already-aborted signal, so the one step that cannot be guarded from here — the poller's own
+   * `db.prepare` — never runs against a closed ledger.
+   */
+  private readonly abortController = new AbortController();
 
   constructor(options: BindingsReconcilerOptions = {}) {
     this.db = options.db;
@@ -193,10 +207,9 @@ export class BindingsReconciler {
 
   async reconcile(registry?: Registry): Promise<ReconcileResult> {
     if (this.stopping) {
-      // The "before the work starts" half of the B-98 guard (B-102f): the checks after `createPoller`
-      // below only cover a reconcile already in flight when `stopAll()` runs. A reconcile that begins
-      // after shutdown must not build a transport at all — `stop()` has already closed the ledger, and
-      // B-98's timeout-then-late-resolve path is exactly reachable from here.
+      // One of the three windows the latch closes (B-102f): a reconcile that BEGINS after `stopAll()`. It is
+      // the narrowest of the three — no production caller reconciles after shutdown — but it is the only one
+      // that is cheap to check up front, and it keeps the class honest about being terminal on its own.
       return {
         changed: false,
         added: [],
@@ -275,6 +288,14 @@ export class BindingsReconciler {
 
     // 2. Add or update active bindings
     for (const [projectId, binding] of activeMap.entries()) {
+      if (this.stopping) {
+        // Shutdown began while this loop was awaiting an earlier binding (B-102f). Nothing more may be
+        // started: every remaining step here exists to create a poller, and the poller factory prepares a
+        // statement against the ledger `stop()` has closed. `break`, not `continue`, because the remaining
+        // bindings have no cleanup outstanding — nothing was ever created for them.
+        break;
+      }
+
       const bot = targetRegistry.bots.find((b) => b.bot_id === binding.bot_id);
       const config = materializeBindingConfig(binding, bot ?? { username: "unknown_bot" });
       const current = this.managedBindings.get(projectId);
@@ -282,7 +303,15 @@ export class BindingsReconciler {
       if (!current) {
         // New active binding
         const { transport, roomGuard } = await this.buildTransport(binding, config, bot);
-        const poller = this.createPoller ? await this.createPoller(binding, config, transport) : undefined;
+        if (this.stopping) {
+          // The latch flipped while the transport was being built (B-102f) — the window B-98's
+          // timeout-then-late-resolve path actually reaches. The transport is discarded: it owns no socket
+          // of its own, and the same discard already happens in the post-`createPoller` guard below.
+          continue;
+        }
+        const poller = this.createPoller
+          ? await this.createPoller(binding, config, transport, this.abortController.signal)
+          : undefined;
         if (this.stopping) {
           // stopAll() ran while this add was still in flight (B-98) — the poller just started must be
           // stopped, never registered into a map nothing will ever call stopAll() on again.
@@ -311,7 +340,13 @@ export class BindingsReconciler {
           }
 
           const { transport, roomGuard } = await this.buildTransport(binding, config, bot);
-          const poller = this.createPoller ? await this.createPoller(binding, config, transport) : undefined;
+          if (this.stopping) {
+            // Same B-102f window as the new-binding branch above, reached through the update path.
+            continue;
+          }
+          const poller = this.createPoller
+            ? await this.createPoller(binding, config, transport, this.abortController.signal)
+            : undefined;
           if (this.stopping) {
             // Same B-98 guard as the new-binding branch above.
             if (poller?.stop) await poller.stop();
@@ -342,6 +377,9 @@ export class BindingsReconciler {
 
   async stopAll(): Promise<void> {
     this.stopping = true;
+    // Abort the factory signal first: a factory that was already entered and is awaiting a secret-store
+    // read will hand an already-aborted signal to `startPoller`, whose loop body then never runs (B-102f).
+    this.abortController.abort();
     for (const managed of this.managedBindings.values()) {
       if (managed.poller?.stop) {
         await managed.poller.stop();

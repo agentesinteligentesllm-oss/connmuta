@@ -68,7 +68,38 @@ function sampleUpdate(
 }
 
 describe("daemon poller loop (PR-22b)", () => {
-	it("409 surfaced, never retried blindly (TELEGRAM_CONFLICT)", async () => {
+	it("an already-aborted signal skips the whole loop body, touching no ledger (B-102f primitive)", async () => {
+			let prepareCalls = 0;
+			// The production factory's own first statement is `startPoller(...)`, whose run loop prepares a
+			// statement against the ledger before it awaits anything. Counting the prepares is therefore the
+			// honest way to assert "this poller never touched the ledger", without depending on the precise
+			// error a closed DatabaseSync throws.
+			const countedDb = new Proxy({} as DatabaseSync, {
+				get: () => () => {
+					prepareCalls += 1;
+					throw new Error("database is not open");
+				},
+			});
+
+			const ac = new AbortController();
+			ac.abort();
+			const handle = startPoller({
+				db: countedDb,
+				binding: sampleBinding(),
+				client: new FakeTelegramClient(),
+				signal: ac.signal,
+			});
+			await handle.done;
+
+			assert.equal(
+				prepareCalls,
+				0,
+				"an already-aborted signal must skip the loop body entirely, so no statement is ever prepared " +
+					"against a ledger a shutdown has closed (B-102f's second window)",
+			);
+		});
+
+		it("409 surfaced, never retried blindly (TELEGRAM_CONFLICT)", async () => {
 		await withLedger(async (db) => {
 			const binding = sampleBinding();
 			const client = new FakeTelegramClient();

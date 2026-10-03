@@ -204,9 +204,12 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonInstan
       db: ledger.db,
       loader: registry,
       createTelegramClient: (bot) => buildTelegramClient(bot.bot_id),
-      createPoller: async (binding) => {
+      createPoller: async (binding, _config, _transport, signal) => {
         const client = await buildTelegramClient(binding.bot_id);
-        return startPoller({ db: ledger!.db, binding, client, emitter });
+        // `signal` is the reconciler's shutdown signal (B-102f): when it is already aborted, `startPoller`
+        // skips its loop body entirely, so the poller's own `db.prepare` never runs against a ledger this
+        // shutdown has closed.
+        return startPoller({ db: ledger!.db, binding, client, emitter, signal });
       },
     });
 

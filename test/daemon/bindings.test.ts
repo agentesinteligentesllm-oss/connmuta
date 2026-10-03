@@ -289,6 +289,76 @@ describe("BindingsReconciler (registry hot-reload, poller lifecycle, BINDING_CHA
     );
   });
 
+  it("a reconcile stalled in buildTransport and released after stopAll() never reaches the poller factory (B-102f)", async () => {
+    const db = createTestDatabase();
+    let pollerCreated = 0;
+    let releaseBuildTransport: (() => void) | undefined;
+    const buildTransportGate = new Promise<void>((resolve) => {
+      releaseBuildTransport = resolve;
+    });
+    let signalBuildTransport: (() => void) | undefined;
+    const buildTransportEntered = new Promise<void>((resolve) => {
+      signalBuildTransport = resolve;
+    });
+
+    const reconciler = new BindingsReconciler({
+      db,
+      createTransport: async () => {
+        signalBuildTransport?.();
+        // The stalled step B-98's timeout gives up on. Whatever happens next runs against a ledger
+        // `stop()` has already closed, so the poller factory — whose first statement prepares a
+        // statement against that ledger — must not be reached at all.
+        await buildTransportGate;
+        return { transport: {} as never };
+      },
+      createPoller: async () => {
+        pollerCreated += 1;
+        return { stop: async () => {} };
+      },
+    });
+
+    const reconcilePromise = reconciler.reconcile(baseRegistry);
+    await buildTransportEntered;
+
+    // The give-up: shutdown proceeds while this reconcile is still in flight.
+    await reconciler.stopAll();
+
+    releaseBuildTransport?.();
+    const result = await reconcilePromise;
+
+    assert.equal(
+      pollerCreated,
+      0,
+      "once shutdown has begun, an in-flight reconcile must not reach the poller factory at all — " +
+        "that factory is what touches the closed ledger (B-102f)",
+    );
+    assert.equal(result.added.length, 0);
+    assert.equal(reconciler.getActiveBindings().length, 0);
+  });
+
+  it("stopAll() aborts the signal the reconciler hands its poller factory (B-102f, the window after the guard)", async () => {
+    let received: AbortSignal | undefined;
+
+    const reconciler = new BindingsReconciler({
+      createPoller: async (_binding, _config, _transport, signal) => {
+        received = signal;
+        return { stop: async () => {} };
+      },
+    });
+
+    await reconciler.reconcile(baseRegistry);
+    assert.ok(received, "the poller factory must receive an abort signal, so a poller created after the give-up stays inert");
+    assert.equal(received!.aborted, false, "while nothing has stopped, the signal must not be aborted");
+
+    await reconciler.stopAll();
+    assert.equal(
+      received!.aborted,
+      true,
+      "stopAll() must abort it: a factory that was already entered when shutdown began can still be awaiting a " +
+        "secret-store read, and the poller it then creates must never touch the closed ledger (B-102f)",
+    );
+  });
+
   it("stopAll() before reconcile() starts no transport and no poller at all — the latch is checked before the work, not only after it (B-102f)", async () => {
     const db = createTestDatabase();
     let transportBuilt = 0;

@@ -1019,6 +1019,104 @@ test("bootstrap: stop() records no give-up line when the in-flight tick settles 
   }
 });
 
+test("bootstrap: a tick released after stop() gave up does no work against the closed ledger (B-102f)", async () => {
+  const homeDir = createTempHome();
+  const fakeStore: SecretStore = {
+    kind: "file",
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {},
+  };
+
+  const emptyRegistry: Registry = {
+    registry_version: REGISTRY_VERSION,
+    bots: [],
+    groups: [],
+    projects: [],
+    bindings: [],
+  };
+  writeFileSync(join(homeDir, "registry.json"), JSON.stringify(emptyRegistry));
+
+  let releaseFactory: (() => void) | undefined;
+  const factoryGate = new Promise<void>((resolve) => {
+    releaseFactory = resolve;
+  });
+  let factoryEntered = false;
+
+  let daemon: Awaited<ReturnType<typeof startDaemon>> | undefined;
+  try {
+    daemon = await startDaemon({
+      homeDir,
+      secretStore: fakeStore,
+      heartbeatPeriodMs: 5,
+      // Bound far below the gate: stop() gives up while the tick is still stalled in the client build.
+      stopTickTimeoutMs: 50,
+      telegramClientFactory: async (): Promise<TelegramClient> => {
+        factoryEntered = true;
+        await factoryGate;
+        return {
+          getUpdates: async () => ({ ok: true as const, updates: [] }),
+          sendMessage: async () => ({ ok: true as const }),
+        } as unknown as TelegramClient;
+      },
+    });
+
+    const registryWithBinding: Registry = {
+      registry_version: REGISTRY_VERSION,
+      bots: [
+        {
+          bot_id: 444333225,
+          username: "test_bot_late",
+          token_ref: { store: "keychain", account: "bot:444333225" },
+          added_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+      groups: [{ group_id: -1004443332224, added_at: "2026-09-01T00:00:00.000Z" }],
+      projects: [{ project_id: "prj-b98-late", path: homeDir }],
+      bindings: [
+        {
+          project_id: "prj-b98-late",
+          bot_id: 444333225,
+          group_id: -1004443332224,
+          agent_id: "@b98-late-agent",
+          status: "active",
+          roster_snapshot: [{ agent_id: "@b98-late-agent", user_id: 444333225, username: "test_bot_late" }],
+          roster_hash: ROSTER_HASH,
+          bound_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    };
+    writeFileSync(join(homeDir, "registry.json"), JSON.stringify(registryWithBinding));
+
+    const deadline = Date.now() + 30_000;
+    while (!factoryEntered) {
+      assert.ok(Date.now() < deadline, "no tick ever started the factory call");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    if (daemon === undefined) throw new Error("daemon never started");
+    const daemonRef = daemon;
+
+    // stop() gives up on the stalled tick, closes the ledger, and returns.
+    await daemonRef.stop();
+
+    // Now the tick resumes — after the ledger is closed. It must do no ledger work at all.
+    releaseFactory?.();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    assert.doesNotMatch(
+      readDaemonLog(homeDir),
+      /heartbeat tick failed/,
+      "a tick released after the shutdown give-up must not attempt ledger work: creating its poller after " +
+        "`db.close()` throws 'database is not open' and surfaces here as a failed tick (B-102f)",
+    );
+    assert.equal(readRunFile(daemonRef.dirs.runDir), null);
+  } finally {
+    await daemon?.stop().catch(() => {});
+    cleanupTempHome(homeDir);
+  }
+});
+
 test("bootstrap: stop() closes the real IPC server — a subsequent request is refused (PR-40a)", async () => {
   const homeDir = createTempHome();
   const fakeStore: SecretStore = {
