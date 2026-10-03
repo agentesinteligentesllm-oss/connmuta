@@ -202,7 +202,8 @@ One line per guarantee: the invariant (not an example), and the test that fails 
   change. Neither replaces the other.
 - **Archive on completion.** Each shipped change is archived so its specs become the baseline the
   next phase modifies. v1 never archived its change: `openspec/specs/` stayed empty and a follow-up
-  change would have had nothing to `MODIFY` (analysis bundle, map `governance-docs`).
+  change would have had nothing to `MODIFY` (analysis bundle, map `governance-docs`). When archiving,
+  relative links must be adjusted to account for the increased directory depth, enforced by `test:static`.
 - **Preflight — pending Director decision.** Pace (interactive or autonomous), confirmation of the
   artifact store, and the PR strategy are decided by the Director at the F1 preflight (decision
   record, "pending Director decisions"). Until then, this section describes the tribunal's
@@ -224,6 +225,7 @@ One line per guarantee: the invariant (not an example), and the test that fails 
 | Never `npx` at runtime | v1's clone-plus-compile start exceeded the 30 s MCP timeout in production. Distribution is a compiled `dist` with `npm-shrinkwrap` and a `files` whitelist. | D9; v1 `docs/UPGRADE-v1.0.1.md:161-178` |
 | Documentation is a deliverable | A substantive unit updates the documents it affects in the same PR. [../00-INDEX.md](../00-INDEX.md) is the single entry point; v1 had three documents claiming that role. | D10 |
 | Pointer integrity | Moving or renaming a file that another file points to updates the pointer in the same commit. | v1 `HANDOFF.md:441-448` |
+| Relative link integrity | Every relative link in tracked Markdown files must resolve to an existing target on disk, verified by `test/security/markdown-links.test.ts` in `npm run test:static` and pinned by a non-vacuous negative fixture. | B-110; Pointer integrity; `test/security/markdown-links.test.ts` |
 | No production data in the repository | Bot usernames, numeric user ids, developer names, production chat ids and tokens never appear in any committed file. A secret scan is part of the release checklist. | writing rules of this repository; B-16; research `security-isolation` T12 |
 | Commits | Only the Director authorizes a commit; the writer prepares the change and the PR. | decision record; [../../AGENTS.md](../../AGENTS.md) |
 
