@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -111,12 +111,11 @@ test("importing the CLI module does not execute it", () => {
   }
 });
 
-// B-97: the entry guard (`import.meta.main`) has no test that actually spawns the built CLI and
-// confirms it runs. The prior `process.argv[1]` guard was silently false only behind a POSIX
-// symlinked npm bin, which this Windows machine cannot reproduce, so this test cannot show a RED
-// against that specific defect; it pins the guard firing on direct execution at all, a guarantee
-// that had no test before. Proven with a mutation, not a reproduced symlink bug: a direct temporary
-// edit to a permanently-false condition made this test fail before the fix landed.
+// B-97: the entry guard (`import.meta.main`) must fire when the built CLI is the process entry, a
+// guarantee that had no test before this pair. The defect it replaced compared a non-realpath'd
+// `process.argv[1]` against a realpath'd `import.meta.url`, so the guard was false whenever the
+// entry path crossed a link and `conmuta` exited 0 with zero bytes on both streams. Proven with a
+// mutation as well: a temporarily patched build whose guard was permanently false failed this test.
 test("spawning the built CLI directly runs it (the entry guard fires)", () => {
   const result = spawnSync(process.execPath, [CLI_ENTRY], { encoding: "utf8", shell: false });
   assert.equal(result.status, EXIT_USAGE, `expected the guard to fire and runCli to run: ${result.stderr}`);
@@ -124,6 +123,60 @@ test("spawning the built CLI directly runs it (the entry guard fires)", () => {
     result.stderr.includes(PRODUCT_NAME),
     `expected usage output naming ${PRODUCT_NAME} on stderr, got: ${JSON.stringify(result.stderr)}`,
   );
+});
+
+// B-97: the row originally said the defect was "not reproduced" because it needs a POSIX symlinked
+// npm bin and "this machine is Windows". That named the platform instead of the class. The class is
+// ANY link the entry path crosses, and a Windows directory JUNCTION belongs to it — creatable here
+// with neither Developer Mode nor admin — so the defect IS reproducible on this machine, and this
+// test is the pinning test ADR-12 asked for rather than a proxy for one.
+//
+// MEASURED, against this same built bundle, on Windows 11 (Node v24.16.0), not asserted:
+//   direct invocation   -> exit 2 (the guard fires)
+//   junction invocation -> exit 0 and ZERO bytes on stdout and stderr with the OLD guard, which is
+//                          exactly the silent no-op the row describes; exit 2 with `import.meta.main`.
+// Non-vacuity is therefore reproduced rather than claimed: restoring the old guard fails this test.
+//
+// Node ignores the `'junction'` type on POSIX and creates a directory SYMLINK instead, so this one
+// code path covers the POSIX case the row was written for as well.
+test("the entry guard fires when the built CLI is reached through a directory link (B-97)", (t) => {
+  assert.ok(existsSync(CLI_ENTRY), `expected the built CLI at ${CLI_ENTRY}: run 'npm run build' first`);
+  const dir = mkdtempSync(join(tmpdir(), "conmuta-entry-link-"));
+  try {
+    const linked = join(dir, "clidir");
+    try {
+      symlinkSync(dirname(CLI_ENTRY), linked, "junction");
+    } catch (error) {
+      // A filesystem that cannot create a directory link cannot express this condition at all, so
+      // skipping is the honest outcome — and the reason names itself, so this can never be a silent
+      // Windows skip that leaves the guarantee apparently covered.
+      t.skip(`this filesystem refuses a directory link (${String(error)}); B-97 is not expressible here`);
+      return;
+    }
+    const result = spawnSync(process.execPath, [join(linked, "main.js")], { encoding: "utf8", shell: false });
+    assert.equal(
+      result.status,
+      EXIT_USAGE,
+      `expected the guard to fire through the link, got status ${result.status}: ${result.stderr}`,
+    );
+    assert.ok(
+      result.stderr.includes(PRODUCT_NAME),
+      `expected usage output naming ${PRODUCT_NAME} on stderr, got: ${JSON.stringify(result.stderr)}`,
+    );
+    // The failure mode is not a wrong exit code but SILENCE: exit 0 with nothing on either stream.
+    // Asserting on the bytes directly keeps that specific defect visible if the guard ever regresses.
+    assert.notEqual(
+      `${result.stdout}${result.stderr}`,
+      "",
+      "B-97's failure mode is exit 0 with zero bytes on both streams; the linked entry produced no output",
+    );
+  } finally {
+    // Safe against the link: Node's `lstat` reports a junction as a symbolic link, so `rmSync`
+    // unlinks the junction itself and never descends into the real `dist/src/cli` it points at.
+    // Verified before this test landed: a junction to a directory holding a file was removed with
+    // the target's file still present.
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // --- Dispatcher: exactly one wired subcommand, and every misuse is a usage error ---

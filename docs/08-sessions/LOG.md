@@ -4,10 +4,10 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
-## Session 70 — B-95 remainder closed completely under ODD; B-102 and B-99 committed
+## Session 70 — B-95 remainder and B-97 closed completely under ODD
 
 - **Date**: 2026-10-03 local time.
-- **Authority**: the Director's explicit instruction — *"Sí, adelante con tus recomendaciones, toma las riendas, tienes toda Mi autorización para que puedas aplicar todo lo que consideres prudente necesario y puedas continuar a pasos agigantados."*
+- **Authority**: the Director's explicit instruction — *"Sí, adelante con tus recomendaciones, toma las riendas, tienes toda Mi autorización para que puedas aplicar todo lo que consideres prudente necesario y puedas continuar a pasos agigantados."* — and, after a provider outage interrupted the session, *"Continúa con todo esto, hazlo con maestría."*
 - **Preflight**: Baseline suite 1885/1879/0/6 and `test:static` 101/101; `gentle-ai` 4.0.0; RDD `on (decided by global)`; Arena unreachable — TCP probe to `127.0.0.1:8765` answered `Connection refused` (exit 1), satisfying DN-09. Subagent tool execution verified healthy (`muszhwo7-1-h4a9`). Engram session started (`connmuta-session-70`, project `connmuta`).
 - **Commits from session 69 landed**: `f2adff2` (`docs(tribunal): record Judgment Day approval for B-102 residuals`) and `83b9373` (`test(daemon): convert timer-based tests to condition waits and live tick observation (B-99)`).
 - **B-95 remainder closed completely under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`)**:
@@ -16,7 +16,14 @@
   3. **Review note R3-1**: In `src/daemon/serve/doorbell.ts:120`, tightened `to` check in `parseScannedEnvelope` to require `AGENT_ID_PATTERN` when non-null; added tests in `test/daemon/serve/doorbell.test.ts`.
   4. **Review note R2-1**: In `test/channel/main.test.ts:74`, eliminated drift-prone count comment on `MIN_SCANNED_SPECIFIERS`.
   5. Backlog row `B-95` marked `done` in `docs/06-backlog/CHECKLIST.md`.
-- **Verification**: `npm test` **1901 / 1895 / 0 / 6** (+16 tests), `test:static` **101 / 101**, `%TEMP%\conmuta-*` count unchanged (0 → 0).
+- **B-97 closed completely — the row's `not reproduced` premise was wrong about the CLASS, and that was disproved empirically before any test was written.** The row had said the entry-guard defect needs a POSIX symlinked npm bin and "this machine is Windows", so it could only be pinned by a mutation. The class is actually *any link the entry path crosses*: the old guard compared a non-realpath'd `process.argv[1]` with a realpath'd `import.meta.url`. Measured here, in order, as real probes rather than assumptions:
+  1. `fs.symlinkSync(..., 'file')` → **`EPERM`** on this machine (no Developer Mode, no admin), so a true symlink is genuinely unavailable — the row was right about *that*.
+  2. A **hard link** does NOT reproduce the defect (measured: old guard still fires, `true`), because a hard link has no target to realpath against — recorded so the dead end is not re-explored.
+  3. A **directory junction** DOES: `fs.symlinkSync(dir, link, 'junction')` succeeds without privileges (mount-point reparse tag, not the symbolic-link privilege), and against the built bundle the **old guard gave direct `exit 2` but junction `exit 0` with ZERO bytes on stdout and stderr** — exactly the silent no-op the row describes — while `import.meta.main` gives `exit 2` both ways.
+  - New pinning test `test/cli/main.test.ts`'s "the entry guard fires when the built CLI is reached through a directory link (B-97)", the ADR-12 test the row asked for instead of a proxy: it creates a junction to `dist/src/cli` and spawns `node <junction>/main.js`. **Non-vacuity reproduced, not claimed:** with the old guard restored the new test fails with `expected the guard to fire through the link, got status 0:` **while the pre-existing direct-execution test still passes**, proving the old test never covered this path. Node ignores the `'junction'` type on POSIX and creates a directory symlink, so the one code path covers the POSIX case too; **no separate POSIX CI job was added**, since the row offered it as an alternative and the existing `windows-latest` job now exercises the guarantee.
+  - Two safety facts were verified before the test landed rather than assumed: `fs.lstatSync` reports a junction as a symbolic link, so Node's `rmSync(..., { recursive: true })` unlinks the junction and **never descends into the real `dist/src/cli`** (checked with a junction to a directory holding a file — the target's file survived); and a filesystem that refuses to create a directory link `t.skip()`s with a self-naming reason rather than passing silently.
+  - Test-only change (plus this row and the docs); **no `src/` change**, because session 55 (`24d7dc6`) had already replaced the guard with `import.meta.main`.
+- **Verification**: `npm test` **1902 / 1896 / 0 / 6** (+17 over session 69's 1885), `test:static` **101 / 101**, `%TEMP%\conmuta-*` count unchanged (0 → 0). Independent verification of the B-95 commit by `gentle-ai-verify` (task `mut0gvfn-2-9l0t`) reproduced 1901/1895/0/6 and 101/101 on a clean tree at `a4885f3` and confirmed all three corrupt-envelope test groups present.
 
 ## Session 69 — B-102 dual audit completed (APPROVED) and B-99 closed completely
 
