@@ -33,7 +33,7 @@ silently across multiple sessions.
 |---|---|---|
 | 1 | Create non-vacuous fixture `test/fixtures/markdown-links-negative.md` and static gate `test/security/markdown-links.test.ts`. Observe RED on clean-tree scan (fails reporting the 38 broken links) and GREEN on the non-vacuous negative assertion. | `test/fixtures/markdown-links-negative.md`; `test/security/markdown-links.test.ts`; observed RED (38 failures); commit `88bec3c` |
 | 2 | Repair the 38 broken relative links across 8 files in `openspec/changes/archive/**` (F1: 19 links, F2: 11 links, F7a: 8 links). Observe GREEN on `test/security/markdown-links.test.ts` (0 broken links across all tracked markdown files). | Diff across `openspec/changes/archive/**`; `test:static` passes; observed GREEN (101/101 static tests pass); commit `11b2b57` |
-| 3 | Reconcile `docs/01-constitution/GOVERNANCE.md` §6 engineering rules and `docs/06-backlog/CHECKLIST.md` (close B-110). | `docs/01-constitution/GOVERNANCE.md`; `docs/06-backlog/CHECKLIST.md`; B-110 marked `done` |
+| 3 | Reconcile `docs/01-constitution/GOVERNANCE.md` §6 engineering rules and `docs/06-backlog/CHECKLIST.md` (close B-110). | `docs/01-constitution/GOVERNANCE.md`; `docs/06-backlog/CHECKLIST.md`; B-110 marked `done`; commit `4dcbf7b` |
 
 ## Verification
 
