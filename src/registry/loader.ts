@@ -118,6 +118,14 @@ export function parseRegistryText(text: string): RegistryParseResult {
 	} catch {
 		return { ok: false, problems: [{ kind: "invalid_json" }] };
 	}
+	// B-31: the post-parse gate. The raw scan above cannot see a shape a JSON escape assembled, so the
+	// parsed values are walked with the same rule and rejected with the same problem kind — forbidden
+	// content means this file must not be on disk in any form, so it is reported alone, exactly as the
+	// pre-parse scan reports it, rather than alongside a schema complaint that would invite the operator
+	// to repair the syntax of a file whose content is the actual problem.
+	if (containsForbiddenContent(raw)) {
+		return { ok: false, problems: [{ kind: "forbidden_content" }] };
+	}
 	return parseRegistryDocument(raw);
 }
 
@@ -145,6 +153,75 @@ export function parseRegistryText(text: string): RegistryParseResult {
  */
 function withoutRosterHashes(text: string): string {
 	return text.replace(new RegExp(`${ROSTER_HASH_VALUE_PATTERN}(?![0-9a-fA-F:])`, "gi"), ROSTER_HASH_PLACEHOLDER);
+}
+
+/**
+ * Maximum depth the post-parse content walk descends to.
+ *
+ * The strict schema accepts at most three levels (document, `bindings[]`/`groups[]`/…, entry), so a
+ * document deeper than this is refused by the schema regardless of what the walk does: the bound exists
+ * only so a pathological document yields that refusal instead of an uncaught `RangeError` from this
+ * recursion, which would crash the loader on a file the human can still hand-edit (R6). It can
+ * therefore not hide a secret in an **accepted** file, because no accepted file reaches it. The same
+ * bound, for the same reason, is in `shared/project-file.ts`.
+ */
+const MAX_CONTENT_WALK_DEPTH = 32;
+
+/**
+ * Whether one document string carries a forbidden shape, with the roster-hash exemption applied.
+ *
+ * The exemption is not optional here. `roster_hash` is required on every binding and its
+ * `sha256:<64 hex>` value matches the shared token regex by accident (B-27), so checking parsed values
+ * unmasked would refuse **every** valid registry — reintroducing B-27's failure through this new path.
+ * Applying the same mask keeps ledger and registry agreeing about one rule instead of each having its
+ * own idea of what a token is.
+ */
+function hasForbiddenShape(text: string): boolean {
+	try {
+		assertNoTokenShape(withoutRosterHashes(text));
+		return false;
+	} catch {
+		return true;
+	}
+}
+
+/**
+ * Walk every string in the parsed document — values and key names — looking for a forbidden shape.
+ *
+ * **Why a second gate exists at all (B-31).** R5's scan runs over the raw text *before* parsing, which
+ * design §4 requires and which is why a torn file carrying a leak reports `forbidden_content` alone. But
+ * that scan cannot see a token written as a JSON escape: `1234567\u003aAAHk…` holds no literal `\d+:` in
+ * the file, is accepted, and the parsed value is the token — sitting in `~/.conmuta/registry.json`, in
+ * the daemon's memory, and reported by nothing. This gate closes that gap from the other side: the same
+ * rule, applied to the values parsing produced.
+ *
+ * It runs over the **raw** parsed value rather than the validated document on purpose, mirroring
+ * `shared/project-file.ts`: a document with an unknown key is refused anyway, and skipping the walk there
+ * would hide a token sitting in the same document.
+ */
+function containsForbiddenContent(value: unknown, depth = 0): boolean {
+	if (depth > MAX_CONTENT_WALK_DEPTH) {
+		return false;
+	}
+	if (typeof value === "string") {
+		return hasForbiddenShape(value);
+	}
+	if (Array.isArray(value)) {
+		return value.some((item) => containsForbiddenContent(item, depth + 1));
+	}
+	if (typeof value === "object" && value !== null) {
+		for (const [key, item] of Object.entries(value)) {
+			// A key is document text too: a token in key position is the same leak, and the pre-parse scan
+			// has the same escape blind spot in key position as it does in value position.
+			if (hasForbiddenShape(key)) {
+				return true;
+			}
+			if (containsForbiddenContent(item, depth + 1)) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 /** Whether two fingerprints describe the same file state (both members, D-12). */

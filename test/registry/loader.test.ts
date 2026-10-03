@@ -443,6 +443,100 @@ test("the mask is case-insensitive, so an uppercase hash is the shape problem it
 	assert.deepEqual(result.problems, [{ kind: "schema_invalid" }]);
 });
 
+// --- B-31: the raw-text scan is pre-parse, so a JSON escape is a second, post-parse gate ---
+
+/**
+ * The fixture token with its colon written as a JSON escape.
+ *
+ * As **file text** this is `1234567\u003aAAHk…`, which carries no literal `\d+:` and therefore passes
+ * R5's raw-text scan; as a **parsed value** it is the token. That gap is B-31.
+ */
+const ESCAPED_FIXTURE_TOKEN = FIXTURE_TOKEN.replace(":", "\\u003a");
+
+/** The JSON *text* of `document`, with every token rewritten into its escaped form. */
+function asEscapedText(document: unknown): string {
+	return JSON.stringify(document).replaceAll(FIXTURE_TOKEN, ESCAPED_FIXTURE_TOKEN);
+}
+
+test("a token hidden from the raw scan by a JSON escape in a VALUE is still refused (B-31)", () => {
+	// A minimal document on purpose, so the premise is assertable at document level. Every valid registry
+	// carries a `roster_hash`, whose `sha256:<64 hex>` value matches the token regex by accident (B-27), so
+	// a full document always contains *some* token shape and the premise could not be checked against it.
+	// Here the escaped token is the only token-shaped thing this text could carry — and it does not.
+	const text = `{"note":"${ESCAPED_FIXTURE_TOKEN}"}`;
+	assert.equal(
+		TELEGRAM_BOT_TOKEN_RE.test(text),
+		false,
+		"the escaped form must carry no literal token shape, or this test proves nothing",
+	);
+	assert.equal(JSON.parse(text).note, FIXTURE_TOKEN, "the escape must still resolve to the real token");
+
+	const result = parseRegistryText(text);
+	if (result.ok) {
+		assert.fail("a token that only exists after parsing must still be refused");
+	}
+	assert.deepEqual(result.problems, [{ kind: "forbidden_content" }]);
+	assert.equal(JSON.stringify(result).includes(FIXTURE_TOKEN), false, "the result must never carry the match");
+});
+
+test("a token hidden from the raw scan by a JSON escape in a KEY is still refused (B-31)", () => {
+	// `project-file.ts` walks key names as document text too (a token in key position is the same leak),
+	// so the registry's gate has to make the same call or the two files disagree about one rule.
+	const leaky = validRegistryDocument();
+	const withTokenKey = { ...leaky.groups[0], [FIXTURE_TOKEN]: "value" };
+	const result = parseRegistryText(asEscapedText({ ...leaky, groups: [withTokenKey] }));
+	if (result.ok) {
+		assert.fail("a token in key position must be refused, escaped or not");
+	}
+	assert.deepEqual(result.problems, [{ kind: "forbidden_content" }]);
+});
+
+test("the post-parse gate descends nested objects and arrays, not only top-level fields (B-31)", () => {
+	const leaky = validRegistryDocument();
+	const nested = { ...leaky.projects[0], extra: [{ deeper: [FIXTURE_TOKEN] }] };
+	const result = parseRegistryText(asEscapedText({ ...leaky, projects: [nested] }));
+	if (result.ok) {
+		assert.fail("a token nested in an array of objects must be refused");
+	}
+	assert.deepEqual(result.problems, [{ kind: "forbidden_content" }]);
+});
+
+test("the canonical roster hash stays exempt through the post-parse gate (the B-27 regression guard)", () => {
+	// This is the half that can break in the other direction, and the reason the gate must reuse
+	// `withoutRosterHashes`: `roster_hash` is required on every binding and its `sha256:<64 hex>` value
+	// matches the token regex by accident, so a gate that checked parsed values unmasked would refuse
+	// EVERY valid registry — B-27's failure, reintroduced through the new path.
+	const valid = validRegistryDocument();
+	const result = parseRegistryText(asEscapedText(valid));
+	if (!result.ok) {
+		assert.fail(`a valid registry must still load; got ${JSON.stringify(result.problems)}`);
+	}
+	assert.equal(result.registry.bindings[0]?.roster_hash, VALID_ROSTER_HASH);
+
+	// And the exemption must not shadow the gate: the same document, plus one escaped token elsewhere,
+	// is refused. Masking the hash must not turn the walk off.
+	const both = validRegistryDocument();
+	both.groups[0] = { ...both.groups[0], title: FIXTURE_TOKEN };
+	const bothResult = parseRegistryText(asEscapedText(both));
+	if (bothResult.ok) {
+		assert.fail("an escaped token must be refused even when a canonical hash is also present");
+	}
+	assert.deepEqual(bothResult.problems, [{ kind: "forbidden_content" }]);
+});
+
+test("a pathologically deep document is refused as a problem, never as a RangeError (B-31 guard)", () => {
+	// Guards the new gate rather than the old scan: a recursive walk without a depth bound throws a
+	// `RangeError` on a document `JSON.parse` handles happily, which would crash the documented pre-commit
+	// path with a stack trace instead of a verdict. `shared/project-file.ts` bounds its own walk for the
+	// same reason and this one must not be the weaker of the two.
+	const deep = `{"projects":${'['.repeat(20_000)}${']'.repeat(20_000)}}`;
+	const result = parseRegistryText(deep);
+	if (result.ok) {
+		assert.fail("a document that deep is not a registry");
+	}
+	assert.equal(result.problems.length > 0, true, "a refusal, not a thrown RangeError");
+});
+
 // --- R6: this module has no path that writes a binding ---
 
 test("the loader exposes no write path, and hands out one stable snapshot (R6)", () => {
