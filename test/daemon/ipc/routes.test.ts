@@ -168,7 +168,7 @@ interface Harness {
 	reload(document: unknown): Promise<void>;
 }
 
-async function withHarness(run: (h: Harness) => Promise<void>): Promise<void> {
+async function withHarness(run: (h: Harness) => Promise<void>, routesDepsOverrides: Partial<RoutesDeps> = {}): Promise<void> {
 	const home = mkdtempSync(join(tmpdir(), "conmuta-routes-"));
 	const registryPath = join(home, "registry.json");
 	const ledger = openLedger({ homeDir: home });
@@ -212,6 +212,7 @@ async function withHarness(run: (h: Harness) => Promise<void>): Promise<void> {
 		handshakeStore,
 		sessionStore,
 		daemon: { pid: 424242, started_at: "2026-01-01T00:00:00.000Z", secret_store_kind: "keychain" },
+		...routesDepsOverrides,
 	};
 
 	const server = createIpcServer({ handlers: createSessionRoutes(deps) });
@@ -262,7 +263,7 @@ function validSessionRequestBody(h: Harness, overrides: Record<string, unknown> 
 		group_id: GROUP_ID,
 		roster_hash: ROSTER_HASH,
 		host: "claude-code",
-		pid: 555,
+		pid: process.pid,
 		hmac: expectedSessionProof(h.secret, serverNonce),
 		server_nonce: serverNonce,
 		...overrides,
@@ -590,10 +591,16 @@ test("POST /tools/status reaches serveStatus: reports this session's real bindin
 		const { bearer } = await openValidSession(h);
 		const res = await sendRequest({ port: h.port, method: "POST", path: "/tools/status", body: "{}", authorization: `Bearer ${bearer}` });
 		assert.equal(res.status, HTTP_OK, res.bodyText);
-		const parsed = JSON.parse(res.bodyText) as { agent_id: string; chat_id: number; binding: { project_id: string } };
+		const parsed = JSON.parse(res.bodyText) as {
+			agent_id: string;
+			chat_id: number;
+			binding: { project_id: string };
+			daemon: { sessions: { active: number; max: number } };
+		};
 		assert.equal(parsed.agent_id, "@alice-agent");
 		assert.equal(parsed.chat_id, GROUP_ID);
 		assert.equal(parsed.binding.project_id, PROJECT_ID);
+		assert.deepEqual(parsed.daemon.sessions, { active: 1, max: 64 });
 	});
 });
 
@@ -1008,3 +1015,78 @@ test("route-level schema validation refuses a malformed /channel/cursor body wit
 		assert.deepEqual(cursorRows(h.db), [], "a malformed body is refused before ensure");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Dead-PID session sweep (B-106 remainder)
+// ---------------------------------------------------------------------------
+
+test("POST /session sweeps dead sessions: a defunct client PID has its bearer revoked and slot reclaimed", async () => {
+	const alivePids = new Set<number>([1111, 2222, 3333]);
+	await withHarness(
+		async (h) => {
+			const s1 = await openValidSession(h, { pid: 1111 });
+			const s2 = await openValidSession(h, { pid: 2222 });
+			assert.equal(h.sessionStore.size, 2);
+
+			// Simulate PID 1111 dying abruptly (e.g. SIGKILL, IDE closed without DELETE /session)
+			alivePids.delete(1111);
+
+			// Opening a new session sweeps defunct sessions
+			const s3 = await openValidSession(h, { pid: 3333 });
+
+			// Session 1111 should be revoked, so total active sessions is 2 (2222 and 3333), not 3
+			assert.equal(h.sessionStore.size, 2);
+			assert.equal(h.sessionStore.validate(s1.bearer), false, "dead PID's bearer must be revoked");
+			assert.equal(h.sessionStore.validate(s2.bearer), true, "live PID's bearer must survive");
+			assert.equal(h.sessionStore.validate(s3.bearer), true, "new session bearer must be active");
+
+			// Calling a tool route with the revoked bearer now fails with 401
+			const res = await sendRequest({
+				port: h.port,
+				method: "POST",
+				path: "/tools/status",
+				body: "{}",
+				authorization: `Bearer ${s1.bearer}`,
+			});
+			assert.equal(res.status, HTTP_UNAUTHORIZED);
+		},
+		{
+			isProcessAlive: (pid: number) => alivePids.has(pid),
+		},
+	);
+});
+
+test("POST /session at capacity sweeps dead sessions to make room for a new session", async () => {
+	const alivePids = new Set<number>();
+	// We start with PID 100 dead
+	await withHarness(
+		async (h) => {
+			// Pre-fill the session store to capacity (MAX_ACTIVE_SESSIONS = 64)
+			// One session opened with PID 100 (which will die)
+			const deadSession = await openValidSession(h, { pid: 100 });
+			alivePids.add(100);
+
+			// Fill remaining 63 slots directly in sessionStore
+			const dummyNonce = "d".repeat(32);
+			while (h.sessionStore.size < 64) {
+				const bearer = h.sessionStore.mint(dummyNonce, expectedSessionProof(h.secret, dummyNonce));
+				assert.ok(bearer);
+			}
+			assert.equal(h.sessionStore.size, 64);
+
+			// Now PID 100 dies
+			alivePids.delete(100);
+
+			// A new session request for PID 200 arrives.
+			// With dead-PID sweep, the dead session is revoked, freeing a slot, so mint succeeds!
+			alivePids.add(200);
+			const { status, parsed } = await postSession(h, validSessionRequestBody(h, { pid: 200 }));
+			assert.equal(status, HTTP_OK, `expected success, got ${JSON.stringify(parsed)}`);
+			assert.equal(h.sessionStore.validate(deadSession.bearer), false);
+		},
+		{
+			isProcessAlive: (pid: number) => alivePids.has(pid),
+		},
+	);
+});
+

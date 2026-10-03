@@ -109,6 +109,7 @@ import { serveFetch, type ServeFetchDeps } from "../serve/fetch.js";
 import { serveStatus, type ServeStatusDeps, type StatusDaemonFacts } from "../serve/status.js";
 import { serveThread, ThreadToolError, type ServeThreadDeps } from "../serve/thread.js";
 import { classifyErrorChain } from "../telegram.js";
+import { isProcessAlive } from "../lifecycle/lock.js";
 import type { PendingHandshakeStore } from "./handshake.js";
 import type { IpcHandler, IpcRequest, IpcResponse } from "./server.js";
 import type { SessionStore } from "./sessions.js";
@@ -185,6 +186,11 @@ export interface RoutesDeps {
 	 * default here).
 	 */
 	readonly generateId?: () => string;
+	/**
+	 * Checks whether a client process is alive. Injected for testing; production defaults to
+	 * {@link isProcessAlive} from `daemon/lifecycle/lock.ts`.
+	 */
+	readonly isProcessAlive?: (pid: number) => boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +219,29 @@ function sameFrozenBinding(a: FrozenBindingSnapshot, b: FrozenBindingSnapshot): 
 
 function frozenSnapshotOf(binding: ManagedBinding["binding"]): FrozenBindingSnapshot {
 	return { bot_id: binding.bot_id, group_id: binding.group_id, agent_id: binding.agent_id };
+}
+
+/**
+ * Sweeps the in-memory session map for clients whose operating system process has exited.
+ * Reclaims active bearer slots in {@link SessionStore} when client processes were killed or exited
+ * without a graceful `DELETE /session` release (B-106 remainder).
+ *
+ * @returns the count of reclaimed dead-PID session slots.
+ */
+export function sweepDeadSessions(
+	deps: RoutesDeps,
+	sessions: Map<string, FrozenSessionRecord>,
+): number {
+	const checkAlive = deps.isProcessAlive ?? isProcessAlive;
+	let swept = 0;
+	for (const [bearer, record] of sessions.entries()) {
+		if (!checkAlive(record.pid)) {
+			deps.sessionStore.revoke(bearer);
+			sessions.delete(bearer);
+			swept++;
+		}
+	}
+	return swept;
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +416,9 @@ function createOpenSessionHandler(
 			return { status: HTTP_BAD_REQUEST, body: ipcTransportError(IPC_BAD_REQUEST, "invalid POST /session body") };
 		}
 		const parsed = parseResult.data;
+
+		// Reclaim defunct session slots before nonce consumption and minting (B-106 remainder)
+		sweepDeadSessions(deps, sessions);
 
 		const managed = deps.bindings.getBinding(parsed.project_id);
 		if (managed === undefined) {
@@ -574,6 +606,8 @@ function createStatusHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessi
 			return auth.response;
 		}
 
+		sweepDeadSessions(deps, sessions);
+
 		const parsedInput = statusInputSchema.safeParse(request.body);
 		if (!parsedInput.success) {
 			return { status: HTTP_BAD_REQUEST, body: ipcTransportError(IPC_BAD_REQUEST, "invalid POST /tools/status body") };
@@ -592,7 +626,10 @@ function createStatusHandler(deps: RoutesDeps, sessions: Map<string, FrozenSessi
 				reminder_window_hours: auth.managed.config.reminder_window_hours,
 			},
 			session: { client_id: auth.session.client_id },
-			daemon: deps.daemon,
+			daemon: {
+				...deps.daemon,
+				active_sessions: deps.sessionStore.size,
+			},
 			now,
 		};
 
