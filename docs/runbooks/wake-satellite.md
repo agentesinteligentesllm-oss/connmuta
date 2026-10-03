@@ -151,19 +151,26 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 - **A woken turn is headless.** There is no human at a permission prompt. That is why `wake` is the default
   for an enabled binding and why `off` is the default overall.
 - **The argv templates mirror the RFC's proposal** (`pi -p`, `claude -p`, `codex exec`, `opencode run`) and the
-  prompt is appended as the final argument. **`pi -p` is verified against Pi 0.99.2 on Windows (2026-10-01): the
-  turn started, called `conmuta_fetch` and read its inbox.** The other three are still unverified against
-  installed versions. Harness CLIs change: verify the form by hand for the version you have installed, and use
-  `--arg` if it differs. The phase's tests pin the *shape* (closed executable, literal argv, `shell: false`,
-  confined cwd and environment), not any particular harness version's flags.
-- **On Windows the four harnesses are `.cmd` shims, and the runner refuses them.** npm installs `pi`,
-  `claude`, `codex` and `opencode` as batch shims, and a process started with `shell: false` cannot execute a
-  `.cmd` (`EINVAL` — pinned by `test/runner/harness.test.ts`'s "a launch failure is `unavailable`, never a
-  shell fallback"). The ledger then shows `wake` with `outcome: "unavailable"` and the message **stays
-  pending**, so a permanently misconfigured harness produces one refusal a minute instead of losing anything.
-  The fix is a **real executable** that takes the same argv: a small shell-free launcher (the team's working
-  example is a Go `pi.exe` that runs `exec.Command` with a literal argv) delivered **only to the runner
-  process's environment**, by prepending its directory to that process's own `PATH`.
+  prompt is appended as the final argument. **All four forms are verified live against installed versions on
+  Windows 11 (sessions 60 and 66)**:
+  - `pi -p`: verified end to end on the bus (Pi 0.99.2 / 1.0.1; 2026-10-01) — the turn started, called `conmuta_fetch`,
+    read its inbox, and posted replies with `conmuta_send`.
+  - `claude -p`: verified live (Claude Code 2.1.283; 2026-10-03) — parsed `-p` and processed headless prompt directly.
+  - `codex exec`: verified live (Codex CLI 0.152.1; 2026-10-03) — parsed `exec` and processed headless prompt with
+    `stdio: ["ignore", "pipe", "pipe"]`.
+  - `opencode run`: verified live (Opencode 1.18.31; 2026-10-03) — parsed `run` and processed headless prompt with
+    `stdio: ["ignore", "pipe", "pipe"]`.
+  The phase's tests pin the *shape* (closed executable, literal argv, `shell: false`, confined cwd and environment),
+  and the default argv table in `runner/constants.ts` matches real CLIs.
+- **On Windows npm harnesses are `.cmd` shims, and the runner refuses them under `shell: false`.** npm installs
+  `pi`, `codex` and `opencode` as batch shims, and a process started with `shell: false` cannot execute a `.cmd`
+  (`EINVAL` — pinned by `test/runner/harness.test.ts`'s "a launch failure is `unavailable`, never a shell fallback").
+  `claude` on Windows ships a native PE binary (`~/.local/bin/claude.exe`), so it starts directly without a shell.
+  For `pi`, `codex` and `opencode`, both `@openai/codex` and `opencode-ai` package precompiled native `.exe` binaries
+  inside their platform packages, and the working remedy for any harness requiring one is a **real executable**
+  that takes the same argv: a small shell-free launcher (the team's working example is a Go `pi.exe` that runs
+  `exec.Command` with a literal argv) delivered **only to the runner process's environment**, by prepending its
+  directory to that process's own `PATH`.
 - **Never put that executable on the machine `PATH`.** A `pi.exe` ahead of npm's `pi.cmd` would shadow the
   interactive `pi` command for **every** terminal on the machine. The runner's shell-free requirement is the
   runner's; the rest of the machine keeps its shims.

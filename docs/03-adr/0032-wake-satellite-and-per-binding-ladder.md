@@ -259,3 +259,12 @@ work** — the core's isolation is untouched by construction, not by promise.
 **What is not verified yet:** the tests drive a scripted daemon link and a scripted turn; no real
 end-to-end run (a live daemon, a real harness, a real message) has been performed, and the four harness argv
 forms have not been exercised against installed harness versions. Filed as **B-105**.
+
+### Resolution of B-105 (sessions 60, 61, 66)
+
+- **B-105(a) (SDD artifact set)**: closed in session 61 (2026-10-01) and archived to
+  `openspec/changes/archive/2026-10-01-f7a-wake-satellite/`.
+- **B-105(b) (real end-to-end run and live harness argv verification)**: closed in sessions 60 and 66.
+  `pi -p` verified end to end on the bus with real messages in session 60. In session 66, all four
+  harnesses (`pi`, `claude`, `codex`, `opencode`) installed on Windows 11 were verified live against real
+  binaries with `shell: false`. `HARNESS_DEFAULT_ARGS` in `runner/constants.ts` matches real CLIs exactly.
