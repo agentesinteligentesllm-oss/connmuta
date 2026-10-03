@@ -120,7 +120,13 @@ verify `conmuta.json` (identifiers only) and the registry binding.
 - WHEN `conmuta project bind` is run selecting that same bot for a second active binding
 - THEN the command refuses citing R1 and neither `conmuta.json` nor the registry is written
 
-Traces: OVERVIEW §10.2 "Assign project"; DATA-MODEL.md §2.5 R1-R4; CONSTITUTION.md §2 inv. 1
+#### Scenario: A conflicting or malformed tool-config entry is refused before any write
+
+- GIVEN a selected tool whose project config already contains a conflicting entry under the server name or is malformed
+- WHEN `conmuta project bind` runs with that tool selected
+- THEN the command refuses citing the tool config refusal reason before writing `conmuta.json` and before committing the registry binding, and leaves the project and registry unchanged
+
+Traces: OVERVIEW §10.2 "Assign project"; DATA-MODEL.md §2.5 R1-R4; CONSTITUTION.md §2 inv. 1; ADR-0035
 
 ### Requirement: Written tool-config files are gitignored, never committed as-is
 

@@ -99,7 +99,8 @@ substitute for an unreachable Arena (Judgment Day) in `bus-v2-b104-wake-satellit
 `proposed` until the Director confirms it (pending board row 21); 0033 was authorized and confirmed
 `accepted` by the Director on 2026-10-01 (B-107), reviewed under the same substitute in
 `bus-v2-b107-optional-project-001`; 0034 was applied on 2026-10-02 under that session's standing Director
-authorization (no separate confirmation requested; B-109):
+authorization (no separate confirmation requested; B-109); 0035 was applied on 2026-10-03 under that session's standing Director
+authorization (no separate confirmation requested; B-111):
 
 | File | Decision | Supersedes |
 |------|----------|------------|
@@ -110,6 +111,7 @@ authorization (no separate confirmation requested; B-109):
 | [`0032-wake-satellite-and-per-binding-ladder.md`](./03-adr/0032-wake-satellite-and-per-binding-ladder.md) | The wake satellite outside the core + the per-binding ladder `off`·`notify`·`wake`·`autopilot`, human-only machine-local opt-in, bounds and a self-reported wake ledger (B-104; `proposed`, pending the Director — board row 21) | 0006 in part and 0029 in part (the satellite's phase target only) |
 | [`0033-project-flag-as-assertion.md`](./03-adr/0033-project-flag-as-assertion.md) | `--project` is an assertion, not a requirement: the thin client binds to the nearest ancestor `conmuta.json`, so one id-free registration serves every session under a tree (B-107; `accepted`, confirmed by the Director 2026-10-01) | 0028 rule 4 in part |
 | [`0034-id-free-installer-entry.md`](./03-adr/0034-id-free-installer-entry.md) | The installer writes id-free launcher entries: the project file is the binding, the entry is a launch recipe, so a copied or re-bound directory cannot carry a stale assertion (B-109; `accepted`, applied 2026-10-02 under the session's standing Director authorization) | 0031 rule 2 in part; states ADR-0033's filed open end |
+| [`0035-pre-validate-tool-configs-in-project-bind.md`](./03-adr/0035-pre-validate-tool-configs-in-project-bind.md) | Pre-validate tool-config merges in `project bind` before any write: zero partial bind (B-111; `accepted`, applied 2026-10-03 under the session's standing Director authorization) | refines installer-wizard "before writing anything" guarantee |
 
 ### `05-tribunal/` — debate record
 
