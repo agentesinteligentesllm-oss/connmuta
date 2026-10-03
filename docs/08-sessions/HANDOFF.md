@@ -64,7 +64,7 @@ consentimiento de la revisión nativa es del Director, no tuyo.
 1. **Autonomy**: confirm the opening prompt re-states it; if it does not, ask one question.
 2. **Memory**: start an Engram session (`mem_session_start`) and pass its id to `mem_save`. This
    repository's Engram project is **`connmuta`** (§8).
-3. **Arena**: prove reachability with a real tool call, never `curl` alone. Session 63's evidence:
+3. **Arena**: prove reachability with a real tool call, never `curl` alone. Sessions 63 and 64 evidence:
    `pi mcp list` shows **no `arena` server registered**, and a TCP connect to the documented endpoint
    (`timeout 5 bash -c '</dev/tcp/127.0.0.1/8765'`) answers **connection refused**. That satisfies DN-09's
    substitute condition directly, and the audit runs under Judgment Day.
@@ -278,7 +278,7 @@ consentimiento de la revisión nativa es del Director, no tuyo.
 | **B-111** | `project bind` aborts *after* the registry commit and the `conmuta.json` write when a tool-config merge refuses, leaving a partially applied bind whose re-run can trip the bijective invariants. Found by Judgment Day round 1 of session 63; needs a decision (it touches the bind wizard's ordering guarantee and the `installer-wizard` spec) | Kairo (F2 follow-up) |
 | **B-95 remainder / B-102 residuals** | B-95(d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded parse needs its own decision; three non-blocking notes. B-102 (a)(b)(c)(f)(g); (f) keeps resurfacing | Kairo, "cheap at the next touch" |
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), three backups to delete once nothing needs reverting | Director |
-| The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–63. **Also undispositioned**: session 63's candidate left no lineage (the host declined it), so there is nothing to abandon | Director/maintainer |
+| The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–64. **Also undispositioned**: session 63/64 candidates left no lineage (the host declined them), so there is nothing to abandon | Director/maintainer |
 | ADR-0032 | still `proposed` (pending the Director's confirmation and its three sub-questions, board row 21) — the wake satellite has been shipped, running and audited since session 59, so this is a bookkeeping gap, not a functional one | Director |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
@@ -299,7 +299,7 @@ consentimiento de la revisión nativa es del Director, no tuyo.
   retired. Both files were backed up before being changed
   (`mcp.json.bak-pre-project-scope-20260930-215503`, `mcp.json.bak-pre-b107-…`).
 - **Arena**: no `arena` MCP server is registered for Pi, and `127.0.0.1:8765` refuses connections
-  (session 63). `.mcp.json` still holds the (gitignored) bridge credential; never commit or quote it.
+  (sessions 63, 64). `.mcp.json` still holds the (gitignored) bridge credential; never commit or quote it.
 - v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, read-only.
 - **The local bus (conmuta) is live on this machine**: daemon home `~/.conmuta/`, two bots
   (`agente_kairo_bot`, `agent_luisgtz_bot`) and two bindings — `telegram-bus-agent` (this repository, group
