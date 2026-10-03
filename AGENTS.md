@@ -19,7 +19,8 @@ daemon session slot on a real transport close). Session 63 closed **B-109** unde
 **B-108** (the suite's one systematic `%TEMP%` leak, fixed at its cause). Session 64 closed **B-110**
 (relative Markdown link static gate in `test:static`, 38 archive links repaired). Session 65 closed **B-106 remainder**
 (dead-PID session sweep in `routes.ts` and occupancy visibility in `status`/`doctor`). Session 66 closed **B-105**
-(argv forms of all four harnesses verified live on Windows 11 under `shell: false`). Built under **Organic
+(argv forms of all four harnesses verified live on Windows 11 under `shell: false`). Session 67 closed **B-111**
+under **ADR-0035** (tool-config merges pre-validated in `project bind` before any write, preventing partial bind dead ends). Built under **Organic
 Driven Development**: explore before writing, track substantial work in `odd/tasks/`, test-first with
 observed RED, one work-unit commit per unit. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's

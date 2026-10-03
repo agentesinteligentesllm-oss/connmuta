@@ -4,6 +4,51 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 67 — B-111 closed completely under ADR-0035 (tool config pre-validation before project bind mutations)
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's explicit instruction and standing authorization — *"te solicito que tengas las riendas
+  que tome las riendas y que no me preguntes absolutamente nada. Confío plenamente en tu criterio y te autorizo todo lo
+  que consideres adecuado y necesario. Cuando termines necesito que revise la documentación que esté actualizada, que
+  no haya confusión en ambigüedades, que prepares el handof para la siguiente sesión y necesito que me des en tres líneas
+  un mini prompt para continuar con la siguiente sesión."*
+- **Preflight**: `git fetch`/`status` clean; baseline suite **1869/1863/0/6** and `test:static` **101/101** from a removed
+  `dist/`; `gentle-ai` 4.0.0; RDD `on (decided by global)`; **Arena unreachable** — TCP probe to `127.0.0.1:8765`
+  answered `Connection refused` (exit code 1) and `pi mcp list` has no `arena` registered, confirming DN-09's
+  substitute condition.
+- **B-111 closed completely under Organic Driven Development (ADR-0035, Option a)**:
+  1. **ODD tracking**: `odd/tasks/b-111-project-bind-prevalidation.md` opened and mirrored to Engram topic
+     `odd/b-111-project-bind-prevalidation/tasks`.
+  2. **Strict TDD with observed RED**:
+     - **Pre-flight check**: Added `checkFileEdit(options: Omit<EditFileOptions, "now">): CheckFileEditOutcome` to
+       `src/installer/file-edit.ts`. Executes steps 1–4 of the edit pipeline in read-only mode (symlink check, absent check,
+       strict parse, entry conflict check) without making any writes, creating temp files, or taking backups. Pinned by
+       6 dedicated tests in `test/installer/file-edit.test.ts` (observed RED before GREEN).
+     - **Pre-validation in wizard**: In `src/installer/wizards/project-bind.ts`, resolved tool targets immediately after
+       R1–R3 checks and ran `checkFileEdit` on all targets *before* `writeProjectFile` and *before* `commitRegistryChange`.
+     - **Outcome variant**: Added `{ outcome: "tool-config-refused", toolId, path, reason, message }` to `ProjectBindOutcome`.
+       When any tool config refuses (conflict, parse error, symlink), `runProjectBind` returns immediately. Crucially,
+       neither `conmuta.json` nor `registry.json` is written, eliminating the partial-bind dead end where bijective invariants
+       R1/R2 block re-runs. Pinned by tests in `test/installer/wizards/project-bind.test.ts`.
+     - **CLI reporting**: In `src/cli/main.ts`, `reportProjectBindOutcome` handles `"tool-config-refused"`, prints the refusal
+       reason, tool id, and diff to stderr, and exits with code 1. Pinned by test in `test/cli/main.test.ts`.
+     - **ADR-0035**: Authored `docs/03-adr/0035-pre-validate-tool-configs-in-project-bind.md` (`accepted` under standing authorization).
+     - **Documentation reconciled**: Updated `docs/03-adr/INDEX.md`, `docs/00-INDEX.md`, `openspec/specs/installer-wizard/spec.md`
+       (new scenario and trace for tool-config refusal before any write), `docs/06-backlog/CHECKLIST.md` (row B-111 marked `done`).
+  3. **RDD native review & Independent verification**:
+     - `gentle_review` `inspect` -> START resolved to **`declined_this_candidate`** (host-resolved, `lineage_created: false`,
+       `mutation_performed: false`, `risk_level: high`, `outcome: consent-declined-this-candidate`).
+     - `assess` returned the RDD-off risk-gated plan: writer self-verifies and separate independent verifier always runs.
+     - Independent technical verification by `gentle-ai-verify` subagent (task `musunsj7-1-3w37`): PASS on all 5 claims with
+       line-level citations and clean suite execution.
+  4. **Verification**: Full suite `npm test` **1878 / 1872 / 0 / 6** (+9 tests); `test:static` **101 / 101** pass; zero temp growth
+     under `%TEMP%`.
+  5. **Commits on `main`**:
+     - `7a18006` feat(installer): add checkFileEdit for read-only pre-flight validation (B-111)
+     - `523f7d6` feat(installer): pre-validate tool configs before project bind mutations (B-111)
+     - `2701945` feat(cli): report tool-config-refused cleanly on project bind (B-111)
+     - `57bb5e5` docs(adr): record ADR-0035 for project bind tool config pre-validation (B-111)
+
 ## Session 66 — B-105 closed completely (wake satellite harness argv forms verified live)
 
 - **Date**: 2026-10-03 local time.
