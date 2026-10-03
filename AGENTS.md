@@ -20,7 +20,10 @@ daemon session slot on a real transport close). Session 63 closed **B-109** unde
 (relative Markdown link static gate in `test:static`, 38 archive links repaired). Session 65 closed **B-106 remainder**
 (dead-PID session sweep in `routes.ts` and occupancy visibility in `status`/`doctor`). Session 66 closed **B-105**
 (argv forms of all four harnesses verified live on Windows 11 under `shell: false`). Session 67 closed **B-111**
-under **ADR-0035** (tool-config merges pre-validated in `project bind` before any write, preventing partial bind dead ends). Built under **Organic
+under **ADR-0035** (tool-config merges pre-validated in `project bind` before any write, preventing partial bind dead ends). Session 68 closed **B-102**
+(the daemon's shutdown latch is now checked across all three windows where it matters — a fresh reconcile, a reconcile already in flight, and the poller factory itself, which
+receives an abort signal; `stop()` also records in `daemon.log` the stalled tick it gave up on). Its first attempt at the in-flight window was **rejected by an independent judge** and corrected,
+and that audit is recorded as **partial** (one judge, not two) in [HANDOFF](./docs/08-sessions/HANDOFF.md) §5. Built under **Organic
 Driven Development**: explore before writing, track substantial work in `odd/tasks/`, test-first with
 observed RED, one work-unit commit per unit. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's

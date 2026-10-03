@@ -4,6 +4,87 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+## Session 68 — B-102 residuals closed, and (f) corrected after an independent judge rejected the first fix
+
+- **Date**: 2026-10-03 local time.
+- **Authority**: the Director's explicit instruction — *"adelante con tu recomendación, continúa, y hazlo con maestría"* —
+  after the session's opening prompt asked for the handoff read and a real Arena probe.
+- **Preflight**: `git fetch`/`status` clean at `8ee3ddf`; baseline suite **1878/1872/0/6** and `test:static` **101/101** from a
+  removed `dist/`; `gentle-ai` 4.0.0; RDD `on (decided by global)`; **Arena unreachable** — `pi mcp list` shows no
+  `arena` server and a TCP probe to `127.0.0.1:8765` answered `Connection refused` (exit 1), satisfying DN-09's
+  substitute condition. Engram session started (`session-68`, project `connmuta`).
+- **B-102 closed completely.** Backlog row B-102 carried five open findings from B-98's own RDD review, all residuals of
+  the daemon shutdown path. (d) and (e) were already closed in sessions 56/57; this session closed (a), (b), (c), (f)
+  and (g). ODD tracking in `odd/tasks/b-102-residuals.md`, mirrored to Engram topic `odd/b-102-residuals/tasks`.
+  1. **(f), the finding that kept resurfacing — fixed, but only after the first attempt was REJECTED.** The first
+     attempt (`aa7fbd8`) put the `stopping` check at the top of `reconcile()` only. That covers a reconcile that
+     *begins* after `stopAll()`, which no production caller can produce: `stop()` clears the heartbeat interval
+     before the latch is set and `onTick` already refuses to overlap ticks. The window (f) names is a reconcile
+     **already in flight** when `STOP_TICK_TIMEOUT_MS` expires, and that one is past the top check, so it still
+     reached `buildTransport` and then `createPoller`, whose first statement prepares a statement against the
+     ledger `stop()` had closed. The independent judge that caught it supplied the exact verification, and the
+     defect was then reproduced end to end: `heartbeat tick failed: database is not open` in `daemon.log`.
+     **Corrected in `5bf647a`**: the in-flight path re-checks the latch at the top of each binding still to
+     process (`break`) and again immediately after `buildTransport` resolves (`continue`, discarding the
+     transport — it owns no socket, and the pre-existing post-`createPoller` guard already discarded one the
+     same way); and the poller factory now receives an `AbortController` signal that `stopAll()` aborts, so a
+     factory already entered and still awaiting a secret-store read hands `startPoller` an already-aborted
+     signal, whose loop body never runs and never prepares a statement (`startPoller` already supported
+     `signal`; the reconciler simply never used it). Three windows, three checks, none substituting for
+     another. The false claim in `aa7fbd8`'s own comment — that the timeout-then-late-resolve path was
+     "exactly reachable" from the fresh-call check — is corrected in place.
+  2. **(a) the untested update-existing-binding branch, pinned.** New test in `test/daemon/bindings.test.ts`: seed a
+     managed binding, change its `roster_hash` to force the update branch, gate the replacement `createPoller`, run
+     `stopAll()` inside that window, release, and assert the replacement poller was stopped exactly once while
+     `result.updated` stayed empty. The behaviour already existed, so there was no RED-as-bug; **non-vacuity was proven by
+     mutation** (deleting the guard makes the test fail; the tree was restored and `git status` confirmed clean).
+  3. **(g) the silent give-up, recorded.** `raceAgainstTimeout` deliberately keeps its documented contract (a timeout is
+     silent; the caller checks its own state), so `stop()` now observes the in-flight tick's settlement through
+     `.then(onFulfilled, onRejected)` — which also preserves the `catch(() => {})` that kept a rejection from escaping —
+     and writes one `daemon.log` line naming `STOP_TICK_TIMEOUT_MS` only when the tick had not settled. **RED observed
+     first** (the line was absent). A tick that settles inside the bound writes nothing, pinned by its own precision test
+     and verified non-vacuous by mutation (logging unconditionally fails that test).
+  4. **(c) the latch's contract stated.** `BindingsReconciler.stopping`'s doc comment now says the latch is never
+     cleared, that `stopAll()` is terminal and once-per-process, and names both windows it covers.
+  5. **(b) the fixed sleeps replaced.** The two negative assertions that proved a poller stopped by sampling a counter
+     and sleeping a fixed 60 ms (the B-98 test) and 40 ms (the sibling "overlapping heartbeat tick" test) now use
+     `assertStableFor`, a bounded observation window that fails fast and reports the value it actually saw. The 40 ms
+     site was converted too: identical pattern, same file, and leaving it would have kept alive exactly what B-99
+     replaced.
+- **Inline verification (disclosed fallback, later superseded by a PARTIAL independent review).** The subagent runtime could not
+  execute tools for most of the session: `gentle-ai-verify` failed four times (the first task included reproducing the suite),
+  and `jd-judge-a` and `gentle-ai-explore` failed once each, all with the same `assistant reported an error` outcome,
+  while text-only probes of the same agents returned normally. The verification
+  was therefore performed inline, read-only, with citations, and is reported as self-verification: `reconcile()` is
+  called only at boot (`bootstrap.ts:242`) and inside the heartbeat tick (`:334`); `stopAll()` only from `stop()`
+  (`:282`) and the boot-failure cleanup (`:379`, which ends in `throw`); and `DaemonInstance` exposes `stop` but **not**
+  `reconcile`, so no real call path can reconcile after `stopAll()` — the new early guard cannot regress anything.
+  **No third-party verdict existed for this candidate when this paragraph was written.**
+- **Independent review: PARTIAL, and it found a CRITICAL this session had missed.** `jd-judge-b` completed and returned
+  two rows; `jd-judge-a` never ran (the runtime fault above), so this is one judge, not the two a Judgment Day needs,
+  and it is recorded as partial. **JD-B-001, CRITICAL, accepted and corrected**: the fresh-call check did not cover the
+  window B-102(f) actually describes, and the judge supplied the verification that reproduced it. Fixed in `5bf647a`
+  with the three-window design above, pinned at the bindings level and end to end, and mutation-measured (removing the
+  post-`buildTransport` check fails the in-flight test; removing that check *and* the abort fails the end-to-end test
+  with the real closed-ledger symptom). **JD-B-002, SUGGESTION, accepted and filed**: `bootstrap.test.ts:517` still
+  proves a negative with a bare 60 ms sleep — the same B-99 family this session removed two members of, but outside the
+  stop path, and its honest fix needs a positive observation of live ticks inside the window, so it was added to row
+  B-99 rather than converted here. **What the CRITICAL slipped past is worth keeping**: the self-verification asked
+  whether any caller reconciles after `stopAll()`, and the answer was no — which is precisely why that check could not
+  be the fix.
+- **RDD**: `inspect` offered `review.start` for target `sha256:6f94b8d9…`; START resolved to
+  **`consent-declined-this-candidate`** (`lineage_created: false`, `mutation_performed: false`, risk `medium`, 6 files /
+  415 changed lines, `correction_budget: 0`). A decline is candidate-scoped and is not the kill switch, so the RDD-off
+  risk-gated plan applies: writer self-verifies and the separate independent verifier runs — which is what the session
+  attempted before the runtime fallback above. START was not re-driven against the same, already-disposed candidate.
+- **Verification**: full suite `npm test` **1885 / 1879 / 0 / 6** (+7 tests), `test:static` **101 / 101**, zero
+  `%TEMP%\conmuta-*` growth across a full run.
+- **Commits on `main`**:
+  - `aa7fbd8` fix(daemon): check the stopping latch before reconcile starts any work (B-102f)
+  - `6118cd8` fix(daemon): bound and record the shutdown wait on an in-flight tick (B-102b, B-102g)
+  - `931b39c` docs(backlog): close the B-102 residuals with their evidence (B-102a,b,c,f,g)
+  - `5bf647a` fix(daemon): close B-102f in the window it actually names (the corrective work unit)
+
 ## Session 67 — B-111 closed completely under ADR-0035 (tool config pre-validation before project bind mutations)
 
 - **Date**: 2026-10-03 local time.

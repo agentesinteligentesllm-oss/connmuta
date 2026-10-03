@@ -4,19 +4,20 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 67** (2026-10-03 local). Every § carries session 67's state unless a line says otherwise.
+> **Last rewritten: end of session 68** (2026-10-03 local). Every § carries session 68's state unless a line says otherwise.
 >
-> **Session 67 in one paragraph — B-111 closed completely under ADR-0035 (tool config pre-validation in `project bind` before any write);
-> suite 1878/1872/0/6, test:static 101/101, zero temp leaks.** The instruction was open-ended under standing authorization
-> from the Director ("toma las riendas y no me preguntes absolutamente nada... confío plenamente en tu criterio...").
-> **B-111 landed under ODD (Option a)**: `checkFileEdit` added to `src/installer/file-edit.ts` (executing steps 1–4 of the edit
-> pipeline in read-only mode, with zero writes and zero backups); `runProjectBind` in `src/installer/wizards/project-bind.ts`
-> pre-validates all selected tool configs with `checkFileEdit` *before* `writeProjectFile` and *before* `commitRegistryChange`.
-> When any tool config refuses (conflict, parse error, symlink), `runProjectBind` returns `{ outcome: "tool-config-refused", toolId, path, reason, message }`.
-> In `src/cli/main.ts`, `reportProjectBindOutcome` formats the refusal details and diff on stderr and exits 1. Neither `conmuta.json`
-> nor `registry.json` is modified on refusal, eliminating the dead-end partial bind trap where bijective invariants R1/R2 block re-runs.
-> ADR-0035 authored and accepted under standing authorization. Specs and backlog updated. Full suite **1878/1872/0/6**,
-> `test:static` **101/101**, zero temp leaks.
+> **Session 68 in one paragraph — B-102 closed, and its finding (f) corrected after an independent judge rejected the
+> first fix. suite 1885/1879/0/6, test:static 101/101, zero temp leaks.** B-102 carried five open residuals of B-98's
+> shutdown work. (f) — re-confirmed CRITICAL by independent review passes in sessions 56 and 57 — is that a reconcile
+> **already in flight** when `STOP_TICK_TIMEOUT_MS` expires keeps working against the ledger `stop()` has closed. The
+> session's first attempt fixed the wrong window (a fresh reconcile after `stopAll()`, which no production caller can
+> produce); the independent judge caught it and supplied the verification, and the defect was reproduced end to end:
+> `heartbeat tick failed: database is not open`. `5bf647a` closes it with three checks over three windows — the fresh
+> call, the in-flight loop (before and after `buildTransport`), and an `AbortController` signal handed to the poller
+> factory so an already-entered factory yields a poller that touches no ledger. (g) `stop()` records the tick it gave
+> up on; (a) the untested update-existing-binding branch is pinned; (c) the latch's terminal contract is stated;
+> (b) two fixed-sleep stability assertions became a bounded observation window.
+> **The audit of this candidate is PARTIAL — §5 is the most important section to read.**
 
 ---
 
@@ -25,11 +26,11 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **Session 67 closed B-111 completely under ADR-0035.** All selected tool configs are pre-validated before any write, preventing partial binds on conflict/parse error. Row B-111 marked `done`. |
-| What is next? | Residuals: **B-95(d)** + `fetch.ts`'s unguarded parse, **B-102(a)(b)(c)(f)(g)**. **F6** still blocked on B-11/B-12/B-16. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). |
-| What is the Director's to decide? | The Engram housekeeping classification (299 legacy mutation rows, 88 `sync_state` rows, 2 ownership rows, 7 historical drift findings — `repairable: false`); B-11/B-12/B-16 for F6. |
-| Where to read next | §0 first; then §3 and §7. §4 is the list of traps. |
+| What is new? | **Session 68 closed B-102** (a, b, c, f, g), after an independent judge rejected the first attempt at (f); the corrected fix is `5bf647a`. Row B-102 marked `done`. |
+| What is next? | Residuals: **B-95 remainder**, **B-97** (POSIX symlinked-bin entry guard), **B-99** (now four members: three timer-based tests plus `bootstrap.test.ts:517`), **B-101**'s relocation question. **F6** still blocked on B-11/B-12/B-16. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Plus **subagent health** (§0.2 row 9): session 68's runtime could not execute tools, so most of its work was self-verified. |
+| What is the Director's to decide? | The Engram housekeeping classification; **B-11/B-12/B-16** for F6; and whether to complete the **partial** audit of session 68's candidate (§5). |
+| Where to read next | §0 first; then §3, §4 and **§5** (the audit limitation). |
 
 ---
 
@@ -38,45 +39,50 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4) y confirma Arena con una llamada real. Estado al cerrar la
-sesión 67: B-111 cerrado completamente bajo ADR-0035 (pre-validación de herramientas en `project bind`).
-Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los residuales B-95(d)/B-102.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3, §4, §5) y confirma Arena con una llamada real. Estado al cerrar la
+sesión 68: B-102 cerrado, con (f) corregido tras el rechazo de un juez independiente (tres ventanas: llamada nueva,
+reconcile en vuelo, y señal de aborto al factory del poller). Suite 1885/1879/0/6, test:static 101/101. La auditoría
+de esa sesión es PARCIAL (el runtime de subagentes no ejecutaba herramientas): si esta sesión tiene subagentes sanos,
+primero corre el segundo juez ciego sobre los commits aa7fbd8..5bf647a antes de seguir. Residuales siguientes: B-95,
+B-97, B-99.
 ```
 
 ### 0.2 First commands (stop and report if any output disagrees)
 
 | # | Command | Expected |
 |---|---|---|
-| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence, and a clean tree. Read `git log --oneline -12` rather than trusting a SHA written here: session 67's work sits on top of session 66's close-out. **Do not treat the commit base as a fixed number** — take it from `git log` |
+| 1 | `git fetch origin && git status -sb` | `## main...origin/main` with no divergence, and a clean tree. Read `git log --oneline -12` rather than trusting a SHA written here. **Do not treat the commit base as a fixed number** — take it from `git log` |
 | 2 | `rm -rf dist` | prints nothing |
 | 3 | `ls openspec/changes/` | `archive` only |
 | 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
-| 6 | `gentle-ai --version` | `3.7.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1878 tests, 1872 pass, 0 fail, 6 skip**; `test:static` **101/101** |
+| 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
+| 7 | `npm run build && npm test` | exit 0; **1885 tests, 1879 pass, 0 fail, 6 skip**; `test:static` **101/101** |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
+| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Session 68 could not: every tool-using subagent task failed while a text-only one succeeded. See §5 |
 
 ### 0.3 Settle before any work
 
 1. **Autonomy**: confirm the opening prompt re-states it; if it does not, ask one question.
 2. **Memory**: start an Engram session (`mem_session_start`) and pass its id to `mem_save`. This
    repository's Engram project is **`connmuta`** (§8).
-3. **Arena**: prove reachability with a real tool call, never `curl` alone. Sessions 63, 64, 65, 66, 67 evidence:
+3. **Arena**: prove reachability with a real tool call, never `curl` alone. Sessions 63–68 evidence:
    `pi mcp list` shows **no `arena` server registered**, and a TCP connect to the documented endpoint
    (`timeout 5 bash -c '</dev/tcp/127.0.0.1/8765'`) answers **connection refused**. That satisfies DN-09's
-   substitute condition directly, and the audit runs under Judgment Day / verifier.
+   substitute condition directly.
 
 ### 0.4 Standing instructions from the Director
 
 - **RDD consent is asked per candidate; never answer it for the Director.** A decline is candidate-scoped and
-  is not the kill switch, and it never lowers the bar: the RDD-off fallback re-enables the separate verifier,
-  which is what `gentle-ai-verify` provides. **The consent binding EXPIRES AFTER 10 MINUTES**, so `inspect` →
-  START → answer must fit in one uninterrupted window.
+  is not the kill switch, and it never lowers the bar: the RDD-off fallback re-enables the separate verifier.
+  **The consent binding EXPIRES AFTER 10 MINUTES**, so `inspect` → START → answer must fit in one
+  uninterrupted window. **Do not re-drive START against a candidate the host already disposed of.**
 - **Commits and push are authorized per session, and the two are not the same authorization.**
 - **Never accept a partial judgment, and never accept an `APPROVE` as if it were the gate.**
 - **Commit messages carry no `Co-Authored-By` and no AI attribution**; conventional commits only, by work
   unit.
-- **Never trust a delegated agent's own report at face value.**
+- **Never trust a delegated agent's own report at face value** — and equally, **never report a verification
+  that did not happen** (§5).
 - **The `frisco` binding is live and must not be re-armed** (§3).
 
 ---
@@ -86,28 +92,30 @@ Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los 
 | Item | State | Pointer |
 |---|---|---|
 | F1–F5 | **Archived**, unchanged since session 55 | `openspec/changes/archive/` |
-| B-98, B-99, B-100(a)(b), B-101, B-103, B-104 | Closed (sessions 55–61) | `docs/06-backlog/CHECKLIST.md` |
-| **B-105** | **CLOSED COMPLETELY — sessions 61 & 66.** All four harnesses (`pi`, `claude`, `codex`, `opencode`) verified live against real binaries with `shell: false`. `HARNESS_DEFAULT_ARGS` in `runner/constants.ts` matches real CLIs. Runbook and ADR-0032 updated | `docs/06-backlog/CHECKLIST.md`; `docs/runbooks/wake-satellite.md`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` |
-| **B-106** | **CLOSED COMPLETELY — sessions 62 & 65.** Source release on transport close landed session 62 (`awaitTransportClose`). Remainder closed session 65: dead-PID sweep in `src/daemon/ipc/routes.ts` (`sweepDeadSessions`); occupancy visibility in `status` and `doctor` | `docs/06-backlog/CHECKLIST.md`; `odd/tasks/b-106-occupancy-and-dead-pid-sweep.md` |
-| **B-107** | **RESOLVED — session 62** under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) (`accepted`): `--project` is an assertion, the binding comes from the nearest ancestor `conmuta.json`, and one **id-free** user-level registration serves a whole tree | `docs/03-adr/0033-project-flag-as-assertion.md` |
-| **B-108** | **CLOSED — session 63.** Fixed with `withInstallerLedger(homeDir, body)` in `src/cli/main.ts` | `docs/06-backlog/CHECKLIST.md`; `src/cli/main.ts` |
-| **B-109** | **CLOSED — session 63** under [ADR-0034](../03-adr/0034-id-free-installer-entry.md) (`accepted`) | `docs/03-adr/0034-id-free-installer-entry.md` |
-| **B-110** | **CLOSED — session 64.** Relative-link verification gate `test/security/markdown-links.test.ts` added to `test:static`, pinned by negative fixture. All 38 broken links in `openspec/changes/archive/**` repaired | `test/security/markdown-links.test.ts`; `docs/06-backlog/CHECKLIST.md` |
-| **B-111** | **CLOSED COMPLETELY — session 67** under [ADR-0035](../03-adr/0035-pre-validate-tool-configs-in-project-bind.md) (`accepted`, Option a). `checkFileEdit` adds read-only pre-flight checks; `project bind` pre-validates tool configs before any write; `tool-config-refused` reported cleanly | `docs/03-adr/0035-pre-validate-tool-configs-in-project-bind.md`; `docs/06-backlog/CHECKLIST.md` |
-| **B-95 remainder, B-102 residuals** | Open, low priority, "cheap win at the next touch" | `docs/06-backlog/CHECKLIST.md` |
+| B-98, B-99, B-100(a)(b), B-101, B-103, B-104 | Closed (sessions 55–61); **B-99 still open** (see its row) | `docs/06-backlog/CHECKLIST.md` |
+| **B-105** | **CLOSED COMPLETELY — sessions 61 & 66** | `docs/runbooks/wake-satellite.md`; ADR-0032 |
+| **B-106** | **CLOSED COMPLETELY — sessions 62 & 65** | `odd/tasks/b-106-occupancy-and-dead-pid-sweep.md` |
+| **B-107** | **RESOLVED — session 62** under [ADR-0033](../03-adr/0033-project-flag-as-assertion.md) | `docs/03-adr/0033-project-flag-as-assertion.md` |
+| **B-108** | **CLOSED — session 63** (`withInstallerLedger`) | `src/cli/main.ts` |
+| **B-109** | **CLOSED — session 63** under [ADR-0034](../03-adr/0034-id-free-installer-entry.md) | `docs/03-adr/0034-id-free-installer-entry.md` |
+| **B-110** | **CLOSED — session 64** (relative Markdown link gate in `test:static`) | `test/security/markdown-links.test.ts` |
+| **B-111** | **CLOSED COMPLETELY — session 67** under [ADR-0035](../03-adr/0035-pre-validate-tool-configs-in-project-bind.md) | `docs/03-adr/0035-pre-validate-tool-configs-in-project-bind.md` |
+| **B-102** | **CLOSED — session 68** (residuals a, b, c, f, g; d and e were closed in sessions 56/57). Three checks over three windows: a reconcile that begins after `stopAll()` returns unchanged; an in-flight reconcile re-checks the latch at the top of each remaining binding and again after `buildTransport` resolves, so the poller factory is never reached; and the factory receives an abort signal `stopAll()` aborts, so a poller created after the latch flipped touches no ledger. Plus: the update-existing-binding branch pinned, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability proofs replaced. The first attempt at (f) was **rejected by an independent judge** and corrected in `5bf647a` — see §5 | `odd/tasks/b-102-residuals.md`; `docs/06-backlog/CHECKLIST.md` |
+| **B-95 remainder** | Open, low priority, "cheap win at the next touch": (d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded parse needs its own decision; three non-blocking review notes | `docs/06-backlog/CHECKLIST.md` |
+| **B-99** | Open, and now **four** members: the three timer-based tests plus `test/daemon/bootstrap.test.ts:517`, added by session 68's review (JD-B-002) | `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
-| Tests on `main` | `npm test` **1878/1872/0/6**; `test:static` **101/101** | — |
+| Tests on `main` | `npm test` **1885/1879/0/6**; `test:static` **101/101** | — |
 
 ---
 
 ## §2 — What earlier sessions did (context, not to redo)
 
-1. **Session 67** closed B-111 completely: implemented `checkFileEdit` in `src/installer/file-edit.ts`, pre-validated tool configs in `runProjectBind` before any write, surfaced `tool-config-refused` in CLI reporting, authored ADR-0035, updated specs/backlog/indexes, suite 1878/1872/0/6, static 101/101.
-2. **Session 66** closed B-105 completely: verified argv forms of all 4 installed harnesses live against real binaries with `shell: false`, confirmed `HARNESS_DEFAULT_ARGS`, updated runbook and ADR-0032.
-3. **Session 65** closed B-106 remainder completely: dead-PID sweep in `routes.ts`, session occupancy in `status` and `doctor`, specs updated, suite 1869/1863/0/6, static 101/101.
-4. **Session 64** closed B-110: relative Markdown link verification gate in `test:static`, 38 archive links repaired.
-5. **Session 63** closed B-109 under ADR-0034 and B-108 at its cause.
-6. **Session 62** closed B-107 under ADR-0033 and B-106 at its source.
+1. **Session 68** closed B-102: three shutdown-latch checks over three windows, the update-existing-binding guard branch pinned by test and mutation, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability assertions replaced by `assertStableFor`. Its first attempt at (f) was rejected by an independent judge and corrected in `5bf647a`.
+2. **Session 67** closed B-111 completely: `checkFileEdit` pre-flight validation in `project bind` before any write, `tool-config-refused` reported cleanly, ADR-0035 authored.
+3. **Session 66** closed B-105 completely: argv forms of all four harnesses verified live with `shell: false`.
+4. **Session 65** closed B-106 remainder: dead-PID sweep in `routes.ts`, session occupancy in `status` and `doctor`.
+5. **Session 64** closed B-110: relative Markdown link gate in `test:static`, 38 archive links repaired.
+6. **Sessions 62–63** closed B-107 (ADR-0033), B-106's source, B-109 (ADR-0034) and B-108.
 
 ---
 
@@ -115,46 +123,114 @@ Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los 
 
 1. **The `frisco` binding is armed and running — do not re-arm it.**
 2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
-3. **Pick from the remaining units**:
-   - **B-95 remainder / B-102 residuals**.
-4. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
-5. **Do not restart B-105, B-106, B-108, B-109, B-110, or B-111** — all are closed with evidence (§1).
+3. **If this session's subagents can use tools (§0.2 row 9), run the missing second blind review over
+   `aa7fbd8..5bf647a` first** (§5) — session 68 got one judge, not the two a Judgment Day needs.
+4. **Pick from the remaining units**:
+   - **B-95 remainder** (the `fetch.ts` corrupt-row decision is the substantive one; the rest are notes),
+   - **B-97** (POSIX symlinked-bin entry guard; needs Linux/macOS, so it also touches B-12's scope),
+   - **B-99** (now four members: three timer-based tests plus `test/daemon/bootstrap.test.ts:517`, whose honest
+     fix needs a positive observation of live ticks inside the window — `assertStableFor` in the same file is the
+     reusable starting point),
+   - **B-101**'s remaining question (where the Judgment Day operating detail should live).
+5. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
+6. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111 or B-102** — all are closed with evidence (§1).
 
 ---
 
 ## §4 — Facts that will bite you
 
+- **`BindingsReconciler`'s shutdown latch has three checks for three windows, and none substitutes for another (B-102f).** `stopAll()` is terminal and once-per-process. (1) A `reconcile()` that *begins* after it returns unchanged. (2) A reconcile already *in flight* re-checks the latch at the top of each binding still to process (`break`) and again after `buildTransport` resolves (`continue`, discarding the transport, which owns no socket). (3) The poller factory receives an `abortController` signal that `stopAll()` aborts, so `startPoller` — whose whole loop body is skipped for an already-aborted signal — never prepares a statement against the closed ledger. The post-`createPoller` guard remains as the last line for a poller that was already running. Removing any one of the three re-opens a real window; the second and third were each proven necessary by mutation.
+- **`DaemonInstance` exposes `stop` but not `reconcile`** — the only reconcile callers are the boot sequence (`bootstrap.ts:242`) and the heartbeat tick (`:334`).
+- **`raceAgainstTimeout` is deliberately silent about which side won.** `stop()` observes the tick's settlement itself; do not "simplify" that away, and do not move the log into `raceAgainstTimeout` — it is a generic single-purpose module with no `runDir`, kept out of `bootstrap.ts` so the daemon bundle's audited timer inventory stays confined.
 - **The installer CLI's ledger handle is closed now — do not "simplify" `withInstallerLedger` away.**
 - **The written tool-config entry is id-free (ADR-0034).**
 - **Tool-config merges in `project bind` are pre-validated before any write (ADR-0035, B-111).**
-- **Two identifiers must not be mixed**: Engram `connmuta` (repo) vs Engram `frisco-erp` and bus `frisco`.
+- **Two identifiers must not be mixed**: Engram `connmuta` (repo) vs. Engram `frisco-erp` and bus `frisco`.
 - **The daemon's session pool is bounded at `MAX_ACTIVE_SESSIONS = 64`** (`src/shared/constants.ts`).
   Session release runs on transport close (B-106 source); dead PIDs are swept on `POST /session` and
-  `POST /tools/status` (`sweepDeadSessions`); and occupancy is visible in `status` (`daemon.sessions`)
-  and `doctor` (`session-pool`).
+  `POST /tools/status` (`sweepDeadSessions`); occupancy is visible in `status` (`daemon.sessions`) and
+  `doctor` (`session-pool`).
 - **Relative links in tracked Markdown files are enforced by `test:static` (B-110).**
 - **PT-22's repository scan reads TRACKED files only.**
 
 ---
 
-## §5 — Next session, exact sequence
+## §5 — Audit state for session 68's candidate (PARTIAL; read before trusting it)
 
-- [ ] **1. Verify the tree** (§0.2); the suite must be 1878/1872/0/6 and `test:static` 101/101.
-- [ ] **2. Settle §0.3** (autonomy, Engram session, Arena).
-- [ ] **3. Choose the unit** (§3.3): B-95 remainder / B-102 residuals.
-- [ ] **4. If a unit changes behavior**, follow the ODD flow this project enforces.
-- [ ] **5. Close the session**: overwrite this file, add the LOG entry at the top, update `AGENTS.md`'s
-      Status pointer, and the backlog rows touched.
+**The RDD provider outcome**: `inspect` offered `review.start` for target `sha256:6f94b8d9…` (6 files / 415
+changed lines, risk `medium`); START resolved to **`consent-declined-this-candidate`** — `lineage_created:
+false`, `mutation_performed: false`, `correction_budget: 0`. The host resolved the consent prompt; the decline is
+candidate-scoped and is not the kill switch, so the RDD-off plan applied (writer self-verifies, separate verifier
+runs). START was **not** re-driven against the same, already-disposed candidate: repeating it would ask the
+Director to re-answer a question they had already answered.
 
----
+**Independent verification by subagent was mostly unavailable, and the reason matters.** The runtime could not
+execute *tools* for most of the session: text-only tasks of the same agents succeeded, while every tool-using task
+failed. The failures, in order:
+
+| Attempt | Agent | Outcome |
+|---|---|---|
+| 1 | `gentle-ai-verify` | failed — `assistant reported an error` (task included reproducing the full suite) |
+| 2 | `gentle-ai-verify` | failed, same outcome (task excluded the suite) |
+| 3 | `gentle-ai-verify` | failed, same outcome (task reduced to reading one file, three questions) |
+| 4 | `jd-judge-a` | failed, same outcome |
+| 5 | `gentle-ai-explore` | failed, same outcome (read one file, report its line count) |
+| 6 | `gentle-ai-verify` | succeeded — a text-only task, no tools |
+| 7 | `jd-judge-b` | **succeeded** — a read-only review that did use tools |
+
+So the Judgment Day fallback (DN-09's substitute for an unreachable Arena) ran **partially**: one judge, not the
+two a Judgment Day needs. **That one judge found a CRITICAL this session had missed**, which is the most useful
+result of the whole session and the reason this section is honest rather than reassuring.
+
+### JD-B-001 — CRITICAL, accepted and corrected (`5bf647a`)
+
+The first fix for (f) put the `stopping` check at the top of `reconcile()` only. That covers a reconcile that
+*begins* after `stopAll()`, which no production caller can produce. The window (f) actually names is a reconcile
+**already in flight** when `STOP_TICK_TIMEOUT_MS` expires — past that check — which still reached
+`buildTransport` and then `createPoller`, whose first statement prepares a statement against the ledger `stop()`
+had closed. The judge also supplied the exact verification, which reproduced the real symptom end to end:
+`heartbeat tick failed: database is not open` in `daemon.log`. The correction adds the in-flight loop checks and
+the abort signal described in §4; all three windows are now pinned, and mutation-measured (removing the
+post-`buildTransport` check fails the in-flight test; removing it *and* the abort fails the end-to-end test).
+
+**Why the self-verification missed it, which is a reusable lesson**: it asked *whether any caller reconciles after
+`stopAll()`* and correctly answered no. That answer was true, and it was also the proof that the check could not
+be the fix — the check's own reachability was never the point. Verifying a fix's premise is not verifying that
+the fix addresses the finding.
+
+### JD-B-002 — SUGGESTION, accepted and filed to B-99
+
+`test/daemon/bootstrap.test.ts:517` still proves a negative ("an unchanged registry must not re-fire
+BINDING_CHANGED on every tick") with a bare 60 ms sleep — the same B-99 family this session removed two
+members of. It is outside the stop path, and its honest fix needs a *positive* observation of live ticks inside
+the window (the neighbouring `getUpdatesCalls` counter provides one), so it was filed to row B-99 rather than
+converted here.
+
+### What is NOT established
+
+- **No second judge.** `jd-judge-a` never ran, so correctness was reviewed by one independent reader, not two.
+- **The end-to-end test's path is the injected-factory path.** It exercises `startPoller`'s aborted-signal
+  behaviour through the real `createPoller` wiring in `bootstrap.ts`, but the Telegram client is a fake. The
+  guarantee rests on `startPoller`'s `while (!signal.aborted)` loop head, which is real code with its own
+  direct test (`test/daemon/poller.test.ts`, the aborted-signal pin).
+- **The final numbers were measured by the session's own tooling**, not by the judge: `npm test` 1885/1879/0/6,
+  `test:static` 101/101, zero `%TEMP%\conmuta-*` growth.
+
+**What the next session should do**: if its subagents can use tools (§0.2 row 9), run the missing second
+blind review over `aa7fbd8..5bf647a` before starting new work, and record the verdict here and in
+`docs/05-tribunal/INDEX.md`. Until then this candidate has been **self-verified plus one adversarial pass**, and
+that limitation should travel with it.
 
 ## §6 — Do not redo
 
-- F1–F5 archives, B-98, B-99, B-100(a)(b), B-101, B-103, B-104, B-105, B-106, B-107, B-108, B-109, B-110, B-111: closed;
-  do not re-open or re-review.
+- F1–F5 archives, B-98, B-100(a)(b), B-101, B-103, B-104, B-105, B-106, B-107, B-108, B-109, B-110, B-111,
+  **B-102**: closed; do not re-open or re-review.
 - **B-105 is closed completely**: do not re-verify the harness argv forms or re-open the satellite SDD set.
 - **B-106 is closed completely**: do not re-implement the transport close release or the dead-PID sweep.
 - **B-111 is closed completely**: do not re-implement tool config pre-validation.
+- **B-102 is closed**: do not re-add a third `stopping` check, and do not remove any of the four that exist
+  (per-binding top-of-loop, post-`buildTransport`, post-`createPoller`, and the fresh-call check at the top of
+  `reconcile()`) — nor the abort signal the factory receives.
 - **ADR-0033's and ADR-0034's settled points**: do not re-add `--project` to the installer's written entry.
 - **B-108's fix**: do not replace `withInstallerLedger`.
 - **B-110's 38 archived relative links are repaired and the gate is active in `test:static`.**
@@ -165,9 +241,12 @@ Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los 
 
 | Id | Point | Owner |
 |---|---|---|
-| **B-95 remainder / B-102 residuals** | B-95(d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded parse needs its own decision; three non-blocking notes. B-102 (a)(b)(c)(f)(g); (f) keeps resurfacing | Kairo, "cheap at the next touch" |
+| **B-95 remainder** | (d) stays design-exact; `src/daemon/serve/fetch.ts:244-246`'s unguarded `JSON.parse` needs its own corrupt-row decision; three non-blocking notes (a drifting specifier-count comment, a permissive `to` in `parseStoredEnvelope`, and the silent skip of an unreadable doorbell row) | Kairo, "cheap at the next touch" |
+| **B-97** | `src/cli/main.ts`'s `isDirectlyExecuted()` guard may silently do nothing behind a POSIX symlinked npm bin; needs Linux/macOS to confirm, so it is adjacent to B-12 | Director + Kairo |
+| **B-99** | **Four** members now: the three timer-based tests (two in `test/daemon/lifecycle/heartbeat.test.ts`, one in `test/daemon/no-emission.test.ts`) plus `test/daemon/bootstrap.test.ts:517`, whose "an unchanged registry must not re-fire BINDING_CHANGED on every tick" is a negative proven by a bare 60 ms sleep. The honest fix needs a positive observation of live ticks inside the window (the neighbouring `getUpdatesCalls` counter provides one); `assertStableFor` in the same file is the reusable starting point | Kairo (Director schedules) |
+| **B-101 (relocation)** | Whether the Judgment Day operating detail should move out of the overwritten `HANDOFF.md` into `GOVERNANCE` or a durable runbook | Director |
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), three backups to delete once nothing needs reverting | Director |
-| The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–67. Candidates left no lineage (the host declined them) | Director/maintainer |
+| The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–68. Candidates left no lineage (the host declined them). The `2aa0da0`-era base that kept re-surfacing B-102(f) now points at fixed code, so this is expected to stay quiet | Director/maintainer |
 | ADR-0032 | still `proposed` (pending the Director's confirmation) | Director |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
@@ -179,7 +258,7 @@ Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los 
 - `origin` = `https://github.com/agentesinteligentesllm-oss/connmuta.git`, branch `main`. `gh` commands run
   with `GH_TOKEN="$(gh auth token -h github.com -u agentesinteligentesllm-oss)"`; **never run `gh auth
   switch`**. Force-push and deletion of `main` are blocked.
-- **Session 67's commits and push status: read `git log` and `git status -sb`** (§0.2 row 1) rather than
+- **Session 68's commits and push status: read `git log` and `git status -sb`** (§0.2 row 1) rather than
   trusting a SHA written here.
 - **The four harnesses ARE installed**: `pi` and `pi.cmd` (`%APPDATA%\npm`), `claude`
   (`~/.local/bin/claude`), `codex`/`codex.cmd` and `opencode`/`opencode.cmd` (`%APPDATA%\npm`).
@@ -187,7 +266,7 @@ Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los 
   `conmuta: connected, 4 tools` running `<repo>\dist\src\cli\main.js mcp`. `FRISCO\.pi\mcp.json` is
   retired.
 - **Arena**: no `arena` MCP server is registered for Pi, and `127.0.0.1:8765` refuses connections
-  (sessions 63, 64, 65, 66, 67). `.mcp.json` still holds the (gitignored) bridge credential; never commit or quote it.
+  (sessions 63–68). `.mcp.json` still holds the (gitignored) bridge credential; never commit or quote it.
 - v1 checkout beside this repo: `telegram-agent-bus` at `bf8f365`, read-only.
 - **The local bus (conmuta) is live on this machine**: daemon home `~/.conmuta/`, two bots
   (`agente_kairo_bot`, `agent_luisgtz_bot`) and two bindings — `telegram-bus-agent` (this repository, group
@@ -198,25 +277,3 @@ Suite 1878/1872/0/6, `test:static` 101/101. La siguiente unidad natural son los 
 - **CodeGraph**: present and usable, `codegraph explore` directly — do not re-init.
 - **Engram's own tool surface is 19 tools** (`mem_*`), registered globally; `mem_context` on project
   `connmuta` is the entry point for a resumed session.
-
----
-
-## §9 — RDD / audit state at session close
-
-Newest first. Every entry is a closed record; the reasoning lives in the tribunal index under the id it
-names.
-
-1. **Session 67 — B-111 closed completely under ADR-0035 (tool config pre-validation before project bind mutations)**:
-   RDD `inspect` on candidate → START resolved to **`declined_this_candidate`** (host-resolved, `lineage_created: false`,
-   `mutation_performed: false`, `risk_level: high`, 11 files / 446 changed lines, `outcome: consent-declined-this-candidate`).
-   Independent verification by `gentle-ai-verify` subagent (task `musunsj7-1-3w37`): verified all 5 claims with
-   line-level citations (**PASS**).
-   `checkFileEdit` adds read-only pre-flight validation in `src/installer/file-edit.ts` (steps 1–4).
-   `runProjectBind` in `src/installer/wizards/project-bind.ts` pre-validates tool configs before `writeProjectFile` and
-   before `commitRegistryChange`.
-   `tool-config-refused` reported on stderr with diff in `src/cli/main.ts` and exits 1.
-   Neither `conmuta.json` nor `registry.json` is modified on refusal, preventing the dead-end partial bind trap.
-   ADR-0035 authored and accepted under standing authorization.
-   Full suite `npm test` **1878 / 1872 / 0 / 6** pass (+9 tests); `test:static` **101 / 101** pass; 0 temp
-   growth under `%TEMP%`.
-   Commits on `main`: `7a18006`, `523f7d6`, `2701945`, `57bb5e5`.

@@ -41,21 +41,36 @@ latch contract.
 
 ## Design
 
-### (f) — Guard before the work starts, not only after it finishes
+### (f) — The window that actually matters, closed by three checks and not one
 
-`reconcile()` returns the unchanged result immediately when `this.stopping` is already true, before
-it loads a registry or touches any binding. This is the "check before `buildTransport` starts"
-half; the existing post-`createPoller` guards stay exactly as they are, because they cover the
-different window where `stopAll()` races an already-running reconcile.
+**Corrected in `5bf647a`, after the independent review rejected the first attempt as an incomplete fix.**
+The first attempt put the `stopping` check at the top of `reconcile()` only. That covers a reconcile that
+*begins* after `stopAll()` — which no production caller can produce, because `stop()` clears the heartbeat
+interval before the latch is set and `onTick` already refuses to overlap ticks. The window (f) names is a
+reconcile **already in flight** when `STOP_TICK_TIMEOUT_MS` expires, and that one is past the top check: it
+still reached `buildTransport` and then `createPoller`, whose first statement prepares a statement against
+the ledger `stop()` had closed. The defect was reproduced end to end and pinned:
+`heartbeat tick failed: database is not open` in `daemon.log`.
 
-This also gives the latch its explicit terminal semantics **(c)**: a reconciler that has been
-stopped never starts anything again, by contract, not only by the code's accident.
+Three checks now cover three windows, and none substitutes for another:
+
+1. **Fresh call** — `reconcile()` returns unchanged at once. Narrow (no production caller needs it) but
+   correct, and it keeps the class terminal on its own terms, which is also (c).
+2. **In flight** — the latch is re-checked at the top of each binding the loop has still to process
+   (`break`, not `continue`: nothing was ever created for those bindings, so there is no cleanup to run) and
+   again immediately after `buildTransport` resolves, so the poller factory is never reached once shutdown
+   has begun. The transport built in that second case is discarded; it owns no socket of its own, and the
+   pre-existing post-`createPoller` guard already discarded one the same way.
+3. **Inside the factory** — the factory is handed an `AbortController` signal that `stopAll()` aborts, so a
+   factory already entered and still awaiting a secret-store read hands `startPoller` an already-aborted
+   signal, whose loop body then never runs and never prepares a statement. `startPoller` already supported
+   `signal`; the reconciler simply never used it. The post-`createPoller` guard stays as the last line for a
+   poller that was already running.
 
 ### (c) — State the contract on the field
 
-The field's doc comment already says "never cleared"; it gains the *why*: `stopAll()` is terminal
-and once-per-process in this daemon's lifecycle, so a reconcile after it is a no-op rather than a
-restart.
+The field's doc comment states that the latch is never cleared, that `stopAll()` is terminal and
+once-per-process, and names all three windows above.
 
 ### (g) — Record the give-up
 
@@ -89,28 +104,33 @@ stays confined (`test/security/daemon-bundle.test.ts`).
 | T3 | State the terminal-latch contract on `BindingsReconciler.stopping` | doc comment + `reconcile()` doc |
 | T4 | `stop()` logs one `daemon.log` line when the tick wait times out (RED first) | `test/daemon/bootstrap.test.ts` RED → GREEN |
 | T5 | Replace the fixed 60 ms assertion in the B-98 regression test with a bounded condition poll | `test/daemon/bootstrap.test.ts` |
+| T6 | **Corrective, added after the independent review rejected T1 as incomplete** — close the in-flight window with a post-`buildTransport` latch check, a per-iteration check, and an abort signal handed to the poller factory; pin it at the bindings level and end to end | `5bf647a`; `test/daemon/bindings.test.ts`, `test/daemon/bootstrap.test.ts`, `test/daemon/poller.test.ts` |
 
 ## Verification
 
-- `npm test`: **1881 tests / 1875 pass / 0 fail / 6 skip** (baseline 1878/1872/0/6, so +3 tests:
-the two new `bindings.test.ts` cases, the new `bootstrap.test.ts` precision case; the rewritten
-assertions replace existing ones).
+- `npm test`: **1885 tests / 1879 pass / 0 fail / 6 skip** (baseline 1878/1872/0/6, so +7: the new
+  `bindings.test.ts` cases, the new `poller.test.ts` primitive, the two new `bootstrap.test.ts` cases, and
+  the rewritten assertions that replaced existing ones).
 - `npm run test:static`: **101 / 101**.
 - Zero `%TEMP%\conmuta-*` growth across one full `npm test` run (0 before, 0 after).
-- Observed RED before GREEN for **(f)** (`transportBuilt` asserted `0`, got `1`) and **(g)**
-  (the give-up line was absent).
-- Mutation-measured non-vacuity for the two tests whose behaviour already existed or whose claim is a
-  "must not happen": removing the update branch's late guard fails **(a)**; logging unconditionally
-  fails the **(g)** precision test.
-- Disclosed out-of-scope-ish change: the 40 ms fixed-sleep site in `bootstrap.test.ts`'s
-  "overlapping heartbeat tick" test was converted to the same helper. Same pattern, same file, and
-  leaving it would have kept alive exactly what B-99 replaced.
+- Observed RED before GREEN for **(f)** (`transportBuilt` asserted `0`, got `1`), for the in-flight window
+  (`pollerCreated` asserted `0`, got `1`), and for **(g)** (the give-up line was absent).
+- Mutation-measured non-vacuity: removing the update branch's late guard fails **(a)**; logging
+  unconditionally fails the **(g)** precision test; removing the post-`buildTransport` check fails the
+  in-flight test; removing that check **and** the abort fails the end-to-end test with the real
+  `heartbeat tick failed: database is not open` symptom.
+- Disclosed extra change: the 40 ms fixed-sleep site in `bootstrap.test.ts`'s "overlapping heartbeat tick"
+  test was converted to the same helper — same pattern, same file, and leaving it would have kept alive
+  exactly what B-99 replaced. **Not converted, and filed instead:** `bootstrap.test.ts:517`'s "an unchanged
+  registry must not re-fire BINDING_CHANGED on every tick" (the independent review's JD-B-002), because it
+  needs a *positive* observation of live ticks inside the window to be non-vacuous, which belongs with B-99.
 
 ## Commits
 
 | Commit | Subject |
 |---|---|
-| `aa7fbd8` | `fix(daemon): check the stopping latch before reconcile starts any work (B-102f)` — `src/daemon/bindings.ts` + `test/daemon/bindings.test.ts` ((f), (a), (c)) |
+| `aa7fbd8` | `fix(daemon): check the stopping latch before reconcile starts any work (B-102f)` — `src/daemon/bindings.ts` + `test/daemon/bindings.test.ts`; **its (f) claim was wrong, corrected by `5bf647a`** |
 | `6118cd8` | `fix(daemon): bound and record the shutdown wait on an in-flight tick (B-102b, B-102g)` — `src/daemon/bootstrap.ts` + `test/daemon/bootstrap.test.ts` ((g), (b)) |
+| `5bf647a` | `fix(daemon): close B-102f in the window it actually names` — the corrective work unit (T6) |
 
 Backlog row `B-102` is marked `done` in `docs/06-backlog/CHECKLIST.md`.
