@@ -313,6 +313,9 @@ export function reportProjectBindOutcome(io: CliIo, result: ProjectBindOutcome):
 		case "registry-commit-failed":
 			io.err(`${PRODUCT_NAME}: registry commit failed (${result.detail.outcome})`);
 			return 1;
+		case "tool-config-refused":
+			io.err(`${PRODUCT_NAME}: tool config merge refused for ${result.toolId} (${result.reason}):\n${result.message}`);
+			return 1;
 	}
 }
 

@@ -712,6 +712,21 @@ test("reportProjectBindOutcome reports a failed gitignore update on stderr witho
   assert.deepEqual(captured.err, [`${PRODUCT_NAME}: could not update .gitignore for claude-code: EACCES`]);
 });
 
+test("reportProjectBindOutcome reports tool-config-refused on stderr and exits 1 (B-111)", () => {
+  const captured = makeIo();
+  const result: ProjectBindOutcome = {
+    outcome: "tool-config-refused",
+    toolId: "cursor",
+    path: "/path/to/.cursor/mcp.json",
+    reason: "conflict",
+    message: "refusing to overwrite a different entry",
+  };
+
+  assert.equal(reportProjectBindOutcome(captured.io, result), 1);
+  assert.deepEqual(captured.out, []);
+  assert.deepEqual(captured.err, [`${PRODUCT_NAME}: tool config merge refused for cursor (conflict):\nrefusing to overwrite a different entry`]);
+});
+
 
 // --- B-108: the installer's ledger is released on every path ------------------
 
