@@ -4,7 +4,9 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 70** (2026-10-03 local). Every § carries session 70's state unless a line says otherwise.
+> **Last rewritten: end of session 70** (2026-10-03 local), **including the post-commit RDD disposition and the
+> independent verification results (§5), which were settled after the session's commits and before the machine was
+> powered off.** Every § carries session 70's state unless a line says otherwise.
 >
 > **Session 70 in one paragraph — B-95 remainder, B-97 and B-31 closed under ODD; B-102 and B-99 commits landed. Suite 1907/1901/0/6, test:static 101/101, zero temp leaks.** B-95 remainder was closed at its source under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe corrupt-row handling in `src/daemon/serve/fetch.ts:244-246` (`parseStoredEnvelope` defensively validates object structure, envelope types, non-empty threads, and `to`/`basis`, returning `null` on corruption and skipping the row without throwing, while `lastRowSeq` still advances the client cursor past damaged rows), pinned by 14 test cases in `test/daemon/serve/fetch.test.ts` (observed RED before GREEN, non-vacuity proven by mutation); review note R3-1 addressed in `src/daemon/serve/doorbell.ts` (non-null `to` tightened with `AGENT_ID_PATTERN`); review note R2-1 addressed in `test/channel/main.test.ts` (drift-prone count comment removed). B-97 was then closed by correcting the row's own premise: the guard's defect class is *any link the entry path crosses*, not only a POSIX symlink, and a Windows directory **junction** reproduces it with neither Developer Mode nor admin — measured here as direct `exit 2` versus junction `exit 0` with zero bytes on both streams, and pinned by a new test whose non-vacuity is the old guard restored failing it while the pre-existing test still passes. **B-31** closed the JSON-escape bypass of the registry's pre-parse R5 scan with a post-parse value walk (`odd/tasks/b-31-registry-escaped-token.md`), reusing the existing roster-hash mask so the new gate cannot reintroduce B-27's blanket refusal.
 
@@ -30,8 +32,19 @@
 ```text
 Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. B-31, B-95, B-97, B-99 y B-102
 están cerrados (1907 pruebas, test:static 101/101). No queda unidad que el harness pueda cerrar solo: revisa §3.3 y
-elige la clase de backlog a atacar, o espera a que el Director decida B-11/B-12/B-16 para abrir F6.
+elige la clase de backlog a atacar (recomendado: B-54), o espera a que el Director decida B-11/B-12/B-16 para abrir F6.
 ```
+
+### 0.1b If the machine was just powered on (session 70 ended with a shutdown)
+
+The tree is committed and clean at `673151b` (`main` **12 commits ahead** of `origin/main`, **not pushed** — the
+push is the Director's decision, never taken). Nothing needs re-arming: the daemon home `~/.conmuta/`, the id-free
+user-level bus registration and the armed `frisco` binding all live on disk (ADR-0033), so a cold machine needs no
+setup — only §0.2's `git fetch`, `rm -rf dist`, rebuild and full test run. Read `git log --oneline -12` for the real
+base rather than trusting any SHA written here. **Engram is the fastest way in for a resumed session**: `mem_context`
+on project `connmuta` carries session 70's summary, the independent verification results and the RDD disposition,
+including two facts deliberately kept out of the repository (§5.2 explains why a meta-record must not get its own
+commit).
 
 ### 0.2 First commands (stop and report if any output disagrees)
 
@@ -68,7 +81,9 @@ elige la clase de backlog a atacar, o espera a que el Director decida B-11/B-12/
 - **Commit messages carry no `Co-Authored-By` and no AI attribution**; conventional commits only, by work
   unit.
 - **Never trust a delegated agent's own report at face value** — and equally, **never report a verification
-  that did not happen** (§5).
+  that did not happen** (§5). Re-verify the delegate's own artifact where one exists: re-run its probe, read the
+  committed file it claims to have checked, confirm `git diff` is empty, and clean up any scratch it left in
+  `%TEMP%`.
 - **The `frisco` binding is live and must not be re-armed** (§3).
 
 ---
@@ -149,21 +164,47 @@ elige la clase de backlog a atacar, o espera a que el Director decida B-11/B-12/
 
 ---
 
-## §5 — Audit state (B-102 CLOSED in session 69; all three session-70 candidates DECLINED)
+## §5 — Audit state (B-102 CLOSED in session 69; every session-70/71 candidate DECLINED; B-31 independently verified)
 
-**RDD state for session 70: every candidate was host-resolved as `consent-declined-this-candidate`, so no native
-review exists for this session's work and the separate independent verifier was the only independent pass.** The
-host resolved two: the B-95/B-97 accumulated target (`sha256:2cd5fa16…`, 19 files / 1314 lines) and the B-31
-accumulated target (`sha256:8937c6f2…`, 23 files / 1653 lines). Both returned `lineage_created: false`,
-`mutation_performed: false`. **A decline is candidate-scoped, is not the kill switch, and is not the Director
-declining the work** — it means no native review exists and the bar does not move, so the independent verifier ran
-instead. **Do not re-inspect or re-drive START on either target.** They are recorded here rather than given their
-own commit for the reason session 68 gave: the projection is a committed-only base diff from `8ee3ddf`, so any new
-commit mints a new `target_identity` and with it another prompt for a Director who has now declined three
-accumulated candidates in a row. That pattern is the signal worth acting on: **the accumulated target keeps growing
-across sessions, and a Director asked to consent to 1600+ lines spanning three sessions' work will keep saying no.**
-The next session that wants a native review should narrow the candidate to a single work-unit commit with an
-explicit `baseRef` plus `committedOnly: true`, which is also what ODD's own close-out rule asks for (a work-unit
+### 5.1 — Independent verification that DID run
+
+- **B-31 — `gentle-ai-verify`, task `mut1av5k-3-bfej`, clean.** Reproduced `npm test` **1907/1901/0/6**,
+  `test:static` **101/101**, `dist/test/registry/loader.test.js` 29/29, all 5 B-31 tests present
+  (`loader.test.ts:460,481,493,503,526`), and `%TEMP%/conmuta-*` 0 → 0. It then went past the brief with 25/25
+  assertions of its own and **turned two claims that had only been reasoned into empirical ones**: the depth
+  bound cannot hide a secret in an accepted document (a 35-level document is refused as `schema_invalid`, not
+  `RangeError`, and `registryFileSchema` plus every sub-schema are strict `z.strictObject` with no recursion, so
+  maximum accepted nesting is 4), and the gate adds **no** new false refusals (legitimate documents with colons,
+  numbers in titles, Windows/UNC/Unix paths, prose and `settings.secret_markers` all load). It also extended
+  coverage to **every mutable string position** and **every secret class** through the gate.
+- **Never trust the delegated report at face value — this one was re-verified by the parent before being
+  accepted**: the verifier's own probe artifact was re-run (`25/25 PASSED`), `git show HEAD:src/registry/loader.ts`
+  was read to confirm the gate is really in the committed tree (`containsForbiddenContent(raw)` at :126,
+  `MAX_CONTENT_WALK_DEPTH = 32` at :168, `withoutRosterHashes(text)` at :181), `git diff HEAD -- src test` was
+  confirmed empty (it edited nothing), and the scratch file it left in `%TEMP%` was removed.
+- **B-95 — `gentle-ai-verify`, task `mut0gvfn-2-9l0t`, clean** (1901/1895/0/6 and 101/101 at `a4885f3`, all three
+  corrupt-envelope test groups confirmed).
+
+### 5.2 — Native review: no candidate was approved, and none exists
+
+**Every candidate was host-resolved as `consent-declined-this-candidate`, so no native review exists for sessions
+70–71 and the separate independent verifier above was the only independent pass. Five declines across three
+sessions:** session 68's two (`sha256:6f94b8d9…`, 6 files / 415 lines; `sha256:5977c01d…`, 10 files / 1008 lines)
+and the accumulated target re-offered after each growth (`sha256:2cd5fa16…`, 19 files / 1314 lines; `sha256:8937c6f2…`,
+23 files / 1653 lines; `sha256:f0f16d67…`, 23 files / **1684** lines). All returned `lineage_created: false` and
+`mutation_performed: false`, so **no lineage exists and no review state was mutated** — there is nothing to
+acknowledge, correct, recover or reset. **Do not re-inspect or re-drive START on any of these targets.**
+
+**A decline is candidate-scoped, is not the kill switch, and is not the Director declining the work** — the bar
+does not move and the independent verifier runs instead.
+
+**The pattern, and the one actionable conclusion.** The projection is a committed-only base diff from the fixed
+base `8ee3ddf`, so **every new commit mints a new `target_identity` and re-prompts**. The candidate grew
+1314 → 1653 → 1684 lines and each growth produced another decline. Two consequences the next session should
+respect: **(a)** do not create a commit whose only purpose is to record a decline or a verification result — the
+fix for this trap cannot itself be a commit, so fold such meta-records into the next real work commit; **(b)** a
+session that actually wants a native review must **narrow the candidate to a single work-unit commit** with an
+explicit `baseRef` plus `committedOnly: true`, which is also what ODD's own close-out rule requires (a work-unit
 commit or a PR slice, never the accumulated feature branch).
 
 ---
