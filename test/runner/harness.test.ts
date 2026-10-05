@@ -91,19 +91,74 @@ test("harness: the executable set is closed — a record cannot name a shell or 
 });
 
 test("harness: the four declared harnesses resolve to their literal default argv plus the prompt last", () => {
-	for (const [harness, expected] of [
-		["pi", ["-p"]],
-		["claude", ["-p"]],
-		["codex", ["exec"]],
-		["opencode", ["run"]],
-	] as const) {
-		const resolved = resolveHarnessSpec(entry({ harness }), PROMPT);
-		assert.equal(resolved.kind, "spec");
-		if (resolved.kind === "spec") {
-			assert.equal(resolved.spec.bin, harness);
-			assert.deepEqual(resolved.spec.argv, [...expected, PROMPT]);
-			assert.equal(resolved.spec.argv[resolved.spec.argv.length - 1], PROMPT);
-		}
+	// The closed executable set is still four names; what changed on 2026-10-05 is that a `wake` turn is only
+	// started for a harness with a verified send-proof profile, which today is `pi` alone. The others are
+	// refused (see the next test) rather than started with a full toolset.
+	const resolved = resolveHarnessSpec(entry({ harness: "pi", level: "wake" }), PROMPT);
+	assert.equal(resolved.kind, "spec");
+	if (resolved.kind === "spec") {
+		assert.equal(resolved.spec.bin, "pi");
+		assert.deepEqual(resolved.spec.argv, ["-p", "--no-extensions", "--tools", "read,grep,find,ls", PROMPT]);
+		assert.equal(resolved.spec.argv[resolved.spec.argv.length - 1], PROMPT);
+	}
+});
+
+test("harness: a level/harness pair with no verified send-proof profile is refused, never started", () => {
+	for (const harness of ["claude", "codex", "opencode"] as const) {
+		assert.deepEqual(
+			resolveHarnessSpec(entry({ harness, level: "wake" }), PROMPT),
+			{ kind: "refused", reason: "profile_unavailable" },
+			`${harness} has no verified send-proof profile`, 
+		);
+	}
+	// `autopilot` exists to run a shell, and a shell can always send: it has no send-proof profile at all.
+	assert.deepEqual(resolveHarnessSpec(entry({ harness: "pi", level: "autopilot" }), PROMPT), {
+		kind: "refused",
+		reason: "profile_unavailable",
+	});
+});
+
+test("harness: the send-proof profile is appended last, after the record's own arguments", () => {
+	const resolved = resolveHarnessSpec(
+		entry({ harness: "pi", level: "wake", harness_args: ["--model", "placeholder-model"] }),
+		PROMPT,
+	);
+	assert.equal(resolved.kind, "spec");
+	if (resolved.kind === "spec") {
+		assert.deepEqual(resolved.spec.argv, [
+			"-p",
+			"--model",
+			"placeholder-model",
+			"--no-extensions",
+			"--tools",
+			"read,grep,find,ls",
+			PROMPT,
+		]);
+	}
+});
+
+test("harness: a record cannot widen or remove the send-proof profile with its own arguments", () => {
+	for (const flag of [
+		"--tools",
+		"-t",
+		"--exclude-tools",
+		"-xt",
+		"--no-tools",
+		"-nt",
+		"--no-builtin-tools",
+		"-nbt",
+		"--no-extensions",
+		"-ne",
+		"--extension",
+		"-e",
+		"--tools=bash",
+		"-tbash",
+	]) {
+		assert.deepEqual(
+			resolveHarnessSpec(entry({ harness: "pi", level: "wake", harness_args: [flag] }), PROMPT),
+			{ kind: "refused", reason: "arguments_refused" },
+			`expected ${flag} to be refused`,
+		);
 	}
 });
 
@@ -111,14 +166,6 @@ test("harness: the interpreter escape hatch and the permission-bypass flags are 
 	for (const flag of REFUSED_ARGUMENTS) {
 		const resolved = resolveHarnessSpec(entry({ harness_args: [flag] }), PROMPT);
 		assert.deepEqual(resolved, { kind: "refused", reason: "arguments_refused" }, `expected ${flag} to be refused`);
-	}
-});
-
-test("harness: extra arguments are kept literal and still come before the prompt", () => {
-	const resolved = resolveHarnessSpec(entry({ harness: "claude", harness_args: ["--model", "placeholder-model"] }), PROMPT);
-	assert.equal(resolved.kind, "spec");
-	if (resolved.kind === "spec") {
-		assert.deepEqual(resolved.spec.argv, ["-p", "--model", "placeholder-model", PROMPT]);
 	}
 });
 
@@ -145,8 +192,9 @@ test("harness: a hostile prompt reaches the child as ONE argv element, never spl
 	calls[0].child.emitClose(0);
 	await pending;
 
-	assert.equal(calls[0].argv.length, 2);
-	assert.equal(calls[0].argv[1], hostile);
+	// The prompt is the LAST element, behind the send-proof profile, and stays exactly one inert argument.
+	assert.equal(calls[0].argv.at(-1), hostile);
+	assert.equal(calls[0].argv.filter((arg) => arg === hostile).length, 1);
 	assert.equal(calls[0].options.shell, false);
 });
 
@@ -246,7 +294,7 @@ test("harness: `--flag=value` and an attached short form are refused too, not on
 		assert.deepEqual(resolved, { kind: "refused", reason: "arguments_refused" }, `expected ${arg} to be refused`);
 	}
 	// And a legitimate argument of the same shape still passes.
-	const ok = resolveHarnessSpec(entry({ harness: "codex", harness_args: ["--model=placeholder"] }), PROMPT);
+	const ok = resolveHarnessSpec(entry({ harness: "pi", harness_args: ["--model=placeholder"] }), PROMPT);
 	assert.equal(ok.kind, "spec");
 });
 

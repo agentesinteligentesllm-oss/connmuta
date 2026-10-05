@@ -228,7 +228,7 @@ test("loop: `wake` starts exactly one turn, records exactly one accepted wake, t
 		assert.equal(await loop.tick(new AbortController().signal), "woke");
 		assert.equal(fix.turns.length, 1);
 		assert.equal(fix.turns[0].cwd, CWD);
-		assert.deepEqual(fix.turns[0].spec.argv.slice(0, -1), ["-p"]);
+		assert.deepEqual(fix.turns[0].spec.argv.slice(0, -1), ["-p", "--no-extensions", "--tools", "read,grep,find,ls"]);
 
 		const written = rows(fix);
 		assert.equal(written.length, 1, "exactly one row per accepted wake");
@@ -242,15 +242,16 @@ test("loop: `wake` starts exactly one turn, records exactly one accepted wake, t
 	}
 });
 
-test("loop: the turn's own environment is not the runner's — the spec carries the prompt, nothing else", async () => {
-	const fix = fixture({ ladder: entry("autopilot", "claude", ["--model", "placeholder-model"]) });
+test("loop: the turn's own environment is not the runner's — the spec carries the prompt last, after the send-proof profile", async () => {
+	const fix = fixture({ ladder: entry("wake", "pi", ["--model", "placeholder-model"]) });
 	try {
 		const loop = new WakeLoop(fix.deps);
 		assert.equal(await loop.tick(new AbortController().signal), "woke");
 		const argv = fix.turns[0].spec.argv;
-		assert.deepEqual(argv.slice(0, 3), ["-p", "--model", "placeholder-model"]);
-		assert.ok(argv[3].includes(PROJECT));
-		assert.ok(argv[3].includes("autopilot"));
+		assert.deepEqual(argv.slice(0, -1), ["-p", "--model", "placeholder-model", "--no-extensions", "--tools", "read,grep,find,ls"]);
+		const prompt = argv[argv.length - 1];
+		assert.ok(prompt.includes(PROJECT));
+		assert.ok(prompt.includes("wake"));
 	} finally {
 		await withFixture(fix, async () => {});
 	}
@@ -362,8 +363,34 @@ test("loop: a refused argument list stops the turn before anything is started", 
 	}
 });
 
-test("loop: an unavailable harness is recorded as a wake whose turn failed, and the message stays pending", async () => {
-	const fix = fixture({ ladder: entry("wake"), turn: { kind: "unavailable", detail: "ENOENT" } });
+test("loop: a level or harness with no send-proof profile is refused before anything is started (2026-10-05 order)", async () => {
+	const fix = fixture({ ladder: entry("autopilot", "pi") });
+	try {
+		const loop = new WakeLoop(fix.deps);
+		assert.equal(await loop.tick(new AbortController().signal), "refused");
+		assert.deepEqual(fix.turns, [], "no turn may start with the harness's full toolset");
+		assert.deepEqual(advances(fix), []);
+		assert.equal(rows(fix).at(-1)?.reason, "profile_unavailable");
+	} finally {
+		await withFixture(fix, async () => {});
+	}
+});
+
+test("loop: a `wake` turn with the read-only profile cannot have been given a shell", async () => {
+	const fix = fixture({ ladder: entry("wake") });
+	try {
+		const loop = new WakeLoop(fix.deps);
+		assert.equal(await loop.tick(new AbortController().signal), "woke");
+		const argv = fix.turns[0].spec.argv;
+		assert.ok(argv.includes("--no-extensions"), "no extension surface means no bus tools");
+		assert.ok(argv.includes("--tools"));
+		assert.ok(!argv.includes("bash"), "the profile must not carry the shell tool");
+	} finally {
+		await withFixture(fix, async () => {});
+	}
+});
+
+test("loop: an unavailable harness is recorded as a wake whose turn failed, and the message stays pending", async () => {	const fix = fixture({ ladder: entry("wake"), turn: { kind: "unavailable", detail: "ENOENT" } });
 	try {
 		const loop = new WakeLoop(fix.deps);
 		assert.equal(await loop.tick(new AbortController().signal), "woke");

@@ -68,7 +68,10 @@ export const HARNESS_DEFAULT_ARGS: Readonly<Record<HarnessName, readonly string[
 };
 
 /** Arguments refused outright in a ladder record's `harness_args`, whatever executable they would reach:
- * these are the shell and interpreter escape hatch that would defeat R2's closed-executable rule. */
+ * these are the shell and interpreter escape hatch that would defeat R2's closed-executable rule, and — added
+ * 2026-10-05 — the tool-exposure flags that would widen or remove the send-proof profile `runner/harness.ts`
+ * appends after them. `-e`/`--extension` loads arbitrary extension code into the turn, an interpreter-class
+ * escape. */
 export const REFUSED_ARGUMENTS = [
   "-c",
   "--command",
@@ -77,7 +80,46 @@ export const REFUSED_ARGUMENTS = [
   "-exec",
   "--dangerously-skip-permissions",
   "--dangerously-bypass-approvals-and-sandbox",
+  "--tools",
+  "-t",
+  "--exclude-tools",
+  "-xt",
+  "--no-tools",
+  "-nt",
+  "--no-builtin-tools",
+  "-nbt",
+  "--no-extensions",
+  "-ne",
+  "--extension",
+  "-e",
 ] as const;
+
+/**
+ * The **send-proof capability profile** a woken turn is started under, per harness (ADR-0032 R5/R7; the
+ * Director's order of 2026-10-05: *no woken turn may send anything, directly or indirectly*). The runner
+ * appends these arguments **after** the record's own `harness_args`, so nothing an operator records can
+ * widen them, and {@link REFUSED_ARGUMENTS} refuses the flags that would try.
+ *
+ * `pi`, the harness every measured wake turn used, takes `--no-extensions --tools read,grep,find,ls`:
+ *  - `--no-extensions` drops every extension, the built-in MCP extension included, so the turn has **no
+ *    `conmuta_*` tool** even when the host enables the bus — which is exactly what supplied the four tools
+ *    on 2026-10-04;
+ *  - `--tools read,grep,find,ls` drops **`bash`**, so the turn can neither read the daemon's run-file
+ *    secret nor speak the IPC, the two steps of the improvised send of 2026-10-04.
+ *
+ * `null` is deliberate and fail-closed everywhere else: the other three harnesses' own tool-restriction
+ * flags have not been verified live (session 66 verified their argv *forms*, never a restriction flag), and
+ * no `autopilot` turn has a profile at all because `autopilot` exists to run a shell and a shell can always
+ * send. An undeclared profile means the runner **refuses to start the turn** (`profile_unavailable`) instead
+ * of starting one with the harness's full toolset — the same direction R2 already takes for a shell-free
+ * launch failure. Adding a verified profile is the one thing that re-enables a harness or the act level.
+ */
+export const SEND_PROOF_PROFILES: Readonly<Record<HarnessName, readonly string[] | null>> = {
+  pi: ["--no-extensions", "--tools", "read,grep,find,ls"],
+  claude: null,
+  codex: null,
+  opencode: null,
+};
 
 /** The environment a woken harness inherits. An allow-list, never a copy of the runner's own environment:
  * the satellite must not hand a woken turn the operator's tokens, keys or IDE variables (R7). */
