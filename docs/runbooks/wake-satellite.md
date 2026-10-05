@@ -202,6 +202,20 @@ The load-bearing control is therefore the capability profile above, and its limi
 harness configuration. A process started outside this runner with a shell of its own is outside what the
 runner can bound.
 
+**What this does not promise, second part: it never reaches the session you are sitting in.** No level above
+delivers a bus message to the interactive host session you have open. `notify` tells you on the runner
+process's **stderr** and records the event — it does not post to Telegram and it does not surface in your
+session. `wake` starts a **separate headless turn**, which since 2026-10-05 has no shell and no MCP surface,
+so it cannot read the inbox or reply either. `autopilot` is refused. **The bus is pull-only for a host
+session**: a live session learns what arrived when *it* runs `fetch`, which is the only reason the
+`<!-- conmuta:begin -->` block in a bound project tells an agent to fetch. If your expectation is "a message
+addressed to me should wake the session I am sitting in", that path was never built — it is recorded as
+[B-115](../06-backlog/CHECKLIST.md), with its evidence in
+[`odd/tasks/b-115-wake-does-not-reach-a-live-session.md`](../../odd/tasks/b-115-wake-does-not-reach-a-live-session.md),
+and it needs an ADR before code. What the ladder is for is the other direction: letting the *machine* notice
+while no session is open, at the level you arm. Arming it again is now safe **for the reason it was disarmed**
+(no woken turn can send), and unsafe for the reason this paragraph gives (it still will not reach you).
+
 **How to turn it back on.** Adding a verified send-proof profile for a harness (or a safe `autopilot` shape)
 is a code change in `runner/constants.ts` plus a live probe like the one that verified `pi`. To arm the
 despertador at all, `conmuta-runner ladder set --project "<id>" --level notify --harness pi --by "<you>"`;
