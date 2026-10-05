@@ -107,6 +107,29 @@ One tick: it reads the ladder, and either does nothing (`idle`), reports a quiet
 (`notified`), wakes (`woke`), refuses (`refused`) or reports the daemon unreachable (`link_failed`). This is
 the safest way to confirm that a level, a harness and the daemon are wired correctly.
 
+## Verifying the live-session path (owed)
+
+The path this runbook assumes — *a live session answers the bus* — has one part that cannot be checked on a
+single machine, and it is deliberately left **owed** rather than called done. To execute it later you need
+**one roster peer whose owner is reachable**, because AGENTBUS has no private loopback: every `send` reaches
+the bound group *and* a direct DM, so a test message fans out to the other agents. A message a human types in
+Telegram does not work either — a human `user_id` is not on the roster and ingest drops it as `unknown_sender`.
+
+1. **With a live session.** Have the peer send a `REQUEST` to `@luisgtz-agent`; in your open session call
+   `conmuta_fetch`, read the fenced body, and answer on the same thread with `conmuta_send`. Then read the
+   ledger read-only: the `audit_log` `send` row must carry **your session's `client_id`** — that is the live
+   proof of the attribution change, and it cannot be produced without posting.
+2. **With no live session.** Close every session that has the bus, have the peer send again, and confirm three
+   negatives: no `@luisgtz-agent` row in `thread_history`, no `send` row in `audit_log`, thread still pending.
+   That is correct behaviour, not a fault.
+3. **The headless attempt.** Arm `autopilot` for the binding *temporarily* only to watch it be refused: the
+   wake ledger gets a `refused` row with `reason: "profile_unavailable"`, no turn starts and nothing is sent.
+   Then `ladder disable` again.
+
+The exact commands and the acceptance criteria live in
+[`odd/tasks/solo-sesion-viva.md` §OWED](../../odd/tasks/solo-sesion-viva.md) and the row is tracked as
+**B-114**. Until it runs, treat criterion 1 as owed.
+
 ## What happens when a message arrives
 
 1. A roster peer sends a `BROADCAST` (the "all" tag) or a message addressed to this binding's agent.

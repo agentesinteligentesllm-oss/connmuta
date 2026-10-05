@@ -106,3 +106,64 @@ Result: **C1–C8 PASS; zero blockers; zero unverified items.**
 
 Hygiene: `git status --short` empty; `%TEMP%/conmuta-*` = 0 before and 0 after. The verifier ran no bus tool
 (a `conmuta_fetch` would have advanced the shared inbox cursor).
+
+## OWED — the end-to-end live-session test (deferred 2026-10-05, no peer collaborator available)
+
+The order's criterion 1 — *with a live session open, an incoming bus message is answered from that session* —
+is the one part that cannot be proven on this machine alone, and it is **deliberately left pending** rather
+than declared done. Criterion 2 is already satisfied (the runner is off and the ledger records no
+`@luisgtz-agent` send: 53+ minutes measured), and criterion 3 is covered by the runner's audited
+`refused (profile_unavailable)` plus the eight tests with observed RED. This section exists so the test can be
+executed later without re-deriving anything.
+
+**Why it is pending.** AGENTBUS has no private loopback: every `send` goes to the bound group *and* as a direct
+DM, so any test message fans out to the other four roster agents and can set them answering. That is exactly
+the traffic this work exists to stop, so it is not something to do unprompted. **A message typed into Telegram
+by a human does not work either** — a human `user_id` is not on the roster and ingest drops it as
+`unknown_sender`, so the sender must be one of the roster *agents* (`@rodrigo-agent`, `@jomata-agent`,
+`@luisrey-agent`, `@coordinador-frisco`) and its owner must be available. As of 2026-10-05 no such collaborator
+was available.
+
+**Preconditions for the run (check each, do not assume).**
+
+1. A roster peer's owner is reachable (their agent can send into the group).
+2. A Pi session open in `…\ORION OCG\FRISCO` (or `frisco-erp`) **started after 2026-10-05**, so it declares
+   the four `conmuta_*` tools. Verify by asking it to call `conmuta_status`, or read the session's own
+   request for `mcp__conmuta__conmuta_fetch`.
+3. `node dist/runner/main.js ladder get` → the binding is `off` (or, for step C only, deliberately `wake`).
+
+**Step A — criterion 1 (with a live session).**
+
+1. The peer sends a `REQUEST` addressed to `@luisgtz-agent` on a fresh thread (or a `BROADCAST`).
+2. In the open session, call `conmuta_fetch`; the body arrives inside its `UNTRUSTED-PEER-INPUT` fence.
+3. Answer on the same thread from **that** session with `conmuta_send` (`REPLY`).
+4. Evidence to capture, read-only, all three:
+   ```sh
+   python3 -c "import sqlite3;c=sqlite3.connect('file:C:/Users/LABORATORIO/.conmuta/ledger.db?mode=ro',uri=True);\
+   print(list(c.execute(\"select at,thread_id,eid,from_agent_id,type from thread_history order by at desc limit 4\")))"
+   python3 -c "import sqlite3;c=sqlite3.connect('file:C:/Users/LABORATORIO/.conmuta/ledger.db?mode=ro',uri=True);\
+   print(list(c.execute(\"select ts,direction,outcome,reason,client_id from audit_log order by id desc limit 4\")))"
+   ```
+   **What makes this the interesting test:** the `audit_log` `send` row must now carry a non-null `client_id` —
+   the session's own. That is the live, Telegram-visible proof of the attribution change, which could not be
+   produced earlier without posting.
+
+**Step B — criterion 2 (with no live session).**
+
+1. Close every session that has the bus (or open a fresh one and do **not** call any bus tool).
+2. The peer sends another `REQUEST` on a fresh thread; wait past the reminder window.
+3. Expected: **no** `@luisgtz-agent` row in `thread_history` for that thread, **no** `send` row in `audit_log`,
+   and the thread still pending. That is correct behaviour, not a failure.
+
+**Step C — criterion 3 (the headless attempt is refused and audited).** Only if it is worth the temporary arming:
+
+1. `node dist/runner/main.js ladder set --project frisco --level autopilot --harness pi --by "<you>: temporary, verified and disabled again"`
+   (`autopilot` is refused by design, so this proves the refusal path rather than starting a turn).
+2. The peer sends; the peer's message is what gives the runner something to wake for.
+3. Expected: a `refused` row with `reason: "profile_unavailable"` in `~/.conmuta/runner/wake-ledger.jsonl`,
+   no turn started, **no** send anywhere. Then `… ladder disable --project frisco --by "<you>: done"`.
+   For the `wake` profile instead, expect a `wake` row plus a turn whose declared tools are exactly
+   `read, grep, find, ls` — no `bash`, no `conmuta_*` — and still no send.
+
+**Acceptance:** A, B and C each observed with the raw output above pasted; then the binding back to `off`, no
+autostart entry, and zero `cmd`/`node` of the runner. Until then this criterion stays **owed**, not done.
