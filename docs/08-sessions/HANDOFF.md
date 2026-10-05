@@ -64,12 +64,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3). El frente del bus está al día: **PR #106 y PR #107 están mergeados**
-(`925c10d` y `35ac1a6`), y la auditoría previa de #106 encontró un CRITICAL que se cerró antes del merge (`8e8d8b7`).
-Lo que sigue pendiente, todo tuyo: **T6**, el timbre con un par real del roster (B-114); **B-112** (perfil a prueba
-de envío para `claude`/`codex`/`opencode`) y **B-113** (el daemon no puede acreditar «hay un humano presente»); y
-**dos decisiones de diseño**: B-117 (¿lista negra, o parseo verificado del argv?) y B-119 (¿verificar la entrega del
-timbre, o aceptar best-effort?). Sigue por §3 y no reabras nada de §6.
+Lee desde la raíz de este repositorio `docs/08-sessions/HANDOFF.md` (§0, §1, §3). El frente del bus está mergeado y auditado: PR #106, #107 y #108, los tres en `main`.
+Lo que queda: **T6 sigue debiendo** —el timbre con un par real del roster (B-114), que necesita a un compañero y no se puede solo— y **cuatro filas nuevas son tuyas**: B-112, B-113, B-117 y B-119.
+Sigue §3 y no reabras §6; y si un run de CI sale rojo, mirá `gh run view <run-id> --json jobs` y buscá `cancelled` antes de concluir (§4): este repositorio está teniendo jobs que se quedan sin runner.
 ```
 
 ### 0.1b If the machine was just powered on
@@ -226,8 +223,9 @@ expected to print, precisely so the reader can compare, and their values are che
    commit `925c10d`.** The audit is done and recorded (`bus-v2-pr106-audit-001`), and the merged branch carries
    `8e8d8b7` (the CRITICAL fix) and `21fcc40` (the corrected claims). Seven rows — **B-117–B-123** — carry the
    audit's non-blocking findings, including the design decision it deliberately did not take (**B-119**, whether a
-   ring that was never delivered should be retried or accepted as best-effort). The session-73 record itself rides
-   in **PR #107**, which is the next merge decision.
+   ring that was never delivered should be retried or accepted as best-effort). The session-73 record followed in
+   **PR #107** (`35ac1a6`) and the documentation hygiene in **PR #108** (`38c1346`) — **nothing is open on the merge
+   gate.**
 1. **The ring owes its first real firing, and that is the only unit the bus front has left (F7c T6 / B-114).** With
    the adapter armed, a roster **agent** sending a directed message or a broadcast should make the open session ring
    and answer. It needs a peer whose owner is available: AGENTBUS has no private loopback, a human `user_id` is not
@@ -240,7 +238,7 @@ expected to print, precisely so the reader can compare, and their values are che
 3. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
 4. **No open row the harness can close alone.** What remains is either the Director's or a scheduled class:
 
-   **3.1 — Director-only decisions.** **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
+   **3.1 — Director-only decisions.** **Four new** filed rows are the Director's, each with its evidence in §7: **B-112** (the send-proof profile is verified for `pi` only, so `claude`/`codex`/`opencode` and `autopilot` are refused), **B-113** (the daemon cannot accredit “a human is present”), **B-117** (the profile is guarded by a deny-list, which a value-consuming record argument can partly defeat — the structural alternative is a parse check on the resolved argv) and **B-119** (an undelivered ring commits the cursor and is not retried; verify the delivery or accept best-effort). **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
 
    **3.2 — Spike/research rows, each needing a real investigation.** **B-05** (gentle-ai installer study), **B-07** (bot-to-bot group visibility for non-admin bots), **B-08** (IPC handshake + named-pipe DACL on Windows), **B-09** (MCP notification rendering per host).
 
@@ -258,6 +256,16 @@ expected to print, precisely so the reader can compare, and their values are che
 
 ## §4 — Facts that will bite you
 
+- **A red CI run in this repository can be a cancellation, not a failure — measured 2026-10-05.** Six `build-and-test`
+  jobs across four runs, **including one on `main`'s own merge commit**, completed **`cancelled`**, every one of them
+  with **no log at all** (`gh run view --job <id> --log` answers `log not found`), and in each run the sibling leg
+  completed `success`. `.github/workflows/ci.yml` has **no `concurrency` block**, the repository is **public**, and
+  there is no `timeout-minutes`: the `windows-latest` runner simply never arrives (one run sat with **both** legs
+  queued for ~25 minutes). **So read the jobs before believing a red** — `gh run view <run-id> --json jobs` names
+  `cancelled` apart from a failure, and `gh run list --limit 5` shows the queue. It is a *check to verify*, never a
+  check to dismiss. When the gate cannot be satisfied, reproduce **every step of the workflow locally**
+  (`npm run build`, `npm test`, `npm run test:wrong-room`, `npm run test:static`) and record in the merge message
+  which check never ran: **a check that never ran is not a check that passed.**
 - **Falsify a delegated finding; never quote it.** The PR #106 audit's round 1 asserted that Pi's extension
   `sendMessage` cannot throw. The writer believed it, rewrote `channel-pi/host.ts`, renamed a test that was *not*
   vacuous, and that landed in `main` — before the next pass read the API layer that **does** throw

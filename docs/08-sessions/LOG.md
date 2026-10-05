@@ -4,6 +4,12 @@
 > describes does (see [`HANDOFF.md`](./HANDOFF.md) for the current state). Rules from v1's
 > ROLLOUT-LOG apply: dated, newest first, and every claim says how it knows.
 
+> **One heading is missing here, and it is declared rather than reconstructed.** There is **no `## Session 64`
+> entry** in this file: sessions 73 down to 65 are present, and session 63 follows 65. Session 64's one recorded unit
+> closed **B-110** (the relative-link gate) and is described **inside the session-65 entry** below, which is why this
+> log and `HANDOFF.md` seem to attribute that closure differently. Both `CHECKLIST.md`'s B-110 row and the handoff
+> say **session 64**, and both are right. Nothing is invented here to fill the gap.
+
 ## Session 73 — the audit the merge gate required, and the CRITICAL it caught (`pr106-audit`)
 
 - **Date**: 2026-10-05 local.
