@@ -4,9 +4,29 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: session 72** (2026-10-05 local), **after F7c shipped the host-side doorbell that reaches the
-> live session and the branch was published.** Every § carries session 72's state unless a line says otherwise;
-> §2 keeps the earlier sessions as context.
+> **Last rewritten: session 73** (2026-10-05 local), **after the pre-merge audit of PR #106 found a CRITICAL and the
+> branch grew two commits.** Every § carries session 73's state unless a line says otherwise; §2 keeps the earlier
+> sessions as context.
+>
+> **Session 73 in one paragraph — the audit the merge gate asked for, and what it caught.** The Director instructed
+> this session to merge PR #106 *after reviewing it*. The native review path could not take the accumulated candidate
+> (session 72 measured `lens_context_budget_exceeded`), so the branch was audited under `GOVERNANCE.md` §3's
+> documented substitute: **two blind reviewers plus a separate verifying executor**. Both reviewers, independently and
+> with the same mechanism, **refuted C3** — *no woken turn may send anything, directly or indirectly* — and it
+> reproduced: `REFUSED_ARGUMENTS` never refused `--`, so a ladder record with `harness_args: ["--"]` produced argv
+> `["-p","--","--no-extensions","--tools","read,grep,find,ls",PROMPT]`, and Pi's parser breaks at the first `--`
+> (`dist/cli/args.js:23-32`), turning the entire send-proof profile into positional prompt text. The wake turn started
+> with `read`, `bash`, `edit`, `write` and extensions loaded — the 2026-10-04 path, reachable through
+> `ladder set --arg=--` and through a hand-edited ladder file, both of which this product documents as legitimate.
+> **Fixed in `8e8d8b7`** (RED before the constant, GREEN after), together with a test on the same guarantee that
+> could not have failed (`!argv.includes("bash")` passes for `read,grep,find,ls,bash`; proven blind by mutation —
+> five tests fail once `bash` is added, while the old assertion alone reported `true`). **`21fcc40`** then corrected
+> the three claims the audit found stronger than their controls. Round 2, on the narrow fix, found the same
+> **WARNING** residual twice and independently — a record argument that consumes the next argv element and is placed
+> last swallows `--no-extensions`; both bounded it identically (`--tools` still holds, so no `bash`, no `conmuta_*`,
+> no send path) and both named the same limit of a deny-list as an instrument. Filed as **B-117–B-123**; the 400-line
+> `size:exception` and **DN-05 formally unsatisfied** are disclosed in the PR. **The merge is not done**: CI green on
+> `8e8d8b7` for both Node legs, and the ring's end-to-end firing is still owed (B-114 / T6).
 >
 > **Session 72 in one paragraph — the live session can finally be woken (F7c).** The Director's report was that a
 > directed message or a broadcast never reached the session he was sitting in. Session 72 **measured** the two
@@ -95,6 +115,20 @@ commit).
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
 | 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70. See §5 |
 
+> **Row 2's trap, corrected in session 73.** `rm -rf dist` deletes the artifact the F7c adapter is armed by:
+> `~/.pi/agent/settings.json` points `extensions` at this checkout's absolute `dist/channel-pi/main.js`. A session
+> already running keeps the module in memory and row 7 rebuilds it, so the window is only as wide as the build — but
+> a session that starts inside it, or a build that fails, arms nothing and rings nothing. Rebuild immediately after
+> deleting; never leave this checkout with `dist/` gone.
+>
+> **And the subagent row needed more than a probe.** The three sessions that reported "unreliable subagents" were not
+> seeing a harness failure: a delegate with no entry in `~/.pi/agent/subagents.json`'s `model_profiles` fails with
+> `assistant reported an error` and **zero tool calls**, while `deepseek/deepseek-flash` is the string measured to
+> work. Profiles were added in session 73 (backup `subagents.json.bak-pre-profile-fix-20261005123100`), after which
+> `jd-judge-a`, `jd-judge-b` and `gentle-ai-verify` all ran. The four `review-*` lens profiles were left alone on
+> purpose: they belong to the native review pipeline, and changing their model is a behaviour change nobody asked
+> for.
+
 ### 0.3 Settle before any work
 
 1. **Autonomy**: confirm the opening prompt re-states it; if it does not, ask one question.
@@ -164,6 +198,11 @@ commit).
 
 ## §3 — What's next
 
+0. **The merge of PR #106 is the one open action, and it is the Director's (session 73).** The audit is done and
+   recorded (`bus-v2-pr106-audit-001`), the branch carries `8e8d8b7` and `21fcc40`, and CI is green on both Node legs
+   for `8e8d8b7`. What remains is the merge decision itself. Seven rows — **B-117–B-123** — carry the audit's
+   non-blocking findings, including the design decision it deliberately did not take (**B-119**, whether a ring that
+   was never delivered should be retried or accepted as best-effort).
 1. **The ring owes its first real firing, and that is the only unit the bus front has left (F7c T6 / B-114).** With
    the adapter armed, a roster **agent** sending a directed message or a broadcast should make the open session ring
    and answer. It needs a peer whose owner is available: AGENTBUS has no private loopback, a human `user_id` is not
@@ -332,6 +371,7 @@ instead, which is where such a record belongs.
 | **B-114** | **The end-to-end live-session test is owed, and it needs a collaborator.** Criterion 1 of the 2026-10-05 order — a live session answering an incoming bus message — cannot be proven alone: AGENTBUS has no private loopback (every `send` reaches the group *and* a DM, so a test message fans out to the other four agents), and a human typing in Telegram is dropped as `unknown_sender`, so the sender must be a roster *agent* whose owner is available. Criteria 2 and 3 are satisfied and pinned. **Steps and acceptance criteria:** `odd/tasks/solo-sesion-viva.md` §OWED; runbook "Verifying the live-session path (owed)". Do not call this done until step A's `audit_log` `send` row is shown carrying a non-null `client_id` | Director (needs a peer) |
 | ADR-0032 | still `proposed` (pending the Director's confirmation) | Director |
 | **B-112 / B-113** | Filed in session 71. **B-112**: the send-proof profile is verified for `pi` only, so `autopilot` and `claude`/`codex`/`opencode` are refused; closing it means verifying each harness's own restriction flag on the installed binary the way session 66 verified the argv forms. **B-113**: the daemon cannot accredit "a human is present" (every same-user process reads the same run file and speaks the same IPC; `host` is the same literal `unknown` for both), and the only shape that could — a TTY-gated per-session human grant — is more surface than the order asked for. Do not re-derive either. | Director (B-112 is a bounded harness-verification job) |
+| **B-117 / B-119** | Two design decisions the PR #106 audit refused to take inline. **B-117**: the send-proof profile is guarded by a deny-list, and a record argument that consumes the next argv element and is placed last can swallow `--no-extensions` (bounded — `--tools` still holds, so no `bash`, no `conmuta_*` and no send path). The structural alternative, parsing the resolved argv and refusing on mismatch, costs either coupling the runner to each host's parser or forbidding bare value-consuming flags in a record. **B-119**: Pi's extension-facing `sendMessage` cannot throw, so a ring that was never delivered commits the cursor and is never retried; either make delivery verifiable and refuse to advance the cursor, or accept best-effort in ADR-0036 with the loss recorded. Both need their ADR before code | Director |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
 ---
