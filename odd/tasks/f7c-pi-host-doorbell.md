@@ -40,23 +40,29 @@ with `conmuta_send`. The extension never carries peer prose, never acknowledges,
 
 ## Tasks
 
-- [ ] **T1 — the host module, test-first.** `channel-pi/host.ts`: `createPiDoorbellAdapter(deps)` over injected
-  `{ pi, link, now }`, returning the `session_start` / `session_shutdown` handlers. RED first: the fake `pi`
-  records `sendMessage` calls. Pins the ring's exact shape (`customType`, `triggerTurn`, `deliverAs`), that the
-  content comes only from the closed doorbell field set, the cooldown / one-in-flight / per-window budget
-  constants, the guarded call after the session ended, and the bounded shutdown.
-- [ ] **T2 — the extension entry.** `channel-pi/main.ts`: the default export factory that wires the real link
-  (`createDaemonLink`) and a `DoorbellWatcher` to `host.ts`. No watcher or timer in the factory (Pi's own
-  extension rule); resources start at `session_start`, end at `session_shutdown`. `channel-pi/tsconfig.json`
-  mirroring `channel/tsconfig.json`.
-- [ ] **T3 — the bundle-closure pin.** `test/security/channel-pi-bundle.test.ts`, modeled on
-  `channel-bundle.test.ts`: non-vacuous closure with sentinels; no `src/daemon/`, `child_process`, `node:sqlite`,
-  keyring, Telegram URL, `.getUpdates(`, `.sendMessage(`; `fs` confined to the two shipped readers; a closed
-  timer allow-list; every rule seeded with a negative.
-- [ ] **T4 — packaging and the runbook.** `package.json` `files` entry for `dist/channel-pi/**` (no new `bin`:
-  this artifact is loaded by the host, not executed as a command); `docs/runbooks/host-doorbell-pi.md` with the
-  manual, user-level arming steps, the best-effort delivery note, and the "a ring is not a delivery guarantee"
-  bound.
+- [x] **T1 — the host module, test-first.** Done. `channel-pi/constants.ts` (`PI_DOORBELL_HOST_LABEL`,
+  `PI_DOORBELL_CUSTOM_TYPE`, `PI_RING_COOLDOWN_MS`) and `channel-pi/host.ts` (`PiMessenger`,
+  `createPiRinger`). RED observed first (the stub rang nothing, so 4 of 6 assertions failed), then GREEN
+  6/6 in `test/channel-pi/host.test.ts`: the exact message/options shape, the content being the
+  notification's own text, the cooldown merging instead of queueing, a host failure propagating, and a
+  failed ring not starting the cooldown.
+- [x] **T2 — the extension entry.** Done. `channel-pi/main.ts` (the default-export factory: binding from the
+  nearest ancestor `conmuta.json`, link, `DoorbellWatcher` with `createPiRinger` as `deliver`, loop under an
+  `AbortController`, idempotent `session_shutdown` that aborts and closes), plus `channel-pi/tsconfig.json`
+  and the root `tsconfig.json` reference. No host package is imported: the two host types are declared
+  structurally and locally, so `tsc -b` has no new dependency to resolve.
+- [x] **T3 — the bundle-closure pin.** Done. `test/security/channel-pi-bundle.test.ts`, 19 tests, all green:
+  closure non-vacuous (18 files, floor 14, sentinels incl. `src/shared/roster-hash.js`), no `src/daemon/`,
+  `child_process`, `node:sqlite`, keyring, Telegram URL, `.getUpdates(`; `fs` confined to the two shipped
+  readers; a closed timer allow-list; no `node:timers`; bare specifiers reduced to
+  `node:crypto,node:fs,node:os,node:path,zod`; and the adapted send rule — **the ring is the only
+  `.sendMessage(` call site in the closure, exactly one call, in `channel-pi/host.js`**. Every rule seeded.
+- [x] **T4 — packaging and the runbook.** Done. `package.json` `files` gained `dist/channel-pi/**` (no bin);
+  `test/security/pack.test.ts` gained the whitelist entry plus a packed-entry assertion for
+  `dist/channel-pi/main.js`, which is the only thing that would surface a wrong glob because this artifact
+  has no bin. Runbook `docs/runbooks/host-doorbell-pi.md` (manual, user-level arming; how to verify; what the
+  ring does and how to stop it; best-effort delivery). `docs/02-architecture/OVERVIEW.md`'s Wake-up row no
+  longer calls host wake-up pull-only without qualification.
 - [ ] **T5 — docs reconciliation.** `docs/02-architecture/OVERVIEW.md`'s Wake-up row stops saying host wake-up
   is pull-only *without qualification*; `docs/03-adr/0036-*.md` moves to `accepted` on the Director's word;
   `docs/00-INDEX.md` and `docs/06-backlog/CHECKLIST.md` carry B-116.
