@@ -81,3 +81,28 @@ Each behavior-changing commit carries its own `FUENTE:` / `PROPUESTA:` lines in 
   bounded change this order asked for; it remains the option to reach for if a daemon-side proof is ever
   required.
 
+
+## Independent verification (2026-10-05)
+
+RDD preflight against the frozen candidate: `inspect` offered `review.start`; two pre-authority validation
+errors (`requires lineageId`; `supports only "ordinary" or "judgment-day" mode`) created no lineage; the third
+START returned a **host-resolved consent** — `consent-declined-this-candidate`, `lineage_created: false`,
+`mutation_performed: false`, `risk_level: medium`, 37 files / 2254 lines. The decline is candidate-scoped and is
+not the kill switch, so the RDD-off fallback re-enabled the separate verifier, run as `gentle-ai-verify`
+(read-only) over this work unit.
+
+Result: **C1–C8 PASS; zero blockers; zero unverified items.**
+
+| Claim | Result |
+|---|---|
+| C1 the profile is appended last, prompt last (built `dist/runner/harness.js`) | PASS — argv `["-p","--model","x","--no-extensions","--tools","read,grep,find,ls","PROMPT"]` |
+| C2 a pair with no profile is refused | PASS — `autopilot+pi` and `wake+claude` both → `{kind:"refused",reason:"profile_unavailable"}` |
+| C3 the record cannot widen the profile | PASS — all 8 flags (`--tools`, `-t`, `--exclude-tools`, `--no-extensions`, `-ne`, `-e`, `--extension`, `--tools=bash`) → `arguments_refused` |
+| C4 sender attribution in the built daemon | PASS — all 6 send `appendAuditRow` calls carry `client_id: deps.client_id ?? null`; `sendDeps` carries `client_id: auth.session.client_id` |
+| C5 named constant, not an inline literal | PASS — `SEND_PROOF_PROFILES` in `dist/runner/constants.js`, `null` for the other three harnesses |
+| C6 focused tests + non-vacuity | PASS — 53/53. **Disclosed as weaker than requested:** the verifier pinned the assertions instead of patching a copy, so its non-vacuity proof is indirect. The stronger RED evidence is this change's own stash run: 12 tests failed against the pre-change runner and pass after. |
+| C7 documentation matches the code | PASS — runbook no longer claims the turn fetches/replying, names `profile_unavailable`; ADR-0032 carries the amendment; README row 5 links to it |
+| C8 live probe: no shell, no bus | PASS — `pi -p --no-extensions --tools read,grep,find,ls` declares exactly `read,grep,find,ls`; `mcp__conmuta` = 0; no `bash` |
+
+Hygiene: `git status --short` empty; `%TEMP%/conmuta-*` = 0 before and 0 after. The verifier ran no bus tool
+(a `conmuta_fetch` would have advanced the shared inbox cursor).
