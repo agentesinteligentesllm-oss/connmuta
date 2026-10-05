@@ -4,9 +4,32 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: session 72** (2026-10-05 local), **after F7c shipped the host-side doorbell that reaches the
-> live session and the branch was published.** Every § carries session 72's state unless a line says otherwise;
-> §2 keeps the earlier sessions as context.
+> **Last rewritten: session 73** (2026-10-05 local), **after the pre-merge audit of PR #106 found a CRITICAL and the
+> branch grew two commits.** Every § carries session 73's state unless a line says otherwise; §2 keeps the earlier
+> sessions as context.
+>
+> **Session 73 in one paragraph — the audit the merge gate asked for, and what it caught.** The Director instructed
+> this session to merge PR #106 *after reviewing it*. The native review path could not take the accumulated candidate
+> (session 72 measured `lens_context_budget_exceeded`), so the branch was audited under `GOVERNANCE.md` §3's
+> documented substitute: **two blind reviewers plus a separate verifying executor**. Both reviewers, independently and
+> with the same mechanism, **refuted C3** — *no woken turn may send anything, directly or indirectly* — and it
+> reproduced: `REFUSED_ARGUMENTS` never refused `--`, so a ladder record with `harness_args: ["--"]` produced argv
+> `["-p","--","--no-extensions","--tools","read,grep,find,ls",PROMPT]`, and Pi's parser breaks at the first `--`
+> (`dist/cli/args.js:23-32`), turning the entire send-proof profile into positional prompt text. The wake turn started
+> with `read`, `bash`, `edit`, `write` and extensions loaded — the 2026-10-04 path, reachable through
+> `ladder set --arg=--` and through a hand-edited ladder file, both of which this product documents as legitimate.
+> **Fixed in `8e8d8b7`** (RED before the constant, GREEN after), together with a test on the same guarantee that
+> could not have failed (`!argv.includes("bash")` passes for `read,grep,find,ls,bash`; proven blind by mutation —
+> five tests fail once `bash` is added, while the old assertion alone reported `true`). **`21fcc40`** then corrected
+> the three claims the audit found stronger than their controls. Round 2, on the narrow fix, found the same
+> **WARNING** residual twice and independently — a record argument that consumes the next argv element and is placed
+> last swallows `--no-extensions`; both bounded it identically (`--tools` still holds, so no `bash`, no `conmuta_*`,
+> no send path) and both named the same limit of a deny-list as an instrument. Filed as **B-117–B-123**; the 400-line
+> `size:exception` and **DN-05 formally unsatisfied** are disclosed in the PR. **The merge was taken on 2026-10-05:
+> `MERGED` at 19:13:15Z as merge commit `925c10d`**, with CI green on both Node legs. The follow-up pass of the audit
+> then found one of round 1's findings **wrong** — the ring *does* throw on a stale context — so `channel-pi/host.ts`,
+> its test and **B-119** were corrected again, and that correction is recorded rather than hidden. The ring's
+> end-to-end firing is still owed (B-114 / T6).
 >
 > **Session 72 in one paragraph — the live session can finally be woken (F7c).** The Director's report was that a
 > directed message or a broadcast never reached the session he was sitting in. Session 72 **measured** the two
@@ -54,7 +77,7 @@
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
 | What is new? | **The live session can be woken: F7c shipped.** `channel-pi/` — a host-side Pi extension that holds the existing body-less doorbell and injects one **attributable, body-less ring** into the live session, which then fetches and answers. `ADR-0036` `accepted`, row **B-116**, phase **F7c**. It is **armed machine-wide** (`~/.pi/agent/settings.json` `extensions`). The `solo-sesion-viva` mode stands: `wake` on `pi` runs under a send-proof profile, `autopilot` and the other three harnesses are refused, `audit_log.client_id` names the sender. The `frisco` despertador is **off** and must stay off. |
 | What is next? | **The ring's end-to-end firing with a real roster peer — owed (B-114 / F7c T6).** It needs a peer whose owner is available; AGENTBUS has no private loopback, so a test message fans out to every agent in the group. Everything else on the bus front is done: **B-112** (send-proof profiles for `claude`/`codex`/`opencode`) and **B-113** (the daemon cannot accredit a human) are filed and bounded. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: **two delegates failed with zero tool calls in session 72** (`gentle-ai-explore`, `gentle-ai-worker`) — re-verify before relying on one, and expect to do the work inline. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: session 72's **two delegates that failed with zero tool calls** (`gentle-ai-explore`, `gentle-ai-worker`) were not a harness failure — they had no `model_profiles` entry, and session 73 fixed that (see the note below the table). Re-verify with one tiny probe before relying on a delegate, but do not assume the work must be done inline. |
 | What is the Director's to decide? | Whether the published branch gets merged (the repository's own rule is an audit before merge, and the Director declined all reviews in session 72); the Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). |
 | Where to read next | §0 first; then §1, §3, and §4. |
 
@@ -91,9 +114,23 @@ commit).
 | 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1907 tests, 1901 pass, 0 fail, 6 skip**; `test:static` **101/101** |
+| 7 | `npm run build && npm test` | exit 0; **1948 tests, 1942 pass, 0 fail, 6 skip**; `test:static` **120/120** (session 73's counts; the clean-build step in row 2 is what makes them mean anything — see the note below the table) |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
-| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70. See §5 |
+| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70, and working again in session 73 after the model-profile fix below. See §5 |
+
+> **Row 2's trap, corrected in session 73.** `rm -rf dist` deletes the artifact the F7c adapter is armed by:
+> `~/.pi/agent/settings.json` points `extensions` at this checkout's absolute `dist/channel-pi/main.js`. A session
+> already running keeps the module in memory and row 7 rebuilds it, so the window is only as wide as the build — but
+> a session that starts inside it, or a build that fails, arms nothing and rings nothing. Rebuild immediately after
+> deleting; never leave this checkout with `dist/` gone.
+>
+> **And the subagent row needed more than a probe.** The three sessions that reported "unreliable subagents" were not
+> seeing a harness failure: a delegate with no entry in `~/.pi/agent/subagents.json`'s `model_profiles` fails with
+> `assistant reported an error` and **zero tool calls**, while `deepseek/deepseek-flash` is the string measured to
+> work. Profiles were added in session 73 (backup `subagents.json.bak-pre-profile-fix-20261005123100`), after which
+> `jd-judge-a`, `jd-judge-b` and `gentle-ai-verify` all ran. The four `review-*` lens profiles were left alone on
+> purpose: they belong to the native review pipeline, and changing their model is a behaviour change nobody asked
+> for.
 
 ### 0.3 Settle before any work
 
@@ -142,10 +179,10 @@ commit).
 | **B-31** | **CLOSED — session 70.** R5's scan runs pre-parse (design §4), so a token written as a JSON escape (`1234567\u003aAAHk…`) held no literal shape in the file and was accepted, then sat in `registry.json` and the daemon's memory reported by nothing. `src/registry/loader.ts` gained a post-parse walk over values **and** key names, reusing `assertNoTokenShape` and — load-bearingly — the existing `withoutRosterHashes` mask, with `MAX_CONTENT_WALK_DEPTH = 32`. 5 tests in `test/registry/loader.test.ts` (escaped value, escaped key, nested, the hash exemption surviving and not shadowing, the depth bound); RED before GREEN, non-vacuity by mutation. | `src/registry/loader.ts`; `odd/tasks/b-31-registry-escaped-token.md` |
 | **`solo-sesion-viva`** | **Session 71 — the bus answers only from a live session.** `SEND_PROOF_PROFILES` (`wake` on `pi` = `--no-extensions --tools read,grep,find,ls`, appended last, after the record's own args); `refused (profile_unavailable)` for `autopilot` and the three unverified harnesses; tool-exposure flags refused; `audit_log.client_id` carries the sender on every send row (was hardcoded `null`). Runbook, ADR-0032 amendment and README row 5 updated. Live probe: the profile declares exactly `read,grep,find,ls` — no `bash`, zero `mcp__conmuta`. **B-112**, **B-113** filed. Branch `fix/solo-sesion-viva`, **not pushed**. | `odd/tasks/solo-sesion-viva.md`; `docs/runbooks/wake-satellite.md`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` |
 | **B-99** | **CLOSED COMPLETELY — sessions 55 & 69** (commit `dd464a7` converted the three original tests to `waitForCondition`; session 69 closed the remaining fixed sleeps in `heartbeat.test.ts` and converted `bootstrap.test.ts:517` to positively observe live ticks with stable audit rows, plus converting boot/add waits to condition waits) | `odd/tasks/b-99-timer-tests.md`; `docs/06-backlog/CHECKLIST.md` |
-| **F7c / B-116** | **DELIVERED (T1–T5) — session 72; T6 owed.** `channel-pi/` (ADR-0036): a host-side Pi extension that holds F4's body-less doorbell and injects one attributable, body-less ring (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`), which starts a turn in the live session so it can fetch and answer. Measured reason it is an extension and not a port: Pi renders **no** MCP notification. Pinned by 6 ring tests, 6 lifecycle tests, a bundle-closure gate (the ring is the only `.sendMessage(` call site; no `src/daemon/`, no Telegram path), an extended twin gate and a packed-entry assertion. Verified live against the running daemon (`client_cursors.host = pi-host-doorbell`) and **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a roster peer is owed (B-114 / T6)** | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md); `odd/tasks/f7c-pi-host-doorbell.md`; `docs/runbooks/host-doorbell-pi.md` |
+| **F7c / B-116** | **DELIVERED (T1–T5) — session 72; T6 owed.** `channel-pi/` (ADR-0036): a host-side Pi extension that holds F4's body-less doorbell and injects one attributable, body-less ring (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`), which starts a turn in the live session so it can fetch and answer. Measured reason it is an extension and not a port: Pi renders **no** MCP notification. Pinned by 6 ring tests, 6 lifecycle tests, a bundle-closure gate (the ring is the only `.sendMessage(` call site; no `src/daemon/`, no Telegram path), an extended twin gate and a packed-entry assertion. Verified live against the running daemon (`client_cursors.host = pi-host-doorbell`) and **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a roster peer is owed (B-114 / T6)**. **Audited and merged in session 73** (`8e8d8b7` fixes the CRITICAL the audit's two blind reviewers found independently; `21fcc40` corrects three claims that were stronger than their controls; merge commit `925c10d`). The residual the audit then found in the fix is filed as **B-117** | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md); `odd/tasks/f7c-pi-host-doorbell.md`; `docs/runbooks/host-doorbell-pi.md` |
 | **B-115** | **CLOSED — session 72.** The audit that recorded the truth (*no ladder level reaches a live host session*) and the classification that closed it (new row **B-116** under new phase **F7c**, on the Director's explicit answers). The gap it named is now addressed by shipped code; what remains is the live firing, tracked under B-114 | `odd/tasks/b-115-wake-does-not-reach-a-live-session.md`; `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16; F7b follows F6; F7c is delivered outside SDD | `docs/07-plan/WORK-PLAN.md` |
-| Tests on the branch | `npm test` **1947/1941/0/6**; `test:static` **120/120**; `%TEMP%` 0 → 0 from a clean build | — |
+| Tests on the merged branch | `npm test` **1948/1942/0/6**; `test:static` **120/120**; `%TEMP%` 0 → 0 from a clean build (session 73, after `8e8d8b7`) | — |
 
 ---
 
@@ -164,6 +201,12 @@ commit).
 
 ## §3 — What's next
 
+0. **The merge decision for PR #106 is the Director's, and it was taken on 2026-10-05: `MERGED` at 19:13:15Z as merge
+   commit `925c10d`.** The audit is done and recorded (`bus-v2-pr106-audit-001`), and the merged branch carries
+   `8e8d8b7` (the CRITICAL fix) and `21fcc40` (the corrected claims). Seven rows — **B-117–B-123** — carry the
+   audit's non-blocking findings, including the design decision it deliberately did not take (**B-119**, whether a
+   ring that was never delivered should be retried or accepted as best-effort). The session-73 record itself rides
+   in **PR #107**, which is the next merge decision.
 1. **The ring owes its first real firing, and that is the only unit the bus front has left (F7c T6 / B-114).** With
    the adapter armed, a roster **agent** sending a directed message or a broadcast should make the open session ring
    and answer. It needs a peer whose owner is available: AGENTBUS has no private loopback, a human `user_id` is not
@@ -332,6 +375,7 @@ instead, which is where such a record belongs.
 | **B-114** | **The end-to-end live-session test is owed, and it needs a collaborator.** Criterion 1 of the 2026-10-05 order — a live session answering an incoming bus message — cannot be proven alone: AGENTBUS has no private loopback (every `send` reaches the group *and* a DM, so a test message fans out to the other four agents), and a human typing in Telegram is dropped as `unknown_sender`, so the sender must be a roster *agent* whose owner is available. Criteria 2 and 3 are satisfied and pinned. **Steps and acceptance criteria:** `odd/tasks/solo-sesion-viva.md` §OWED; runbook "Verifying the live-session path (owed)". Do not call this done until step A's `audit_log` `send` row is shown carrying a non-null `client_id` | Director (needs a peer) |
 | ADR-0032 | still `proposed` (pending the Director's confirmation) | Director |
 | **B-112 / B-113** | Filed in session 71. **B-112**: the send-proof profile is verified for `pi` only, so `autopilot` and `claude`/`codex`/`opencode` are refused; closing it means verifying each harness's own restriction flag on the installed binary the way session 66 verified the argv forms. **B-113**: the daemon cannot accredit "a human is present" (every same-user process reads the same run file and speaks the same IPC; `host` is the same literal `unknown` for both), and the only shape that could — a TTY-gated per-session human grant — is more surface than the order asked for. Do not re-derive either. | Director (B-112 is a bounded harness-verification job) |
+| **B-117 / B-119** | Two design decisions the PR #106 audit refused to take inline. **B-117**: the send-proof profile is guarded by a deny-list, and a record argument that consumes the next argv element and is placed last can swallow `--no-extensions` (bounded — `--tools` still holds, so no `bash`, no `conmuta_*` and no send path). The structural alternative, parsing the resolved argv and refusing on mismatch, costs either coupling the runner to each host's parser or forbidding bare value-consuming flags in a record. **B-119**: Pi's extension-facing `sendMessage` cannot throw, so a ring that was never delivered commits the cursor and is never retried; either make delivery verifiable and refuse to advance the cursor, or accept best-effort in ADR-0036 with the loss recorded. Both need their ADR before code | Director |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
 ---
