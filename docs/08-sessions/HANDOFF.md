@@ -4,11 +4,26 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 70** (2026-10-03 local), **including the post-commit RDD disposition and the
-> independent verification results (§5), which were settled after the session's commits and before the machine was
-> powered off.** Every § carries session 70's state unless a line says otherwise.
+> **Last rewritten: session 71** (2026-10-05 local), **after the daemon restart that made the send-attribution
+> code live and after the independent verification (§5) came back with zero blockers.** Every § carries session 71's
+> state unless a line says otherwise; §2 keeps the earlier sessions as context.
 >
-> **Session 70 in one paragraph — B-95 remainder, B-97 and B-31 closed under ODD; B-102 and B-99 commits landed. Suite 1907/1901/0/6, test:static 101/101, zero temp leaks.** B-95 remainder was closed at its source under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe corrupt-row handling in `src/daemon/serve/fetch.ts:244-246` (`parseStoredEnvelope` defensively validates object structure, envelope types, non-empty threads, and `to`/`basis`, returning `null` on corruption and skipping the row without throwing, while `lastRowSeq` still advances the client cursor past damaged rows), pinned by 14 test cases in `test/daemon/serve/fetch.test.ts` (observed RED before GREEN, non-vacuity proven by mutation); review note R3-1 addressed in `src/daemon/serve/doorbell.ts` (non-null `to` tightened with `AGENT_ID_PATTERN`); review note R2-1 addressed in `test/channel/main.test.ts` (drift-prone count comment removed). B-97 was then closed by correcting the row's own premise: the guard's defect class is *any link the entry path crosses*, not only a POSIX symlink, and a Windows directory **junction** reproduces it with neither Developer Mode nor admin — measured here as direct `exit 2` versus junction `exit 0` with zero bytes on both streams, and pinned by a new test whose non-vacuity is the old guard restored failing it while the pre-existing test still passes. **B-31** closed the JSON-escape bypass of the registry's pre-parse R5 scan with a post-parse value walk (`odd/tasks/b-31-registry-escaped-token.md`), reusing the existing roster-hash mask so the new gate cannot reintroduce B-27's blanket refusal.
+> **Session 71 in one paragraph — the bus now answers only from a live session (`solo-sesion-viva`).** The Director's
+> order: with a live session open that session answers, with none open nobody answers and the thread stays pending,
+> and **no woken (headless) turn may send anything, directly or indirectly**. Step 0 stopped the bleed (ladder `off`,
+> the Startup entry archived, both runner processes killed — killing only the `cmd` leaves the `node` orphaned).
+> Step 1 chose **capability over permission**: `SEND_PROOF_PROFILES` (`runner/constants.ts`) runs `wake` on `pi` as
+> `pi -p --no-extensions --tools read,grep,find,ls`, appended after the record's own `harness_args`; a level/harness
+> pair with no verified profile is **refused** (`profile_unavailable`) instead of started with a full toolset — so
+> `autopilot` and `wake` on `claude`/`codex`/`opencode` never start (**B-112**) — and the flags that could widen the
+> profile are refused. The daemon's half is **attribution, not accreditation**: `audit_log.client_id` now carries the
+> sender on every send row (it was hardcoded `null`, which is why the four 2026-10-04 replies could not be traced at
+> all); the accreditation gap is recorded as **B-113** so nobody re-derives it. Step 2 found the real cause of the
+> missing `conmuta_*` tools: an **unregistered `pi-mcp-adapter`** had written `"extensions": ["-builtin:mcp"]` into
+> `~/.pi/agent/settings.json`, disabling Pi's built-in MCP for every session while `pi mcp list` still connected.
+> Suite **1912/1906/0/6**, `test:static` **101/101**, `%TEMP%\conmuta-*` 0 → 0; independent verifier C1–C8
+> **PASS**. Commits on branch `fix/solo-sesion-viva`, **not pushed**.
+>
 
 ---
 
@@ -17,8 +32,8 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **B-95 remainder CLOSED COMPLETELY** (safe corrupt-row policy in `fetch.ts`, cursor advances, R3-1/R2-1 review notes resolved); **B-97 CLOSED** with a genuinely RED-reproducing test (Windows directory junction); **B-31 CLOSED** (post-parse gate for an escaped token in `registry.json`, with the roster-hash mask reused so B-27 cannot be reintroduced); **B-102 and B-99 commits landed** on `main`. Rows B-31, B-95, B-97, B-99, B-102 marked `done`. |
-| What is next? | **No open row the harness can close alone.** The backlog still holds **78 long-standing open rows** (§3.3), all deliberate non-blocking deferrals from F1/F2 reviews; the ones with real teeth are named there. **B-101**'s relocation is a Director/editorial decision. **F6** blocked on B-11/B-12/B-16; **F7b** after F6. |
+| What is new? | **The bus is in `solo-sesion-viva` mode: it answers only from a live session, and no woken turn can send.** `wake` on `pi` runs under a send-proof profile; `autopilot` and the other three harnesses are refused (`profile_unavailable`); `audit_log.client_id` now names the sender on every send row. The `frisco` despertador is **off** and must stay off. Session 70's **B-95 remainder, B-97, B-31** closures stand. |
+| What is next? | **Nothing open on the bus front.** **B-112** (verify the send-proof profile for `claude`/`codex`/`opencode`, restoring the capability session 66 verified) and **B-113** (the daemon-side accreditation gap, recorded so it is not re-derived) are filed. Otherwise as before: no open row the harness can close alone (§3.3), **F6** blocked on B-11/B-12/B-16, **F7b** after F6. |
 | What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health was verified working in sessions 69 and 70. |
 | What is the Director's to decide? | The Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). |
 | Where to read next | §0 first; then §1, §3, and §4. |
@@ -105,6 +120,7 @@ commit).
 | **B-95 remainder** | **CLOSED COMPLETELY — session 70** under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`). Safe corrupt-row policy in `src/daemon/serve/fetch.ts:244-246` (skips corrupt/unparseable rows without failing, cursor advances past them); review notes R3-1 (doorbell.ts to check) and R2-1 (comment drift) resolved. | `src/daemon/serve/fetch.ts`; `docs/06-backlog/CHECKLIST.md` |
 | **B-97** | **CLOSED COMPLETELY — session 70.** The guard was already `import.meta.main` (session 55, `24d7dc6`); what session 70 closed is the row's own premise plus the missing ADR-12 pin. The defect class is any link the entry path crosses, not only a POSIX symlink: a Windows directory **junction** reproduces it with neither Developer Mode nor admin. Measured against the built bundle here — old guard: direct `exit 2` but junction `exit 0` with **zero bytes** on both streams (the silent no-op); `import.meta.main`: `exit 2` both ways. New test `test/cli/main.test.ts`'s "the entry guard fires when the built CLI is reached through a directory link (B-97)" creates the junction and spawns through it; non-vacuity is a restored old guard failing that test while the pre-existing direct test still passes. No `src/` change; no separate POSIX CI job (the row offered it as an alternative, and `windows-latest` now exercises the guarantee). | `test/cli/main.test.ts`; `docs/06-backlog/CHECKLIST.md` |
 | **B-31** | **CLOSED — session 70.** R5's scan runs pre-parse (design §4), so a token written as a JSON escape (`1234567\u003aAAHk…`) held no literal shape in the file and was accepted, then sat in `registry.json` and the daemon's memory reported by nothing. `src/registry/loader.ts` gained a post-parse walk over values **and** key names, reusing `assertNoTokenShape` and — load-bearingly — the existing `withoutRosterHashes` mask, with `MAX_CONTENT_WALK_DEPTH = 32`. 5 tests in `test/registry/loader.test.ts` (escaped value, escaped key, nested, the hash exemption surviving and not shadowing, the depth bound); RED before GREEN, non-vacuity by mutation. | `src/registry/loader.ts`; `odd/tasks/b-31-registry-escaped-token.md` |
+| **`solo-sesion-viva`** | **Session 71 — the bus answers only from a live session.** `SEND_PROOF_PROFILES` (`wake` on `pi` = `--no-extensions --tools read,grep,find,ls`, appended last, after the record's own args); `refused (profile_unavailable)` for `autopilot` and the three unverified harnesses; tool-exposure flags refused; `audit_log.client_id` carries the sender on every send row (was hardcoded `null`). Runbook, ADR-0032 amendment and README row 5 updated. Live probe: the profile declares exactly `read,grep,find,ls` — no `bash`, zero `mcp__conmuta`. **B-112**, **B-113** filed. Branch `fix/solo-sesion-viva`, **not pushed**. | `odd/tasks/solo-sesion-viva.md`; `docs/runbooks/wake-satellite.md`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` |
 | **B-99** | **CLOSED COMPLETELY — sessions 55 & 69** (commit `dd464a7` converted the three original tests to `waitForCondition`; session 69 closed the remaining fixed sleeps in `heartbeat.test.ts` and converted `bootstrap.test.ts:517` to positively observe live ticks with stable audit rows, plus converting boot/add waits to condition waits) | `odd/tasks/b-99-timer-tests.md`; `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
 | Tests on `main` | `npm test` **1907/1901/0/6**; `test:static` **101/101** | — |
@@ -127,6 +143,7 @@ commit).
 ## §3 — What's next
 
 1. **The `frisco` binding is armed and running — do not re-arm it.**
+1. **The `frisco` despertador is OFF, and it must stay off.** Session 71 disabled it, removed the Startup entry and killed both processes, on the Director's order that the bus answer only from a live session. Re-arming is a Director decision and a deliberate act: `wake` no longer replies (it has no bus and no shell) and `autopilot` is refused, so `notify` is the only level that does anything useful. See the runbook's "A woken turn cannot send".
 2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
 3. **No open row the harness can close alone.** What remains is either the Director's or a scheduled class:
 
@@ -188,12 +205,15 @@ commit).
 ### 5.2 — Native review: no candidate was approved, and none exists
 
 **Every candidate was host-resolved as `consent-declined-this-candidate`, so no native review exists for sessions
-70–71 and the separate independent verifier above was the only independent pass. Five declines across three
+70–71 and the separate independent verifier above was the only independent pass. Six declines across four
 sessions:** session 68's two (`sha256:6f94b8d9…`, 6 files / 415 lines; `sha256:5977c01d…`, 10 files / 1008 lines)
 and the accumulated target re-offered after each growth (`sha256:2cd5fa16…`, 19 files / 1314 lines; `sha256:8937c6f2…`,
-23 files / 1653 lines; `sha256:f0f16d67…`, 23 files / **1684** lines). All returned `lineage_created: false` and
-`mutation_performed: false`, so **no lineage exists and no review state was mutated** — there is nothing to
-acknowledge, correct, recover or reset. **Do not re-inspect or re-drive START on any of these targets.**
+23 files / 1653 lines; `sha256:f0f16d67…`, 23 files / **1684** lines; `sha256:c90c38ab…`, the session-71 target at
+**37 files / 2254 lines**, `risk_level: medium`). Session 71's decline followed two **pre-authority** START
+validation errors (`requires lineageId`; missing `mode`) that created no lineage either. All returned
+`lineage_created: false` and `mutation_performed: false`, so **no lineage exists and no review state was mutated**
+— there is nothing to acknowledge, correct, recover or reset. **Do not re-inspect or re-drive START on any of these
+targets.**
 
 **A decline is candidate-scoped, is not the kill switch, and is not the Director declining the work** — the bar
 does not move and the independent verifier runs instead.
@@ -265,6 +285,7 @@ instead, which is where such a record belongs.
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), three backups to delete once nothing needs reverting | Director |
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–68. Candidates left no lineage (the host declined them). The `2aa0da0`-era base that kept re-surfacing B-102(f) now points at fixed code, so this is expected to stay quiet | Director/maintainer |
 | ADR-0032 | still `proposed` (pending the Director's confirmation) | Director |
+| **B-112 / B-113** | Filed in session 71. **B-112**: the send-proof profile is verified for `pi` only, so `autopilot` and `claude`/`codex`/`opencode` are refused; closing it means verifying each harness's own restriction flag on the installed binary the way session 66 verified the argv forms. **B-113**: the daemon cannot accredit "a human is present" (every same-user process reads the same run file and speaks the same IPC; `host` is the same literal `unknown` for both), and the only shape that could — a TTY-gated per-session human grant — is more surface than the order asked for. Do not re-derive either. | Director (B-112 is a bounded harness-verification job) |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
 ---
@@ -280,6 +301,14 @@ instead, which is where such a record belongs.
 - **The four harnesses ARE installed**: `pi` and `pi.cmd` (`%APPDATA%\npm`), `claude`
   (`~/.local/bin/claude`), `codex`/`codex.cmd` and `opencode`/`opencode.cmd` (`%APPDATA%\npm`).
 - **The bus is registered once, id-free, at the user level**: `pi mcp list` here shows
+- **MCP is ON for sessions again, and that is load-bearing.** `~/.pi/agent/settings.json` no longer carries
+  `"-builtin:mcp"` (an unregistered `pi-mcp-adapter` had written it, which disabled MCP for every session).
+  The conmuta entries are `exposure: "direct"` — Pi's default is `codemode`, which does **not** declare tools —
+  at the user level (`~/.pi/agent/mcp.json`, id-free per ADR-0033) and in `FRISCO\.pi\mcp.json` (also id-free now).
+  `pi mcp list` in FRISCO → `conmuta: connected, 4 tools (direct, project)`. Two measured consequences: outside a
+  bound tree the user-level entry reports `failed (no conmuta.json found above …)` once per session, and
+  **`frisco-erp/.mcp.json` is not read by Pi at all** (Claude-style file) — the entry serving that tree is the
+  user-level one.
   `conmuta: connected, 4 tools` running `<repo>\dist\src\cli\main.js mcp`. `FRISCO\.pi\mcp.json` is
   retired.
 - **Arena**: no `arena` MCP server is registered for Pi, and `127.0.0.1:8765` refuses connections
