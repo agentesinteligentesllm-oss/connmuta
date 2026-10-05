@@ -575,6 +575,26 @@ test("POST /tools/send reaches sendPath: a valid send is delivered through the r
 	});
 });
 
+test("POST /tools/send attributes the send to its session in audit_log (2026-10-05 order)", async () => {
+	await withHarness(async (h) => {
+		const { bearer, response } = await openValidSession(h);
+		const res = await sendRequest({
+			port: h.port,
+			method: "POST",
+			path: "/tools/send",
+			body: JSON.stringify({ type: "BROADCAST", body: "attribution probe" }),
+			authorization: `Bearer ${bearer}`,
+		});
+		assert.equal(res.status, HTTP_OK, res.bodyText);
+
+		// Before this change every send row carried `client_id = null`, so the four headless replies of
+		// 2026-10-04 could not be traced to a client from the ledger at all.
+		const sends = auditRows(h.db, PROJECT_ID).filter((row) => row.direction === "send" && row.outcome === "ok");
+		assert.equal(sends.length, 1, "exactly one successful send row");
+		assert.equal(sends[0]!.client_id, response.client_id, "the ledger must name the client that sent");
+	});
+});
+
 test("POST /tools/fetch reaches serveFetch: a fresh session's fetch returns a real cursor and an empty log", async () => {
 	await withHarness(async (h) => {
 		const { bearer } = await openValidSession(h);
