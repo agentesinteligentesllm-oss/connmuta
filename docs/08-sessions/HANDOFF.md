@@ -64,12 +64,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3). El frente del bus está al día: **PR #106 y PR #107 están mergeados**
-(`925c10d` y `35ac1a6`), y la auditoría previa de #106 encontró un CRITICAL que se cerró antes del merge (`8e8d8b7`).
-Lo que sigue pendiente, todo tuyo: **T6**, el timbre con un par real del roster (B-114); **B-112** (perfil a prueba
-de envío para `claude`/`codex`/`opencode`) y **B-113** (el daemon no puede acreditar «hay un humano presente»); y
-**dos decisiones de diseño**: B-117 (¿lista negra, o parseo verificado del argv?) y B-119 (¿verificar la entrega del
-timbre, o aceptar best-effort?). Sigue por §3 y no reabras nada de §6.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3). El bus está mergeado y auditado: PR #106 `925c10d`, #107 `35ac1a6`, #108 `38c13460`.
+Falta sólo T6 —el timbre con un par real del roster (B-114), en una sesión Pi ligada a `frisco`— más lo tuyo: B-112, B-113, y las decisiones B-117/B-119.
+Sigue §3, no reabras §6, y antes de mergear mirá `gh run view --json jobs`: un rojo ahí puede ser cancelación por runner ausente, no un test fallido.
 ```
 
 ### 0.1b If the machine was just powered on
@@ -240,7 +237,7 @@ expected to print, precisely so the reader can compare, and their values are che
 3. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
 4. **No open row the harness can close alone.** What remains is either the Director's or a scheduled class:
 
-   **3.1 — Director-only decisions.** **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
+   **3.1 — Director-only decisions.** Four filed rows are the Director's, each with its evidence in §7: **B-112** (the send-proof profile is verified for `pi` only, so `claude`/`codex`/`opencode` and `autopilot` are refused), **B-113** (the daemon cannot accredit “a human is present”), **B-117** (the profile is guarded by a deny-list, which a value-consuming record argument can partly defeat — the structural alternative is a parse check on the resolved argv) and **B-119** (an undelivered ring commits the cursor and is not retried; verify the delivery or accept best-effort). **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
 
    **3.2 — Spike/research rows, each needing a real investigation.** **B-05** (gentle-ai installer study), **B-07** (bot-to-bot group visibility for non-admin bots), **B-08** (IPC handshake + named-pipe DACL on Windows), **B-09** (MCP notification rendering per host).
 
