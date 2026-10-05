@@ -100,7 +100,12 @@ test("a ring after the cooldown goes through", async () => {
 	assert.equal(sent.length, 2, "the cooldown must end, or the adapter would ring once per session");
 });
 
-test("a host failure propagates instead of being swallowed, so the watcher reports it and retries", async () => {
+test("a throw from the ring's own collaborator surfaces instead of being swallowed", async () => {
+	// What this pins, exactly: `createPiRinger` does not catch a throw from the messenger it was handed. It does
+	// NOT pin what the host does when a ring is not delivered, and the previous name implied it did. Pi's real
+	// `sendMessage` is a synchronous wrapper that hands a rejection to its own error surface and returns `void`,
+	// so it cannot throw and this fake cannot reach any state the shipped host can reach — the adapter's own
+	// module doc carries the measured mechanism and the filed decision.
 	const ring = createPiRinger({ pi: throwingPi() });
 
 	await assert.rejects(() => ring(notification()), /stale after session replacement or reload/);

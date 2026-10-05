@@ -123,6 +123,15 @@ export const REFUSED_ARGUMENTS = [
  * send. An undeclared profile means the runner **refuses to start the turn** (`profile_unavailable`) instead
  * of starting one with the harness's full toolset — the same direction R2 already takes for a shell-free
  * launch failure. Adding a verified profile is the one thing that re-enables a harness or the act level.
+ *
+ * **What this profile does and does not guarantee — measured by the audit of 2026-10-05.** It is appended
+ * after the record's own arguments, so a record cannot replace the tool list: a later `--tools` wins, and the
+ * record's own `--tools` is refused. That tool allowlist is the floor — it is what removes `bash` and every
+ * `conmuta_*` tool. `--no-extensions` is depth on top of it: a record argument that consumes the next argv
+ * element and is placed last (`--model`, `--provider`, `--system-prompt`, `--api-key`, `--session`, …) swallows
+ * it, so extensions load again. That is a deny-list's real limit — it can only refuse the tokens it names — so
+ * it is disclosed here rather than claimed away, and the structural alternative (parse the resolved argv and
+ * refuse on mismatch, which would couple this module to the host's parser) is filed as its own backlog row.
  */
 export const SEND_PROOF_PROFILES: Readonly<Record<HarnessName, readonly string[] | null>> = {
   pi: ["--no-extensions", "--tools", "read,grep,find,ls"],

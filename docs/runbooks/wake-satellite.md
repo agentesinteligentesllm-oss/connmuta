@@ -186,14 +186,27 @@ capability, not by permission:
 - `wake` on `pi` is started as `pi -p --no-extensions --tools read,grep,find,ls`. `--no-extensions` removes
 the built-in MCP extension, so there is no `conmuta_*` tool to call; `--tools read,grep,find,ls` removes
 `bash`, so there is no shell to read the run file or speak raw IPC with.
-- The profile is appended **after** the record's own `harness_args`, and a record that tries to widen it
-  (`--tools`, `--exclude-tools`, `--no-tools`, `--no-extensions`, `-e`, …) is refused.
+- The profile is appended **after** the record's own `harness_args`, and a record that tries to *replace* it
+  (`--tools`, `--exclude-tools`, `--no-tools`, `--no-extensions`, `-e`, `--`, …) is refused. `--` is the entry
+  that is not a flag at all: it is the option terminator, and refusing it is what keeps appending meaningful —
+  a parser that stops flag parsing there turns the whole profile into prompt text.
+- **Which half is load-bearing, stated because the audit of 2026-10-05 measured it.**
+  `--tools read,grep,find,ls` is the floor: it removes the shell and every `conmuta_*` tool, and a record cannot
+  replace it, because a later `--tools` wins and the record's own `--tools` is refused. `--no-extensions` is
+  depth, not the floor: a record argument that *consumes the next argv element* and is placed last — `--model`,
+  `--provider`, `--system-prompt`, `--api-key`, `--session`, `--thinking`, … none of which is a widening flag
+  and none of which a deny-list names — swallows it, so extensions load again, the built-in MCP extension
+  included. The bus tools stay out of reach because `--tools` still holds, and that is the measured bound. It
+  is disclosed rather than argued away: a deny-list can only refuse the tokens it names, and the structural
+  alternative (parse the resolved argv and refuse on mismatch) is filed as its own backlog row.
 - A level or harness with **no verified send-proof profile is refused, never started with its full toolset**:
   `autopilot`, and `wake` on `claude`, `codex` and `opencode`. The refusal is recorded in the wake ledger as
   `refused (profile_unavailable)` — not a silent drop.
-- The daemon now records the sending session's `client_id` on every `send` audit row, so a send is
-  attributable after the fact; it was hardcoded `null` until this change, which is why the four replies
-  above could not be traced to a client from the ledger at all.
+- The daemon now records the sending session's `client_id` on every `send` audit row written by a
+  **session-authenticated** call, so a send is attributable after the fact; it was hardcoded `null` until this
+  change, which is why the four replies above could not be traced to a client from the ledger at all. The
+  daemon's own `doctor` DM probe also writes a `send` row, and it carries `client_id: null` on purpose: no
+  session exists to name, and the row identifies itself by `reason: "DOCTOR_PROBE"`.
 
 **What this does not promise.** A daemon-side proof of "a human is present" is not achievable inside the
 core: every local process of the same OS user reads the same run file and speaks the same authenticated
@@ -287,7 +300,7 @@ despertador at all, `conmuta-runner ladder set --project "<id>" --level notify -
 | `off (unknown_harness)` | The record names a harness outside the closed set. Re-arm with one of the four names. |
 | `off (unknown_level)` | A typo in the level. Re-arm. |
 | `refused (cooldown)` / `(budget_exhausted)` | Working as designed; the message stays pending. |
-| `refused (arguments_refused)` | The record's `--arg` list contains an interpreter, a permission-bypass flag, or a flag that would widen the send-proof profile (`--tools`, `--no-extensions`, `-e`, …). |
+| `refused (arguments_refused)` | The record's `--arg` list contains an interpreter, a permission-bypass flag, the option terminator `--`, or a flag that would replace the send-proof profile (`--tools`, `--no-extensions`, `-e`, …). Note that `ladder set` does **not** pre-validate the list, so a record carrying one of these is written successfully and only refuses at the first tick — the message stays pending. |
 | `refused (profile_unavailable)` | The level or harness has no verified send-proof profile — `autopilot`, or `wake` on `claude`/`codex`/`opencode`. Nothing was started; the message stays pending. |
 | `refused (in_flight)` | A turn is still running. It is bounded by the ten-minute turn timeout. |
 | `link_failed` | No live daemon for this user, or the run file's daemon died. Start the daemon and run again. |

@@ -15,10 +15,19 @@ import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "./constants.js";
  * normally, so the watcher commits its cursor and moves on; rejecting would instead look like a
  * delivery failure and make the watcher back off and re-read the same window.
  *
- * **A genuine failure propagates.** `pi.sendMessage` throws when the session is no longer live (the
- * host invalidates the extension's runtime at replacement, reload or shutdown). That is a real
- * non-delivery, and the watcher already knows what to do with it — `deliver_failed`, one paced retry,
- * and no cursor advance — so this function must not swallow it.
+ * **What a host failure actually does — measured, not intended.** An earlier version of this paragraph said
+ * that a genuine failure propagates. It does not, and the mechanism matters more than the wording, so here it
+ * is: the host's extension-facing `sendMessage` is a **synchronous wrapper over an async method** that reports
+ * the rejection to its own error surface — `sendMessage: (message, options) => { this.sendCustomMessage(message,
+ * options).catch(err => runner.emitError({ event: "send_message", error: … })) }` — and its declared type is
+ * `void` (`@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts:1221`). It cannot throw. So a ring
+ * that was never delivered resolves here, this function records it as rung, and the shipped `DoorbellWatcher`
+ * commits the doorbell cursor and does not re-read that window. **The message is not lost** — the doorbell
+ * cursor is not the session's own client cursor, so the session still sees the row when it fetches — but the
+ * *ring* is not retried and the live session is not told. Making delivery verifiable is a design decision with
+ * its own ADR (verify the ring, or refuse to advance a cursor for an unverifiable one), so it is filed rather
+ * than improvised here. What this function still guarantees is narrower and exact: it does not catch a throw
+ * from the collaborator it was handed.
  */
 
 /**
@@ -55,8 +64,9 @@ export function createPiRinger(deps: PiRingerDeps): (notification: ChannelNotifi
 			{ customType: PI_DOORBELL_CUSTOM_TYPE, content: notification.content, display: true },
 			{ triggerTurn: true, deliverAs: "followUp" },
 		);
-		// Only after the call returned: a throw above is a non-delivery, and a non-delivery must not
-		// start the next ring's cooldown.
+		// Only after the call returned: a throw above is a non-delivery, and a non-delivery must not start the
+		// next ring's cooldown. Note what this guard actually covers: the real host cannot throw (see the module
+		// doc), so it protects against an injected collaborator, not against a live host failing to deliver.
 		lastRingAt = at;
 	};
 }
