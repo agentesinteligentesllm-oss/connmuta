@@ -47,7 +47,7 @@ AI agents working on this repository bootstrap from [`AGENTS.md`](./AGENTS.md) (
 | 2 | One daemon per OS user is the sole Telegram consumer for every bot token on that machine; thin per-project stdio MCP clients reach it over authenticated loopback IPC and never poll Telegram themselves. | ADR-0029 |
 | 3 | A human-editable JSON registry plus a SQLite ledger (durable inbox, offsets, threads, per-client cursors, audit log). Tokens live in the OS secret store, never in project files or IDE environments. | ADR-0030 |
 | 4 | Distributed on npm with compiled output and a shrinkwrap; Node >= 24 is the installer's first gate; Windows first, macOS only after a real smoke test. | ADR-0031 |
-| 5 | The core is a passive switch: no exec, no shell, no autonomous emission. Peer content is data, never action. | Five invariants in the [constitution](./docs/01-constitution/CONSTITUTION.md) |
+| 5 | The core is a passive switch: no exec, no shell, no autonomous emission. Peer content is data, never action. A woken turn is started with no shell and no bus surface, so it cannot send (2026-10-05, [ADR-0032](./docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md#amendment-2026-10-05--no-woken-turn-may-send)). | Five invariants in the [constitution](./docs/01-constitution/CONSTITUTION.md) |
 
 Details: [`docs/02-architecture/OVERVIEW.md`](./docs/02-architecture/OVERVIEW.md).
 
