@@ -111,7 +111,7 @@ commit).
 | 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1907 tests, 1901 pass, 0 fail, 6 skip**; `test:static` **101/101** |
+| 7 | `npm run build && npm test` | exit 0; **1948 tests, 1942 pass, 0 fail, 6 skip**; `test:static` **120/120** (session 73's counts; the clean-build step in row 2 is what makes them mean anything — see the note below the table) |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
 | 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70. See §5 |
 
@@ -176,10 +176,10 @@ commit).
 | **B-31** | **CLOSED — session 70.** R5's scan runs pre-parse (design §4), so a token written as a JSON escape (`1234567\u003aAAHk…`) held no literal shape in the file and was accepted, then sat in `registry.json` and the daemon's memory reported by nothing. `src/registry/loader.ts` gained a post-parse walk over values **and** key names, reusing `assertNoTokenShape` and — load-bearingly — the existing `withoutRosterHashes` mask, with `MAX_CONTENT_WALK_DEPTH = 32`. 5 tests in `test/registry/loader.test.ts` (escaped value, escaped key, nested, the hash exemption surviving and not shadowing, the depth bound); RED before GREEN, non-vacuity by mutation. | `src/registry/loader.ts`; `odd/tasks/b-31-registry-escaped-token.md` |
 | **`solo-sesion-viva`** | **Session 71 — the bus answers only from a live session.** `SEND_PROOF_PROFILES` (`wake` on `pi` = `--no-extensions --tools read,grep,find,ls`, appended last, after the record's own args); `refused (profile_unavailable)` for `autopilot` and the three unverified harnesses; tool-exposure flags refused; `audit_log.client_id` carries the sender on every send row (was hardcoded `null`). Runbook, ADR-0032 amendment and README row 5 updated. Live probe: the profile declares exactly `read,grep,find,ls` — no `bash`, zero `mcp__conmuta`. **B-112**, **B-113** filed. Branch `fix/solo-sesion-viva`, **not pushed**. | `odd/tasks/solo-sesion-viva.md`; `docs/runbooks/wake-satellite.md`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` |
 | **B-99** | **CLOSED COMPLETELY — sessions 55 & 69** (commit `dd464a7` converted the three original tests to `waitForCondition`; session 69 closed the remaining fixed sleeps in `heartbeat.test.ts` and converted `bootstrap.test.ts:517` to positively observe live ticks with stable audit rows, plus converting boot/add waits to condition waits) | `odd/tasks/b-99-timer-tests.md`; `docs/06-backlog/CHECKLIST.md` |
-| **F7c / B-116** | **DELIVERED (T1–T5) — session 72; T6 owed.** `channel-pi/` (ADR-0036): a host-side Pi extension that holds F4's body-less doorbell and injects one attributable, body-less ring (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`), which starts a turn in the live session so it can fetch and answer. Measured reason it is an extension and not a port: Pi renders **no** MCP notification. Pinned by 6 ring tests, 6 lifecycle tests, a bundle-closure gate (the ring is the only `.sendMessage(` call site; no `src/daemon/`, no Telegram path), an extended twin gate and a packed-entry assertion. Verified live against the running daemon (`client_cursors.host = pi-host-doorbell`) and **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a roster peer is owed (B-114 / T6)** | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md); `odd/tasks/f7c-pi-host-doorbell.md`; `docs/runbooks/host-doorbell-pi.md` |
+| **F7c / B-116** | **DELIVERED (T1–T5) — session 72; T6 owed.** `channel-pi/` (ADR-0036): a host-side Pi extension that holds F4's body-less doorbell and injects one attributable, body-less ring (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`), which starts a turn in the live session so it can fetch and answer. Measured reason it is an extension and not a port: Pi renders **no** MCP notification. Pinned by 6 ring tests, 6 lifecycle tests, a bundle-closure gate (the ring is the only `.sendMessage(` call site; no `src/daemon/`, no Telegram path), an extended twin gate and a packed-entry assertion. Verified live against the running daemon (`client_cursors.host = pi-host-doorbell`) and **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a roster peer is owed (B-114 / T6)**. **Audited and merged in session 73** (`8e8d8b7` fixes the CRITICAL the audit's two blind reviewers found independently; `21fcc40` corrects three claims that were stronger than their controls; merge commit `925c10d`). The residual the audit then found in the fix is filed as **B-117** | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md); `odd/tasks/f7c-pi-host-doorbell.md`; `docs/runbooks/host-doorbell-pi.md` |
 | **B-115** | **CLOSED — session 72.** The audit that recorded the truth (*no ladder level reaches a live host session*) and the classification that closed it (new row **B-116** under new phase **F7c**, on the Director's explicit answers). The gap it named is now addressed by shipped code; what remains is the live firing, tracked under B-114 | `odd/tasks/b-115-wake-does-not-reach-a-live-session.md`; `docs/06-backlog/CHECKLIST.md` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16; F7b follows F6; F7c is delivered outside SDD | `docs/07-plan/WORK-PLAN.md` |
-| Tests on the branch | `npm test` **1947/1941/0/6**; `test:static` **120/120**; `%TEMP%` 0 → 0 from a clean build | — |
+| Tests on the merged branch | `npm test` **1948/1942/0/6**; `test:static` **120/120**; `%TEMP%` 0 → 0 from a clean build (session 73, after `8e8d8b7`) | — |
 
 ---
 
@@ -198,11 +198,12 @@ commit).
 
 ## §3 — What's next
 
-0. **The merge of PR #106 is the one open action, and it is the Director's (session 73).** The audit is done and
-   recorded (`bus-v2-pr106-audit-001`), the branch carries `8e8d8b7` and `21fcc40`, and CI is green on both Node legs
-   for `8e8d8b7`. What remains is the merge decision itself. Seven rows — **B-117–B-123** — carry the audit's
-   non-blocking findings, including the design decision it deliberately did not take (**B-119**, whether a ring that
-   was never delivered should be retried or accepted as best-effort).
+0. **The merge decision for PR #106 is the Director's, and it was taken on 2026-10-05: `MERGED` at 19:13:15Z as merge
+   commit `925c10d`.** The audit is done and recorded (`bus-v2-pr106-audit-001`), and the merged branch carries
+   `8e8d8b7` (the CRITICAL fix) and `21fcc40` (the corrected claims). Seven rows — **B-117–B-123** — carry the
+   audit's non-blocking findings, including the design decision it deliberately did not take (**B-119**, whether a
+   ring that was never delivered should be retried or accepted as best-effort). The session-73 record itself rides
+   in **PR #107**, which is the next merge decision.
 1. **The ring owes its first real firing, and that is the only unit the bus front has left (F7c T6 / B-114).** With
    the adapter armed, a roster **agent** sending a directed message or a broadcast should make the open session ring
    and answer. It needs a peer whose owner is available: AGENTBUS has no private loopback, a human `user_id` is not
