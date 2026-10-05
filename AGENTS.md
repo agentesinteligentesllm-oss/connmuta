@@ -23,7 +23,7 @@ daemon session slot on a real transport close). Session 63 closed **B-109** unde
 under **ADR-0035** (tool-config merges pre-validated in `project bind` before any write, preventing partial bind dead ends). Session 68 closed **B-102**
 (the daemon's shutdown latch is now checked across all three windows where it matters — a fresh reconcile, a reconcile already in flight, and the poller factory itself, which
 receives an abort signal; `stop()` also records in `daemon.log` the stalled tick it gave up on). Its first attempt at the in-flight window was **rejected by an independent judge** and corrected,
-and that audit is recorded as **partial** (one judge, not two) in [HANDOFF](./docs/08-sessions/HANDOFF.md) §5. Built under **Organic
+and that audit is recorded as **partial** (one judge, not two) in [HANDOFF](./docs/08-sessions/HANDOFF.md) §5. **Session 72** closed **B-115** and delivered **F7c** (`channel-pi/` under [ADR-0036](./docs/03-adr/0036-pi-host-doorbell-adapter.md), row B-116): a host-side Pi extension that rings the live session with one attributable, body-less doorbell event — an extension rather than an MCP channel because Pi renders **no** MCP notification at all, measured. The ring's first real firing with a roster peer stays **owed** (B-114). Built under **Organic
 Driven Development**: explore before writing, track substantial work in `odd/tasks/`, test-first with
 observed RED, one work-unit commit per unit. This field used to
 carry an inline session-by-session narrative that grew to ~78.5k characters (out of this file's

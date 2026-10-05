@@ -538,6 +538,9 @@ function createSendHandler(
 			db: deps.db,
 			project_id: auth.session.project_id,
 			bot_id: auth.managed.binding.bot_id,
+			// 2026-10-05: the sending session's client_id travels into every send audit row, so the ledger can
+			// answer "which client sent this?" — the question the four headless replies of 2026-10-04 could not.
+			client_id: auth.session.client_id,
 			config: auth.managed.config,
 			transport,
 			roomGuard,

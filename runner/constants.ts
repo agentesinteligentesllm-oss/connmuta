@@ -68,7 +68,11 @@ export const HARNESS_DEFAULT_ARGS: Readonly<Record<HarnessName, readonly string[
 };
 
 /** Arguments refused outright in a ladder record's `harness_args`, whatever executable they would reach:
- * these are the shell and interpreter escape hatch that would defeat R2's closed-executable rule. */
+ * these are the shell and interpreter escape hatch that would defeat R2's closed-executable rule, and — added
+ * 2026-10-05 — the tool-exposure flags that would widen or remove the send-proof profile `runner/harness.ts`
+ * appends after them. The last entry is neither: `--` is the option terminator, and it is refused because
+ * everything after it becomes positional. `-e`/`--extension` loads arbitrary extension code into the turn, an
+ * interpreter-class escape. */
 export const REFUSED_ARGUMENTS = [
   "-c",
   "--command",
@@ -77,7 +81,64 @@ export const REFUSED_ARGUMENTS = [
   "-exec",
   "--dangerously-skip-permissions",
   "--dangerously-bypass-approvals-and-sandbox",
+  "--tools",
+  "-t",
+  "--exclude-tools",
+  "-xt",
+  "--no-tools",
+  "-nt",
+  "--no-builtin-tools",
+  "-nbt",
+  "--no-extensions",
+  "-ne",
+  "--extension",
+  "-e",
+  // The option terminator, and the one entry here that is not a flag at all. Refusing it is what keeps the
+  // profile's protection POSITIONAL rather than conventional: the harness appends the profile last, but a
+  // parser that stops flag parsing at `--` makes every later token a positional, so the profile would arrive
+  // as prompt text and never apply — restoring the full tool set the profile exists to remove. Pi's parser
+  // breaks on the first `--` (`@earendil-works/pi-coding-agent/dist/cli/args.js:23-32`); that is the only such
+  // break in it, and it is reachable through `ladder set --arg=--` and through hand-editing the ladder file,
+  // both of which this product documents as legitimate. Found independently by both judges of PR #106's audit
+  // (2026-10-05, JD-A-001 / JD-B-F1) after the earlier judges of the same phase found the `--flag=value` gap.
+  "--",
 ] as const;
+
+/**
+ * The **send-proof capability profile** a woken turn is started under, per harness (ADR-0032 R5/R7; the
+ * Director's order of 2026-10-05: *no woken turn may send anything, directly or indirectly*). The runner
+ * appends these arguments **after** the record's own `harness_args`, so nothing an operator records can
+ * widen them, and {@link REFUSED_ARGUMENTS} refuses the flags that would try.
+ *
+ * `pi`, the harness every measured wake turn used, takes `--no-extensions --tools read,grep,find,ls`:
+ *  - `--no-extensions` drops every extension, the built-in MCP extension included, so the turn has **no
+ *    `conmuta_*` tool** even when the host enables the bus — which is exactly what supplied the four tools
+ *    on 2026-10-04;
+ *  - `--tools read,grep,find,ls` drops **`bash`**, so the turn can neither read the daemon's run-file
+ *    secret nor speak the IPC, the two steps of the improvised send of 2026-10-04.
+ *
+ * `null` is deliberate and fail-closed everywhere else: the other three harnesses' own tool-restriction
+ * flags have not been verified live (session 66 verified their argv *forms*, never a restriction flag), and
+ * no `autopilot` turn has a profile at all because `autopilot` exists to run a shell and a shell can always
+ * send. An undeclared profile means the runner **refuses to start the turn** (`profile_unavailable`) instead
+ * of starting one with the harness's full toolset — the same direction R2 already takes for a shell-free
+ * launch failure. Adding a verified profile is the one thing that re-enables a harness or the act level.
+ *
+ * **What this profile does and does not guarantee — measured by the audit of 2026-10-05.** It is appended
+ * after the record's own arguments, so a record cannot replace the tool list: a later `--tools` wins, and the
+ * record's own `--tools` is refused. That tool allowlist is the floor — it is what removes `bash` and every
+ * `conmuta_*` tool. `--no-extensions` is depth on top of it: a record argument that consumes the next argv
+ * element and is placed last (`--model`, `--provider`, `--system-prompt`, `--api-key`, `--session`, …) swallows
+ * it, so extensions load again. That is a deny-list's real limit — it can only refuse the tokens it names — so
+ * it is disclosed here rather than claimed away, and the structural alternative (parse the resolved argv and
+ * refuse on mismatch, which would couple this module to the host's parser) is filed as its own backlog row.
+ */
+export const SEND_PROOF_PROFILES: Readonly<Record<HarnessName, readonly string[] | null>> = {
+  pi: ["--no-extensions", "--tools", "read,grep,find,ls"],
+  claude: null,
+  codex: null,
+  opencode: null,
+};
 
 /** The environment a woken harness inherits. An allow-list, never a copy of the runner's own environment:
  * the satellite must not hand a woken turn the operator's tokens, keys or IDE variables (R7). */

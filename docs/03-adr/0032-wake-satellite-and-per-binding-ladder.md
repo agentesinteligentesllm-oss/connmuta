@@ -268,3 +268,36 @@ forms have not been exercised against installed harness versions. Filed as **B-1
   `pi -p` verified end to end on the bus with real messages in session 60. In session 66, all four
   harnesses (`pi`, `claude`, `codex`, `opencode`) installed on Windows 11 were verified live against real
   binaries with `shell: false`. `HARNESS_DEFAULT_ARGS` in `runner/constants.ts` matches real CLIs exactly.
+
+### Amendment (2026-10-05) — no woken turn may send
+
+The Director ordered on 2026-10-05 that the bus answer **only from a living interactive session**: with a
+live session open that session answers, and with none open nobody answers and the thread simply stays
+pending. **No woken (headless) turn may send anything, directly or indirectly.**
+
+Measured trigger. Four `REPLY`s left in `@luisgtz-agent`'s name on 2026-10-04 without the Director's session
+knowing (two at 22:46Z, two at 23:28Z; `thread_history` in `~/.conmuta/ledger.db`). The woken turn had **no**
+`conmuta_*` tool, but it had `bash`: it read `~/.conmuta/run/daemon.json` (the run-file secret), wrote its own
+IPC client and sent anyway. The session transcript is the proof of the mechanism, and `audit_log.client_id`
+was `null` on all four send rows, so the ledger could not even name the client.
+
+What this amendment changes (R5 and R7 refined; nothing else touched):
+
+- **R5.** `wake` no longer means "read/reply-only". A woken turn is started under a **send-proof capability
+  profile**: no shell and no extension surface, therefore no `conmuta_*` tool and no raw-IPC path. It records
+  what it found and stops. The profile is a named constant (`SEND_PROOF_PROFILES`, `runner/constants.ts`),
+  appended **after** the record's own `harness_args`; the flags that would widen or remove it (`--tools`,
+  `--exclude-tools`, `--no-tools`, `--no-extensions`, `-e`, …) are refused outright.
+- **R5/R7.** A level or harness with **no verified send-proof profile is refused**, never started with its
+  full toolset, and the refusal is a counted row (`refused (profile_unavailable)`) — never a silent drop.
+  `autopilot` is refused by this rule, because the act profile needs a shell and a shell can always send.
+  Adding a verified profile is the one thing that re-enables a harness or the act level.
+- **R3 and R6a stand unchanged.** The daemon gains no knowledge of the satellite: it gains no route, no IPC
+  contract change and no wire change. Its single change is that `audit_log.client_id` now carries the sending
+  session's `client_id` (it was pinned at `null`), so a send is attributable after the fact.
+
+**Residual risk, stated plainly.** A local process of the same OS user, started outside this runner with a
+shell of its own, can still impersonate an interactive client: the daemon cannot accredit "a human is
+present", and the thin client's `host` label is the same literal for an interactive session and a woken one.
+The capability profile is what closes the measured path, and today it pins exactly one harness (`pi`) and one
+level (`wake`).

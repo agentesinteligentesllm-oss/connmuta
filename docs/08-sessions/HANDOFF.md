@@ -4,11 +4,46 @@
 > next session does and what it must not redo. History lives in [`LOG.md`](./LOG.md); decisions live in the
 > ADRs and the tribunal index, never here.
 >
-> **Last rewritten: end of session 70** (2026-10-03 local), **including the post-commit RDD disposition and the
-> independent verification results (§5), which were settled after the session's commits and before the machine was
-> powered off.** Every § carries session 70's state unless a line says otherwise.
+> **Last rewritten: session 72** (2026-10-05 local), **after F7c shipped the host-side doorbell that reaches the
+> live session and the branch was published.** Every § carries session 72's state unless a line says otherwise;
+> §2 keeps the earlier sessions as context.
 >
-> **Session 70 in one paragraph — B-95 remainder, B-97 and B-31 closed under ODD; B-102 and B-99 commits landed. Suite 1907/1901/0/6, test:static 101/101, zero temp leaks.** B-95 remainder was closed at its source under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe corrupt-row handling in `src/daemon/serve/fetch.ts:244-246` (`parseStoredEnvelope` defensively validates object structure, envelope types, non-empty threads, and `to`/`basis`, returning `null` on corruption and skipping the row without throwing, while `lastRowSeq` still advances the client cursor past damaged rows), pinned by 14 test cases in `test/daemon/serve/fetch.test.ts` (observed RED before GREEN, non-vacuity proven by mutation); review note R3-1 addressed in `src/daemon/serve/doorbell.ts` (non-null `to` tightened with `AGENT_ID_PATTERN`); review note R2-1 addressed in `test/channel/main.test.ts` (drift-prone count comment removed). B-97 was then closed by correcting the row's own premise: the guard's defect class is *any link the entry path crosses*, not only a POSIX symlink, and a Windows directory **junction** reproduces it with neither Developer Mode nor admin — measured here as direct `exit 2` versus junction `exit 0` with zero bytes on both streams, and pinned by a new test whose non-vacuity is the old guard restored failing it while the pre-existing test still passes. **B-31** closed the JSON-escape bypass of the registry's pre-parse R5 scan with a post-parse value walk (`odd/tasks/b-31-registry-escaped-token.md`), reusing the existing roster-hash mask so the new gate cannot reintroduce B-27's blanket refusal.
+> **Session 72 in one paragraph — the live session can finally be woken (F7c).** The Director's report was that a
+> directed message or a broadcast never reached the session he was sitting in. Session 72 **measured** the two
+> candidate surfaces instead of assuming them: Pi's MCP runtime renders **no** notification (`notifications/message`
+> reaches `~/.pi/agent/mcp.log` and appears **zero** times in a session transcript), so F4's `claude/channel` shape
+> has **no Pi equivalent** — and Pi's **extension** surface does carry a message into the live session and
+> **starts a turn**, proved with two live probes against an external trigger while the session was mid-turn. On that
+> measurement, and on the Director's ratification, **ADR-0036** (`accepted`) opened a new backlog row **B-116** under
+> a new phase **F7c**: `channel-pi/`, a host-side extension that holds F4's **existing body-less doorbell** and injects
+> one **attributable, body-less ring** (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`,
+> `deliverAs: "followUp"`). It is a doorbell, not a second reader: no peer prose, no acknowledgement, **no send path
+> of its own** — pinned statically, the ring is the only `.sendMessage(` call site in its whole closure. Suite
+> **1947/1941/0/6**, `test:static` **120/120**, `%TEMP%` 0 → 0 from a clean build; the transport half was verified
+> **live** against the running daemon (a `client_cursors` row with `host: pi-host-doorbell`), and the adapter is
+> **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a real roster peer is
+> still owed (B-114 / T6)** — never declared. Two native-review measurements were taken: the **accumulated branch
+> candidate is un-reviewable** (`lens_context_budget_exceeded`, no authority created), and a narrow committed
+> candidate closed `approved` with **zero lenses** (`non_executable_only`) — a classification, not a review. Branch
+> `fix/solo-sesion-viva` **pushed** at the Director's explicit authorization, with a PR open.
+>
+> **Session 71 in one paragraph — the bus now answers only from a live session (`solo-sesion-viva`).** The Director's
+> order: with a live session open that session answers, with none open nobody answers and the thread stays pending,
+> and **no woken (headless) turn may send anything, directly or indirectly**. Step 0 stopped the bleed (ladder `off`,
+> the Startup entry archived, both runner processes killed — killing only the `cmd` leaves the `node` orphaned).
+> Step 1 chose **capability over permission**: `SEND_PROOF_PROFILES` (`runner/constants.ts`) runs `wake` on `pi` as
+> `pi -p --no-extensions --tools read,grep,find,ls`, appended after the record's own `harness_args`; a level/harness
+> pair with no verified profile is **refused** (`profile_unavailable`) instead of started with a full toolset — so
+> `autopilot` and `wake` on `claude`/`codex`/`opencode` never start (**B-112**) — and the flags that could widen the
+> profile are refused. The daemon's half is **attribution, not accreditation**: `audit_log.client_id` now carries the
+> sender on every send row (it was hardcoded `null`, which is why the four 2026-10-04 replies could not be traced at
+> all); the accreditation gap is recorded as **B-113** so nobody re-derives it. Step 2 found the real cause of the
+> missing `conmuta_*` tools: an **unregistered `pi-mcp-adapter`** had written `"extensions": ["-builtin:mcp"]` into
+> `~/.pi/agent/settings.json`, disabling Pi's built-in MCP for every session while `pi mcp list` still connected.
+> Suite **1912/1906/0/6**, `test:static` **101/101**, `%TEMP%\conmuta-*` 0 → 0; independent verifier C1–C8
+> **PASS**. Commits on branch `fix/solo-sesion-viva`, **not pushed** — the push came in session 72, on the
+> Director's explicit authorization, together with `30b134d`, `4fea14d` and `57bd944`.
+>
 
 ---
 
@@ -17,10 +52,10 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **B-95 remainder CLOSED COMPLETELY** (safe corrupt-row policy in `fetch.ts`, cursor advances, R3-1/R2-1 review notes resolved); **B-97 CLOSED** with a genuinely RED-reproducing test (Windows directory junction); **B-31 CLOSED** (post-parse gate for an escaped token in `registry.json`, with the roster-hash mask reused so B-27 cannot be reintroduced); **B-102 and B-99 commits landed** on `main`. Rows B-31, B-95, B-97, B-99, B-102 marked `done`. |
-| What is next? | **No open row the harness can close alone.** The backlog still holds **78 long-standing open rows** (§3.3), all deliberate non-blocking deferrals from F1/F2 reviews; the ones with real teeth are named there. **B-101**'s relocation is a Director/editorial decision. **F6** blocked on B-11/B-12/B-16; **F7b** after F6. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health was verified working in sessions 69 and 70. |
-| What is the Director's to decide? | The Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). |
+| What is new? | **The live session can be woken: F7c shipped.** `channel-pi/` — a host-side Pi extension that holds the existing body-less doorbell and injects one **attributable, body-less ring** into the live session, which then fetches and answers. `ADR-0036` `accepted`, row **B-116**, phase **F7c**. It is **armed machine-wide** (`~/.pi/agent/settings.json` `extensions`). The `solo-sesion-viva` mode stands: `wake` on `pi` runs under a send-proof profile, `autopilot` and the other three harnesses are refused, `audit_log.client_id` names the sender. The `frisco` despertador is **off** and must stay off. |
+| What is next? | **The ring's end-to-end firing with a real roster peer — owed (B-114 / F7c T6).** It needs a peer whose owner is available; AGENTBUS has no private loopback, so a test message fans out to every agent in the group. Everything else on the bus front is done: **B-112** (send-proof profiles for `claude`/`codex`/`opencode`) and **B-113** (the daemon cannot accredit a human) are filed and bounded. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: **two delegates failed with zero tool calls in session 72** (`gentle-ai-explore`, `gentle-ai-worker`) — re-verify before relying on one, and expect to do the work inline. |
+| What is the Director's to decide? | Whether the published branch gets merged (the repository's own rule is an audit before merge, and the Director declined all reviews in session 72); the Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). |
 | Where to read next | §0 first; then §1, §3, and §4. |
 
 ---
@@ -30,9 +65,9 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. B-31, B-95, B-97, B-99 y B-102
-están cerrados (1907 pruebas, test:static 101/101). No queda unidad que el harness pueda cerrar solo: revisa §3.3 y
-elige la clase de backlog a atacar (recomendado: B-54), o espera a que el Director decida B-11/B-12/B-16 para abrir F6.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. F7c está entregado y commiteado
+(57bd944): channel-pi/ despierta la sesión viva con un timbre atribuible. Lo que falta es T6 —el anillo con un par
+real del roster (B-114)—, más B-112 y B-113. Sigue por §3 y no reabras nada de §6.
 ```
 
 ### 0.1b If the machine was just powered on (session 70 ended with a shutdown)
@@ -105,9 +140,12 @@ commit).
 | **B-95 remainder** | **CLOSED COMPLETELY — session 70** under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`). Safe corrupt-row policy in `src/daemon/serve/fetch.ts:244-246` (skips corrupt/unparseable rows without failing, cursor advances past them); review notes R3-1 (doorbell.ts to check) and R2-1 (comment drift) resolved. | `src/daemon/serve/fetch.ts`; `docs/06-backlog/CHECKLIST.md` |
 | **B-97** | **CLOSED COMPLETELY — session 70.** The guard was already `import.meta.main` (session 55, `24d7dc6`); what session 70 closed is the row's own premise plus the missing ADR-12 pin. The defect class is any link the entry path crosses, not only a POSIX symlink: a Windows directory **junction** reproduces it with neither Developer Mode nor admin. Measured against the built bundle here — old guard: direct `exit 2` but junction `exit 0` with **zero bytes** on both streams (the silent no-op); `import.meta.main`: `exit 2` both ways. New test `test/cli/main.test.ts`'s "the entry guard fires when the built CLI is reached through a directory link (B-97)" creates the junction and spawns through it; non-vacuity is a restored old guard failing that test while the pre-existing direct test still passes. No `src/` change; no separate POSIX CI job (the row offered it as an alternative, and `windows-latest` now exercises the guarantee). | `test/cli/main.test.ts`; `docs/06-backlog/CHECKLIST.md` |
 | **B-31** | **CLOSED — session 70.** R5's scan runs pre-parse (design §4), so a token written as a JSON escape (`1234567\u003aAAHk…`) held no literal shape in the file and was accepted, then sat in `registry.json` and the daemon's memory reported by nothing. `src/registry/loader.ts` gained a post-parse walk over values **and** key names, reusing `assertNoTokenShape` and — load-bearingly — the existing `withoutRosterHashes` mask, with `MAX_CONTENT_WALK_DEPTH = 32`. 5 tests in `test/registry/loader.test.ts` (escaped value, escaped key, nested, the hash exemption surviving and not shadowing, the depth bound); RED before GREEN, non-vacuity by mutation. | `src/registry/loader.ts`; `odd/tasks/b-31-registry-escaped-token.md` |
+| **`solo-sesion-viva`** | **Session 71 — the bus answers only from a live session.** `SEND_PROOF_PROFILES` (`wake` on `pi` = `--no-extensions --tools read,grep,find,ls`, appended last, after the record's own args); `refused (profile_unavailable)` for `autopilot` and the three unverified harnesses; tool-exposure flags refused; `audit_log.client_id` carries the sender on every send row (was hardcoded `null`). Runbook, ADR-0032 amendment and README row 5 updated. Live probe: the profile declares exactly `read,grep,find,ls` — no `bash`, zero `mcp__conmuta`. **B-112**, **B-113** filed. Branch `fix/solo-sesion-viva`, **not pushed**. | `odd/tasks/solo-sesion-viva.md`; `docs/runbooks/wake-satellite.md`; `docs/03-adr/0032-wake-satellite-and-per-binding-ladder.md` |
 | **B-99** | **CLOSED COMPLETELY — sessions 55 & 69** (commit `dd464a7` converted the three original tests to `waitForCondition`; session 69 closed the remaining fixed sleeps in `heartbeat.test.ts` and converted `bootstrap.test.ts:517` to positively observe live ticks with stable audit rows, plus converting boot/add waits to condition waits) | `odd/tasks/b-99-timer-tests.md`; `docs/06-backlog/CHECKLIST.md` |
-| Next SDD change | None queued. F6 blocked on B-11/B-12/B-16 | `docs/07-plan/WORK-PLAN.md` |
-| Tests on `main` | `npm test` **1907/1901/0/6**; `test:static` **101/101** | — |
+| **F7c / B-116** | **DELIVERED (T1–T5) — session 72; T6 owed.** `channel-pi/` (ADR-0036): a host-side Pi extension that holds F4's body-less doorbell and injects one attributable, body-less ring (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`), which starts a turn in the live session so it can fetch and answer. Measured reason it is an extension and not a port: Pi renders **no** MCP notification. Pinned by 6 ring tests, 6 lifecycle tests, a bundle-closure gate (the ring is the only `.sendMessage(` call site; no `src/daemon/`, no Telegram path), an extended twin gate and a packed-entry assertion. Verified live against the running daemon (`client_cursors.host = pi-host-doorbell`) and **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a roster peer is owed (B-114 / T6)** | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md); `odd/tasks/f7c-pi-host-doorbell.md`; `docs/runbooks/host-doorbell-pi.md` |
+| **B-115** | **CLOSED — session 72.** The audit that recorded the truth (*no ladder level reaches a live host session*) and the classification that closed it (new row **B-116** under new phase **F7c**, on the Director's explicit answers). The gap it named is now addressed by shipped code; what remains is the live firing, tracked under B-114 | `odd/tasks/b-115-wake-does-not-reach-a-live-session.md`; `docs/06-backlog/CHECKLIST.md` |
+| Next SDD change | None queued. F6 blocked on B-11/B-12/B-16; F7b follows F6; F7c is delivered outside SDD | `docs/07-plan/WORK-PLAN.md` |
+| Tests on the branch | `npm test` **1947/1941/0/6**; `test:static` **120/120**; `%TEMP%` 0 → 0 from a clean build | — |
 
 ---
 
@@ -126,7 +164,15 @@ commit).
 
 ## §3 — What's next
 
-1. **The `frisco` binding is armed and running — do not re-arm it.**
+1. **The ring owes its first real firing, and that is the only unit the bus front has left (F7c T6 / B-114).** With
+   the adapter armed, a roster **agent** sending a directed message or a broadcast should make the open session ring
+   and answer. It needs a peer whose owner is available: AGENTBUS has no private loopback, a human `user_id` is not
+   on the roster (ingest drops it as `unknown_sender`), and a test message fans out to every agent in the group.
+   Acceptance is the raw evidence: the transcript showing the `conmuta-doorbell` entry and the automatic turn, plus
+   the `audit_log` `send` row carrying a **non-null `client_id`**. Until a peer is available it stays **owed**, never
+   declared. Note the tree matters: this repository's own roster is `@kairo-agent` alone, so nothing can ring here —
+   a tree with peers is where it must be shown.
+1. **The `frisco` despertador is OFF, and it must stay off.** Session 71 disabled it, removed the Startup entry and killed both processes, on the Director's order that the bus answer only from a live session. Re-arming is a Director decision and a deliberate act: `wake` no longer replies (it has no bus and no shell) and `autopilot` is refused, so `notify` is the only level that does anything useful. See the runbook's "A woken turn cannot send".
 2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
 3. **No open row the harness can close alone.** What remains is either the Director's or a scheduled class:
 
@@ -185,15 +231,34 @@ commit).
 - **B-95 — `gentle-ai-verify`, task `mut0gvfn-2-9l0t`, clean** (1901/1895/0/6 and 101/101 at `a4885f3`, all three
   corrupt-envelope test groups confirmed).
 
-### 5.2 — Native review: no candidate was approved, and none exists
+### 5.2 — Native review: one candidate was approved and burned, and it required no reviewer
 
-**Every candidate was host-resolved as `consent-declined-this-candidate`, so no native review exists for sessions
-70–71 and the separate independent verifier above was the only independent pass. Five declines across three
+**Session 72 took the two measurements this file has been carrying as advice.** First, the **accumulated branch
+candidate is not merely declined — it is un-reviewable**: `review.start` on the workspace projection returned
+`lens_context_budget_exceeded` in `preflight` (`mutation_outcome: not_started`), *no* authority created, nothing to
+repair or abandon, and its own continuation says to reduce the candidate. The trap §5.2 described (every commit
+mints a new `target_identity` and re-prompts) now has a hard floor under it. Second, a **narrow committed candidate**
+(`baseRef=54d5511`, `committedOnly: true`, 7 files / 434 lines) closed **`approved`** with `risk_tier: low`,
+**`selected_lenses: []`** and `lenses_required: false` because the reason was **`non_executable_only`** — a
+classification, not a review, and it must never be reported as one. Its authority was burned
+(`gentle-ai.review-acknowledged/v1`, lineage `review-37e325421d7cc221`); delivery stayed ordinary repository policy.
+**The Director then declined review for the F7c code unit explicitly** ("no voy a revisar nada"), so that unit has no
+lineage and is recorded as deliberately unreviewed.
+
+**What follows for any future session:** a code unit that wants a native review must be **its own narrow committed
+candidate**, and it will require lenses (it is executable). The six declines of sessions 68–71 still stand, as does
+their disposition — see the paragraph below, kept because it is the record of those candidates.
+
+**Every candidate of sessions 68–71 was host-resolved as `consent-declined-this-candidate`, so no native review exists
+for them and the separate independent verifier above was the only independent pass. Six declines across four
 sessions:** session 68's two (`sha256:6f94b8d9…`, 6 files / 415 lines; `sha256:5977c01d…`, 10 files / 1008 lines)
 and the accumulated target re-offered after each growth (`sha256:2cd5fa16…`, 19 files / 1314 lines; `sha256:8937c6f2…`,
-23 files / 1653 lines; `sha256:f0f16d67…`, 23 files / **1684** lines). All returned `lineage_created: false` and
-`mutation_performed: false`, so **no lineage exists and no review state was mutated** — there is nothing to
-acknowledge, correct, recover or reset. **Do not re-inspect or re-drive START on any of these targets.**
+23 files / 1653 lines; `sha256:f0f16d67…`, 23 files / **1684** lines; `sha256:c90c38ab…`, the session-71 target at
+**37 files / 2254 lines**, `risk_level: medium`). Session 71's decline followed two **pre-authority** START
+validation errors (`requires lineageId`; missing `mode`) that created no lineage either. All returned
+`lineage_created: false` and `mutation_performed: false`, so **no lineage exists and no review state was mutated**
+— there is nothing to acknowledge, correct, recover or reset. **Do not re-inspect or re-drive START on any of these
+targets.**
 
 **A decline is candidate-scoped, is not the kill switch, and is not the Director declining the work** — the bar
 does not move and the independent verifier runs instead.
@@ -264,7 +329,9 @@ instead, which is where such a record belongs.
 | **B-101 (relocation)** | Whether the Judgment Day operating detail should move out of the overwritten `HANDOFF.md` into `GOVERNANCE` or a durable runbook. Engineering-adjacent but editorial, and `GOVERNANCE.md` is constitution-adjacent, so this is not a drive-by move | Director |
 | Engram housekeeping | 299 legacy cloud-sync mutation rows and 2 ownership rows the tool marks `repairable: false` (per-row human classification; local use unaffected), 1 deliberate drift case (`manual-save-frisco`), three backups to delete once nothing needs reverting | Director |
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–68. Candidates left no lineage (the host declined them). The `2aa0da0`-era base that kept re-surfacing B-102(f) now points at fixed code, so this is expected to stay quiet | Director/maintainer |
+| **B-114** | **The end-to-end live-session test is owed, and it needs a collaborator.** Criterion 1 of the 2026-10-05 order — a live session answering an incoming bus message — cannot be proven alone: AGENTBUS has no private loopback (every `send` reaches the group *and* a DM, so a test message fans out to the other four agents), and a human typing in Telegram is dropped as `unknown_sender`, so the sender must be a roster *agent* whose owner is available. Criteria 2 and 3 are satisfied and pinned. **Steps and acceptance criteria:** `odd/tasks/solo-sesion-viva.md` §OWED; runbook "Verifying the live-session path (owed)". Do not call this done until step A's `audit_log` `send` row is shown carrying a non-null `client_id` | Director (needs a peer) |
 | ADR-0032 | still `proposed` (pending the Director's confirmation) | Director |
+| **B-112 / B-113** | Filed in session 71. **B-112**: the send-proof profile is verified for `pi` only, so `autopilot` and `claude`/`codex`/`opencode` are refused; closing it means verifying each harness's own restriction flag on the installed binary the way session 66 verified the argv forms. **B-113**: the daemon cannot accredit "a human is present" (every same-user process reads the same run file and speaks the same IPC; `host` is the same literal `unknown` for both), and the only shape that could — a TTY-gated per-session human grant — is more surface than the order asked for. Do not re-derive either. | Director (B-112 is a bounded harness-verification job) |
 | B-11, B-12, B-16 | Gate F6 | Director |
 
 ---
@@ -280,6 +347,14 @@ instead, which is where such a record belongs.
 - **The four harnesses ARE installed**: `pi` and `pi.cmd` (`%APPDATA%\npm`), `claude`
   (`~/.local/bin/claude`), `codex`/`codex.cmd` and `opencode`/`opencode.cmd` (`%APPDATA%\npm`).
 - **The bus is registered once, id-free, at the user level**: `pi mcp list` here shows
+- **MCP is ON for sessions again, and that is load-bearing.** `~/.pi/agent/settings.json` no longer carries
+  `"-builtin:mcp"` (an unregistered `pi-mcp-adapter` had written it, which disabled MCP for every session).
+  The conmuta entries are `exposure: "direct"` — Pi's default is `codemode`, which does **not** declare tools —
+  at the user level (`~/.pi/agent/mcp.json`, id-free per ADR-0033) and in `FRISCO\.pi\mcp.json` (also id-free now).
+  `pi mcp list` in FRISCO → `conmuta: connected, 4 tools (direct, project)`. Two measured consequences: outside a
+  bound tree the user-level entry reports `failed (no conmuta.json found above …)` once per session, and
+  **`frisco-erp/.mcp.json` is not read by Pi at all** (Claude-style file) — the entry serving that tree is the
+  user-level one.
   `conmuta: connected, 4 tools` running `<repo>\dist\src\cli\main.js mcp`. `FRISCO\.pi\mcp.json` is
   retired.
 - **Arena**: no `arena` MCP server is registered for Pi, and `127.0.0.1:8765` refuses connections
@@ -292,5 +367,12 @@ instead, which is where such a record belongs.
   `@coordinador-frisco`).
 - The SDD preflight for this project is Automatic / Both (hybrid) / Auto (`stacked-to-main`).
 - **CodeGraph**: present and usable, `codegraph explore` directly — do not re-init.
+- **The F7c host adapter is armed machine-wide, and that is a deliberate environment fact**: `~/.pi/agent/settings.json`
+  carries `extensions: ["…/telegram_bus_agent/dist/channel-pi/main.js"]` (backup `settings.json.bak-pre-f7c-arming-20261005`).
+  Every Pi session on this machine therefore loads it at `session_start` and binds to the nearest ancestor
+  `conmuta.json`; a session outside any bound tree reports one line (`pi-host-doorbell: no conmuta.json found above …`)
+  and arms nothing. It ships nothing into the repository, needs no installer step, and is removed by taking that entry
+  out. **The path is this checkout's `dist/`, so the arming depends on `dist/` existing here** — a moved or unbuilt tree
+  means the extension fails to load, which is the price of arming by path before F6 publishes the package.
 - **Engram's own tool surface is 19 tools** (`mem_*`), registered globally; `mem_context` on project
   `connmuta` is the entry point for a resumed session.

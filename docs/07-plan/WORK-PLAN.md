@@ -29,6 +29,7 @@ flowchart LR
   F5 --> F6
   F1 --> F7a[F7a wake satellite]
   F4 --> F7a
+  F4 --> F7c[F7c host push adapter]
   F7a --> F7b[F7b referee satellite]
   F6 --> F7b
   F6 --> F8[F8 desktop tray shell]
@@ -164,6 +165,19 @@ flowchart LR
 | Backlog | B-04. |
 | Risks | Tauri vs Electron is Alpha's recommendation, not yet a Director decision (B-04 `open`); signing costs recur. |
 
+## F7c — Host push adapter (Pi)
+
+| Field | Content |
+|---|---|
+| Goal | Let a message that arrives for a bound project reach the **interactive session a human is sitting in**, instead of waiting for that session to fetch — the gap [B-115](../06-backlog/CHECKLIST.md) records. **Not F7a's job**: the satellite starts a *new headless turn* and its own row says it never wakes a host session. |
+| Deliverables | `channel-pi/` — a host-side Pi extension that holds F4's body-less doorbell and injects one **attributable, body-less ring** per announcement (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`); the bounds as named constants (one read in flight, ring cooldown, per-window budget, bounded shutdown); its bundle-closure pin; and the manual, user-level arming runbook. The extension carries no peer prose, has no send path, no shell and no MCP client of its own. |
+| Dependencies | F4's shipped doorbell (`POST /channel/doorbell`) and its client half (`channel/daemon-link.ts`, `channel/doorbell-loop.ts`). **Not F6**: it consumes the local IPC. Its only host requirement is Pi's extension surface on the installed version. |
+| Validation | `test/channel-pi/*` for the ring's exact shape, the content's closed field set, the bounds, the guarded call after the session ended and the bounded shutdown; `test/security/channel-pi-bundle.test.ts` for the closure (no `src/daemon/`, `child_process`, Telegram or send call, closed timer allow-list). Static invariant: no core bundle closure gains a reference to `channel-pi/`. **The end-to-end run is owed** — it needs a roster peer, exactly like B-114. |
+| SDD change | `f7c-pi-host-doorbell` (proposed; name fixed at that change's preflight) |
+| Spikes | **B-09 answered for Pi on 2026-10-05, and the answer changed the design**: Pi does not render MCP notifications (`notifications/message` goes to `mcp.log`), so the Pi adapter uses the host's extension surface instead of an MCP channel. Codex/OpenCode/Antigravity stay unchecked-and-absent; Gemini CLI/Cursor untested. |
+| Backlog | **B-116** (the adapter), which answers **B-115**; B-114's live-session criterion becomes provable through it. |
+| Risks | A new trust boundary **inside the host process** — an extension runs with the session's permissions, which is more than an MCP server gets; mitigated by manual, per-machine arming and by the adapter having no send path at all, pinned statically. Delivery is best-effort and must never be documented as a guarantee. |
+
 ## Backlog cross-reference
 
 | Backlog | Phase | Status in CHECKLIST | Where it is honored |
@@ -186,3 +200,6 @@ flowchart LR
 | B-18 | F1 | decided | `conmuta.json` |
 | B-19 … B-103 | F1–F5 follow-ups | see CHECKLIST | carried; none blocks the phases below — the rows are read at the next touch of the files they name |
 | B-104 | F7a | decided | the wake requirement phase F7a exists for ([ADR-0032](../03-adr/0032-wake-satellite-and-per-binding-ladder.md)) |
+| B-114 | F7c | open | the live-session end-to-end test this phase makes provable |
+| B-115 | F7c | open | the gap: no ladder level reaches a live host session |
+| B-116 | F7c | decided | the host push adapter ([ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md)) |

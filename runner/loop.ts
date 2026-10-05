@@ -48,7 +48,14 @@ import { readWatermarkFor, writeWatermark } from "./watermark.js";
 
 export type TickOutcome = "idle" | "silent" | "notified" | "woke" | "refused" | "link_failed";
 
-export type RefusalReason = "in_flight" | "cooldown" | "budget_exhausted" | "harness_unknown" | "arguments_refused";
+export type RefusalReason =
+	| "in_flight"
+	| "cooldown"
+	| "budget_exhausted"
+	| "harness_unknown"
+	| "arguments_refused"
+	/** No verified send-proof profile covers this level/harness pair, so no turn was started (2026-10-05). */
+	| "profile_unavailable";
 
 export interface WakeLoopDeps {
 	readonly projectId: string;

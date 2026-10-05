@@ -6,6 +6,7 @@ import {
 	HARNESS_NAMES,
 	MAX_TURN_OUTPUT_CHARS,
 	REFUSED_ARGUMENTS,
+	SEND_PROOF_PROFILES,
 	WAKE_KILL_GRACE_MS,
 	WAKE_TURN_TIMEOUT_MS,
 	type HarnessName,
@@ -29,6 +30,10 @@ import type { LadderEntry } from "./ladder.js";
  *    not hand a woken turn the operator's tokens, keys or IDE variables, and it holds none of its own.
  *  - **a confined working directory.** `cwd` is the bound project's own directory, resolved by the same
  *    walk-up the thin client uses.
+ *  - **a send-proof tool profile.** Every woken turn is started under {@link SEND_PROOF_PROFILES}: no shell
+ *    and no extension surface, so no `conmuta_*` tool and no raw IPC. A level or harness with no verified
+ *    profile is **refused** (`profile_unavailable`), never started with the harness's full toolset
+ *    (Director's order, 2026-10-05: no headless turn may send anything, directly or indirectly).
  *  - **a bounded turn.** Ten minutes, named in `./constants.ts`, then `SIGTERM` and, after a grace period,
  *    `SIGKILL`. One hung harness therefore cannot hold the binding's single in-flight slot forever.
  *  - **no permissions it grants.** This module writes no settings file and declares no permission: the
@@ -43,7 +48,7 @@ export interface HarnessSpec {
 	readonly argv: readonly string[];
 }
 
-export type HarnessRefusalReason = "harness_unknown" | "arguments_refused";
+export type HarnessRefusalReason = "harness_unknown" | "arguments_refused" | "profile_unavailable";
 
 export type HarnessResolution =
 	| { readonly kind: "spec"; readonly spec: HarnessSpec }
@@ -62,22 +67,38 @@ export function isRefusedArgument(arg: string): boolean {
 }
 
 /**
+ * The arguments that make a woken turn **send-proof**, or `null` when no verified profile covers this
+ * (level, harness) pair. Only `wake` has one: `autopilot` exists to run a shell, and a shell can always
+ * send, so it has none and is refused (see {@link SEND_PROOF_PROFILES}, `runner/constants.ts`).
+ */
+function sendProofProfile(level: LadderEntry["level"], bin: HarnessName): readonly string[] | null {
+	return level === "wake" ? SEND_PROOF_PROFILES[bin] : null;
+}
+
+/**
  * Resolves a ladder entry into an executable argv, or refuses. `arguments_refused` is the interpreter escape
- * hatch: an argument that would hand the harness a command string of its own (`-c`, `eval`, …) or that would
- * turn its own permission system off is refused outright, because either one makes the closed-executable rule
- * meaningless.
+ * hatch: an argument that would hand the harness a command string of its own (`-c`, `eval`, …), that would
+ * turn its own permission system off, or that would widen the send-proof profile this function appends is
+ * refused outright, because any of them makes the closed-executable rule meaningless. `profile_unavailable`
+ * is the fail-closed answer for a level or harness with no verified send-proof profile: no turn starts.
  */
 export function resolveHarnessSpec(entry: LadderEntry, prompt: string): HarnessResolution {
 	if (!(HARNESS_NAMES as readonly string[]).includes(entry.harness)) {
 		return { kind: "refused", reason: "harness_unknown" };
 	}
 	const bin = entry.harness as HarnessName;
-	const args = [...HARNESS_DEFAULT_ARGS[bin], ...(entry.harness_args ?? [])];
-	for (const arg of args) {
+	const operatorArgs = [...HARNESS_DEFAULT_ARGS[bin], ...(entry.harness_args ?? [])];
+	for (const arg of operatorArgs) {
 		if (isRefusedArgument(arg)) {
 			return { kind: "refused", reason: "arguments_refused" };
 		}
 	}
+	const profile = sendProofProfile(entry.level, bin);
+	if (profile === null) {
+		return { kind: "refused", reason: "profile_unavailable" };
+	}
+	// The profile is appended LAST, so it is the tool selection the harness actually applies.
+	const args = [...operatorArgs, ...profile];
 	return { kind: "spec", spec: { bin, args, argv: [...args, prompt] } };
 }
 

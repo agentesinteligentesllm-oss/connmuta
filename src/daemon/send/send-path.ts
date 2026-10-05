@@ -161,6 +161,13 @@ export interface SendPathDeps {
 	readonly db: DatabaseSync;
 	readonly project_id: string;
 	readonly bot_id: number;
+	/**
+	 * The session's daemon-minted `client_id` — the one field that makes a send *attributable* after the
+	 * fact. `audit_log.client_id` was hardcoded `null` on every send row until 2026-10-05, which is why the
+	 * four headless replies of 2026-10-04 could not be traced to a client from the ledger at all.
+	 * Optional only so an older test double keeps compiling; `daemon/ipc/routes.ts` always supplies it.
+	 */
+	readonly client_id?: string | null;
 	readonly config: Pick<BindingConfig, "agent_id" | "roster" | "secret_markers" | "chat_id">;
 	readonly transport: Transport;
 	readonly roomGuard: Pick<RoomGuardClient, "assertTarget">;
@@ -295,7 +302,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 					project_id: deps.project_id,
 					bot_id: deps.bot_id,
 					chat_id: deps.config.chat_id,
-					client_id: null,
+					client_id: deps.client_id ?? null,
 					direction: "send",
 					eid: null,
 					envelope_type: typeof input.type === "string" ? input.type : null,
@@ -353,7 +360,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 				project_id: deps.project_id,
 				bot_id: deps.bot_id,
 				chat_id: deps.config.chat_id,
-				client_id: null,
+				client_id: deps.client_id ?? null,
 				direction: "send",
 				eid,
 				envelope_type: envelope.type,
@@ -386,7 +393,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 				project_id: deps.project_id,
 				bot_id: deps.bot_id,
 				chat_id: deps.config.chat_id,
-				client_id: null,
+				client_id: deps.client_id ?? null,
 				direction: "send",
 				eid,
 				envelope_type: envelope.type,
@@ -462,7 +469,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 						project_id: deps.project_id,
 						bot_id: deps.bot_id,
 						chat_id: deps.config.chat_id,
-						client_id: null,
+						client_id: deps.client_id ?? null,
 						direction: "send",
 						eid,
 						envelope_type: envelope.type,
@@ -490,7 +497,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 					project_id: deps.project_id,
 					bot_id: deps.bot_id,
 					chat_id: deps.config.chat_id,
-					client_id: null,
+					client_id: deps.client_id ?? null,
 					direction: "send",
 					eid,
 					envelope_type: envelope.type,
@@ -560,7 +567,7 @@ async function runSendPath(input: SendToolInput, deps: SendPathDeps): Promise<Se
 			project_id: deps.project_id,
 			bot_id: deps.bot_id,
 			chat_id: deps.config.chat_id,
-			client_id: null,
+			client_id: deps.client_id ?? null,
 			direction: "send",
 			eid,
 			envelope_type: envelope.type,

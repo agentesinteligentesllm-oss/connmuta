@@ -19,23 +19,30 @@ and never writes to any settings or permissions file.
    runner cannot make it work either — and on Windows there is a second, harder gate: see "Windows: the four
    harnesses are `.cmd` shims" below, because for those four names a shell is the *only* thing your
    terminal has that the runner deliberately refuses.
-3. **The `conmuta` MCP entry your host will load for the woken turn.** The turn reaches the bus with the
-   same thin client every other session uses. Give it **one id-free entry** — `conmuta mcp`, with no
-   `--project` — in your host's **user-level** config (a Pi host keeps it in `~/.pi/agent/mcp.json`). The
-   client then binds to the nearest ancestor `conmuta.json` of the turn's own cwd, so that single entry
-   serves every bound tree on the machine and keeps serving them when a new binding is armed
+3. **The `conmuta` MCP entry your *interactive* session will load.** Since 2026-10-05 a woken turn is
+   started with **no MCP surface at all** (`--no-extensions`, see "A woken turn cannot send" below), so this
+   entry is for the session you sit in, not for the turn. Give it **one id-free entry** — `conmuta mcp`, with
+   no `--project` — in your host's **user-level** config (a Pi host keeps it in `~/.pi/agent/mcp.json`), and
+   set `"exposure": "direct"` on it so the four `conmuta_*` tools are declared instead of hidden behind
+   `codemode`. The client then binds to the nearest ancestor `conmuta.json` of the session's own cwd, so that
+   single entry serves every bound tree on the machine and keeps serving them when a new binding is armed
    ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md)). Two traps this avoids, both measured on
    2026-10-01:
    - A **project-level** entry (`<project>/.pi/mcp.json`) is invisible to a session whose cwd is a
      subfolder of the bound root — host config is cwd-relative, with no ancestor walk-up.
    - A project-level entry is also **trust-gated**: the host reads it only after a trust decision for
      that folder has been saved, and a headless run (`pi -p`, exactly what this runner starts) has
-     nobody to ask, so it resolves *not trusted* — the turn would keep its quota cost and lose every
-     `conmuta_*` tool.
+     nobody to ask, so it resolves *not trusted*.
    A `--project <id>` on the entry is still accepted (it is an assertion the client checks against the
-   file it found), but it is what makes the entry wrong in every other tree: do not use it for the
-   woken turn. (Verified 2026-10-01: a woken turn with the user-level entry called `conmuta_fetch` and
-   read its inbox.) A turn that cannot call `conmuta_fetch` will do nothing useful.
+   file it found), but it is what makes the entry wrong in every other tree: do not use it.
+
+   > **Measured 2026-10-05, correcting this runbook's own premise.** `~/.pi/agent/trust.json` **does exist**
+   > and marks FRISCO trusted, and the entry was correct — and neither session had a `conmuta_*` tool anyway.
+   > The real cause was `"extensions": ["-builtin:mcp"]` in `~/.pi/agent/settings.json`, left behind by an
+   > unregistered `pi-mcp-adapter`, which turns Pi's built-in MCP off for **every** session. `pi mcp list`
+   > still connected (it always uses the built-in), which is what made the failure look like a trust problem.
+   > Fixed by removing that entry and setting `exposure: "direct"`; a session in FRISCO now declares
+   > `mcp__conmuta__conmuta_send/fetch/status/thread` (verified from the session's own request).
 
 ## The ladder: one machine-local record per binding
 
@@ -46,9 +53,9 @@ the ladder lives under the daemon home (`~/.conmuta/runner/ladder.json`), never 
 | Level | What it does |
 |---|---|
 | `off` | Nothing at all: the runner does not even hold a session against the daemon. |
-| `notify` | Tells you on stderr and records the event. **Starts no turn.** |
-| `wake` | Starts one turn, read/reply-only: it may fetch, read the project and reply or ACK. |
-| `autopilot` | Starts one turn in the confined act profile: it may also run this project's own tests and linters and make scoped edits inside the worktree. |
+| `notify` | Tells you on stderr and records the event. **Starts no turn.** This is the level to arm when all you want is to be told. |
+| `wake` | Starts one turn under a **send-proof profile**: no shell and no MCP surface, so it cannot read the inbox, cannot reply and cannot run anything. It records what it found and stops. **A `wake` turn cannot answer the bus** (2026-10-05) — see "A woken turn cannot send". |
+| `autopilot` | **Refused.** The act profile needs a shell, and a shell can always send, so no `autopilot` turn is ever started; the refusal is recorded as `profile_unavailable`. |
 
 ```sh
 # 1. See what is armed right now.
@@ -100,6 +107,29 @@ One tick: it reads the ladder, and either does nothing (`idle`), reports a quiet
 (`notified`), wakes (`woke`), refuses (`refused`) or reports the daemon unreachable (`link_failed`). This is
 the safest way to confirm that a level, a harness and the daemon are wired correctly.
 
+## Verifying the live-session path (owed)
+
+The path this runbook assumes — *a live session answers the bus* — has one part that cannot be checked on a
+single machine, and it is deliberately left **owed** rather than called done. To execute it later you need
+**one roster peer whose owner is reachable**, because AGENTBUS has no private loopback: every `send` reaches
+the bound group *and* a direct DM, so a test message fans out to the other agents. A message a human types in
+Telegram does not work either — a human `user_id` is not on the roster and ingest drops it as `unknown_sender`.
+
+1. **With a live session.** Have the peer send a `REQUEST` to `@luisgtz-agent`; in your open session call
+   `conmuta_fetch`, read the fenced body, and answer on the same thread with `conmuta_send`. Then read the
+   ledger read-only: the `audit_log` `send` row must carry **your session's `client_id`** — that is the live
+   proof of the attribution change, and it cannot be produced without posting.
+2. **With no live session.** Close every session that has the bus, have the peer send again, and confirm three
+   negatives: no `@luisgtz-agent` row in `thread_history`, no `send` row in `audit_log`, thread still pending.
+   That is correct behaviour, not a fault.
+3. **The headless attempt.** Arm `autopilot` for the binding *temporarily* only to watch it be refused: the
+   wake ledger gets a `refused` row with `reason: "profile_unavailable"`, no turn starts and nothing is sent.
+   Then `ladder disable` again.
+
+The exact commands and the acceptance criteria live in
+[`odd/tasks/solo-sesion-viva.md` §OWED](../../odd/tasks/solo-sesion-viva.md) and the row is tracked as
+**B-114**. Until it runs, treat criterion 1 as owed.
+
 ## What happens when a message arrives
 
 1. A roster peer sends a `BROADCAST` (the "all" tag) or a message addressed to this binding's agent.
@@ -110,9 +140,10 @@ the safest way to confirm that a level, a harness and the daemon are wired corre
    pending**, so it wakes as soon as the bound clears.
 4. It starts the harness with a literal argv (the prompt is the last element, `shell: false`) and an
    allow-listed environment, in the project's own directory.
-5. The turn calls `conmuta_fetch`, reads the bodies **inside the fence**, applies this project's own rules,
-   and replies with `conmuta_send`.
-6. Only then does the runner advance the doorbell watermark, and it writes exactly one `wake` row.
+5. The turn runs under the send-proof profile: it reads what it can of the project, records what it found,
+   and **cannot call any bus tool** — the profile has no MCP surface. It does not reply.
+6. Only then does the runner advance the doorbell watermark, and it writes exactly one `wake` row. The
+   thread stays **pending** until a live session with the bus answers it.
 
 ## What is recorded
 
@@ -142,8 +173,72 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 - **The kill switch is effective before the next turn starts**, even if the runner is in the middle of a long
   poll: the ladder is re-read after every poll that finds traffic.
 
-## Limits — read these before choosing `autopilot`
+### A woken turn cannot send (2026-10-05, Director's order)
 
+On 2026-10-04 four `REPLY`s left in `@luisgtz-agent`'s name without the Director's interactive session
+knowing: the woken turn had **no** `conmuta_*` tool, but it had `bash`, so it read the daemon's run-file
+secret, wrote its own IPC client and sent anyway. Measured in `~/.conmuta/ledger.db` (`thread_history`,
+`client_cursors`) and in the turn's own session transcript.
+
+The rule now is absolute: **no woken turn may send anything, directly or indirectly.** It is enforced by
+capability, not by permission:
+
+- `wake` on `pi` is started as `pi -p --no-extensions --tools read,grep,find,ls`. `--no-extensions` removes
+the built-in MCP extension, so there is no `conmuta_*` tool to call; `--tools read,grep,find,ls` removes
+`bash`, so there is no shell to read the run file or speak raw IPC with.
+- The profile is appended **after** the record's own `harness_args`, and a record that tries to *replace* it
+  (`--tools`, `--exclude-tools`, `--no-tools`, `--no-extensions`, `-e`, `--`, …) is refused. `--` is the entry
+  that is not a flag at all: it is the option terminator, and refusing it is what keeps appending meaningful —
+  a parser that stops flag parsing there turns the whole profile into prompt text.
+- **Which half is load-bearing, stated because the audit of 2026-10-05 measured it.**
+  `--tools read,grep,find,ls` is the floor: it removes the shell and every `conmuta_*` tool, and a record cannot
+  replace it, because a later `--tools` wins and the record's own `--tools` is refused. `--no-extensions` is
+  depth, not the floor: a record argument that *consumes the next argv element* and is placed last — `--model`,
+  `--provider`, `--system-prompt`, `--api-key`, `--session`, `--thinking`, … none of which is a widening flag
+  and none of which a deny-list names — swallows it, so extensions load again, the built-in MCP extension
+  included. The bus tools stay out of reach because `--tools` still holds, and that is the measured bound. It
+  is disclosed rather than argued away: a deny-list can only refuse the tokens it names, and the structural
+  alternative (parse the resolved argv and refuse on mismatch) is filed as its own backlog row.
+- A level or harness with **no verified send-proof profile is refused, never started with its full toolset**:
+  `autopilot`, and `wake` on `claude`, `codex` and `opencode`. The refusal is recorded in the wake ledger as
+  `refused (profile_unavailable)` — not a silent drop.
+- The daemon now records the sending session's `client_id` on every `send` audit row written by a
+  **session-authenticated** call, so a send is attributable after the fact; it was hardcoded `null` until this
+  change, which is why the four replies above could not be traced to a client from the ledger at all. The
+  daemon's own `doctor` DM probe also writes a `send` row, and it carries `client_id: null` on purpose: no
+  session exists to name, and the row identifies itself by `reason: "DOCTOR_PROBE"`.
+
+**What this does not promise.** A daemon-side proof of "a human is present" is not achievable inside the
+core: every local process of the same OS user reads the same run file and speaks the same authenticated
+loopback IPC, and the thin client's `host` is the same literal for an interactive session and a woken one.
+The load-bearing control is therefore the capability profile above, and its limit is the operator's own
+harness configuration. A process started outside this runner with a shell of its own is outside what the
+runner can bound.
+
+**What this does not promise, second part: it never reaches the session you are sitting in.** No level above
+delivers a bus message to the interactive host session you have open. `notify` tells you on the runner
+process's **stderr** and records the event — it does not post to Telegram and it does not surface in your
+session. `wake` starts a **separate headless turn**, which since 2026-10-05 has no shell and no MCP surface,
+so it cannot read the inbox or reply either. `autopilot` is refused. **The bus is pull-only for a host
+session**: a live session learns what arrived when *it* runs `fetch`, which is the only reason the
+`<!-- conmuta:begin -->` block in a bound project tells an agent to fetch. If your expectation is "a message
+addressed to me should wake the session I am sitting in", that path was never built — it is recorded as
+[B-115](../06-backlog/CHECKLIST.md), with its evidence in
+[`odd/tasks/b-115-wake-does-not-reach-a-live-session.md`](../../odd/tasks/b-115-wake-does-not-reach-a-live-session.md),
+and it needs an ADR before code. What the ladder is for is the other direction: letting the *machine* notice
+while no session is open, at the level you arm. Arming it again is now safe **for the reason it was disarmed**
+(no woken turn can send), and unsafe for the reason this paragraph gives (it still will not reach you).
+
+**How to turn it back on.** Adding a verified send-proof profile for a harness (or a safe `autopilot` shape)
+is a code change in `runner/constants.ts` plus a live probe like the one that verified `pi`. To arm the
+despertador at all, `conmuta-runner ladder set --project "<id>" --level notify --harness pi --by "<you>"`;
+`notify` needs no profile and starts no turn.
+
+## Limits — read these before choosing a level
+
+- **A woken turn cannot send, and cannot be made able to.** Since 2026-10-05 there is no level that lets a
+  headless turn answer the bus: `wake` has no shell and no bus tool, and `autopilot` is refused. If you want
+  the bus answered, answer it from a live session; if you want to be told, use `notify`.
 - **The profile is not a sandbox.** The runner confines *which program* runs and *what environment and
   directory* it gets. What that program's tools may then do is decided by **your own harness configuration**,
   which the runner never reads and never writes. A capable model can still be talked into misusing a command
@@ -205,7 +300,8 @@ The runner's own diagnostics (the same facts, plus the turn's own output, capped
 | `off (unknown_harness)` | The record names a harness outside the closed set. Re-arm with one of the four names. |
 | `off (unknown_level)` | A typo in the level. Re-arm. |
 | `refused (cooldown)` / `(budget_exhausted)` | Working as designed; the message stays pending. |
-| `refused (arguments_refused)` | The record's `--arg` list contains an interpreter or permission-bypass flag. |
+| `refused (arguments_refused)` | The record's `--arg` list contains an interpreter, a permission-bypass flag, the option terminator `--`, or a flag that would replace the send-proof profile (`--tools`, `--no-extensions`, `-e`, …). Note that `ladder set` does **not** pre-validate the list, so a record carrying one of these is written successfully and only refuses at the first tick — the message stays pending. |
+| `refused (profile_unavailable)` | The level or harness has no verified send-proof profile — `autopilot`, or `wake` on `claude`/`codex`/`opencode`. Nothing was started; the message stays pending. |
 | `refused (in_flight)` | A turn is still running. It is bounded by the ten-minute turn timeout. |
 | `link_failed` | No live daemon for this user, or the run file's daemon died. Start the daemon and run again. |
 | A peer message arrives but no new `wake` row appears | The message was sent by the binding's **own** agent: the doorbell skips self-echo (`row.from_agent_id !== binding.agent_id`, `src/daemon/serve/doorbell.ts:154`), so a binding cannot wake itself. Test with **another** roster agent — a `REQUEST` to this binding's agent, or a `BROADCAST` with no `to` (a `BROADCAST` carrying `to` is refused by the wire schema). A human typing in Telegram does not work either: their `user_id` is not on the roster and ingest drops it as `unknown_sender`. |

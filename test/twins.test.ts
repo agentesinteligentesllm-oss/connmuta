@@ -17,6 +17,15 @@ const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const MIN_CHANNEL_SOURCE_FILES = 3;
 
 /**
+ * The same rule for the F7c host adapter (ADR-0036), whose modules live outside `src/` like the F4
+ * adapter's. Its real count at authoring time is 3 (`main`, `host`, `constants`); the floor tolerates
+ * one legitimately merged module. The gate covers it because the first two directories did not: a new
+ * directory outside `src/` would otherwise be the one place the twin rule silently stopped applying,
+ * which is exactly how the `channel/` rule came to exist.
+ */
+const MIN_CHANNEL_PI_SOURCE_FILES = 3;
+
+/**
  * Every `.ts` file under `dir`, relative to `dir`, excluding declaration files.
  *
  * Declaration files (`*.d.ts`) are generated compiler output living alongside hand-written
@@ -74,6 +83,21 @@ test("every channel/**/*.ts file has a test/channel/**/<same>.test.ts twin", () 
   );
 
   const missingTwins = findMissingTwins(channelDir, join(REPO_ROOT, "test", "channel"));
+
+  assert.deepEqual(missingTwins, [], `missing test twin(s) for: ${missingTwins.join(", ")}`);
+});
+
+test("every channel-pi/**/*.ts file has a test/channel-pi/**/<same>.test.ts twin", () => {
+  const channelPiDir = join(REPO_ROOT, "channel-pi");
+
+  // Non-vacuous, as above: an empty walk would pass without checking a single twin.
+  const channelPiFiles = findTsFiles(channelPiDir);
+  assert.ok(
+    channelPiFiles.length >= MIN_CHANNEL_PI_SOURCE_FILES,
+    `expected at least ${MIN_CHANNEL_PI_SOURCE_FILES} channel-pi/**/*.ts files to check for a twin, found ${channelPiFiles.length}`,
+  );
+
+  const missingTwins = findMissingTwins(channelPiDir, join(REPO_ROOT, "test", "channel-pi"));
 
   assert.deepEqual(missingTwins, [], `missing test twin(s) for: ${missingTwins.join(", ")}`);
 });

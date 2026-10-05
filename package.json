@@ -15,6 +15,7 @@
   "files": [
     "dist/src/**",
     "dist/channel/**",
+    "dist/channel-pi/**",
     "dist/runner/**",
     "npm-shrinkwrap.json",
     "package.json",

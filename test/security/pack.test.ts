@@ -12,10 +12,17 @@ import { RUNNER_NAME } from "../../runner/constants.js";
 // (dist/test/security/ -> dist/test/ -> dist/ -> repo root).
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
-const PACKAGE_JSON_WHITELIST = ["dist/src/**", "dist/channel/**", "dist/runner/**", "npm-shrinkwrap.json", "package.json", "README.md", "LICENSE"];
+const PACKAGE_JSON_WHITELIST = ["dist/src/**", "dist/channel/**", "dist/channel-pi/**", "dist/runner/**", "npm-shrinkwrap.json", "package.json", "README.md", "LICENSE"];
 const CHANNEL_BIN_TARGET = "dist/channel/main.js";
 /** F7a's third bin: the wake satellite, built outside `src/` like the F4 adapter (ADR-0032 R2, PT-34). */
 const RUNNER_BIN_TARGET = "dist/runner/main.js";
+/**
+ * F7c's artifact (ADR-0036): the Pi host adapter. It has no `bin` on purpose — the host loads it by
+ * path, it is not a command — so the packed-entry assertion below is the only thing that proves the
+ * extension actually ships. Without it a wrong `files` glob would leave the artifact unpacked and
+ * silent.
+ */
+const CHANNEL_PI_ENTRY = "dist/channel-pi/main.js";
 const FORBIDDEN_LIFECYCLE_SCRIPTS = ["preinstall", "install", "postinstall", "prepare"];
 
 interface NpmPackEntry {
@@ -70,6 +77,10 @@ test("npm pack --dry-run lists only the declared whitelist (PT-21)", () => {
   assert.ok(packedPaths.length > 0, "expected npm pack to report at least one file");
   assert.ok(packedPaths.includes(CHANNEL_BIN_TARGET), `the channel adapter's bin target ${CHANNEL_BIN_TARGET} must be packed`);
   assert.ok(packedPaths.includes(RUNNER_BIN_TARGET), `the wake satellite's bin target ${RUNNER_BIN_TARGET} must be packed`);
+  assert.ok(
+    packedPaths.includes(CHANNEL_PI_ENTRY),
+    `the Pi host adapter's extension entry ${CHANNEL_PI_ENTRY} must be packed: it has no bin, so nothing else would surface the omission`,
+  );
 
   // `tsc`'s incremental build info carries absolute build-machine paths (T11/T12); it must never
   // reach the tarball even though it lands under the whitelisted `dist/src/**` glob.
