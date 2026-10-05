@@ -8,6 +8,15 @@
 > branch grew two commits.** Every § carries session 73's state unless a line says otherwise; §2 keeps the earlier
 > sessions as context.
 >
+> **This file is the entry point for the bus front, and nothing outside the repository is.** That front used to be
+> started from `FRISCO/HANDOFF-2026-10-05-bus-sesion-dedicada.md`; since 2026-10-05 that file and
+> `FRISCO/HANDOFF-2026-10-04-reparar-despertador-del-bus.md` carry a `⚠️ SUPERADO` banner instead, because the first
+> was written the same day **its own §4 measurement was already committed** and reading it costs re-deriving a
+> finished piece of work. From here on this file carries the state, [`LOG.md`](./LOG.md) the history,
+> [`../05-tribunal/INDEX.md`](../05-tribunal/INDEX.md) the audits, [`../06-backlog/CHECKLIST.md`](../06-backlog/CHECKLIST.md)
+> the work and [`../03-adr/INDEX.md`](../03-adr/INDEX.md) the decisions. **A session paragraph is narrative, never an
+> instruction — §0 is the instruction.**
+>
 > **Session 73 in one paragraph — the audit the merge gate asked for, and what it caught.** The Director instructed
 > this session to merge PR #106 *after reviewing it*. The native review path could not take the accumulated candidate
 > (session 72 measured `lens_context_budget_exceeded`), so the branch was audited under `GOVERNANCE.md` §3's
@@ -31,41 +40,6 @@
 > its test and **B-119** were corrected again, and that correction is recorded rather than hidden. The ring's
 > end-to-end firing is still owed (B-114 / T6).
 >
-> **Session 72 in one paragraph — the live session can finally be woken (F7c).** The Director's report was that a
-> directed message or a broadcast never reached the session he was sitting in. Session 72 **measured** the two
-> candidate surfaces instead of assuming them: Pi's MCP runtime renders **no** notification (`notifications/message`
-> reaches `~/.pi/agent/mcp.log` and appears **zero** times in a session transcript), so F4's `claude/channel` shape
-> has **no Pi equivalent** — and Pi's **extension** surface does carry a message into the live session and
-> **starts a turn**, proved with two live probes against an external trigger while the session was mid-turn. On that
-> measurement, and on the Director's ratification, **ADR-0036** (`accepted`) opened a new backlog row **B-116** under
-> a new phase **F7c**: `channel-pi/`, a host-side extension that holds F4's **existing body-less doorbell** and injects
-> one **attributable, body-less ring** (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`,
-> `deliverAs: "followUp"`). It is a doorbell, not a second reader: no peer prose, no acknowledgement, **no send path
-> of its own** — pinned statically, the ring is the only `.sendMessage(` call site in its whole closure. Suite
-> **1947/1941/0/6**, `test:static` **120/120**, `%TEMP%` 0 → 0 from a clean build; the transport half was verified
-> **live** against the running daemon (a `client_cursors` row with `host: pi-host-doorbell`), and the adapter is
-> **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a real roster peer is
-> still owed (B-114 / T6)** — never declared. Two native-review measurements were taken: the **accumulated branch
-> candidate is un-reviewable** (`lens_context_budget_exceeded`, no authority created), and a narrow committed
-> candidate closed `approved` with **zero lenses** (`non_executable_only`) — a classification, not a review. Branch
-> `fix/solo-sesion-viva` **pushed** at the Director's explicit authorization, with a PR open.
->
-> **Session 71 in one paragraph — the bus now answers only from a live session (`solo-sesion-viva`).** The Director's
-> order: with a live session open that session answers, with none open nobody answers and the thread stays pending,
-> and **no woken (headless) turn may send anything, directly or indirectly**. Step 0 stopped the bleed (ladder `off`,
-> the Startup entry archived, both runner processes killed — killing only the `cmd` leaves the `node` orphaned).
-> Step 1 chose **capability over permission**: `SEND_PROOF_PROFILES` (`runner/constants.ts`) runs `wake` on `pi` as
-> `pi -p --no-extensions --tools read,grep,find,ls`, appended after the record's own `harness_args`; a level/harness
-> pair with no verified profile is **refused** (`profile_unavailable`) instead of started with a full toolset — so
-> `autopilot` and `wake` on `claude`/`codex`/`opencode` never start (**B-112**) — and the flags that could widen the
-> profile are refused. The daemon's half is **attribution, not accreditation**: `audit_log.client_id` now carries the
-> sender on every send row (it was hardcoded `null`, which is why the four 2026-10-04 replies could not be traced at
-> all); the accreditation gap is recorded as **B-113** so nobody re-derives it. Step 2 found the real cause of the
-> missing `conmuta_*` tools: an **unregistered `pi-mcp-adapter`** had written `"extensions": ["-builtin:mcp"]` into
-> `~/.pi/agent/settings.json`, disabling Pi's built-in MCP for every session while `pi mcp list` still connected.
-> Suite **1912/1906/0/6**, `test:static` **101/101**, `%TEMP%\conmuta-*` 0 → 0; independent verifier C1–C8
-> **PASS**. Commits on branch `fix/solo-sesion-viva`, **not pushed** — the push came in session 72, on the
-> Director's explicit authorization, together with `30b134d`, `4fea14d` and `57bd944`.
 >
 
 ---
@@ -88,21 +62,23 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee docs/08-sessions/HANDOFF.md (§0, §1, §3) y confirma Arena con una llamada real. F7c está entregado y commiteado
-(57bd944): channel-pi/ despierta la sesión viva con un timbre atribuible. Lo que falta es T6 —el anillo con un par
-real del roster (B-114)—, más B-112 y B-113. Sigue por §3 y no reabras nada de §6.
+Lee docs/08-sessions/HANDOFF.md (§0, §1, §3). El frente del bus está al día: **PR #106 y PR #107 están mergeados**
+(`925c10d` y `35ac1a6`), y la auditoría previa de #106 encontró un CRITICAL que se cerró antes del merge (`8e8d8b7`).
+Lo único que sigue debiendo es **T6** —el timbre con un par real del roster (B-114)—, más **dos decisiones de diseño
+tuyas**: B-117 (¿lista negra, o parseo verificado del argv?) y B-119 (¿verificar la entrega del timbre, o aceptar
+best-effort?). Sigue por §3 y no reabras nada de §6.
 ```
 
-### 0.1b If the machine was just powered on (session 70 ended with a shutdown)
+### 0.1b If the machine was just powered on
 
-The tree is committed and clean at `673151b` (`main` **12 commits ahead** of `origin/main`, **not pushed** — the
-push is the Director's decision, never taken). Nothing needs re-arming: the daemon home `~/.conmuta/`, the id-free
-user-level bus registration and the armed `frisco` binding all live on disk (ADR-0033), so a cold machine needs no
-setup — only §0.2's `git fetch`, `rm -rf dist`, rebuild and full test run. Read `git log --oneline -12` for the real
-base rather than trusting any SHA written here. **Engram is the fastest way in for a resumed session**: `mem_context`
-on project `connmuta` carries session 70's summary, the independent verification results and the RDD disposition,
-including two facts deliberately kept out of the repository (§5.2 explains why a meta-record must not get its own
-commit).
+Nothing needs re-arming: the daemon home `~/.conmuta/`, the id-free user-level bus registration and the
+**machine-wide armed F7c adapter** all live on disk (ADR-0033, and `~/.pi/agent/settings.json` for the adapter), so a
+cold start needs only §0.2's `git fetch`, rebuild and full test run.
+
+**Do not trust any SHA, count or push status written in this file.** This file is prose and the state moves; the line
+that used to sit here asserted the tree was `12 commits ahead` of `origin/main` and **not pushed**, and by session 73
+both halves were false. Read `git log --oneline -12` and `git status -sb` instead — which is what §0.2 row 1 already
+says, and this is the paragraph that kept contradicting it.
 
 ### 0.2 First commands (stop and report if any output disagrees)
 
@@ -187,6 +163,45 @@ commit).
 ---
 
 ## §2 — What earlier sessions did (context, not to redo)
+> **Sessions 72 and 71, in full.** Kept here rather than at the top of the file, because the top belongs to the
+> current session and **a narrative paragraph is not an instruction** — which is how a stale number written at the
+> top gets read as present state. Newest first.
+>
+> **Session 72 in one paragraph — the live session can finally be woken (F7c).** The Director's report was that a
+> directed message or a broadcast never reached the session he was sitting in. Session 72 **measured** the two
+> candidate surfaces instead of assuming them: Pi's MCP runtime renders **no** notification (`notifications/message`
+> reaches `~/.pi/agent/mcp.log` and appears **zero** times in a session transcript), so F4's `claude/channel` shape
+> has **no Pi equivalent** — and Pi's **extension** surface does carry a message into the live session and
+> **starts a turn**, proved with two live probes against an external trigger while the session was mid-turn. On that
+> measurement, and on the Director's ratification, **ADR-0036** (`accepted`) opened a new backlog row **B-116** under
+> a new phase **F7c**: `channel-pi/`, a host-side extension that holds F4's **existing body-less doorbell** and injects
+> one **attributable, body-less ring** (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`,
+> `deliverAs: "followUp"`). It is a doorbell, not a second reader: no peer prose, no acknowledgement, **no send path
+> of its own** — pinned statically, the ring is the only `.sendMessage(` call site in its whole closure. Suite
+> **1947/1941/0/6**, `test:static` **120/120**, `%TEMP%` 0 → 0 from a clean build; the transport half was verified
+> **live** against the running daemon (a `client_cursors` row with `host: pi-host-doorbell`), and the adapter is
+> **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a real roster peer is
+> still owed (B-114 / T6)** — never declared. Two native-review measurements were taken: the **accumulated branch
+> candidate is un-reviewable** (`lens_context_budget_exceeded`, no authority created), and a narrow committed
+> candidate closed `approved` with **zero lenses** (`non_executable_only`) — a classification, not a review. Branch
+> `fix/solo-sesion-viva` **pushed** at the Director's explicit authorization, with a PR open.
+>
+> **Session 71 in one paragraph — the bus now answers only from a live session (`solo-sesion-viva`).** The Director's
+> order: with a live session open that session answers, with none open nobody answers and the thread stays pending,
+> and **no woken (headless) turn may send anything, directly or indirectly**. Step 0 stopped the bleed (ladder `off`,
+> the Startup entry archived, both runner processes killed — killing only the `cmd` leaves the `node` orphaned).
+> Step 1 chose **capability over permission**: `SEND_PROOF_PROFILES` (`runner/constants.ts`) runs `wake` on `pi` as
+> `pi -p --no-extensions --tools read,grep,find,ls`, appended after the record's own `harness_args`; a level/harness
+> pair with no verified profile is **refused** (`profile_unavailable`) instead of started with a full toolset — so
+> `autopilot` and `wake` on `claude`/`codex`/`opencode` never start (**B-112**) — and the flags that could widen the
+> profile are refused. The daemon's half is **attribution, not accreditation**: `audit_log.client_id` now carries the
+> sender on every send row (it was hardcoded `null`, which is why the four 2026-10-04 replies could not be traced at
+> all); the accreditation gap is recorded as **B-113** so nobody re-derives it. Step 2 found the real cause of the
+> missing `conmuta_*` tools: an **unregistered `pi-mcp-adapter`** had written `"extensions": ["-builtin:mcp"]` into
+> `~/.pi/agent/settings.json`, disabling Pi's built-in MCP for every session while `pi mcp list` still connected.
+> Suite **1912/1906/0/6**, `test:static` **101/101**, `%TEMP%\conmuta-*` 0 → 0; independent verifier C1–C8
+> **PASS**. Commits on branch `fix/solo-sesion-viva`, **not pushed** — the push came in session 72, on the
+> Director's explicit authorization, together with `30b134d`, `4fea14d` and `57bd944`.
 
 1. **Session 70** closed **B-95 remainder** under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe `parseStoredEnvelope` in `src/daemon/serve/fetch.ts` skips corrupt/malformed `envelope_json` rows without throwing, allowing `lastRowSeq` to advance `cursor.next_update_id` past damaged rows so the client never stalls; review note R3-1 addressed in `doorbell.ts` (tightened `to` check) and R2-1 in `test/channel/main.test.ts` (drift comment removed); 14 test cases added in `fetch.test.ts` (RED before GREEN observed, non-vacuity proven by mutation); landed session 69's B-102 and B-99 commits. Then closed **B-97** by correcting its premise: the guard defect triggers through *any* link, and a Windows directory junction reproduces it without privileges (direct `exit 2` vs junction `exit 0`, zero bytes), so a genuinely RED-reproducing test now pins it. Then closed **B-31** with the registry's post-parse leak gate (`odd/tasks/b-31-registry-escaped-token.md`).
 2. **Session 69** completed the missing second blind review for B-102 (`jd-judge-a` returned 0 findings, closing `bus-v2-b102-residuals-001` APPROVED); and closed **B-99 completely** under ODD (fixed sleeps in `heartbeat.test.ts` converted to `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517` converted to positively observe live ticks via `daemon.lock`'s `heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; boot and hot-reload waits converted to condition polls).
@@ -215,9 +230,9 @@ commit).
    the `audit_log` `send` row carrying a **non-null `client_id`**. Until a peer is available it stays **owed**, never
    declared. Note the tree matters: this repository's own roster is `@kairo-agent` alone, so nothing can ring here —
    a tree with peers is where it must be shown.
-1. **The `frisco` despertador is OFF, and it must stay off.** Session 71 disabled it, removed the Startup entry and killed both processes, on the Director's order that the bus answer only from a live session. Re-arming is a Director decision and a deliberate act: `wake` no longer replies (it has no bus and no shell) and `autopilot` is refused, so `notify` is the only level that does anything useful. See the runbook's "A woken turn cannot send".
-2. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
-3. **No open row the harness can close alone.** What remains is either the Director's or a scheduled class:
+2. **The `frisco` despertador is OFF, and it must stay off.** Session 71 disabled it, removed the Startup entry and killed both processes, on the Director's order that the bus answer only from a live session. Re-arming is a Director decision and a deliberate act: `wake` no longer replies (it has no bus and no shell) and `autopilot` is refused, so `notify` is the only level that does anything useful. See the runbook's "A woken turn cannot send".
+3. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
+4. **No open row the harness can close alone.** What remains is either the Director's or a scheduled class:
 
    **3.1 — Director-only decisions.** **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
 
@@ -230,13 +245,20 @@ commit).
    - **Flakes.** `B-39` and `B-57` (wall-clock-sensitive daemon-lifecycle tests make a red CI leg not by itself evidence of a broken commit) and `B-91` (`test:wrong-room`). B-99 and B-96 already closed this class's worst members.
    - **Coverage that is skipped rather than failing.** `B-68`, `B-74(3)`, `B-75(3)` — fake-exec tests skipped on non-Windows hosts although they spawn nothing; `B-24` — no POSIX CI leg at all, so packaging and shebang/file-mode contracts cannot fail here (B-97's own premise lived in this gap).
 
-4. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
-5. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111, B-102, B-99, B-95, B-97 or B-31** — all are closed with evidence (§1).
+5. **Then F6** once B-11/B-12/B-16 are decided; **F7b** after F6.
+6. **Do not restart B-105, B-106, B-108, B-109, B-110, B-111, B-102, B-99, B-95, B-97 or B-31** — all are closed with evidence (§1).
 
 ---
 
 ## §4 — Facts that will bite you
 
+- **Falsify a delegated finding; never quote it.** The PR #106 audit's round 1 asserted that Pi's extension
+  `sendMessage` cannot throw. The writer believed it, rewrote `channel-pi/host.ts`, renamed a test that was *not*
+  vacuous, and that landed in `main` — before the next pass read the API layer that **does** throw
+  (`dist/core/extensions/loader.js:302-305`, `:113-115`) and found the round-1 claim wrong. Verifying the evidence a
+  reviewer cites proves the reviewer read *that*; it does not prove the claim. Try to **negate** it instead, and
+  check this repository's own record first: session 72 had already written the opposite down. The retraction is in
+  **B-119**, in the session-73 entry of `LOG.md`, and in a comment on the merged PR #106.
 - **`BindingsReconciler`'s shutdown latch has three checks for three windows, and none substitutes for another (B-102f).** `stopAll()` is terminal and once-per-process. (1) A `reconcile()` that *begins* after it returns unchanged. (2) A reconcile already *in flight* re-checks the latch at the top of each binding still to process (`break`) and again after `buildTransport` resolves (`continue`, discarding the transport, which owns no socket). (3) The poller factory receives an `abortController` signal that `stopAll()` aborts, so `startPoller` — whose whole loop body is skipped for an already-aborted signal — never prepares a statement against the closed ledger. The post-`createPoller` guard remains as the last line for a poller that was already running. Removing any one of the three re-opens a real window; the second and third were each proven necessary by mutation.
 - **`DaemonInstance` exposes `stop` but not `reconcile`** — the only reconcile callers are the boot sequence (`bootstrap.ts:242`) and the heartbeat tick (`:334`).
 - **`raceAgainstTimeout` is deliberately silent about which side won.** `stop()` observes the tick's settlement itself; do not "simplify" that away, and do not move the log into `raceAgainstTimeout` — it is a generic single-purpose module with no `runDir`, kept out of `bootstrap.ts` so the daemon bundle's audited timer inventory stays confined.
