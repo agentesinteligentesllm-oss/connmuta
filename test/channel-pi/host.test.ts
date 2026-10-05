@@ -100,12 +100,15 @@ test("a ring after the cooldown goes through", async () => {
 	assert.equal(sent.length, 2, "the cooldown must end, or the adapter would ring once per session");
 });
 
-test("a throw from the ring's own collaborator surfaces instead of being swallowed", async () => {
-	// What this pins, exactly: `createPiRinger` does not catch a throw from the messenger it was handed. It does
-	// NOT pin what the host does when a ring is not delivered, and the previous name implied it did. Pi's real
-	// `sendMessage` is a synchronous wrapper that hands a rejection to its own error surface and returns `void`,
-	// so it cannot throw and this fake cannot reach any state the shipped host can reach — the adapter's own
-	// module doc carries the measured mechanism and the filed decision.
+test("a host failure propagates instead of being swallowed, so the watcher reports it and retries", async () => {
+	// Restored name, and the reason is in the record: this pins a state the shipped host CAN reach. The host's
+	// extension API object calls `assertActive()` before delegating
+	// (`dist/core/extensions/loader.js:302-305`) and throws `Error(state.staleMessage)` once the runtime is stale
+	// (`:113-115`), so a ring attempted after a replacement, reload or shutdown throws synchronously — which is
+	// what `throwingPi` fabricates, and what session 72 measured live. An earlier correction in this PR renamed
+	// this test on the belief that the host cannot throw; that belief came from reading only the runtime layer
+	// beneath this one, and it was wrong. The half the host really does swallow is the *asynchronous* rejection,
+	// which is the design decision filed as B-119 and documented in the module.
 	const ring = createPiRinger({ pi: throwingPi() });
 
 	await assert.rejects(() => ring(notification()), /stale after session replacement or reload/);

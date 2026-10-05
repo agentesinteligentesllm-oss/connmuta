@@ -25,8 +25,11 @@
 > **WARNING** residual twice and independently — a record argument that consumes the next argv element and is placed
 > last swallows `--no-extensions`; both bounded it identically (`--tools` still holds, so no `bash`, no `conmuta_*`,
 > no send path) and both named the same limit of a deny-list as an instrument. Filed as **B-117–B-123**; the 400-line
-> `size:exception` and **DN-05 formally unsatisfied** are disclosed in the PR. **The merge is not done**: CI green on
-> `8e8d8b7` for both Node legs, and the ring's end-to-end firing is still owed (B-114 / T6).
+> `size:exception` and **DN-05 formally unsatisfied** are disclosed in the PR. **The merge was taken on 2026-10-05:
+> `MERGED` at 19:13:15Z as merge commit `925c10d`**, with CI green on both Node legs. The follow-up pass of the audit
+> then found one of round 1's findings **wrong** — the ring *does* throw on a stale context — so `channel-pi/host.ts`,
+> its test and **B-119** were corrected again, and that correction is recorded rather than hidden. The ring's
+> end-to-end firing is still owed (B-114 / T6).
 >
 > **Session 72 in one paragraph — the live session can finally be woken (F7c).** The Director's report was that a
 > directed message or a broadcast never reached the session he was sitting in. Session 72 **measured** the two
@@ -74,7 +77,7 @@
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
 | What is new? | **The live session can be woken: F7c shipped.** `channel-pi/` — a host-side Pi extension that holds the existing body-less doorbell and injects one **attributable, body-less ring** into the live session, which then fetches and answers. `ADR-0036` `accepted`, row **B-116**, phase **F7c**. It is **armed machine-wide** (`~/.pi/agent/settings.json` `extensions`). The `solo-sesion-viva` mode stands: `wake` on `pi` runs under a send-proof profile, `autopilot` and the other three harnesses are refused, `audit_log.client_id` names the sender. The `frisco` despertador is **off** and must stay off. |
 | What is next? | **The ring's end-to-end firing with a real roster peer — owed (B-114 / F7c T6).** It needs a peer whose owner is available; AGENTBUS has no private loopback, so a test message fans out to every agent in the group. Everything else on the bus front is done: **B-112** (send-proof profiles for `claude`/`codex`/`opencode`) and **B-113** (the daemon cannot accredit a human) are filed and bounded. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: **two delegates failed with zero tool calls in session 72** (`gentle-ai-explore`, `gentle-ai-worker`) — re-verify before relying on one, and expect to do the work inline. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: session 72's **two delegates that failed with zero tool calls** (`gentle-ai-explore`, `gentle-ai-worker`) were not a harness failure — they had no `model_profiles` entry, and session 73 fixed that (see the note below the table). Re-verify with one tiny probe before relying on a delegate, but do not assume the work must be done inline. |
 | What is the Director's to decide? | Whether the published branch gets merged (the repository's own rule is an audit before merge, and the Director declined all reviews in session 72); the Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). |
 | Where to read next | §0 first; then §1, §3, and §4. |
 
@@ -113,7 +116,7 @@ commit).
 | 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
 | 7 | `npm run build && npm test` | exit 0; **1948 tests, 1942 pass, 0 fail, 6 skip**; `test:static` **120/120** (session 73's counts; the clean-build step in row 2 is what makes them mean anything — see the note below the table) |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
-| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70. See §5 |
+| 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70, and working again in session 73 after the model-profile fix below. See §5 |
 
 > **Row 2's trap, corrected in session 73.** `rm -rf dist` deletes the artifact the F7c adapter is armed by:
 > `~/.pi/agent/settings.json` points `extensions` at this checkout's absolute `dist/channel-pi/main.js`. A session

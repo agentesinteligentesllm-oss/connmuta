@@ -15,19 +15,28 @@ import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "./constants.js";
  * normally, so the watcher commits its cursor and moves on; rejecting would instead look like a
  * delivery failure and make the watcher back off and re-read the same window.
  *
- * **What a host failure actually does — measured, not intended.** An earlier version of this paragraph said
- * that a genuine failure propagates. It does not, and the mechanism matters more than the wording, so here it
- * is: the host's extension-facing `sendMessage` is a **synchronous wrapper over an async method** that reports
- * the rejection to its own error surface — `sendMessage: (message, options) => { this.sendCustomMessage(message,
- * options).catch(err => runner.emitError({ event: "send_message", error: … })) }` — and its declared type is
- * `void` (`@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts:1221`). It cannot throw. So a ring
- * that was never delivered resolves here, this function records it as rung, and the shipped `DoorbellWatcher`
- * commits the doorbell cursor and does not re-read that window. **The message is not lost** — the doorbell
- * cursor is not the session's own client cursor, so the session still sees the row when it fetches — but the
- * *ring* is not retried and the live session is not told. Making delivery verifiable is a design decision with
- * its own ADR (verify the ring, or refuse to advance a cursor for an unverifiable one), so it is filed rather
- * than improvised here. What this function still guarantees is narrower and exact: it does not catch a throw
- * from the collaborator it was handed.
+ * **What a host failure actually does — two layers, measured, and an earlier note in this file got it wrong.**
+ * The failure story has two halves, and they behave oppositely:
+ *
+ *  - **A stale context THROWS.** The host hands the extension an API object whose `sendMessage` calls
+ *    `assertActive()` first (`@earendil-works/pi-coding-agent/dist/core/extensions/loader.js:302-305`), and
+ *    `assertActive` throws `Error(state.staleMessage)` once the runtime was replaced, reloaded or shut down
+ *    (`:113-115`). A call in that state throws **synchronously**, and that is the half this function must not
+ *    swallow: the throw propagates, the shipped `DoorbellWatcher` records `deliver_failed`, backs off, and does
+ *    **not** commit the cursor — so the ring IS retried. Session 72 measured this: *“a call after the session
+ *    ended throws a stale-runtime error that would crash an unguarded watcher.”*
+ *  - **A live session's failed delivery is swallowed.** One layer down, the runtime binds
+ *    `sendMessage: (message, options) => { this.sendCustomMessage(message, options).catch(err =>
+ *    runner.emitError({ event: "send_message", … })) }`, and the declared type is `void`. A rejection from there is
+ *    reported to the host's own error surface and never reaches this function, so the ring resolves, the watcher
+ *    commits the cursor, and that window is not re-read. The *message* is not lost — the doorbell cursor is not
+ *    the session's own client cursor, so the session still sees the row when it fetches — but the ring is not
+ *    retried and the session is not told. Making that half verifiable is the design decision filed as its own row.
+ *
+ * The PR #106 audit read only the lower layer, concluded the API “cannot throw”, and the writer corrected this
+ * file on that report; the follow-up audit read the upper layer and found the correction itself wrong. What
+ * survives is the two-case statement above. The lesson is in the record, not just here: a delegated finding has to
+ * be falsified, not merely quoted — the repo's own session-72 note already said the call throws.
  */
 
 /**
@@ -64,9 +73,9 @@ export function createPiRinger(deps: PiRingerDeps): (notification: ChannelNotifi
 			{ customType: PI_DOORBELL_CUSTOM_TYPE, content: notification.content, display: true },
 			{ triggerTurn: true, deliverAs: "followUp" },
 		);
-		// Only after the call returned: a throw above is a non-delivery, and a non-delivery must not start the
-		// next ring's cooldown. Note what this guard actually covers: the real host cannot throw (see the module
-		// doc), so it protects against an injected collaborator, not against a live host failing to deliver.
+		// Only after the call returned: a stale context throws from that call (see the module doc), and a throw is a
+		// non-delivery that must not start the next ring's cooldown. The host's *asynchronous* failures are the other
+		// half of that doc — they never reach this guard because they never reach this call at all.
 		lastRingAt = at;
 	};
 }
