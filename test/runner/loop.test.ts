@@ -383,8 +383,16 @@ test("loop: a `wake` turn with the read-only profile cannot have been given a sh
 		assert.equal(await loop.tick(new AbortController().signal), "woke");
 		const argv = fix.turns[0].spec.argv;
 		assert.ok(argv.includes("--no-extensions"), "no extension surface means no bus tools");
-		assert.ok(argv.includes("--tools"));
-		assert.ok(!argv.includes("bash"), "the profile must not carry the shell tool");
+		// The tool list is ONE argv element (`--tools read,grep,find,ls`), so `!argv.includes("bash")` alone is
+		// satisfied by `read,grep,find,ls,bash`: it looks for a whole element, never for a tool. This test's
+		// name promises that the turn "cannot have been given a shell", so it has to read the value Pi would
+		// actually apply. Found by the independent verification of PR #106 on 2026-10-05.
+		assert.deepEqual(
+			argv.slice(-4, -1),
+			["--no-extensions", "--tools", "read,grep,find,ls"],
+			"the send-proof profile must be the last thing before the prompt, with the read-only tool list",
+		);
+		assert.ok(!argv.some((arg) => arg.split(",").includes("bash")), "the profile must not carry the shell tool");
 	} finally {
 		await withFixture(fix, async () => {});
 	}

@@ -137,6 +137,21 @@ test("harness: the send-proof profile is appended last, after the record's own a
 	}
 });
 
+test("harness: the argv barrier `--` is refused, because it would make the appended profile positional", () => {
+	// Found independently by both judgment-day judges of PR #106's audit on 2026-10-05 (JD-A-001, JD-B-F1).
+	// `--` is not a flag that widens the profile: it is the option terminator, so enumerating widening flags
+	// misses it entirely. Pi's parser stops flag parsing at the first `--` and turns every later token into a
+	// positional message (`@earendil-works/pi-coding-agent/dist/cli/args.js:23-32`), so
+	// `--no-extensions` and `--tools read,grep,find,ls` would arrive as prompt text, the profile would never
+	// apply, and the turn would start under Pi's default tool set — `read`, `bash`, `edit`, `write` — with
+	// extensions loaded, the built-in MCP one included. That is the 2026-10-04 path exactly: `bash`, then the
+	// daemon run-file secret, then the IPC send.
+	assert.deepEqual(
+		resolveHarnessSpec(entry({ harness: "pi", level: "wake", harness_args: ["--"] }), PROMPT),
+		{ kind: "refused", reason: "arguments_refused" },
+	);
+});
+
 test("harness: a record cannot widen or remove the send-proof profile with its own arguments", () => {
 	for (const flag of [
 		"--tools",
@@ -153,6 +168,7 @@ test("harness: a record cannot widen or remove the send-proof profile with its o
 		"-e",
 		"--tools=bash",
 		"-tbash",
+		"--",
 	]) {
 		assert.deepEqual(
 			resolveHarnessSpec(entry({ harness: "pi", level: "wake", harness_args: [flag] }), PROMPT),

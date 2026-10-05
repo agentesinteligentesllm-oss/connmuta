@@ -70,8 +70,9 @@ export const HARNESS_DEFAULT_ARGS: Readonly<Record<HarnessName, readonly string[
 /** Arguments refused outright in a ladder record's `harness_args`, whatever executable they would reach:
  * these are the shell and interpreter escape hatch that would defeat R2's closed-executable rule, and — added
  * 2026-10-05 — the tool-exposure flags that would widen or remove the send-proof profile `runner/harness.ts`
- * appends after them. `-e`/`--extension` loads arbitrary extension code into the turn, an interpreter-class
- * escape. */
+ * appends after them. The last entry is neither: `--` is the option terminator, and it is refused because
+ * everything after it becomes positional. `-e`/`--extension` loads arbitrary extension code into the turn, an
+ * interpreter-class escape. */
 export const REFUSED_ARGUMENTS = [
   "-c",
   "--command",
@@ -92,6 +93,15 @@ export const REFUSED_ARGUMENTS = [
   "-ne",
   "--extension",
   "-e",
+  // The option terminator, and the one entry here that is not a flag at all. Refusing it is what keeps the
+  // profile's protection POSITIONAL rather than conventional: the harness appends the profile last, but a
+  // parser that stops flag parsing at `--` makes every later token a positional, so the profile would arrive
+  // as prompt text and never apply — restoring the full tool set the profile exists to remove. Pi's parser
+  // breaks on the first `--` (`@earendil-works/pi-coding-agent/dist/cli/args.js:23-32`); that is the only such
+  // break in it, and it is reachable through `ladder set --arg=--` and through hand-editing the ladder file,
+  // both of which this product documents as legitimate. Found independently by both judges of PR #106's audit
+  // (2026-10-05, JD-A-001 / JD-B-F1) after the earlier judges of the same phase found the `--flag=value` gap.
+  "--",
 ] as const;
 
 /**
