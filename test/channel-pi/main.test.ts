@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import type { DaemonLink, DoorbellResponse } from "../../channel/daemon-link.js";
 import { createConmutaDoorbellRegistration, type PiExtensionHost, type PiHostContext } from "../../channel-pi/main.js";
+import { PI_INTERACTIVE_MODE } from "../../channel-pi/constants.js";
 import type { BindingResult } from "../../src/client/binding.js";
 import { EXIT_UNBOUND_PROJECT, PROJECT_FILE_SCHEMA_VERSION } from "../../src/shared/constants.js";
 
@@ -37,7 +38,8 @@ function fakeHost(): { host: PiExtensionHost; registered: Registered[]; notes: s
 	return { host, registered, notes };
 }
 
-const ctxWithNotes = (notes: string[]): PiHostContext => ({
+const ctxWithNotes = (notes: string[], mode: PiHostContext["mode"] = PI_INTERACTIVE_MODE): PiHostContext => ({
+	mode,
 	ui: { notify: (message) => notes.push(message) },
 });
 
@@ -141,6 +143,41 @@ test("a bound session puts exactly one doorbell read in flight, and says nothing
 
 	assert.equal(notes.length, 0, "a healthy session must not warn");
 	assert.equal(polls[0].aborted, false);
+});
+
+// B-124: a harness child is `pi --mode rpc`, and ringing it starts an automatic turn before the parent's
+// task, whose prompt is then rejected with "Agent is already processing". The adapter arms only in an
+// interactive session, so these modes are a correct no-op (and must stay silent — declining is not a fault).
+for (const mode of ["rpc", "json", "print"] as const) {
+	test(`a ${mode} session arms no watcher, mints no link and says nothing (B-124)`, async () => {
+		const { host, registered, notes } = fakeHost();
+		let linkCalls = 0;
+		const { link, polls } = pendingLink();
+		createConmutaDoorbellRegistration(host, {
+			resolveBinding: () => BOUND,
+			createLink: () => {
+				linkCalls += 1;
+				return link;
+			},
+		});
+
+		await handlerFor(registered, "session_start")({ reason: "startup" }, ctxWithNotes(notes, mode));
+
+		assert.equal(linkCalls, 0, "a programmatic session must not mint a daemon session");
+		assert.equal(polls.length, 0, "a programmatic session must not hold the doorbell");
+		assert.equal(notes.length, 0, "declining to arm is a correct no-op, not a failure to report");
+	});
+}
+
+test("an interactive session still arms: the gate removes the programmatic case, not the feature", async () => {
+	const { host, registered, notes } = fakeHost();
+	const { link, polls } = pendingLink();
+	createConmutaDoorbellRegistration(host, { resolveBinding: () => BOUND, createLink: () => link });
+
+	await handlerFor(registered, "session_start")({ reason: "startup" }, ctxWithNotes(notes, PI_INTERACTIVE_MODE));
+	await until(() => polls.length === 1, "the first doorbell read");
+
+	assert.equal(notes.length, 0, "the ring is armed and healthy");
 });
 
 test("a second session_start aborts the loop the first one started, so reloads leave one watcher", async () => {

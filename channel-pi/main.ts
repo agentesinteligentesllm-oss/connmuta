@@ -3,7 +3,7 @@ import { createDaemonLink, type DaemonLink } from "../channel/daemon-link.js";
 import { resolveProjectBinding, type BindingRefusal, type BindingResult } from "../src/client/binding.js";
 import type { SessionIdentity } from "../src/client/session-exchange.js";
 import { computeRosterHash } from "../src/shared/roster-hash.js";
-import { PI_DOORBELL_HOST_LABEL } from "./constants.js";
+import { PI_DOORBELL_HOST_LABEL, PI_INTERACTIVE_MODE } from "./constants.js";
 import { createPiRinger, type PiMessenger } from "./host.js";
 
 /**
@@ -38,6 +38,12 @@ export interface PiHostContext {
 	 * an adapter that assumed a UI would throw in exactly the modes where nobody would see the failure.
 	 */
 	readonly ui?: { notify(message: string, type?: "info" | "warning" | "error"): void } | undefined;
+	/**
+	 * The host's current run mode. The adapter arms its watcher only for {@link PI_INTERACTIVE_MODE}; every
+	 * other mode is a programmatic session that must not be rung (B-124). Optional in the type because this
+	 * repository declares the host structurally, and a host that omits it fails closed to "do not ring".
+	 */
+	readonly mode?: "tui" | "rpc" | "json" | "print" | undefined;
 }
 
 /**
@@ -95,6 +101,14 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 	};
 
 	pi.on("session_start", async (_event, ctx) => {
+		// Only an interactive session is rung (B-124, ADR-0036 amendment 2026-10-06). A harness child runs as
+		// `pi --mode rpc`; ringing it starts an automatic turn before the caller's own task, whose prompt is then
+		// rejected with "Agent is already processing". Declining is a correct no-op, not a failure to report: the
+		// adapter was never meant to serve this session.
+		if (ctx.mode !== PI_INTERACTIVE_MODE) {
+			return;
+		}
+
 		// A reload or a resumed session can start again while an older loop is still winding down. The
 		// abort is what stops it; the new controller owns the loop that follows.
 		controller?.abort();

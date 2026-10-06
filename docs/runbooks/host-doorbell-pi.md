@@ -47,6 +47,14 @@ is deliberate — an adapter that stayed silent when it could not bind would be 
 that bound and found nothing — so arm machine-wide only if that single line in unrelated trees is
 acceptable. Arming per session with `--extension` avoids it entirely.
 
+**A programmatic session is never rung.** The adapter arms only in an interactive session
+(`ctx.mode === "tui"`, [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md) amendment of 2026-10-06). A
+child a harness starts as `pi --mode rpc`, a `--mode json` or `--print` run, and any other non-interactive
+session load the extension but arm nothing, mint no daemon session and print nothing. That is what keeps a
+machine-wide arming from injecting an automatic turn into a subagent — which would make the parent's task
+prompt be rejected with *"Agent is already processing…"* — and it is the point of the adapter: the doorbell
+wakes the session **you are sitting in**, and a session no one is sitting in is not woken.
+
 ## Step 2: verify it is loaded and ringing
 
 Start a session inside a bound tree. The adapter arms itself at `session_start` and says so through the

@@ -34,3 +34,15 @@ export const PI_DOORBELL_CUSTOM_TYPE = "conmuta-doorbell";
  * reply, so the next message is never silently folded into an exchange the human has moved past.
  */
 export const PI_RING_COOLDOWN_MS = 15_000;
+
+/**
+ * The one host run mode the adapter serves.
+ *
+ * Pi reports the current mode on the session context. `"tui"` is the interactive session a person is
+ * sitting in — the session the ring exists to wake. Every other mode is programmatic: `"rpc"` is what a
+ * harness child runs as, and `"json"`/`"print"` are non-interactive runs. Ringing a programmatic session
+ * injects an automatic turn before the caller's own task, and the caller's prompt is then rejected with
+ * *"Agent is already processing"* (B-124, ADR-0036 amendment 2026-10-06), so the watcher is armed only for
+ * this mode. The value is the host's own vocabulary, mirrored here so the gate has one named source.
+ */
+export const PI_INTERACTIVE_MODE = "tui";
