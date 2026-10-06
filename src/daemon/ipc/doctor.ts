@@ -352,6 +352,12 @@ async function runDmProbe(managed: ManagedBinding, deps: DoctorHandlerDeps, now:
 	const roomGuard = managed.roomGuard;
 
 	const peers = dmProbePeers(managed.binding);
+	if (peers.length === 0) {
+		// Nothing to probe: a binding whose roster holds no peer besides its own bot is legitimate, but "pass"
+		// would claim connectivity that was never tested and an `ok` audit row would record a send that never
+		// happened. Warn, and follow the unwired-room-guard branch's own rule: no attempted send, no row.
+		return { id, status: "warn", detail: "no roster peer besides this bot; nothing was probed" };
+	}
 	const ts = now().toISOString();
 	const auditBase = {
 		ts,
@@ -383,11 +389,12 @@ async function runDmProbe(managed: ManagedBinding, deps: DoctorHandlerDeps, now:
 	if (outcome === "rejected") {
 		return { id, status: "fail", detail: `probe failed for all ${peers.length} roster peer(s): ${failures.join("; ")}` };
 	}
-	return {
-		id,
-		status: "pass",
-		detail: `probe delivered to ${delivered}/${peers.length} roster peer(s)${failures.length > 0 ? ` (failed: ${failures.join("; ")})` : ""}`,
-	};
+	if (outcome === "degraded") {
+		// The audit row already says "degraded"; the finding an operator reads has to agree with it, or a
+		// partially reachable roster reads as healthy (B-85 (1)).
+		return { id, status: "warn", detail: `probe delivered to ${delivered}/${peers.length} roster peer(s) (failed: ${failures.join("; ")})` };
+	}
+	return { id, status: "pass", detail: `probe delivered to ${delivered}/${peers.length} roster peer(s)` };
 }
 
 // ---------------------------------------------------------------------------
