@@ -34,3 +34,25 @@ export const PI_DOORBELL_CUSTOM_TYPE = "conmuta-doorbell";
  * reply, so the next message is never silently folded into an exchange the human has moved past.
  */
 export const PI_RING_COOLDOWN_MS = 15_000;
+
+/**
+ * The interactive terminal mode.
+ *
+ * Pi reports the current run mode on the session context. `"tui"` is the terminal session a person is
+ * sitting in, and one of the two host shapes the ring serves — the other is the interactive RPC host,
+ * identified by {@link PI_INTERACTIVE_HOST_ENV}. The value is the host's own vocabulary, mirrored here so
+ * the gate has one named source.
+ */
+export const PI_INTERACTIVE_MODE = "tui";
+
+/**
+ * The environment marker a Pi desktop host sets on the interactive `pi --mode rpc` process it spawns.
+ *
+ * `"rpc"` alone is ambiguous: it is both the harness's headless subagent child and the desktop host a
+ * person is sitting in. The host distinguishes them with this marker, and the harness runner strips it
+ * from every subagent child's environment (`agents-runner.ts` → `withoutInteractiveHost`), so the marker
+ * is present only on the attended process. Reading it is a string contract with the host ecosystem, not a
+ * dependency on the host's package: it mirrors the host's own `isInteractiveMode`. If a host renames it,
+ * the adapter declines to arm (fail-safe) rather than ring a session it cannot classify.
+ */
+export const PI_INTERACTIVE_HOST_ENV = "GENTLE_SHELL_INTERACTIVE_HOST";
