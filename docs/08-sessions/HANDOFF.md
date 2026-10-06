@@ -66,7 +66,7 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee desde la raíz de este repositorio `docs/08-sessions/HANDOFF.md` (§0, §1, §3). Están mergeadas la revisión y la corrección de B-85 unidad (1) y de B-127: `fix/b-85-dm-probe-honest-status` y `fix/b-127-channel-pi-lifecycle`, ambas con review nativo aprobado y reconocido.
+Lee desde la raíz de este repositorio `docs/08-sessions/HANDOFF.md` (§0, §1, §3). Están revisadas y reconocidas (review nativo aprobado, pendientes de tu merge) la corrección de B-85 unidad (1) en `fix/b-85-dm-probe-honest-status` (**PR #111**) y la de B-127 en `fix/b-127-channel-pi-lifecycle` (**PR #112**).
 Lo que queda: **T6 sigue debiendo** —el timbre con un par real del roster (B-114), que necesita a un compañero y no se puede solo—, y **siete filas quedan a tu decisión**: B-112, B-113, B-117, B-119, B-125, B-126 y B-128 (las dos últimas, informativas).
 Sigue §3 y no reabras §6; y si un run de CI sale rojo, mirá `gh run view <run-id> --json jobs` y buscá `cancelled` antes de concluir (§4): este repositorio está teniendo jobs que se quedan sin runner.
 ```
