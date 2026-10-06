@@ -217,20 +217,61 @@ test("the interactive-host predicate is exactly tui or rpc-with-marker", () => {
 	assert.equal(isInteractiveHost(undefined, { [PI_INTERACTIVE_HOST_ENV]: "1" }), false);
 });
 
-test("a second session_start aborts the loop the first one started, so reloads leave one watcher", async () => {
+test("a second session_start stops the first loop and releases the link it held (B-127)", async () => {
 	const { host, registered, notes } = fakeHost();
-	const { link, polls } = pendingLink();
-	createConmutaDoorbellRegistration(host, { resolveBinding: () => BOUND, createLink: () => link });
+	const first = pendingLink();
+	const second = pendingLink();
+	let created = 0;
+	createConmutaDoorbellRegistration(host, {
+		resolveBinding: () => BOUND,
+		createLink: () => [first.link, second.link][created++]!,
+	});
 
 	const start = handlerFor(registered, "session_start");
 	const ctx = ctxWithNotes(notes);
 	await start({ reason: "startup" }, ctx);
-	await until(() => polls.length === 1, "the first doorbell read");
+	await until(() => first.polls.length === 1, "the first doorbell read");
 	await start({ reason: "reload" }, ctx);
-	await until(() => polls.length === 2, "the second doorbell read");
+	await until(() => second.polls.length === 1, "the second doorbell read");
 
-	assert.equal(polls[0].aborted, true, "the superseded loop must be stopped");
-	assert.equal(polls[1].aborted, false, "the current loop must keep polling");
+	assert.equal(first.polls[0]!.aborted, true, "the superseded loop must be stopped");
+	assert.equal(second.polls[0]!.aborted, false, "the current loop must keep polling");
+	assert.equal(first.closes(), 1, "the superseded link still held a daemon session slot; a reload must release it");
+	assert.equal(second.closes(), 0, "the link the reload created is the live one and must stay open");
+
+	await handlerFor(registered, "session_shutdown")({ reason: "quit" }, ctx);
+	assert.equal(second.closes(), 1, "shutdown closes the current link");
+	assert.equal(first.closes(), 1, "and the superseded link is never closed twice");
+});
+
+test("a persistent failure is said once through the UI, not once per retry (B-127, the module doc's own promise)", async (t) => {
+	const { host, registered, notes } = fakeHost();
+	const failing: DaemonLink = {
+		readDoorbell: async () => {
+			throw new Error("no live daemon run file");
+		},
+		commitCursor: async () => 0,
+		close: async () => {},
+	};
+	createConmutaDoorbellRegistration(host, {
+		resolveBinding: () => BOUND,
+		createLink: () => failing,
+		// Each sleep yields a macrotask, which is what lets this test's own turns run between ticks.
+		sleep: () => new Promise((resolve) => setImmediate(resolve)),
+	});
+
+	const ctx = ctxWithNotes(notes);
+	// Registered before the start so a failing assertion cannot leave the loop spinning and hold the runner open.
+	t.after(async () => {
+		await handlerFor(registered, "session_shutdown")({ reason: "quit" }, ctx);
+	});
+
+	await handlerFor(registered, "session_start")({ reason: "startup" }, ctx);
+	await until(() => notes.length >= 1, "the first failure warning");
+	for (let turn = 0; turn < 50; turn += 1) {
+		await new Promise((resolve) => setImmediate(resolve));
+	}
+	assert.equal(notes.length, 1, `each condition is said once per session, got ${notes.length}: ${notes[0]}`);
 });
 
 test("shutdown closes the link once, and only that link", async () => {
