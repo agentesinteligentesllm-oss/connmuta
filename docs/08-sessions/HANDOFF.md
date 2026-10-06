@@ -5,11 +5,12 @@
 > most recent session narratives verbatim as context, moved down from the top so that the top belongs to the current
 > session. The full history is in [`LOG.md`](./LOG.md); decisions live in the ADRs and the tribunal index, never here.
 >
-> **Last rewritten: session 75** (2026-10-06 local), **after B-85 unit (1) and all of B-127 were fixed, natively
-> reviewed and acknowledged (`review-1ee5438a4b675bd7`, `review-93f6998584b08998`), the session-74 documentation
-> close was committed and pushed as `8012434`, and the review store's own lesson was applied by writing down the
-> findings of B-127's review as `B-128`.** Every § carries session 75's state unless a line says otherwise; §2 keeps
-> the earlier sessions as context.
+> **Last rewritten: session 76** (2026-10-06 local), **after the two PRs the previous handoff had left to the Director
+> both landed (#111 → `f71d0e9`, and #112 → `bd0688d`, whose one-line documentation conflict had been hiding the fact
+> that it had never had a single CI run), `dist` was rebuilt from the new `main` so the armed F7c adapter carries the
+> B-127 fix, B-112's three `null` profiles were measured instead of assumed, and ADR-0037/ADR-0038 were written for
+> B-117 and B-119.** Every § carries session 76's state unless a line says otherwise; §2 keeps the two earlier
+> sessions as context.
 >
 > **This file is the entry point for the bus front, and nothing outside the repository is.** That front used to be
 > started from two files that live **outside this repository** — `HANDOFF-2026-10-05-bus-sesion-dedicada.md` and
@@ -21,30 +22,24 @@
 > [`../06-backlog/CHECKLIST.md`](../06-backlog/CHECKLIST.md) the work and [`../03-adr/INDEX.md`](../03-adr/INDEX.md)
 > the decisions. **A session paragraph is narrative, never an instruction — §0 is the instruction.**
 >
-> **Session 75 in one paragraph — the doctor told the truth, and B-126's pointer was measured dead.** The preflight
-> stopped on a **dirty tree**: session 74's *documentation* close (this handoff rewritten to session 74, its `LOG.md`
-> narrative and the B-126 row) had been produced by a bounded documentation writer and never committed, so `HEAD`
-> still carried the session-73 handoff; it was committed as **`8012434`** after `test:static` **120/120** and pushed.
-> Then unit (1) of **B-85** was fixed under ODD: `runDmProbe` (`src/daemon/ipc/doctor.ts`) returned `status: "pass"`
-> for a probe that reached only *some* roster peers, and for a roster with no peer besides the bot at all — where it
-> also wrote an `ok` `DOCTOR_PROBE` row although nothing was sent. The status now follows the audit outcome
-> (`degraded` → `warn`; a zero-peer roster → `warn` with an explicit detail and **no** row, the
-> unwired-room-guard branch's own rule), RED before GREEN, work unit **`9577f23`** on
-> **`fix/b-85-dm-probe-honest-status`**, natively reviewed and **approved** (lineage `review-1ee5438a4b675bd7`,
-> tier medium, one lens, authority burned); B-85 (2)–(4) stay open. **B-126's premise was wrong and is now
-> measured**: acknowledging a review *deletes its transaction directory*, so the prose that row said "lives in that
-> lineage" is gone the moment the lineage is acknowledged; a fresh **independent** review of `channel-pi/` was run
-> instead, and it found two *different* defects — re-verified in the code by mechanism, not taken on the delegate's
-> word — filed as **B-127** (a reload leaks a daemon session slot until the pool is full and the daemon must
-> restart; every failed tick warns through the UI), and **fixed in the same session** (`04706bd`, `86d1a5b` on
-> `fix/b-127-channel-pi-lifecycle`, RED before GREEN for both). Its own review closed **approved** (lineage
-> `review-93f6998584b08998`): the provider's refuter batch ran and **refuted** the single CRITICAL, and the three
-> remaining findings are informational and filed as **B-128** — recorded at capture time, because that is the one
-> thing B-126 proved cannot be recovered afterwards. **B-125** was given its exact cross-package patch and the two
-> host facts that make it safe. **T6 / B-114 is still owed**: this tree's roster is `@kairo-agent` alone, so nothing
-> here can ring.
->
->
+> **Session 76 in one paragraph — the two open PRs landed, and the second one was invisible.** The preflight
+> disagreed with §0.2 in exactly one place, row 7's expected counts, which are session 75's *branch* counts: `main`
+> measures **1957/1951/0/6** and `test:static` 120/120. Arena was unreachable by two real probes, the subagents were
+> healthy (and the delegate's claim was re-verified rather than quoted), and the `frisco` alarm was confirmed still
+> off. #111 was merge-ready and became **`f71d0e9`**. #112 was not: it was **conflicting**, and — the part that
+> mattered — it had **never had a single CI run**, because GitHub cannot build the merge commit of a conflicting PR,
+> so `refs/pull/112/merge` did not exist and the `pull_request` workflow was never created. `gh pr checks` answered
+> *"no checks reported"*, which reads like a clean bill rather than a warning. The conflict was one documentation
+> line — the B-127 row, because `main` edited it at 03:39:18Z and the PR opened at 03:39:23Z — and it was resolved by
+> keeping both sides, proving the result with two diffs. The moment it was pushed the merge ref appeared and CI
+> started on its own; both legs pass. #112 became **`bd0688d`**, and `dist` was rebuilt from the new `main` so the
+> armed F7c adapter finally carries the fix that stops it leaking a daemon session slot per reload. Then **B-112**
+> stopped being an unexamined `null`: `codex` was probed live and **fails** the bar (`exec_command`, `web__run` and
+> `collaboration.send_message` all survive), `opencode` has no flag-level restriction to declare at all, and
+> `claude` has the right flags but cannot authenticate here — so all three stay `null`, on a measured reason each.
+> **ADR-0037** and **ADR-0038** close the two design rows that required an ADR before any code, both `proposed`
+> pending the Director. Landed as **PR #113** (`57a0919`). **T6 / B-114 is still owed**: this roster is
+> `@kairo-agent` alone.
 
 ---
 
@@ -53,10 +48,10 @@
 | Question | Answer |
 |---|---|
 | Where do F1–F5 stand? | **All archived.** Unchanged since session 55. |
-| What is new? | **B-85 unit (1) and all of B-127 are fixed, natively reviewed and acknowledged (session 75)**, and session 74's documentation close was committed and pushed as `8012434`. A fresh independent review of `channel-pi/` — run because B-126's pointer turned out to be **dead** — found two verified defects (B-127), which this session then fixed: a reload now releases the daemon session slot it held, and a persistent failure is said **once** instead of every 5 s. B-127's own review ran its refuter batch (it refuted the one CRITICAL) and its three informational findings are filed as **B-128**. **B-125** carries its exact cross-package patch. The `frisco` despertador is **off** and must stay off. |
-| What is next? | **The Director's merge of the two open PRs** — `fix/b-85-dm-probe-honest-status` and `fix/b-127-channel-pi-lifecycle` — and then a decision on the Director-only rows. No engineering row is closable here without him: **T6 / B-114** still needs a peer (this tree's roster is `@kairo-agent` **alone**, measured with `conmuta_status`), **B-125** needs a `gentle-pi` decision (the exact patch is one hop away), and **B-126**/**B-128** are informational. The B-85 remainder (2)–(4), **B-112**, **B-113**, **B-117** and **B-119** are the Director's too. |
-| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: session 72's **two delegates that failed with zero tool calls** (`gentle-ai-explore`, `gentle-ai-worker`) were not a harness failure — they had no `model_profiles` entry, and session 73 fixed that (see the note below the table). Re-verify with one tiny probe before relying on a delegate, but do not assume the work must be done inline. |
-| What is the Director's to decide? | **B-117** and **B-119** (each needs its ADR before code); **B-112** (send-proof profiles for `claude`/`codex`/`opencode`) and **B-113** (the daemon cannot accredit a human); **B-125** (the `gentle-pi` `--no-extensions` proposal for children) and **B-126** (the two informational findings of PR #110's native review); the Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). The merge of #106, #107, #108 and #110 is **done**, and the reviews were not declined this time: session 73 ran the substitute audit `GOVERNANCE.md` §3 documents for an unreachable Arena (§3 item 0), and session 74 ran the native review itself once the lens was re-routed to DeepSeek. |
+| What is new? | **The merge gate is empty and the handoff's own last two items are done (session 76).** `#111` and `#112` are merged (`f71d0e9`, `bd0688d`), and `dist` was rebuilt from the new `main` so the armed F7c adapter finally carries the B-127 fix. **B-112 is no longer an unexamined `null`**: `codex` was probed live and fails the bar, `opencode` has no flag-level restriction to declare, and `claude` has the right flags but cannot authenticate here — all three stay `null`, on a measured reason each (`odd/tasks/evidence/b-112-harness-send-proof-verification.md`). **ADR-0037** and **ADR-0038** are written for B-117 and B-119, both `proposed`. The `frisco` despertador is **off** and must stay off. |
+| What is next? | **Confirmations, not engineering.** ADR-0037 and ADR-0038 are `proposed` and each needs one word from the Director before any code moves; **B-112**'s only remainder is `claude`'s live probe, blocked on its expired OAuth session and nothing else. **T6 / B-114** still needs a roster peer (this tree's roster is `@kairo-agent` **alone**, measured with `conmuta_status`), and **B-125** needs a `gentle-pi` decision. The B-85 remainder (2)–(4), **B-113**, **B-126** and **B-128** are the Director's too. |
+| What must be settled before any work? | §0.3: autonomy, memory, and **Arena** (unreachable at every session's start since 55; confirm with a real probe). Subagent health: session 72's **two delegates that failed with zero tool calls** (`gentle-ai-explore`, `gentle-ai-worker`) were not a harness failure — they had no `model_profiles` entry, and session 73 fixed that (see the note below the table). Re-verify with one tiny probe before relying on a delegate, but do not assume the work must be done inline. Session 76 confirmed both delegates healthy on the first try. |
+| What is the Director's to decide? | **ADR-0037 and ADR-0038 — one confirmation each, and they are now the only thing standing between B-117/B-119 and code** (both rows are `in-debate`: written, awaiting confirmation). **B-112**'s remainder (`claude`'s live probe) and **B-113** (the daemon cannot accredit a human); **B-125** (the `gentle-pi` `--no-extensions` proposal for children) and the informational **B-126**/**B-128**; the Engram housekeeping classification; **B-11/B-12/B-16** for F6; the B-101 relocation; and **which backlog class to schedule next** (§3.3). Nothing is on the merge gate: #106–#113 are all merged. |
 | Where to read next | §0 first; then §1, §3, and §4. |
 
 ---
@@ -66,9 +61,10 @@
 ### 0.1 Prompt to paste
 
 ```text
-Lee desde la raíz de este repositorio `docs/08-sessions/HANDOFF.md` (§0, §1, §3). Están revisadas y reconocidas (review nativo aprobado, pendientes de tu merge) la corrección de B-85 unidad (1) en `fix/b-85-dm-probe-honest-status` (**PR #111**) y la de B-127 en `fix/b-127-channel-pi-lifecycle` (**PR #112**).
-Lo que queda: **T6 sigue debiendo** —el timbre con un par real del roster (B-114), que necesita a un compañero y no se puede solo—, y **siete filas quedan a tu decisión**: B-112, B-113, B-117, B-119, B-125, B-126 y B-128 (las dos últimas, informativas).
-Sigue §3 y no reabras §6; y si un run de CI sale rojo, mirá `gh run view <run-id> --json jobs` y buscá `cancelled` antes de concluir (§4): este repositorio está teniendo jobs que se quedan sin runner.
+Lee desde la raíz de este repositorio `docs/08-sessions/HANDOFF.md` (§0, §1, §3) y sigue §3 sin reabrir §6.
+Los dos PR que quedaban ya están en `main` (`#111` → `f71d0e9`, `#112` → `bd0688d`), `dist` fue reconstruido desde el nuevo `main`, y la sesión 76 midió B-112: `codex` no puede llevar perfil, `opencode` no tiene bandera que lo declare, y a `claude` solo le falta una credencial válida. ADR-0037 y ADR-0038 están escritos y esperan tu confirmación (B-117 y B-119).
+Lo que sigue debiendo es **T6/B-114**: el timbre con un par real del roster, que necesita a un compañero y no se puede solo.
+Sigue §3 y no reabras §6. Si un run de CI sale rojo, mirá `gh run view <run-id> --json jobs` y buscá `cancelled` antes de concluir (§4). Y si un PR **en conflicto** no reporta checks, no está limpio: **nunca corrió** — GitHub no puede construir su merge ref, así que el workflow no se crea (§4).
 ```
 
 ### 0.1b If the machine was just powered on
@@ -93,7 +89,7 @@ expected to print, precisely so the reader can compare, and their values are che
 | 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0; **1959 tests, 1953 pass, 0 fail, 6 skip**; `test:static` **120/120** (session 75's counts; the clean-build step in row 2 is what makes them mean anything — see the note below the table) |
+| 7 | `npm run build && npm test` | exit 0; **1960 tests, 1954 pass, 0 fail, 6 skip**; `test:static` **120/120** (session 76's counts, on `main` after #113; `04e2f03` measured **1957/1951/0/6** before #111/#112 landed, and this row used to quote session 75's *branch* counts of 1959/1953 — take the number from `git log`'s tip, and note the clean-build step in row 2 is what makes any of them mean anything) |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
 | 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70, and working again in session 73 after the model-profile fix below. See §5 |
 
@@ -162,19 +158,46 @@ expected to print, precisely so the reader can compare, and their values are che
 | **F7c / B-116** | **DELIVERED (T1–T5) — session 72; T6 owed.** `channel-pi/` (ADR-0036): a host-side Pi extension that holds F4's body-less doorbell and injects one attributable, body-less ring (`pi.sendMessage` with `customType` `conmuta-doorbell`, `triggerTurn: true`, `deliverAs: "followUp"`), which starts a turn in the live session so it can fetch and answer. Measured reason it is an extension and not a port: Pi renders **no** MCP notification. Pinned by 6 ring tests, 6 lifecycle tests, a bundle-closure gate (the ring is the only `.sendMessage(` call site; no `src/daemon/`, no Telegram path), an extended twin gate and a packed-entry assertion. Verified live against the running daemon (`client_cursors.host = pi-host-doorbell`) and **armed machine-wide** by the Director's instruction. **The ring's end-to-end firing with a roster peer is owed (B-114 / T6)**. **Audited and merged in session 73** (`8e8d8b7` fixes the CRITICAL the audit's two blind reviewers found independently; `21fcc40` corrects three claims that were stronger than their controls; merge commit `925c10d`). The residual the audit then found in the fix is filed as **B-117**. **Session 74 amended ADR-0036 and closed B-124**: the machine-wide adapter rang harness children, so the watcher now arms only in an interactive session (`mode === "tui"`, or `rpc` with `GENTLE_SHELL_INTERACTIVE_HOST=1`); two blind judges corrected the first `tui`-only cut, and the fix merged as **PR #110** (`0f7707c`) | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md); `odd/tasks/f7c-pi-host-doorbell.md`; `docs/runbooks/host-doorbell-pi.md` |
 | **B-115** | **CLOSED — session 72.** The audit that recorded the truth (*no ladder level reaches a live host session*) and the classification that closed it (new row **B-116** under new phase **F7c**, on the Director's explicit answers). The gap it named is now addressed by shipped code; what remains is the live firing, tracked under B-114 | `odd/tasks/b-115-wake-does-not-reach-a-live-session.md`; `docs/06-backlog/CHECKLIST.md` |
 | **B-124** | **CLOSED — session 74** (`013ca80`, corrected in `d92f2ae`; merged as PR #110, `0f7707c`). The machine-wide `channel-pi` adapter rang gentle-pi's harness children — a child `pi --mode rpc` was rung at `session_start`, its ring started a turn before the parent's task and the parent's prompt was rejected — so the watcher arms only for a session a person is sitting in (`mode === "tui"`, or `rpc` with `GENTLE_SHELL_INTERACTIVE_HOST=1`). Two blind judges found the first `tui`-only cut switched the ring off for the attended desktop host and failed acceptance criterion 2; the correction mirrors gentle-pi's `isInteractiveMode` and was re-verified | [ADR-0036](../03-adr/0036-pi-host-doorbell-adapter.md) "Amendment (2026-10-06)"; `odd/tasks/f7c-doorbell-child-session-collision.md`; `channel-pi/main.ts` |
-| **B-85 (1)** | **CLOSED — session 75** (`9577f23` on `fix/b-85-dm-probe-honest-status`). The DM probe reported `status: "pass"` for a probe that reached only some roster peers, and for a roster with no peer besides the bot — where it also wrote an `ok` `DOCTOR_PROBE` row although nothing was sent. It now follows the audit outcome: `degraded` → `warn`, and a zero-peer roster → `warn` with an explicit detail and no row. RED observed first, natively reviewed and approved (`review-1ee5438a4b675bd7`). **(2)–(4) remain open** | `odd/tasks/b-85-dm-probe-honest-status.md`; `src/daemon/ipc/doctor.ts`; `docs/06-backlog/CHECKLIST.md` |
-| **B-127** | **CLOSED — session 75** (`04706bd`, `86d1a5b` on `fix/b-127-channel-pi-lifecycle`; the row reads `done` on that branch and lands with the merge). Both verified defects fixed under ODD, RED before GREEN: a second `session_start` now closes the superseded link before replacing it, so a reload returns the daemon session slot it held; and the adapter keeps the module doc's "each condition is said once" promise with a per-session, message-keyed gate, so a persistent failure no longer warns every 5 s. `channel/doorbell-loop.ts` is deliberately untouched. Reviewed and acknowledged (`review-93f6998584b08998`, approved; its refuter batch refuted the one CRITICAL) | `odd/tasks/b-127-channel-pi-lifecycle.md`; `channel-pi/main.ts`; `test/channel-pi/main.test.ts`; `docs/06-backlog/CHECKLIST.md` |
+| **B-85 (1)** | **CLOSED — session 75** (`9577f23` on `fix/b-85-dm-probe-honest-status`). The DM probe reported `status: "pass"` for a probe that reached only some roster peers, and for a roster with no peer besides the bot — where it also wrote an `ok` `DOCTOR_PROBE` row although nothing was sent. It now follows the audit outcome: `degraded` → `warn`, and a zero-peer roster → `warn` with an explicit detail and no row. RED observed first, natively reviewed and approved (`review-1ee5438a4b675bd7`). **Merged into `main` in session 76 as `f71d0e9` (PR #111)**, both CI legs green (2m13s / 2m6s). **(2)–(4) remain open** | `odd/tasks/b-85-dm-probe-honest-status.md`; `src/daemon/ipc/doctor.ts`; `docs/06-backlog/CHECKLIST.md` |
+| **B-127** | **CLOSED — session 75** (`04706bd`, `86d1a5b` on `fix/b-127-channel-pi-lifecycle`; the row reads `done` on that branch and **landed with the merge in session 76 as `bd0688d`** — after its one-line `CHECKLIST.md` conflict was resolved, which was what had been hiding the fact that the PR had never had a CI run at all, see §4). Both verified defects fixed under ODD, RED before GREEN: a second `session_start` now closes the superseded link before replacing it, so a reload returns the daemon session slot it held; and the adapter keeps the module doc's "each condition is said once" promise with a per-session, message-keyed gate, so a persistent failure no longer warns every 5 s. `channel/doorbell-loop.ts` is deliberately untouched. Reviewed and acknowledged (`review-93f6998584b08998`, approved; its refuter batch refuted the one CRITICAL) | `odd/tasks/b-127-channel-pi-lifecycle.md`; `channel-pi/main.ts`; `test/channel-pi/main.test.ts`; `docs/06-backlog/CHECKLIST.md` |
 | **B-125** | **OPEN — session 75: the exact patch and its two supporting host facts are written.** `odd/tasks/evidence/b-125-child-no-extensions.md` carries the precise diff against gentle-pi's `childArguments`, the measurement that `--no-extensions` suppresses settings-driven discovery only (`lib/gentle-shell-launcher.ts:928`, comment at `:904-908`) while per-child `--extension` paths keep loading (`lib/agents-runner.ts:260`), the discriminating tests, and why no local `node_modules` patch is a substitute. **Nothing in another package was edited** | Director (cross-package, now one hop) |
 | **B-126** | **OPEN, and now measured unrecoverable — session 75.** `R3-001` (WARNING, `channel-pi/main.ts:113`) and `R3-002` (SUGGESTION, `channel-pi/main.ts:86`) cannot be read back: acknowledging a review deletes its transaction directory, leaving only a 259-byte `terminal-consumption/v1` pointer. Reproduced with session 75's own lineage `review-1ee5438a4b675bd7`. The re-derivation was run instead and filed as **B-127**. Same class as **B-21**, **B-22**, **B-32**, **B-36** | Director (informational) |
+| **B-112** | **MEASURED — session 76; only `claude`'s live probe remains, and it is blocked on a credential.** The row asked to verify each harness's own tool-restriction flag on the installed binary, the way session 66 verified the argv forms; session 71 had set the bar with `pi`. **`codex` fails it**: probed live under `-s read-only --ignore-user-config`, a turn starts and completes yet still declares `functions.exec_command` (a shell), `functions.web__run` (network), `collaboration.send_message` and the MCP resource tools, and `read-only` restricts the filesystem, not the local IPC. **`opencode` has no flag-level restriction to declare at all** (`--pure` drops external plugins only; permissions live in its config/agent layer). **`claude`** documents a true analogue (`--restricted` plus `--strict-mcp-config`) and both flags were shown to parse on the installed binary with a bogus-flag control, but the binary cannot authenticate here (`OAuth session expired and could not be refreshed`), so the tool-declaration probe has not been run for it. All three stay `null`: `null` refuses the turn, while a wrong profile starts a turn that can send | `odd/tasks/evidence/b-112-harness-send-proof-verification.md`; `runner/constants.ts` |
+| **B-117** | **IN-DEBATE — ADR-0037 written in session 76, `proposed` pending the Director.** The ADR refuses the swallow by **shape** rather than by enumeration: a record flag that takes a value must be `--name=value`, and a bare flag is refused unless it is on a named allow-list of value-less flags — unrepresentable instead of refused, host-parser-free, and it closes the `@file` positional by the same rule. `REFUSED_ARGUMENTS` and the profile's appended-last position both stay. No code changes until confirmation | `docs/03-adr/0037-self-contained-record-arguments.md`; `runner/constants.ts` |
+| **B-119** | **IN-DEBATE — ADR-0038 written in session 76, `proposed` pending the Director.** The ADR accepts the ring as **best-effort** and pins its bound instead of narrating it: the extension-facing `sendMessage` is declared `void`, so there is no delivery result to inspect, and refusing an undecidable outcome would turn every cooldown-*merged* ring into a back-off loop — so a test must show a swallowed ring still leaves the *message* visible to the session's own client cursor, while the detectable half (the stale-context throw) keeps being retried. Carries the appended amendment for ADR-0036. No code changes until confirmation | `docs/03-adr/0038-a-ring-is-best-effort.md`; `channel-pi/host.ts` |
 | Next SDD change | None queued. F6 blocked on B-11/B-12/B-16; F7b follows F6; F7c is delivered outside SDD | `docs/07-plan/WORK-PLAN.md` |
-| Tests on the merged branch | `npm test` **1957/1951/0/6**; `test:static` **120/120**; `%TEMP%` 0 → 0 from a clean build (session 74, on the frozen `d92f2ae`) | — |
+| Tests on the merged branch | `npm test` **1960/1954/0/6**; `test:static` **120/120**; `test:wrong-room` 5/5; `%TEMP%` 0 → 0 from a clean build (session 76, on `main` at `57a0919`) | — |
 
 ---
 
 ## §2 — What earlier sessions did (context, not to redo)
-> **Sessions 74 and 73, in full.** Kept here rather than at the top of the file, because the top belongs to the
+> **Sessions 75 and 74, in full.** Kept here rather than at the top of the file, because the top belongs to the
 > current session and **a narrative paragraph is not an instruction** — which is how a stale number written at the
 > top gets read as present state. Newest first.
+>
+> **Session 75 in one paragraph — the doctor told the truth, and B-126's pointer was measured dead.** The preflight
+> stopped on a **dirty tree**: session 74's *documentation* close (this handoff rewritten to session 74, its `LOG.md`
+> narrative and the B-126 row) had been produced by a bounded documentation writer and never committed, so `HEAD`
+> still carried the session-73 handoff; it was committed as **`8012434`** after `test:static` **120/120** and pushed.
+> Then unit (1) of **B-85** was fixed under ODD: `runDmProbe` (`src/daemon/ipc/doctor.ts`) returned `status: "pass"`
+> for a probe that reached only *some* roster peers, and for a roster with no peer besides the bot at all — where it
+> also wrote an `ok` `DOCTOR_PROBE` row although nothing was sent. The status now follows the audit outcome
+> (`degraded` → `warn`; a zero-peer roster → `warn` with an explicit detail and **no** row, the
+> unwired-room-guard branch's own rule), RED before GREEN, work unit **`9577f23`** on
+> **`fix/b-85-dm-probe-honest-status`**, natively reviewed and **approved** (lineage `review-1ee5438a4b675bd7`,
+> tier medium, one lens, authority burned); B-85 (2)–(4) stay open. **B-126's premise was wrong and is now
+> measured**: acknowledging a review *deletes its transaction directory*, so the prose that row said "lives in that
+> lineage" is gone the moment the lineage is acknowledged; a fresh **independent** review of `channel-pi/` was run
+> instead, and it found two *different* defects — re-verified in the code by mechanism, not taken on the delegate's
+> word — filed as **B-127** (a reload leaks a daemon session slot until the pool is full and the daemon must
+> restart; every failed tick warns through the UI), and **fixed in the same session** (`04706bd`, `86d1a5b` on
+> `fix/b-127-channel-pi-lifecycle`, RED before GREEN for both). Its own review closed **approved** (lineage
+> `review-93f6998584b08998`): the provider's refuter batch ran and **refuted** the single CRITICAL, and the three
+> remaining findings are informational and filed as **B-128** — recorded at capture time, because that is the one
+> thing B-126 proved cannot be recovered afterwards. **B-125** was given its exact cross-package patch and the two
+> host facts that make it safe. **T6 / B-114 is still owed**: this tree's roster is `@kairo-agent` alone, so nothing
+> here can ring.
+>
 >
 > **Session 74 in one paragraph — the doorbell must ring only a session that can answer.** The machine-wide
 > `channel-pi` doorbell rang **gentle-pi harness children**. A child is a `pi --mode rpc` process started by
@@ -196,29 +219,6 @@ expected to print, precisely so the reader can compare, and their values are che
 > pointer is dead, see B-127. The ring's first real firing with a roster peer was **still owed (B-114 / T6)** at that
 > session's close, and remains owed.
 >
-> **Session 73 in one paragraph — the audit the merge gate asked for, and what it caught.** The Director instructed
-> this session to merge PR #106 *after reviewing it*. The native review path could not take the accumulated candidate
-> (session 72 measured `lens_context_budget_exceeded`), so the branch was audited under `GOVERNANCE.md` §3's
-> documented substitute: **two blind reviewers plus a separate verifying executor**. Both reviewers, independently and
-> with the same mechanism, **refuted C3** — *no woken turn may send anything, directly or indirectly* — and it
-> reproduced: `REFUSED_ARGUMENTS` never refused `--`, so a ladder record with `harness_args: ["--"]` produced argv
-> `["-p","--","--no-extensions","--tools","read,grep,find,ls",PROMPT]`, and Pi's parser breaks at the first `--`
-> (`dist/cli/args.js:23-32`), turning the entire send-proof profile into positional prompt text. The wake turn started
-> with `read`, `bash`, `edit`, `write` and extensions loaded — the 2026-10-04 path, reachable through
-> `ladder set --arg=--` and through a hand-edited ladder file, both of which this product documents as legitimate.
-> **Fixed in `8e8d8b7`** (RED before the constant, GREEN after), together with a test on the same guarantee that
-> could not have failed (`!argv.includes("bash")` passes for `read,grep,find,ls,bash`; proven blind by mutation —
-> five tests fail once `bash` is added, while the old assertion alone reported `true`). **`21fcc40`** then corrected
-> the three claims the audit found stronger than their controls. Round 2, on the narrow fix, found the same
-> **WARNING** residual twice and independently — a record argument that consumes the next argv element and is placed
-> last swallows `--no-extensions`; both bounded it identically (`--tools` still holds, so no `bash`, no `conmuta_*`,
-> no send path) and both named the same limit of a deny-list as an instrument. Filed as **B-117–B-123**; the 400-line
-> `size:exception` and **DN-05 formally unsatisfied** are disclosed in the PR. **The merge was taken on 2026-10-05:
-> `MERGED` at 19:13:15Z as merge commit `925c10d`**, with CI green on both Node legs. The follow-up pass of the audit
-> then found one of round 1's findings **wrong** — the ring *does* throw on a stale context — so `channel-pi/host.ts`,
-> its test and **B-119** were corrected again, and that correction is recorded rather than hidden. The ring's
-> end-to-end firing is still owed (B-114 / T6).
->
 1. **Session 70** closed **B-95 remainder** under ODD (`odd/tasks/b-95-remainder-fetch-corrupt-row.md`): safe `parseStoredEnvelope` in `src/daemon/serve/fetch.ts` skips corrupt/malformed `envelope_json` rows without throwing, allowing `lastRowSeq` to advance `cursor.next_update_id` past damaged rows so the client never stalls; review note R3-1 addressed in `doorbell.ts` (tightened `to` check) and R2-1 in `test/channel/main.test.ts` (drift comment removed); 14 test cases added in `fetch.test.ts` (RED before GREEN observed, non-vacuity proven by mutation); landed session 69's B-102 and B-99 commits. Then closed **B-97** by correcting its premise: the guard defect triggers through *any* link, and a Windows directory junction reproduces it without privileges (direct `exit 2` vs junction `exit 0`, zero bytes), so a genuinely RED-reproducing test now pins it. Then closed **B-31** with the registry's post-parse leak gate (`odd/tasks/b-31-registry-escaped-token.md`).
 2. **Session 69** completed the missing second blind review for B-102 (`jd-judge-a` returned 0 findings, closing `bus-v2-b102-residuals-001` APPROVED); and closed **B-99 completely** under ODD (fixed sleeps in `heartbeat.test.ts` converted to `waitForCondition`/`assertStableFor`; `bootstrap.test.ts:517` converted to positively observe live ticks via `daemon.lock`'s `heartbeat_at` and `getUpdatesCalls` while asserting stable audit rows; boot and hot-reload waits converted to condition polls).
 3. **Session 68** closed B-102: three shutdown-latch checks over three windows, the update-existing-binding guard branch pinned by test and mutation, the latch's terminal contract stated, `stop()` recording the tick it gave up on, and two fixed-sleep stability assertions replaced by `assertStableFor`. Its first attempt at (f) was rejected by an independent judge and corrected in `5bf647a`.
@@ -239,7 +239,9 @@ expected to print, precisely so the reader can compare, and their values are che
    ring that was never delivered should be retried or accepted as best-effort). The session-73 record followed in
    **PR #107** (`35ac1a6`) and the documentation hygiene in **PR #108** (`38c1346`). Session 74 then merged the
    doorbell fix as **PR #110** (`0f7707c`, the `channel-pi` interactive-only arming) after its own blind dual audit,
-   closing **B-124** — **nothing is open on the merge gate.**
+   closing **B-124** — **nothing is open on the merge gate.** Session 76 emptied it completely: **#111 → `f71d0e9`,
+   #112 → `bd0688d`** (see §4 for the conflicting-PR trap that hid its missing checks) and **PR #113 → `57a0919`**
+   for the B-112 measurement and the two ADRs.
 1. **The ring owes its first real firing, and that is the only unit the bus front has left (F7c T6 / B-114).** With
    the adapter armed, a roster **agent** sending a directed message or a broadcast should make the open session ring
    and answer. It needs a peer whose owner is available: AGENTBUS has no private loopback, a human `user_id` is not
@@ -250,13 +252,15 @@ expected to print, precisely so the reader can compare, and their values are che
    a tree with peers is where it must be shown. What sits beside it rather than blocking it: **B-125** (the
    `gentle-pi` `--no-extensions` proposal for harness children, now with its exact patch in
    `odd/tasks/evidence/b-125-child-no-extensions.md`), **B-126** (measured unrecoverable, §7) and **B-128** (the
-   informational findings of B-127's own review, §7). **B-127 is no longer among them: it is fixed, reviewed and
-   acknowledged (§1).**
+   informational findings of B-127's own review, §7). **B-127 is no longer among them: merged into `main` as
+   `bd0688d` (§1).** Session 76 shortened the rest of the list too: **B-112 is measured** — `codex` fails the bar,
+   `opencode` has no flag-level profile to declare, and `claude` awaits only a valid credential — and **B-117** and
+   **B-119** each have their ADR written (`proposed`), so they now need one confirmation each rather than a design.
 2. **The `frisco` despertador is OFF, and it must stay off.** Session 71 disabled it, removed the Startup entry and killed both processes, on the Director's order that the bus answer only from a live session. Re-arming is a Director decision and a deliberate act: `wake` no longer replies (it has no bus and no shell) and `autopilot` is refused, so `notify` is the only level that does anything useful. See the runbook's "A woken turn cannot send".
 3. **The bus is registered ONCE, id-free, at the user level** (`~/.pi/agent/mcp.json`), per ADR-0033.
 4. **No open row the harness can close alone.** B-127 was the last one and it is done (§1); what remains is either the Director's, needs a peer (T6), or is a scheduled class:
 
-   **3.1 — Director-only decisions.** **Seven** filed rows are the Director's, each with its evidence in §7: **B-112** (the send-proof profile is verified for `pi` only, so `claude`/`codex`/`opencode` and `autopilot` are refused), **B-113** (the daemon cannot accredit “a human is present”), **B-117** (the profile is guarded by a deny-list, which a value-consuming record argument can partly defeat — the structural alternative is a parse check on the resolved argv), **B-119** (an undelivered ring commits the cursor and is not retried; verify the delivery or accept best-effort), **B-125** (pass `--no-extensions` to harness children — a `gentle-pi` change this repository only proposes and deliberately does not make) and **B-126** (the two informational findings of PR #110's native review, measured unrecoverable), and **B-128** (the informational findings of B-127's own review, recorded at capture time). **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
+   **3.1 — Director-only decisions.** **Seven** filed rows are the Director's, each with its evidence in §7: **B-112** (the send-proof profile is verified for `pi` only; **measured in session 76** — `codex` provably retains a shell, network egress and a messaging tool, `opencode` has no flag-level restriction to declare, and `claude` needs only one valid credential for its live probe, so the remaining decision is whether to re-authenticate and finish it or leave the three `null`), **B-113** (the daemon cannot accredit "a human is present"), **B-117** (now `in-debate`: ADR-0037 written and `proposed`, so the choice became a confirmation of the **shape** rule — `--name=value` for a flag that takes a value, bare flags refused unless allow-listed — rather than a design from scratch), **B-119** (now `in-debate`: ADR-0038 written and `proposed`, recommending best-effort for the ring with its bound pinned by a test, plus the appended ADR-0036 amendment), **B-125** (pass `--no-extensions` to harness children — a `gentle-pi` change this repository only proposes and deliberately does not make) and **B-126** (the two informational findings of PR #110's native review, measured unrecoverable), and **B-128** (the informational findings of B-127's own review, recorded at capture time). **B-11** (trademark), **B-12** (macOS smoke test), **B-16** (open-source files) gate F6; **F7b** follows F6. **B-101** (relocation of the Judgment Day operating detail out of this overwritten file) is editorial and `GOVERNANCE.md` is constitution-adjacent, so it is not a drive-by move. **B-04** (desktop shell) and **B-01/B-02/B-03** (group referee, skill templates, ticket-ledger location) are product decisions.
 
    **3.2 — Spike/research rows, each needing a real investigation.** **B-05** (gentle-ai installer study), **B-07** (bot-to-bot group visibility for non-admin bots), **B-08** (IPC handshake + named-pipe DACL on Windows), **B-09** (MCP notification rendering per host).
 
@@ -274,6 +278,18 @@ expected to print, precisely so the reader can compare, and their values are che
 
 ## §4 — Facts that will bite you
 
+- **A conflicting PR gets NO CI run at all, and `gh pr checks` says so quietly — that is the trap (measured
+  2026-10-06).** PR #112 answered `mergeable: CONFLICTING`, `mergeStateStatus: DIRTY`, `check-runs.total_count =
+  0`, `gh pr checks 112` → `no checks reported on the branch`, and `gh run list --branch …` → empty. Cause:
+  `.github/workflows/ci.yml` triggers on `pull_request`, and GitHub cannot build the synthetic merge commit for a
+  conflicting pull request, so **`refs/pull/112/merge` does not exist** — only `refs/pull/112/head`
+  (`git ls-remote origin 'refs/pull/112/*'`). No merge ref, no run. The PR was opened at 03:39:23Z, five seconds
+  after `main` took `61c946c`, so its single conflicting docs row existed from the moment it opened. This is a
+  **different trap** from the cancelled-job one above: there the check ran and died with no log; here it was never
+  created, so "no checks reported" reads like a clean bill rather than a warning. After the conflict was resolved
+  and pushed the merge ref appeared (`d1e2cdd`) and the run started on its own (run `37411590337`, both legs pass).
+  **Before calling any PR merge-ready, check `mergeable` *and* that `refs/pull/<n>/merge` exists** — and read
+  `mergeable`/`mergeStateStatus` from `gh pr view --json`, because `gh pr list --json` returns `UNKNOWN` for both.
 - **A red CI run in this repository can be a cancellation, not a failure — measured 2026-10-05.** Six `build-and-test`
   jobs across four runs, **including one on `main`'s own merge commit**, completed **`cancelled`**, every one of them
   with **no log at all** (`gh run view --job <id> --log` answers `log not found`), and in each run the sibling leg
@@ -428,8 +444,8 @@ instead, which is where such a record belongs.
 | The selectorless RDD chain's stale base and the terminally-stopped lineage `review-688b995abb754a4c` | Not observed firing in sessions 59–68. Candidates left no lineage (the host declined them). The `2aa0da0`-era base that kept re-surfacing B-102(f) now points at fixed code, so this is expected to stay quiet | Director/maintainer |
 | **B-114** | **The end-to-end live-session test is owed, and it needs a collaborator.** Criterion 1 of the 2026-10-05 order — a live session answering an incoming bus message — cannot be proven alone: AGENTBUS has no private loopback (every `send` reaches the group *and* a DM, so a test message fans out to the other four agents), and a human typing in Telegram is dropped as `unknown_sender`, so the sender must be a roster *agent* whose owner is available. Criteria 2 and 3 are satisfied and pinned. **Steps and acceptance criteria:** `odd/tasks/solo-sesion-viva.md` §OWED; runbook "Verifying the live-session path (owed)". Do not call this done until step A's `audit_log` `send` row is shown carrying a non-null `client_id` | Director (needs a peer) |
 | ADR-0032 | still `proposed` (pending the Director's confirmation) | Director |
-| **B-112 / B-113** | Filed in session 71. **B-112**: the send-proof profile is verified for `pi` only, so `autopilot` and `claude`/`codex`/`opencode` are refused; closing it means verifying each harness's own restriction flag on the installed binary the way session 66 verified the argv forms. **B-113**: the daemon cannot accredit "a human is present" (every same-user process reads the same run file and speaks the same IPC; `host` is the same literal `unknown` for both), and the only shape that could — a TTY-gated per-session human grant — is more surface than the order asked for. Do not re-derive either. | Director (B-112 is a bounded harness-verification job) |
-| **B-117 / B-119** | Two design decisions the PR #106 audit refused to take inline. **B-117**: the send-proof profile is guarded by a deny-list, and a record argument that consumes the next argv element and is placed last can swallow `--no-extensions` (bounded — `--tools` still holds, so no `bash`, no `conmuta_*` and no send path). The structural alternative, parsing the resolved argv and refusing on mismatch, costs either coupling the runner to each host's parser or forbidding bare value-consuming flags in a record. **B-119**: Pi's extension-facing `sendMessage` cannot throw, so a ring that was never delivered commits the cursor and is never retried; either make delivery verifiable and refuse to advance the cursor, or accept best-effort in ADR-0036 with the loss recorded. Both need their ADR before code | Director |
+| **B-112 / B-113** | Filed in session 71. **B-112**: the send-proof profile is verified for `pi` only, so `autopilot` and `claude`/`codex`/`opencode` are refused. **Measured in session 76** and narrowed to one credential: `codex` was probed live and **fails** the bar (under `-s read-only --ignore-user-config` it still declares `functions.exec_command`, `functions.web__run`, `collaboration.send_message` and the MCP resource tools), `opencode` has **no flag-level restriction to declare at all**, and `claude` has the right flags (`--restricted` plus `--strict-mcp-config`, both shown to parse) but cannot authenticate here (`OAuth session expired and could not be refreshed`). All three stay `null` on a measured reason each. **B-113**: the daemon cannot accredit "a human is present" (every same-user process reads the same run file and speaks the same IPC; `host` is the same literal `unknown` for both), and the only shape that could — a TTY-gated per-session human grant — is more surface than the order asked for. Do not re-derive either. | Director (B-112's remainder is one credential) |
+| **B-117 / B-119** | Two design decisions the PR #106 audit refused to take inline, and **both now have their ADR written (`proposed`, awaiting one confirmation each)**. **B-117** → **ADR-0037**: the send-proof profile stops being guarded by a deny-list alone, because a record argument that consumes the next argv element and is placed last can swallow `--no-extensions` (bounded — `--tools` still holds, so no `bash`, no `conmuta_*` and no send path). The ADR recommends refusing the **shape** instead of enumerating the tokens: `--name=value` for a flag that takes a value, bare flags refused unless allow-listed, which needs no host parser and closes the `@file` positional by the same rule. **B-119** → **ADR-0038**: **the premise below was corrected twice and the corrected version is the one that counts** — the extension-facing `sendMessage` **does throw** on a stale context (that half propagates and *is* retried); what is swallowed is the runtime's rejected delivery on a **live** session, where the declaration is `void`. So the ring commits the cursor unretried, and the *message* is not lost because the doorbell cursor is not the session's own client cursor. The ADR recommends accepting best-effort and pinning that bound with a test, rather than inventing a verification the API cannot support. | Director |
 | **B-127** | **CLOSED — session 75.** Both verified defects fixed on `fix/b-127-channel-pi-lifecycle` (`04706bd`, `86d1a5b`): a second `session_start` closes the superseded link before replacing it, so a reload returns its daemon session slot (the B-106 lesson the thin client implements); and the adapter enforces the module doc's "each condition is said once" with a per-session, message-keyed gate, so a persistent failure no longer reaches `ctx.ui.notify` every 5 s. Reviewed and acknowledged (`review-93f6998584b08998`; approved, refuter batch refuted the single CRITICAL) | harness (done) |
 | **B-128** | **Open — the informational findings of B-127's own review, written down at capture time.** The review of `fix/b-127-channel-pi-lifecycle` (lineage `review-93f6998584b08998`, target tree `49ae6df1`, **approved**, acknowledgement burned) listed `R3-001` (CRITICAL, `channel-pi/main.ts:165-167`) **refuted by the provider's refuter batch** — which is why a refuter ran and why the review still approved — plus three findings that are declared **informational and non-blocking**: `R3-002` (WARNING, `channel-pi/main.ts:167`), `R3-003` (WARNING, `test/channel-pi/main.test.ts:232-234`) and `R3-004` (SUGGESTION, `test/channel-pi/main.test.ts:271-274`). The ids, locations, severities and dispositions are recorded here on purpose: the reviewer's prose is not carried in the closure and is **not recoverable** after acknowledgement (B-126), so this row is the durable record. Same class and disposition as **B-21**, **B-22**, **B-32**, **B-36** and **B-126** | Ordinary native review of B-127, 2026-10-06 | F7c follow-up | open | `channel-pi/main.ts`; `test/channel-pi/main.test.ts`; B-126 |
 | **B-125** | **Open — and it lives in another package.** The `channel-pi` gate (B-124) stops this extension from ringing a headless child, but the child still loads every extension; the structural remedy — `--no-extensions` for harness children — is in `gentle-pi` (`lib/agents-runner.ts`, which already strips `GENTLE_SHELL_INTERACTIVE_HOST`). Session 75 wrote the exact diff plus the two host facts that make it safe, and deliberately edited nothing: another package, and the fix must stay scoped to the doorbell so a child that legitimately needs an extension keeps it | Director (cross-package proposal, one hop away) |
@@ -488,3 +504,12 @@ instead, which is where such a record belongs.
   `pi --list-models deepseek` resolves `deepseek-flash`.
 - **Engram's own tool surface is 19 tools** (`mem_*`), registered globally; `mem_context` on project
   `connmuta` is the entry point for a resumed session.
+- **The three non-`pi` harnesses' credential state on this machine, measured 2026-10-06 for B-112:** `claude` is
+  installed and its restriction flags parse, but it **cannot authenticate** — `Failed to authenticate: OAuth
+  session expired and could not be refreshed`, so no live tool-declaration probe is possible until it is
+  re-authenticated. `codex` **is** logged in (`codex login status` → `Logged in using ChatGPT`); its *default*
+  (config-loaded) sandbox fails to prepare on this host (`failed to prepare windows sandbox wrapper: … .pnpm-store
+  … os error 1920`) while `-s read-only --ignore-user-config` starts a turn fine — which is why the control probe
+  could not list tools. `opencode` holds two stored credentials (DeepSeek api, omnirouter api) but fails with
+  `Authentication Fails, Your api key: ****0059 is invalid`, and it selects agent `gentle-orchestrator` with model
+  `deepseek-flash`. Evidence: `odd/tasks/evidence/b-112-harness-send-proof-verification.md`.
