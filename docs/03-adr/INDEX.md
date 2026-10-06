@@ -52,7 +52,7 @@ where `design.md` names one; the full v1 debate list is in
 | [0026](0026-unapplied-transition-is-a-diagnostic.md) | A transition that could not be applied is a diagnostic, not news | unversioned | `inherited-valid` | — | `agentbus-orphan-transitions-001` | |
 | [0027](0027-needs-action-projects-the-waiting-turn.md) | `needs_action` describes the turn that is waiting | unversioned (v1 HEAD) | `inherited-valid` | — | `agentbus-needs-action-muestra-apertura-001` | |
 
-## New in this repository (0028–0036)
+## New in this repository (0028–0038)
 
 0028–0031 were accepted by the tribunal in `bus-v2-landing-architecture-001` (consensus after two
 rounds) and confirmed by the Director (DN-04). 0032 was accepted by the tribunal in
@@ -69,7 +69,7 @@ pre-flight dry validation of all tool-config merges before any disk or registry 
 `accepted` by the Director on 2026-10-05**, asked as its own question so the status word would not be inferred from
 an answer about the design; it rests on **two Director questionnaires and a tool-level probe, not a tribunal
 debate** — Arena was unreachable at every session start since session 55, so **no debate id exists for it** and the
-ADR's own Status section says so. It closes **B-116** and answers **B-115**.
+ADR's own Status section says so. It closes **B-116** and answers **B-115**. 0037 and 0038 were written by session 76 on 2026-10-06 to close the two design questions the PR #106 audit deliberately did not take inline (**B-117** and **B-119**). Both are **`proposed` pending Director confirmation**, and neither claims a debate: Arena has been unreachable at every session start since session 55, so **no debate id exists for them** and their Status sections say so. They change no code until they are confirmed — B-117's row reserved the choice to the Director, and B-119's offered two shapes for him to pick.
 
 | # | Title | Status | Supersedes / amends | Debate | Decision record |
 |---|---|---|---|---|---|
@@ -82,6 +82,8 @@ ADR's own Status section says so. It closes **B-116** and answers **B-115**.
 | [0034](0034-id-free-installer-entry.md) | The installer writes id-free launcher entries: the project file is the binding, the entry is a launch recipe | `accepted` | amends 0031 rule 2 in part; states the open end ADR-0033 filed; closes B-109 | `bus-v2-b109-id-free-installer-entry-001` (Judgment Day) | Director's standing authorization for the 2026-10-02 session, quoted in the ADR; B-109; invariant (1) unchanged |
 | [0035](0035-pre-validate-tool-configs-in-project-bind.md) | Pre-validate tool-config merges in `project bind` before any write: zero partial bind | `accepted` | refines installer-wizard "before writing anything" guarantee; closes B-111 | standing Director authorization 2026-10-03 | B-111; invariants (1) and (2) protected from dead-end entrapment |
 | [0036](0036-pi-host-doorbell-adapter.md) | A Pi host adapter holds the doorbell and rings the live session | `accepted` | none — it adds the host-push plane and states what it does **not** amend (no invariant, no layer rule) | no tribunal debate: Arena unreachable since session 55, so DN-09's substitute here is two Director questionnaires plus a tool-level probe | Director confirmation 2026-10-05; closes B-116, answers B-115 |
+| [0037](0037-self-contained-record-arguments.md) | A record argument must be self-contained: `--name=value` for flags that take a value | `proposed` (pending Director) | nothing; narrows the **mechanism** of ADR-0032's R5/R7 profile without changing its decision | no tribunal debate: Arena unreachable since session 55, so no debate id exists; the finding is the PR #106 audit's round 2 (`JD-A-R2-001`, `JD-A-R2-002`, `JD-B-1`) | 2026-10-06, session 76; closes the open design question of **B-117** |
+| [0038](0038-a-ring-is-best-effort.md) | A ring is best-effort, and the loss is bounded by the cursor split | `proposed` (pending Director) | nothing; decides the open question **inside** ADR-0036 and proposes one appended amendment to it | no tribunal debate: Arena unreachable since session 55, so no debate id exists; the finding is the PR #106 audit (`JD-A-002`, `JD-B-1`) **and that audit's own follow-up pass, which found its round-1 claim wrong** | 2026-10-06, session 76; closes the open design question of **B-119** |
 
 ## Closed-permanently items and the two reopened ones
 

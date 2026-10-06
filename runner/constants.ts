@@ -117,12 +117,30 @@ export const REFUSED_ARGUMENTS = [
  *  - `--tools read,grep,find,ls` drops **`bash`**, so the turn can neither read the daemon's run-file
  *    secret nor speak the IPC, the two steps of the improvised send of 2026-10-04.
  *
- * `null` is deliberate and fail-closed everywhere else: the other three harnesses' own tool-restriction
- * flags have not been verified live (session 66 verified their argv *forms*, never a restriction flag), and
- * no `autopilot` turn has a profile at all because `autopilot` exists to run a shell and a shell can always
+ * `null` is deliberate and fail-closed everywhere else, and each `null` is now a **measured** negative rather
+ * than an unexamined one (session 76, 2026-10-06; the full evidence is
+ * `odd/tasks/evidence/b-112-harness-send-proof-verification.md`):
+ *  - `codex` was probed live and **fails the bar**. Under `-s read-only --ignore-user-config` a turn starts and
+ *    completes — those flags are real depth, since they drop config-sourced MCP servers and get past a sandbox
+ *    mode that fails to prepare on this host — but the turn still declares `functions.exec_command` (a shell),
+ *    `functions.web__run` (network), `collaboration.send_message`, and the MCP resource tools. `read-only`
+ *    restricts the filesystem and not the local IPC, so a turn could still read the daemon's run-file secret
+ *    and speak the IPC: the two steps of the improvised send of 2026-10-04.
+ *  - `claude` documents a true analogue — `--restricted` drops Bash, PowerShell, REPL and the other
+ *    code-running tools plus WebFetch, and `--strict-mcp-config` skips MCP servers — and both flags parse on the
+ *    installed binary (a bogus-flag control fails at option parsing while they do not). But the binary cannot
+ *    authenticate on this host (`OAuth session expired and could not be refreshed`), so session 71's
+ *    tool-declaration probe has never been run for it. Documented is not measured; it stays unset until it is.
+ *  - `opencode` has **no flag-level restriction to declare**: `opencode run` offers `--pure` (external plugins
+ *    only), `--agent` (a config artifact, not argv) and `--auto`, and its tool permissions live in its
+ *    config/agent layer. Its own live probe is additionally blocked by an invalid provider key.
+ * No `autopilot` turn has a profile at all, because `autopilot` exists to run a shell and a shell can always
  * send. An undeclared profile means the runner **refuses to start the turn** (`profile_unavailable`) instead
  * of starting one with the harness's full toolset — the same direction R2 already takes for a shell-free
- * launch failure. Adding a verified profile is the one thing that re-enables a harness or the act level.
+ * launch failure. Adding a verified profile is the one thing that re-enables a harness or the act level, and
+ * for this flag the asymmetry is the whole point: `null` fails closed and sends nothing, while a profile that
+ * is wrong *opens* a send path. So an unmeasured `null` is not the defect to fix first; a `null` replaced by an
+ * unmeasured profile would be.
  *
  * **What this profile does and does not guarantee — measured by the audit of 2026-10-05.** It is appended
  * after the record's own arguments, so a record cannot replace the tool list: a later `--tools` wins, and the
