@@ -244,6 +244,36 @@ test("a second session_start stops the first loop and releases the link it held 
 	assert.equal(first.closes(), 1, "and the superseded link is never closed twice");
 });
 
+test("a persistent failure is said once through the UI, not once per retry (B-127, the module doc's own promise)", async (t) => {
+	const { host, registered, notes } = fakeHost();
+	const failing: DaemonLink = {
+		readDoorbell: async () => {
+			throw new Error("no live daemon run file");
+		},
+		commitCursor: async () => 0,
+		close: async () => {},
+	};
+	createConmutaDoorbellRegistration(host, {
+		resolveBinding: () => BOUND,
+		createLink: () => failing,
+		// Each sleep yields a macrotask, which is what lets this test's own turns run between ticks.
+		sleep: () => new Promise((resolve) => setImmediate(resolve)),
+	});
+
+	const ctx = ctxWithNotes(notes);
+	// Registered before the start so a failing assertion cannot leave the loop spinning and hold the runner open.
+	t.after(async () => {
+		await handlerFor(registered, "session_shutdown")({ reason: "quit" }, ctx);
+	});
+
+	await handlerFor(registered, "session_start")({ reason: "startup" }, ctx);
+	await until(() => notes.length >= 1, "the first failure warning");
+	for (let turn = 0; turn < 50; turn += 1) {
+		await new Promise((resolve) => setImmediate(resolve));
+	}
+	assert.equal(notes.length, 1, `each condition is said once per session, got ${notes.length}: ${notes[0]}`);
+});
+
 test("shutdown closes the link once, and only that link", async () => {
 	const { host, registered, notes } = fakeHost();
 	const { link, closes } = pendingLink();

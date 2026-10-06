@@ -28,7 +28,9 @@ import { createPiRinger, type PiMessenger } from "./host.js";
  * reload returns the daemon session slot it held instead of leaking it (B-127).
  *
  * **No silent failure.** An unbound project, no live daemon, a refused binding and a dead loop each say
- * so once, through the one surface the human is looking at. A component that reports health it does not
+ * so once, through the one surface the human is looking at. The "once" is enforced **here**, per session and
+ * keyed by message: the watcher warns on every failed tick by design, so the surface that makes the promise is
+ * the one that keeps it (B-127). A component that reports health it does not
  * have is a filed defect class in this repository (B-85); this adapter must not add to it. Warnings
  * never reach stdout, which is not a channel this adapter owns. **The one deliberate silence is the
  * session that was never this adapter's to serve:** a programmatic host is declined before anything is
@@ -71,6 +73,12 @@ export interface ConmutaDoorbellDeps {
 	readonly createLink?: (identity: SessionIdentity) => DaemonLink;
 	/** Defaults to `process.env`. Injected so the interactive-host gate is asserted without touching the real environment. */
 	readonly env?: NodeJS.ProcessEnv;
+	/**
+	 * Defaults to the watcher's own `abortableSleep`. Injected for the same reason `channel/main.ts` injects it:
+	 * the retry cadence is a collaborator, so a test that drives repeated failures does not spend the backoff
+	 * in wall clock (B-127).
+	 */
+	readonly sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
 }
 
 const describeFailure = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -137,6 +145,20 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 		controller = new AbortController();
 		const signal = controller.signal;
 
+		// The module doc promises each condition is said once through the one surface the human is looking at, and
+		// the watcher warns on every failed tick by design (it never branches on the link's error code). "Once" is
+		// kept here, on the surface that makes the promise, and per session: a reload is a new session and may
+		// report again, and the gate is keyed by message so a genuinely *different* failure is never swallowed
+		// (B-127).
+		const said = new Set<string>();
+		const warnOnce = (message: string): void => {
+			if (said.has(message)) {
+				return;
+			}
+			said.add(message);
+			warn(ctx, message);
+		};
+
 		// The aborted loop's link still holds a daemon session slot, and `session_shutdown` will never see it: a
 		// leaked slot is permanent while this process lives, because `sweepDeadSessions` is PID-based. Release it
 		// here, before the new link replaces it (B-127) — the B-106 rule, release on a real transport close.
@@ -146,7 +168,7 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 
 		const binding = resolveBinding(process.cwd());
 		if (!binding.ok) {
-			warn(ctx, describeRefusal(binding.refusal));
+			warnOnce(describeRefusal(binding.refusal));
 			return;
 		}
 
@@ -164,13 +186,14 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 		const watcher = new DoorbellWatcher({
 			link: { readDoorbell: created.readDoorbell, commitCursor: created.commitCursor },
 			deliver: createPiRinger({ pi }),
-			warn: (message) => warn(ctx, message),
+			warn: warnOnce,
+			sleep: deps.sleep,
 		});
 
 		// Deliberately not awaited: the loop runs for the life of the session, and blocking the host's
 		// `session_start` on a long poll would stall startup. A loop that ends on its own is worth one
 		// line, not a crash.
-		void watcher.run(signal).catch((err) => warn(ctx, `the doorbell loop stopped: ${describeFailure(err)}`));
+		void watcher.run(signal).catch((err) => warnOnce(`the doorbell loop stopped: ${describeFailure(err)}`));
 	});
 
 	pi.on("session_shutdown", async () => {
