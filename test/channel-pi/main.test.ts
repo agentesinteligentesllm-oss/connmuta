@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import type { DaemonLink, DoorbellResponse } from "../../channel/daemon-link.js";
-import { createConmutaDoorbellRegistration, type PiExtensionHost, type PiHostContext } from "../../channel-pi/main.js";
-import { PI_INTERACTIVE_MODE } from "../../channel-pi/constants.js";
+import { createConmutaDoorbellRegistration, isInteractiveHost, type PiExtensionHost, type PiHostContext } from "../../channel-pi/main.js";
+import { PI_INTERACTIVE_HOST_ENV, PI_INTERACTIVE_MODE } from "../../channel-pi/constants.js";
 import type { BindingResult } from "../../src/client/binding.js";
 import { EXIT_UNBOUND_PROJECT, PROJECT_FILE_SCHEMA_VERSION } from "../../src/shared/constants.js";
 
@@ -145,11 +145,21 @@ test("a bound session puts exactly one doorbell read in flight, and says nothing
 	assert.equal(polls[0].aborted, false);
 });
 
-// B-124: a harness child is `pi --mode rpc`, and ringing it starts an automatic turn before the parent's
-// task, whose prompt is then rejected with "Agent is already processing". The adapter arms only in an
-// interactive session, so these modes are a correct no-op (and must stay silent — declining is not a fault).
-for (const mode of ["rpc", "json", "print"] as const) {
-	test(`a ${mode} session arms no watcher, mints no link and says nothing (B-124)`, async () => {
+// B-124: a harness subagent is `pi --mode rpc` WITHOUT the interactive-host marker, and ringing it starts an
+// automatic turn before the caller's task, whose prompt is then rejected with "Agent is already processing".
+// The adapter arms only for a session a person is sitting in: the terminal TUI, or the interactive RPC host
+// (the desktop app sets PI_INTERACTIVE_HOST_ENV=1 and the runner strips it from every subagent child).
+
+const NOT_SERVED: readonly { readonly label: string; readonly mode: PiHostContext["mode"]; readonly env: NodeJS.ProcessEnv }[] = [
+	{ label: "a headless rpc child (no interactive marker)", mode: "rpc", env: {} },
+	{ label: "an rpc run with the interactive marker set to 0", mode: "rpc", env: { [PI_INTERACTIVE_HOST_ENV]: "0" } },
+	{ label: "a json run", mode: "json", env: {} },
+	{ label: "a print run", mode: "print", env: {} },
+	{ label: "a host that omits the run mode", mode: undefined, env: {} },
+];
+
+for (const { label, mode, env } of NOT_SERVED) {
+	test(`${label} arms no watcher, mints no link and says nothing (B-124)`, async () => {
 		const { host, registered, notes } = fakeHost();
 		let linkCalls = 0;
 		const { link, polls } = pendingLink();
@@ -159,9 +169,10 @@ for (const mode of ["rpc", "json", "print"] as const) {
 				linkCalls += 1;
 				return link;
 			},
+			env,
 		});
 
-		await handlerFor(registered, "session_start")({ reason: "startup" }, ctxWithNotes(notes, mode));
+		await handlerFor(registered, "session_start")({ reason: "startup" }, { mode, ui: { notify: (message) => notes.push(message) } });
 
 		assert.equal(linkCalls, 0, "a programmatic session must not mint a daemon session");
 		assert.equal(polls.length, 0, "a programmatic session must not hold the doorbell");
@@ -169,7 +180,7 @@ for (const mode of ["rpc", "json", "print"] as const) {
 	});
 }
 
-test("an interactive session still arms: the gate removes the programmatic case, not the feature", async () => {
+test("an interactive terminal session still arms: the gate removes the programmatic case, not the feature", async () => {
 	const { host, registered, notes } = fakeHost();
 	const { link, polls } = pendingLink();
 	createConmutaDoorbellRegistration(host, { resolveBinding: () => BOUND, createLink: () => link });
@@ -178,6 +189,32 @@ test("an interactive session still arms: the gate removes the programmatic case,
 	await until(() => polls.length === 1, "the first doorbell read");
 
 	assert.equal(notes.length, 0, "the ring is armed and healthy");
+});
+
+test("an interactive RPC host still arms: the desktop app's marker is honored (B-124)", async () => {
+	const { host, registered, notes } = fakeHost();
+	const { link, polls } = pendingLink();
+	createConmutaDoorbellRegistration(host, {
+		resolveBinding: () => BOUND,
+		createLink: () => link,
+		env: { [PI_INTERACTIVE_HOST_ENV]: "1" },
+	});
+
+	await handlerFor(registered, "session_start")({ reason: "startup" }, ctxWithNotes(notes, "rpc"));
+	await until(() => polls.length === 1, "the first doorbell read");
+
+	assert.equal(notes.length, 0, "an attended RPC session is served, not declined");
+});
+
+test("the interactive-host predicate is exactly tui or rpc-with-marker", () => {
+	assert.equal(isInteractiveHost("tui", {}), true);
+	assert.equal(isInteractiveHost("rpc", { [PI_INTERACTIVE_HOST_ENV]: "1" }), true);
+	assert.equal(isInteractiveHost("rpc", {}), false, "a harness child is rpc without the marker");
+	assert.equal(isInteractiveHost("rpc", { [PI_INTERACTIVE_HOST_ENV]: "0" }), false);
+	assert.equal(isInteractiveHost("rpc", { [PI_INTERACTIVE_HOST_ENV]: "true" }), false, "only the exact host value counts");
+	assert.equal(isInteractiveHost("json", { [PI_INTERACTIVE_HOST_ENV]: "1" }), false);
+	assert.equal(isInteractiveHost("print", {}), false);
+	assert.equal(isInteractiveHost(undefined, { [PI_INTERACTIVE_HOST_ENV]: "1" }), false);
 });
 
 test("a second session_start aborts the loop the first one started, so reloads leave one watcher", async () => {

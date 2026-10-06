@@ -27,18 +27,28 @@ in an interactive session** — the session the ring actually serves — never i
 
 ## Decision
 
-**Gate arming on the host's own run mode: `ctx.mode === "tui"`.** A non-interactive session (`rpc`, `json`,
-`print`) arms nothing, creates no daemon session, and says nothing — that is a correct no-op, not a failure. This
-is the product principle the adapter already serves (*the bus answers only from a live session*,
-[`solo-sesion-viva.md`](./solo-sesion-viva.md)) expressed as a mechanism: a session that cannot be answered from
-does not hold the doorbell at all.
+**Arm only for a session a person is sitting in: the terminal TUI, or an interactive RPC host identified by
+the host's own `GENTLE_SHELL_INTERACTIVE_HOST=1` marker.** Every other session (`rpc` without that marker,
+`json`, `print`, or an absent mode) arms nothing, creates no daemon session, and says nothing — a correct
+no-op, not a failure. This is the product principle the adapter already serves (*the bus answers only from a
+live session*, [`solo-sesion-viva.md`](./solo-sesion-viva.md)) expressed as a mechanism: a session that cannot
+be answered from does not hold the doorbell at all.
 
-**Why `ctx.mode` and not tool presence.** The tool signal does not exist at the moment the decision is made:
+**Corrected after the blind dual audit (2026-10-06).** The first cut gated on `ctx.mode === "tui"` alone. Both
+judges independently found that this switches the ring off for the *attended* desktop host: Gentle Shell spawns
+`pi --mode rpc` and sets `GENTLE_SHELL_INTERACTIVE_HOST=1`, and `gentle-pi/lib/agents-runner.ts` **strips that
+marker from every subagent child**, so the marker is exactly the attended-versus-headless discriminator. The
+gate now mirrors the host's own `isInteractiveMode`.
+
+**Why the marker and not tool presence.** The tool signal does not exist at the moment the decision is made:
 measured above, `getActiveTools()` is empty of `mcp__conmuta__*` for the first ~4 s **in an interactive session
 too**, because MCP connects after `session_start`. A gate on tool presence at `session_start` would suppress the
 live session's watcher entirely (breaking the acceptance criterion), and a gate at delivery time would still ring
-a programmatic session that happens to carry the tools. `ctx.mode` is truthful at `session_start` and names
-exactly the thing the ring needs: a person sitting in the session.
+a programmatic session that happens to carry the tools. `hasUI` cannot separate the two either — an rpc child
+reports `hasUI: true`.
+
+**Scope.** This bounds this adapter, not extension loading. `--no-extensions` for harness children lives in
+`gentle-pi` and is filed as **B-125**.
 
 ## Tasks
 

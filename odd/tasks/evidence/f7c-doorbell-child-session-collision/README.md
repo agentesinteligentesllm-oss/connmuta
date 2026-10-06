@@ -31,11 +31,14 @@ written at t+2 s; the ring fires about t+1.2 s after `session_start`.
   {"type":"response","command":"prompt","success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message."}
   ```
 
-## After — the gate `ctx.mode === "tui"` in `channel-pi/main.ts`
+## After — the interactive-host gate in `channel-pi/main.ts`
 
 - `after-child-session.jsonl`: 12 entries and **no** `custom_message/conmuta-doorbell` (grep count 0).
   Entry-type census: `session`, `model_change`, `thinking_level_change`,
   `custom/gentle-pi.session-worktree/v1`, 5× `message`, 3× `context_edit`.
+  **Redacted for repository hygiene:** the `message.sections` of the captured host system prompt (66 879
+  characters of machine-global instructions and another project's operational detail) is replaced by a short
+  marker. Nothing else is changed; the entry topology and the absence of the ring entry are intact.
 - RPC stdout:
 
   ```
@@ -44,6 +47,7 @@ written at t+2 s; the ring fires about t+1.2 s after `session_start`.
 
 ## What this proves
 
-The child's own prompt is accepted and it runs its own turn; the automatic ring turn is gone. The interactive
-path is pinned by "an interactive session still arms…" in `test/channel-pi/main.test.ts`, and the programmatic
-path by the three `B-124` tests, which fail when the gate is removed (mutation evidence is pasted in the PR).
+The child's own prompt is accepted and it runs its own turn; the automatic ring turn is gone. The terminal-TUI
+path is pinned by "an interactive terminal session still arms…" in `test/channel-pi/main.test.ts`, the attended
+RPC host by "an interactive RPC host still arms…", and the headless/programmatic paths by the `B-124` cases —
+which fail when the gate is removed (mutation evidence is pasted in the PR).

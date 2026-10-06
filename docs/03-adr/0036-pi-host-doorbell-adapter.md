@@ -21,10 +21,11 @@ CONSTITUTION: no invariant and no layer rule changes. Functionally it adds a **f
 inside the host process — the extension — without moving the core, which stays passive exactly as it is
 today; the capability lives outside the core, the way the wake satellite does.
 
-**Amended 2026-10-06** (backlog [B-124](../06-backlog/CHECKLIST.md)): the ring is armed **only in an
-interactive session** (`ctx.mode === "tui"`), so a harness child started as `pi --mode rpc` is never rung.
-The amendment at the end of this file carries the measurement and the reason; decision 1 and the test table
-are extended, and nothing else changes.
+**Amended 2026-10-06** (backlog [B-124](../06-backlog/CHECKLIST.md)): the ring is armed **only for a
+session a person is sitting in** — the terminal TUI, or the interactive RPC host identified by the host's own
+`GENTLE_SHELL_INTERACTIVE_HOST=1` marker — so a harness child started as `pi --mode rpc` is never rung. The
+amendment at the end of this file carries the measurement and the reason; decision 1 and the test table are
+extended, and nothing else changes.
 
 ## Date
 
@@ -115,7 +116,9 @@ and the watcher inside `conmuta-runner`), so a third is a shape this repository 
 1. **The push surface is an extension, not a notification.** The measured answer to "can an MCP server notify
    Pi and have it rendered" is **no**, and that finding is recorded here rather than rediscovered. The Pi
    adapter is therefore a **host-side extension**, and it ships as its own artifact (`channel-pi/`), never
-   inside `src/` and never inside any core bundle closure.
+   inside `src/` and never inside any core bundle closure. It is **armed only in a session a person is
+   sitting in** — the terminal TUI, or the interactive RPC host (see the amendment of 2026-10-06 and backlog
+   B-124).
 
 2. **It is the same doorbell, held by a third consumer.** No new daemon route, no wire change, no new ledger
    table, no new cursor kind. The adapter calls the existing `/channel/doorbell` and a body-less ring is the
@@ -187,7 +190,7 @@ and the watcher inside `conmuta-runner`), so a third is a shape this repository 
 | One read in flight, cooldown and per-window budget hold under a burst and under `saturated` | `test/channel-pi/host.test.ts` |
 | A call after the session ended (measured: stale-runtime error) is caught, logged to the adapter's own surface, and never crashes the host | `test/channel-pi/host.test.ts` |
 | `session_shutdown` aborts the loop and closes the link, bounded | `test/channel-pi/host.test.ts` |
-| A non-interactive session (`mode` other than `tui`) arms no watcher, mints no link and says nothing; an interactive one still arms | `test/channel-pi/main.test.ts` |
+| A session that is not one a person is sitting in (`rpc` without the interactive marker, `json`, `print`, or no mode) arms no watcher, mints no link and says nothing; a terminal TUI and an interactive RPC host still arm | `test/channel-pi/main.test.ts` |
 | The adapter's closure cannot reach `src/daemon/`, `child_process`, `node:sqlite`, the keyring, the Telegram API or a send call, and only the paced loop arms a timer | `test/security/channel-pi-bundle.test.ts` (modeled on `channel-bundle.test.ts`) |
 | The `customType` survives into the session as a `custom_message` rather than a plain `user` entry | live probe recorded in the runbook, not a unit test (Pi's runtime is the judge, not this repository) |
 
@@ -203,24 +206,30 @@ error `Agent is already processing. Specify streamingBehavior ('steer' or 'follo
 and the child failed with zero tool calls. A project-level exclusion (`"extensions": ["-<path>"]`) does not
 override the machine-wide inclusion; only the adapter itself can decline.
 
-**What changes.** Decision 1 gains its missing condition: the watcher is armed only when `ctx.mode === "tui"`.
-In any other host mode (`rpc`, `json`, `print`) the adapter arms no watcher, mints no daemon session and
-prints nothing — a correct no-op, not a failure. The ring's shape, its transport, its bounds and its
-inability to send are untouched.
+**What changes.** Decision 1 gains its missing condition: the watcher is armed only for a session a person is
+sitting in — the terminal TUI (`ctx.mode === "tui"`), or an interactive RPC host, identified by the host's own
+`GENTLE_SHELL_INTERACTIVE_HOST=1` marker. Every other session (`rpc` **without** that marker, `json`, `print`,
+or a host that reports no mode at all) arms no watcher, mints no daemon session and prints nothing — a correct
+no-op, not a failure. The ring's shape, its transport, its bounds and its inability to send are untouched.
 
-**Why `ctx.mode` and not "the session has no conmuta tools".** The tool signal does not exist at the moment
-the decision is made. Measured on 2026-10-06, `pi.getActiveTools()` at `session_start` lists **no**
+**Why the host's marker, and neither `tui` alone nor "the session has no conmuta tools".** Two measurements
+settle it. First, `tui` alone switches the ring off for the *attended* desktop host: Gentle Shell spawns
+`pi --mode rpc` and sets `GENTLE_SHELL_INTERACTIVE_HOST=1` on it, and the harness runner **strips that marker
+from every subagent child** (`gentle-pi/lib/rpc-host.ts`, `agents-runner.ts` → `withoutInteractiveHost`), so
+the marker is exactly the attended-versus-headless discriminator — and reading it mirrors the host's own
+`isInteractiveMode` instead of inventing a rule. Second, the tool signal does not exist at the moment the
+decision is made: measured on 2026-10-06, `pi.getActiveTools()` at `session_start` lists **no**
 `mcp__conmuta__*` even in a full interactive session, because MCP connects asynchronously about four seconds
-later; a gate on tool presence at `session_start` would suppress the live session's watcher entirely. A gate at
-delivery time would instead ring a *programmatic* session that happens to carry the tools, which is the
-interference class this amendment closes. `ctx.mode` is truthful at `session_start` and names the thing the
-ring actually needs: a session a person is sitting in. `hasUI` cannot separate the two — a `--mode rpc` child
-reports `hasUI: true`.
+later, so a tool gate would suppress the live session's watcher entirely. `hasUI` cannot separate the two
+either — a `--mode rpc` child reports `hasUI: true`.
 
 **The scope, stated so it is not over-read.** This bounds **this adapter**, not extension loading in general.
 A child process that legitimately needs other extensions still gets them; the fix is not "remove all
-extensions". Passing `--no-extensions` (or an equivalent environment marker) from the harness runner to its
-children is a separate, defence-in-depth proposal that lives in `gentle-pi`, another package, and is filed as
-such rather than edited here. Sending `streamingBehavior: "followUp"` from that runner was rejected: it stops
-the crash, but the automatic turn it queues is useless (the child has no `conmuta_*` tools) and none of the
-interference is removed.
+extensions". Reading `GENTLE_SHELL_INTERACTIVE_HOST` is a string contract with the host ecosystem, not a
+dependency on the host's package, and it fails safe: a host that renames the marker declines to arm rather
+than ringing a session it cannot classify. The defence-in-depth half — having the harness runner pass
+`--no-extensions` (or an equivalent marker) to its children so no extension can interfere at all — is a
+separate proposal that lives in `gentle-pi`, another package; it is filed as backlog **B-125** and is not
+edited here. Sending `streamingBehavior: "followUp"` from that runner was rejected: it stops the crash, but
+the automatic turn it queues is useless (the child has no `conmuta_*` tools) and none of the interference is
+removed.

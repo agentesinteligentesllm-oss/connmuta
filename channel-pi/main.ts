@@ -3,7 +3,7 @@ import { createDaemonLink, type DaemonLink } from "../channel/daemon-link.js";
 import { resolveProjectBinding, type BindingRefusal, type BindingResult } from "../src/client/binding.js";
 import type { SessionIdentity } from "../src/client/session-exchange.js";
 import { computeRosterHash } from "../src/shared/roster-hash.js";
-import { PI_DOORBELL_HOST_LABEL, PI_INTERACTIVE_MODE } from "./constants.js";
+import { PI_DOORBELL_HOST_LABEL, PI_INTERACTIVE_HOST_ENV, PI_INTERACTIVE_MODE } from "./constants.js";
 import { createPiRinger, type PiMessenger } from "./host.js";
 
 /**
@@ -28,7 +28,9 @@ import { createPiRinger, type PiMessenger } from "./host.js";
  * **No silent failure.** An unbound project, no live daemon, a refused binding and a dead loop each say
  * so once, through the one surface the human is looking at. A component that reports health it does not
  * have is a filed defect class in this repository (B-85); this adapter must not add to it. Warnings
- * never reach stdout, which is not a channel this adapter owns.
+ * never reach stdout, which is not a channel this adapter owns. **The one deliberate silence is the
+ * session that was never this adapter's to serve:** a programmatic host is declined before anything is
+ * armed, and that is a correct no-op, not a failure to report (B-124).
  */
 
 /** The host's session context, narrowed to the one surface this adapter uses. */
@@ -39,9 +41,10 @@ export interface PiHostContext {
 	 */
 	readonly ui?: { notify(message: string, type?: "info" | "warning" | "error"): void } | undefined;
 	/**
-	 * The host's current run mode. The adapter arms its watcher only for {@link PI_INTERACTIVE_MODE}; every
-	 * other mode is a programmatic session that must not be rung (B-124). Optional in the type because this
-	 * repository declares the host structurally, and a host that omits it fails closed to "do not ring".
+	 * The host's current run mode. The adapter arms its watcher only when {@link isInteractiveHost} says the
+	 * session is one a person is sitting in: `"tui"`, or the interactive RPC host identified by
+	 * {@link PI_INTERACTIVE_HOST_ENV} (B-124). Optional in the type because this repository declares the host
+	 * structurally, and a host that omits it fails closed to "do not ring".
 	 */
 	readonly mode?: "tui" | "rpc" | "json" | "print" | undefined;
 }
@@ -64,9 +67,24 @@ export interface ConmutaDoorbellDeps {
 	readonly resolveBinding?: (cwd: string) => BindingResult;
 	/** Defaults to `createDaemonLink`. The link is lazy, so injecting it starts nothing. */
 	readonly createLink?: (identity: SessionIdentity) => DaemonLink;
+	/** Defaults to `process.env`. Injected so the interactive-host gate is asserted without touching the real environment. */
+	readonly env?: NodeJS.ProcessEnv;
 }
 
 const describeFailure = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+/**
+ * Whether this host session is one a person is sitting in — the only sessions the ring serves.
+ *
+ * It mirrors the host ecosystem's own `isInteractiveMode`: the terminal TUI, or an interactive RPC host
+ * (the desktop app sets {@link PI_INTERACTIVE_HOST_ENV} on the `pi --mode rpc` process it spawns). A harness
+ * subagent is `rpc` **without** that marker, because the runner strips it from every child, so it declines.
+ * A host that omits `mode` also declines: guessing wrong the other way injects an automatic turn into a
+ * programmatic session, which is the defect (B-124) this gate exists to prevent.
+ */
+export function isInteractiveHost(mode: PiHostContext["mode"], env: NodeJS.ProcessEnv): boolean {
+	return mode === PI_INTERACTIVE_MODE || (mode === "rpc" && env[PI_INTERACTIVE_HOST_ENV] === "1");
+}
 
 /** One line a human can act on, per refusal kind. */
 function describeRefusal(refusal: BindingRefusal): string {
@@ -92,6 +110,7 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 	const resolveBinding =
 		deps.resolveBinding ?? ((cwd: string) => resolveProjectBinding({ project: undefined, cwd }));
 	const createLink = deps.createLink ?? ((identity: SessionIdentity) => createDaemonLink({ identity }));
+	const env = deps.env ?? process.env;
 
 	let controller: AbortController | undefined;
 	let link: DaemonLink | undefined;
@@ -101,11 +120,12 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 	};
 
 	pi.on("session_start", async (_event, ctx) => {
-		// Only an interactive session is rung (B-124, ADR-0036 amendment 2026-10-06). A harness child runs as
-		// `pi --mode rpc`; ringing it starts an automatic turn before the caller's own task, whose prompt is then
-		// rejected with "Agent is already processing". Declining is a correct no-op, not a failure to report: the
-		// adapter was never meant to serve this session.
-		if (ctx.mode !== PI_INTERACTIVE_MODE) {
+		// Only a session a person is sitting in is rung (B-124, ADR-0036 amendment 2026-10-06): the terminal TUI,
+		// or an interactive RPC host. A harness subagent is `rpc` without the interactive marker, so ringing it
+		// would start an automatic turn before the caller's own task, whose prompt is then rejected with "Agent is
+		// already processing". Declining is a correct no-op, not a failure to report: the adapter was never meant
+		// to serve this session.
+		if (!isInteractiveHost(ctx.mode, env)) {
 			return;
 		}
 
