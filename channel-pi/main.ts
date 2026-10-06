@@ -23,7 +23,9 @@ import { createPiRinger, type PiMessenger } from "./host.js";
  * **The lifecycle is the host's, and it is not optional.** Nothing is started in the factory: the host
  * loads extensions in modes that never begin a session, so a watcher, socket or timer armed here would
  * leak in those modes, and Pi's own extension documentation forbids it. Resources start at
- * `session_start` and end at `session_shutdown`.
+ * `session_start` and end at `session_shutdown`. A session that starts **again** (reload, resume,
+ * replacement) is the same rule applied twice: the superseded loop is aborted *and* its link released, so a
+ * reload returns the daemon session slot it held instead of leaking it (B-127).
  *
  * **No silent failure.** An unbound project, no live daemon, a refused binding and a dead loop each say
  * so once, through the one surface the human is looking at. A component that reports health it does not
@@ -134,6 +136,13 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 		controller?.abort();
 		controller = new AbortController();
 		const signal = controller.signal;
+
+		// The aborted loop's link still holds a daemon session slot, and `session_shutdown` will never see it: a
+		// leaked slot is permanent while this process lives, because `sweepDeadSessions` is PID-based. Release it
+		// here, before the new link replaces it (B-127) — the B-106 rule, release on a real transport close.
+		const superseded = link;
+		link = undefined;
+		await superseded?.close();
 
 		const binding = resolveBinding(process.cwd());
 		if (!binding.ok) {
