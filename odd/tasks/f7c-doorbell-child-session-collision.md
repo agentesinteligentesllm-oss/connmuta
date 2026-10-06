@@ -70,8 +70,28 @@ reports `hasUI: true`.
 - [x] **T5 — verification.** Done. `npm test` **1952 / 1946 pass / 0 fail / 6 skip** and `npm run test:static`
   **120 / 120**, both exit 0, run by `gentle-ai-verify` in a bound tree with no *“Agent is already processing”*;
   the focused ring/lifecycle/bundle/twin/pack files are green (32/32) and `test/channel-pi/` is 19/19.
-- [ ] **T6 — close.** Work-unit commit (Conventional Commit, no AI attribution) on the feature branch; native
-  review of that commit; PR with the evidence; three merge gates; bus notice with the merge SHA.
+- [ ] **T6 — close.** Work-unit commit `013ca80` and corrective commit `d92f2ae` (Conventional Commits, no AI
+  attribution) on the feature branch; PR #110 with the evidence; three merge gates; bus notice with the merge
+  SHA.
+
+## Independent verification (2026-10-06) — the substitute audit, and what it caught
+
+The native RDD review could not run: its single selected lens (`review-reliability`) failed four times with a
+provider quota `429` (`agy/gemini-3.8-flash-high`), an infrastructure failure, not a candidate finding. Under
+`GOVERNANCE.md` §3's documented substitute, two blind judges (`jd-judge-a`, `jd-judge-b`) audited the frozen
+commit `013ca80` independently, plus a separate verifying executor. Their rows:
+
+| Row | Severity | Outcome |
+|---|---|---|
+| `JD-A-001` / `JD-B-002` — `tui`-only gate switches the ring off for the **attended** desktop host (Gentle Shell `rpc` + `GENTLE_SHELL_INTERACTIVE_HOST=1`), failing acceptance criterion 2 | WARNING → canonicalized **CRITICAL** (defeats a stated acceptance criterion; corroborated independently) | **Fixed in `d92f2ae`**: the gate mirrors the host's `isInteractiveMode`. Scoped re-judgment: **verified / verified** |
+| `JD-B-001` — the gate literal is not pinned, so a one-token edit silently disables the ring with tests green | WARNING | Fixed: `test/channel-pi/constants.test.ts` pins both literals |
+| `JD-B-004` — ADR says decision 1 carries the arming condition, but only the appendix did | SUGGESTION | Fixed: decision 1 and the status note edited |
+| `JD-A-002` — ADR says the cross-package `--no-extensions` proposal is filed, but no row existed | SUGGESTION | Fixed: backlog **B-125** filed |
+| `JD-B-003` — silent decline for a host that omits `mode` contradicts the "No silent failure" note | SUGGESTION | Reconciled: the module doc and ADR scope the guarantee to sessions the adapter serves; the decline is a documented no-op |
+
+Final verification runs after the correction; its numbers are recorded in the PR. The native review lineage for
+the corrected target (`review-9023a0c29cb89c25`) remains blocked by the same quota and is disclosed as such.
+
 
 ## Out of scope (stated, not silently skipped)
 
