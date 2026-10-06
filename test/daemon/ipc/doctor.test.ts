@@ -537,6 +537,61 @@ test("dm probe failure reports a fail finding and a 'rejected' DOCTOR_PROBE audi
 	});
 });
 
+test("a partially delivered dm probe is a warn, not a pass: one peer answered and one did not (B-85 (1))", async () => {
+	await withHarness(async (h) => {
+		const roomGuard = new FakeRoomGuard();
+		roomGuard.errorsByChatId.set("@bob_example_bot", new TransportError("simulated outage"));
+		const carolEntry: ProjectRosterEntry = { agent_id: "@carol-agent", user_id: 100000004, username: "carol_example_bot" };
+		h.bindings.set(managedBindingFixture({ roster_snapshot: [SELF_ENTRY, PEER_ENTRY, carolEntry] }, roomGuard));
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+
+		const nonce = h.store.issue()!;
+		const handler = createDoctorHandler(h.buildDeps(client));
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: true,
+			}),
+		);
+		const body = doctorResponseSchema.parse(res.body);
+		const probe = body.bindings[0]!.checks.find((c) => c.id === "dm-probe")!;
+		assert.equal(probe.status, "warn", "one unreachable peer is not the same health as every peer answering");
+		assert.ok(probe.detail.includes("1/2"), `the detail still reports delivered/total, got: ${probe.detail}`);
+		assert.ok(probe.detail.includes("@bob-agent"), `and names the peer that failed, got: ${probe.detail}`);
+
+		const rows = h.doctorProbeRows();
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0]!.outcome, "degraded", "the audit row already distinguished the case the finding did not");
+	});
+});
+
+test("a roster with no peer besides the bot reports a warn and writes no probe row, not a pass with '0/0' (B-85 (1))", async () => {
+	await withHarness(async (h) => {
+		const roomGuard = new FakeRoomGuard();
+		h.bindings.set(managedBindingFixture({ roster_snapshot: [SELF_ENTRY] }, roomGuard));
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+
+		const nonce = h.store.issue()!;
+		const handler = createDoctorHandler(h.buildDeps(client));
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: true,
+			}),
+		);
+		const body = doctorResponseSchema.parse(res.body);
+		const probe = body.bindings[0]!.checks.find((c) => c.id === "dm-probe")!;
+		assert.equal(probe.status, "warn", "nothing was probed, so the probe cannot claim health");
+		assert.ok(probe.detail.includes("no roster peer"), `expected an explicit 'nothing was probed' detail, got: ${probe.detail}`);
+		assert.equal(roomGuard.calls.length, 0, "the bot's own entry is never a DM target");
+		assert.equal(h.doctorProbeRows().length, 0, "no send was attempted, so no DOCTOR_PROBE row is owed");
+	});
+});
+
 test("an opted-in DM probe scoped to one project never touches a second bound project's room guard (PR-22, spec `doctor › Opted-in DM probe never crosses project boundaries`)", async () => {
 	await withHarness(async (h) => {
 		const roomGuardA = new FakeRoomGuard();
