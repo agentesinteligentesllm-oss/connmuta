@@ -76,7 +76,7 @@ with a weaker polling one. Rejected: it inverts what ADR-0036 exists to do.
 1. `channel-pi/host.ts` keeps resolving for a ring it handed to the host, and its module doc keeps stating the
    two layers separately: the stale-context throw propagates and **is** retried; the runtime's own swallowed
    rejection is **not** observable from here and is accepted.
-2. **ADR-0036 gets one appended amendment** — not a rewrite — stating that the host-push plane is
+2. **ADR-0036 gets one **further** appended amendment** — not a rewrite — stating that the host-push plane is
    **best-effort**: a resolved ring means the ring was handed to the host, not that the session received it;
    the retry guarantee covers the throw it can see, and the swallowed case is a bounded, disclosed degradation,
    not a guarantee. The amendment lands with the code, after this ADR is confirmed.

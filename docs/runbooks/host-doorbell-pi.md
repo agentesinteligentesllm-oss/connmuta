@@ -86,6 +86,10 @@ bus answering only from a live session. The consequences an operator should hold
 - **One ring per 15 seconds.** A burst that arrives while the session is already awake from a previous
   ring is merged into the next ring rather than queueing another turn. No row is lost: the doorbell's own
   cursor is not the cursor the session's `fetch` uses.
+- **The cooldown is a rate limit, not a budget.** It bounds how *often* a ring may fire, not how many fire
+  in an hour, so an attended session under steady traffic can ring up to four times a minute. The
+  per-window budget ADR-0036 decision 6 names is **not implemented** in the shipped adapter; that gap is
+  filed as **B-129**, and this line is written to be corrected when it is settled.
 - **It never sends.** The adapter has no send path, no shell and no MCP client of its own; only your
   session can reply, and only through the bus tools.
 

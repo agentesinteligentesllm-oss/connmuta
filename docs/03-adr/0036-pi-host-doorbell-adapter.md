@@ -233,3 +233,20 @@ separate proposal that lives in `gentle-pi`, another package; it is filed as bac
 edited here. Sending `streamingBehavior: "followUp"` from that runner was rejected: it stops the crash, but
 the automatic turn it queues is useless (the child has no `conmuta_*` tools) and none of the interference is
 removed.
+
+### Amendment (2026-10-06, second) — a named bound that is not implemented
+
+**What this corrects, and what it does not decide.** Decision 6 above lists "a per-window ring budget" among
+the ring's bounds, and the third row of the test table declares that bound pinned by
+`test/channel-pi/host.test.ts`. Measured on 2026-10-06 (session 76), **the shipped adapter has no such
+budget**: `channel-pi/` implements the cooldown (`PI_RING_COOLDOWN_MS = 15_000`) and no other ring bound, and
+that test file mentions neither `budget` nor `saturated` — its two relevant tests hold the cooldown alone. The
+`WAKE_BUDGET_PER_WINDOW = 20` per hour that does exist belongs to the **headless wake satellite** in
+`runner/constants.ts`, spent by `runner/loop.ts`, not to a turn inside a live session; and the daemon's
+`send/rate.ts` budget governs outbound **sends**, not rings.
+
+So the third row of the table below is satisfied for the cooldown and **not** satisfied for the per-window
+budget or for `saturated`. This amendment records that, so no later session reads the row as a live guarantee;
+it does not choose the fix and it changes no decision this ADR took. The two dispositions, the full evidence
+and the deliberate deferral to B-114's first real firing are filed as [B-129](../06-backlog/CHECKLIST.md), and
+decision 6 stands as written until the Director picks one.
