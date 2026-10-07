@@ -81,11 +81,17 @@ hard-coded list beside it — the comparison pins composition, the list pins con
   confinement is asserted by design, not proven. Fix: a real `RoomGuardClient` over a fake Telegram client, with a
   non-vacuity assertion that the guard's `assertTarget` really refuses a foreign target.
 
-### Unit 4 — B-85 (3)
+### Unit 4 — B-85 (3), stopped and handed over with a measurement
 
 The client applies one `IPC_REQUEST_TIMEOUT_MS` (~70 s) abort to the whole `POST /doctor`, while the daemon
-awaits every binding's checks sequentially. Fix: a named, larger budget for that one call, with its reasoning, and
-a test.
+awaits every binding's checks sequentially. **Measured, and the finding is real:** each Telegram call carries
+`requestTimeoutMs()` = 20 s (`telegram.ts:244-247`), so one binding with a two-peer roster can legally take
+`20*(2+2*2)` = 120 s against a 70 s client budget. **But a client constant cannot bound it**, because
+`roster_snapshot` is uncapped (`registry/schema.ts:189`, `z.array(...).min(1)`), so no single number is an upper
+bound of the daemon's work. The durable fix is a daemon-side deadline that also caps how many probe DMs one
+request may send — a design change with a rate-limit interaction (`GROUP_MESSAGES_PER_MINUTE = 20`). Rather than
+ship a guessed number that pins nothing (the ADR-0012 anti-pattern this whole class is about), the measurement and
+two shapes are recorded on the B-85 row for the Director. **(3) stays open.**
 
 ## Non-goals
 
@@ -103,7 +109,16 @@ a test.
 | 1 | B-82 A1/A2/A3 | closure = 28 files, no secret-store, no network module; two mutations, each failing only the new pin while the old spy passes |
 | 2 | B-82 B1/B3/B4/B5 | see the unit's commit and its tests |
 | 3 | B-85 (2)/(4) | **(2)** pinned by dropping `audit_log`: the handler answers `HTTP 200`, the probe is `warn` with the audit note, and the earlier findings survive; RED observed first (the test failed while the handler still rejected). **(4)** a real `RoomGuardClient` is now in the probe's path — emptying its roster fails four tests, and the cross-project test asserts A's guard refuses B's peer (`WrongRoomError`) instead of inferring the boundary |
-| 4 | B-85 (3) | see the unit's commit and its tests |
+| 4 | B-85 (3) | **not implemented, deliberately.** Measured: 20 s per Telegram call × `(2 + 2r)` per binding against a 70 s client budget, and the roster is uncapped, so no client constant is an upper bound. Measurement and two Director shapes recorded on the B-85 row |
+
+## Evidence to record at close
+
+The **independent pass** for the three units was `gentle-ai-verify` (see HANDOFF §5.1): it reproduced
+1986/1980/0/6, `test:static` 129/129, `test:wrong-room` 5/5 and `%TEMP%` 0 → 0, and re-ran all four non-vacuity
+experiments in a `%TEMP%` copy — the closure mutation, the merged-`runDoctorMain` mutation (2 of 4 fail), the
+empty-roster mutation (exactly 4 fail), and its own WAL `BEGIN EXCLUSIVE` script. It also corrected this
+document's own wording: one of the two `runDoctorMain` pins that fail under the merge mutation is *modified*
+rather than newly added. The parent re-verified every number and mutation first.
 
 ## Engram mirror
 
