@@ -32,6 +32,7 @@ import type { IpcRequest } from "../../../src/daemon/ipc/server.js";
 import type { ManagedBinding } from "../../../src/daemon/bindings.js";
 import { materializeBindingConfig } from "../../../src/daemon/binding-config.js";
 import { TransportError } from "../../../src/daemon/transport/types.js";
+import { RoomGuardClient, WrongRoomError } from "../../../src/daemon/transport/room-guard.js";
 import type { RegistryBinding } from "../../../src/registry/schema.js";
 import type { ProjectRosterEntry } from "../../../src/shared/project-file.js";
 import { openLedger } from "../../../src/ledger/open.js";
@@ -88,10 +89,10 @@ function bindingFixture(overrides: Partial<RegistryBinding> = {}): RegistryBindi
 	};
 }
 
-function managedBindingFixture(overrides: Partial<RegistryBinding> = {}, roomGuard?: FakeRoomGuard): ManagedBinding {
+function managedBindingFixture(overrides: Partial<RegistryBinding> = {}, roomGuard?: RoomGuardClient): ManagedBinding {
 	const binding = bindingFixture(overrides);
 	const config = materializeBindingConfig(binding, "alice_example_bot");
-	return { binding, config, roomGuard: roomGuard as unknown as ManagedBinding["roomGuard"] };
+	return { binding, config, roomGuard };
 }
 
 class FakeBindingsAccessor implements DoctorBindingsAccessor {
@@ -126,9 +127,23 @@ class FakeDoctorTelegramClient implements DoctorTelegramClient {
 	readonly memberStatuses = new Map<number, ChatMemberStatus>();
 	readonly memberErrors = new Map<number, Error>();
 	readonly getChatMemberCalls: Array<{ chatId: number | string; userId: number }> = [];
+	/** DM sends that reached the transport, and per-`chat_id` failures — the delegate side of a real room guard. */
+	readonly sent: Array<{ chat_id: number | string; text: string }> = [];
+	readonly sendErrorsByChatId = new Map<string, Error>();
 
 	constructor(meId: number) {
 		this.meId = meId;
+	}
+
+	async getUpdates() {
+		return [];
+	}
+
+	async sendMessage(params: { chat_id: number | string; text: string }) {
+		this.sent.push({ chat_id: params.chat_id, text: params.text });
+		const err = this.sendErrorsByChatId.get(String(params.chat_id));
+		if (err) throw err;
+		return { message_id: this.sent.length, chat: { id: Number(params.chat_id) || 0, type: this.chatType }, date: 0 };
 	}
 
 	async getMe() {
@@ -151,21 +166,20 @@ class FakeDoctorTelegramClient implements DoctorTelegramClient {
 }
 
 /**
- * A fake `RoomGuardClient` — `sendMessage` only, since that is the whole surface the DM probe calls
- * (`doctor.ts`'s own correction: the probe goes through `roomGuard.sendMessage` directly, one call per
- * peer, never `Transport.send`). `chat_id`-keyed errors let a test fail one specific peer without
- * failing every other one, mirroring `FakeDoctorTelegramClient`'s own per-user error map.
+ * A **real** `RoomGuardClient` over the recording fake above (B-85 (4)).
+ *
+ * The DM-probe tests used a fake guard with no `assertTarget` at all, so the cross-project confinement they claim
+ * was asserted by citation rather than by the code that enforces it in production. The guard's own `assertTarget`
+ * — numeric `chat_id` must equal the binding's group, a string one must be an `@username` **present in the
+ * roster** — is now the component standing between the probe and the transport, and the tests can hold both the
+ * guard and its delegate.
  */
-class FakeRoomGuard {
-	readonly calls: Array<{ chat_id: number | string; text: string }> = [];
-	readonly errorsByChatId = new Map<string, Error>();
-
-	async sendMessage(params: { chat_id: number | string; text: string }): Promise<{ message_id: number }> {
-		this.calls.push({ chat_id: params.chat_id, text: params.text });
-		const err = this.errorsByChatId.get(String(params.chat_id));
-		if (err) throw err;
-		return { message_id: this.calls.length };
-	}
+function realRoomGuard(
+	groupId: number,
+	roster: readonly ProjectRosterEntry[],
+): { roomGuard: RoomGuardClient; telegram: FakeDoctorTelegramClient } {
+	const telegram = new FakeDoctorTelegramClient(BOT_ID);
+	return { roomGuard: new RoomGuardClient(telegram, { groupId, roster }), telegram };
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +490,7 @@ test("no project_id and dm_probe false checks every active binding", async () =>
 
 test("dm probe excludes the bound bot's own roster entry, addresses by username, and appends one 'ok' DOCTOR_PROBE audit row", async () => {
 	await withHarness(async (h) => {
-		const roomGuard = new FakeRoomGuard();
+		const { roomGuard, telegram } = realRoomGuard(GROUP_ID, [SELF_ENTRY, PEER_ENTRY]);
 		h.bindings.set(managedBindingFixture({}, roomGuard));
 		const client = new FakeDoctorTelegramClient(BOT_ID);
 
@@ -494,8 +508,8 @@ test("dm probe excludes the bound bot's own roster entry, addresses by username,
 		const probe = body.bindings[0]!.checks.find((c) => c.id === "dm-probe")!;
 		assert.equal(probe.status, "pass");
 
-		assert.equal(roomGuard.calls.length, 1, "the bot's own roster entry must never be a DM target");
-		assert.equal(roomGuard.calls[0]!.chat_id, "@bob_example_bot", "addressed by username, mirroring DirectTransport's own convention");
+		assert.equal(telegram.sent.length, 1, "the bot's own roster entry must never be a DM target");
+		assert.equal(telegram.sent[0]!.chat_id, "@bob_example_bot", "addressed by username, mirroring DirectTransport's own convention");
 
 		const rows = h.doctorProbeRows();
 		assert.equal(rows.length, 1);
@@ -511,8 +525,8 @@ test("dm probe excludes the bound bot's own roster entry, addresses by username,
 
 test("dm probe failure reports a fail finding and a 'rejected' DOCTOR_PROBE audit row", async () => {
 	await withHarness(async (h) => {
-		const roomGuard = new FakeRoomGuard();
-		roomGuard.errorsByChatId.set("@bob_example_bot", new TransportError("simulated outage"));
+		const { roomGuard, telegram } = realRoomGuard(GROUP_ID, [SELF_ENTRY, PEER_ENTRY]);
+		telegram.sendErrorsByChatId.set("@bob_example_bot", new TransportError("simulated outage"));
 		h.bindings.set(managedBindingFixture({}, roomGuard));
 		const client = new FakeDoctorTelegramClient(BOT_ID);
 
@@ -539,9 +553,9 @@ test("dm probe failure reports a fail finding and a 'rejected' DOCTOR_PROBE audi
 
 test("a partially delivered dm probe is a warn, not a pass: one peer answered and one did not (B-85 (1))", async () => {
 	await withHarness(async (h) => {
-		const roomGuard = new FakeRoomGuard();
-		roomGuard.errorsByChatId.set("@bob_example_bot", new TransportError("simulated outage"));
 		const carolEntry: ProjectRosterEntry = { agent_id: "@carol-agent", user_id: 100000004, username: "carol_example_bot" };
+		const { roomGuard, telegram } = realRoomGuard(GROUP_ID, [SELF_ENTRY, PEER_ENTRY, carolEntry]);
+		telegram.sendErrorsByChatId.set("@bob_example_bot", new TransportError("simulated outage"));
 		h.bindings.set(managedBindingFixture({ roster_snapshot: [SELF_ENTRY, PEER_ENTRY, carolEntry] }, roomGuard));
 		const client = new FakeDoctorTelegramClient(BOT_ID);
 
@@ -569,7 +583,7 @@ test("a partially delivered dm probe is a warn, not a pass: one peer answered an
 
 test("a roster with no peer besides the bot reports a warn and writes no probe row, not a pass with '0/0' (B-85 (1))", async () => {
 	await withHarness(async (h) => {
-		const roomGuard = new FakeRoomGuard();
+		const { roomGuard, telegram } = realRoomGuard(GROUP_ID, [SELF_ENTRY]);
 		h.bindings.set(managedBindingFixture({ roster_snapshot: [SELF_ENTRY] }, roomGuard));
 		const client = new FakeDoctorTelegramClient(BOT_ID);
 
@@ -587,19 +601,19 @@ test("a roster with no peer besides the bot reports a warn and writes no probe r
 		const probe = body.bindings[0]!.checks.find((c) => c.id === "dm-probe")!;
 		assert.equal(probe.status, "warn", "nothing was probed, so the probe cannot claim health");
 		assert.ok(probe.detail.includes("no roster peer"), `expected an explicit 'nothing was probed' detail, got: ${probe.detail}`);
-		assert.equal(roomGuard.calls.length, 0, "the bot's own entry is never a DM target");
+		assert.equal(telegram.sent.length, 0, "the bot's own entry is never a DM target");
 		assert.equal(h.doctorProbeRows().length, 0, "no send was attempted, so no DOCTOR_PROBE row is owed");
 	});
 });
 
 test("an opted-in DM probe scoped to one project never touches a second bound project's room guard (PR-22, spec `doctor › Opted-in DM probe never crosses project boundaries`)", async () => {
 	await withHarness(async (h) => {
-		const roomGuardA = new FakeRoomGuard();
+		const { roomGuard: roomGuardA, telegram: telegramA } = realRoomGuard(GROUP_ID, [SELF_ENTRY, PEER_ENTRY]);
 		h.bindings.set(managedBindingFixture({}, roomGuardA));
 
-		const roomGuardB = new FakeRoomGuard();
 		const daveEntry: ProjectRosterEntry = { agent_id: "@dave-agent", user_id: 100000004, username: "dave_example_bot" };
 		const carolSelfEntry: ProjectRosterEntry = { agent_id: "@carol-agent", user_id: 100000003, username: "carol_example_bot" };
+		const { roomGuard: roomGuardB, telegram: telegramB } = realRoomGuard(-1001234567891, [carolSelfEntry, daveEntry]);
 		h.bindings.set(
 			managedBindingFixture(
 				{
@@ -629,9 +643,59 @@ test("an opted-in DM probe scoped to one project never touches a second bound pr
 		assert.equal(body.bindings.length, 1, "only the requested project's binding is checked at all");
 		assert.equal(body.bindings[0]!.project_id, PROJECT_ID);
 
-		assert.equal(roomGuardA.calls.length, 1, "project A's own roster peer receives exactly one probe message");
-		assert.equal(roomGuardA.calls[0]!.chat_id, "@bob_example_bot");
-		assert.equal(roomGuardB.calls.length, 0, "project B's room guard must never be invoked by a probe scoped to project A");
+		assert.equal(telegramA.sent.length, 1, "project A's own roster peer receives exactly one probe message");
+		assert.equal(telegramA.sent[0]!.chat_id, "@bob_example_bot");
+		assert.equal(telegramB.sent.length, 0, "project B's room guard must never be invoked by a probe scoped to project A");
+
+		// B-85 (4): the guard in this test is the shipped one, and this is what makes the assertion above mean
+		// something. `@dave-agent` is a peer of project B and a stranger to project A, so project A's own guard
+		// refuses it *before any network call* — the boundary is enforced by `assertTarget`, not assumed because the
+		// handler happened to iterate one binding.
+		assert.throws(
+			() => roomGuardA.assertTarget("@dave_example_bot"),
+			WrongRoomError,
+			"project A's guard must refuse a peer that is not on its own roster",
+		);
+		assert.doesNotThrow(() => roomGuardA.assertTarget("@bob_example_bot"), "and accept its own roster peer");
+	});
+});
+
+test("a ledger write failure at the probe's own audit row degrades that finding instead of rejecting the whole report (B-85 (2))", async () => {
+	await withHarness(async (h) => {
+		const { roomGuard, telegram } = realRoomGuard(GROUP_ID, [SELF_ENTRY, PEER_ENTRY]);
+		h.bindings.set(managedBindingFixture({}, roomGuard));
+		const client = new FakeDoctorTelegramClient(BOT_ID);
+
+		// The DMs go out before the audit row is written, so make exactly that write fail and nothing else: the
+		// online checks never touch this table (`deps.db` has no other use in the handler).
+		h.db.exec("DROP TABLE audit_log");
+
+		const nonce = h.store.issue()!;
+		const handler = createDoctorHandler(h.buildDeps(client));
+		const res = await handler(
+			doctorRequest({
+				server_nonce: nonce,
+				hmac: expectedDoctorProof(h.secret, nonce),
+				project_id: PROJECT_ID,
+				dm_probe: true,
+			}),
+		);
+
+		assert.equal(res.status, HTTP_OK, "a ledger failure after the DMs already went out must not reject POST /doctor");
+		assert.equal(telegram.sent.length, 1, "the probe itself did run — this is the post-send write failing");
+		const body = doctorResponseSchema.parse(res.body);
+		const checks = body.bindings[0]!.checks;
+		const probe = checks.find((c) => c.id === "dm-probe")!;
+		assert.equal(
+			probe.status,
+			"warn",
+			"a fully delivered probe whose record could not be written is not the same health as one that was recorded",
+		);
+		assert.match(probe.detail, /audit row could not be written/, `got: ${probe.detail}`);
+		assert.ok(
+			checks.some((c) => c.id === "bot-identity"),
+			"the findings collected before the failed write must survive; the whole point is that the report is not truncated by it",
+		);
 	});
 });
 

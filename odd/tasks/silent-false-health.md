@@ -102,7 +102,7 @@ a test.
 |---|---|---|
 | 1 | B-82 A1/A2/A3 | closure = 28 files, no secret-store, no network module; two mutations, each failing only the new pin while the old spy passes |
 | 2 | B-82 B1/B3/B4/B5 | see the unit's commit and its tests |
-| 3 | B-85 (2)/(4) | see the unit's commit and its tests |
+| 3 | B-85 (2)/(4) | **(2)** pinned by dropping `audit_log`: the handler answers `HTTP 200`, the probe is `warn` with the audit note, and the earlier findings survive; RED observed first (the test failed while the handler still rejected). **(4)** a real `RoomGuardClient` is now in the probe's path — emptying its roster fails four tests, and the cross-project test asserts A's guard refuses B's peer (`WrongRoomError`) instead of inferring the boundary |
 | 4 | B-85 (3) | see the unit's commit and its tests |
 
 ## Engram mirror

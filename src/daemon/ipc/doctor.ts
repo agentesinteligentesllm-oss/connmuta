@@ -385,14 +385,29 @@ async function runDmProbe(managed: ManagedBinding, deps: DoctorHandlerDeps, now:
 	}
 
 	const outcome = failures.length === 0 ? "ok" : delivered > 0 ? "degraded" : "rejected";
-	appendAuditRow(deps.db, { ...auditBase, outcome });
+	// The probe must not be able to destroy its own findings (B-85 (2)). Every other check in this module is
+	// independently fail-safe; this write happens *after* real DMs have already gone out, so a ledger write failure
+	// here (a closed or locked database) used to reject the whole `POST /doctor` handler and discard every finding
+	// collected so far — the opposite of the discipline the rest of the module states. It is degraded into the
+	// finding instead, and a delivered probe whose record is missing is reported as `warn` rather than `pass`: a
+	// ledger read later must not be the only place that knows the probe ran.
+	let auditFailure: string | undefined;
+	try {
+		appendAuditRow(deps.db, { ...auditBase, outcome });
+	} catch (err) {
+		auditFailure = describeError(err);
+	}
+	const auditNote = auditFailure === undefined ? "" : `; the DOCTOR_PROBE audit row could not be written: ${auditFailure}`;
 	if (outcome === "rejected") {
-		return { id, status: "fail", detail: `probe failed for all ${peers.length} roster peer(s): ${failures.join("; ")}` };
+		return { id, status: "fail", detail: `probe failed for all ${peers.length} roster peer(s): ${failures.join("; ")}${auditNote}` };
 	}
 	if (outcome === "degraded") {
 		// The audit row already says "degraded"; the finding an operator reads has to agree with it, or a
 		// partially reachable roster reads as healthy (B-85 (1)).
-		return { id, status: "warn", detail: `probe delivered to ${delivered}/${peers.length} roster peer(s) (failed: ${failures.join("; ")})` };
+		return { id, status: "warn", detail: `probe delivered to ${delivered}/${peers.length} roster peer(s) (failed: ${failures.join("; ")})${auditNote}` };
+	}
+	if (auditFailure !== undefined) {
+		return { id, status: "warn", detail: `probe delivered to ${delivered}/${peers.length} roster peer(s)${auditNote}` };
 	}
 	return { id, status: "pass", detail: `probe delivered to ${delivered}/${peers.length} roster peer(s)` };
 }
