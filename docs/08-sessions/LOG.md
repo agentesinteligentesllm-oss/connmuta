@@ -10,6 +10,28 @@
 > log and `HANDOFF.md` seem to attribute that closure differently. Both `CHECKLIST.md`'s B-110 row and the handoff
 > say **session 64**, and both are right. Nothing is invented here to fill the gap.
 
+## 2026-10-07 (close) — the four decisions, the consent pattern, and where the next session starts
+
+- **The session, in order**: closed B-132 (carried from the previous unit), then **B-117** (ADR-0037 `accepted` and
+  implemented: a record argument is refused by shape), then **B-119** (ADR-0038 `accepted` and implemented: the
+  message is guaranteed, the nudge is best-effort, with the bound pinned by a test), and recorded the Director's
+  four delegated decisions in **`26d3ce2`** — ADR-0037 (c), ADR-0038 (b), **implement the absolute per-window ring
+  budget**, and schedule the **silent-false-health** class.
+- **The pattern worth carrying forward**: five native-review candidates, **two granted and three declined by the
+  host** (`consent-declined-this-candidate`, `lineage_created: false`, `mutation_performed: false`, so nothing
+  existed to repair). The rules followed: never re-drive START on a candidate the host already disposed of, and
+  cover a declined candidate with a separate verifier or the parent's own production-side falsification. Both
+  verifier runs of the day found something real, and both findings were fixed rather than filed.
+- **Where the next session starts**: `main == origin/main == 1aba157`, tree clean, `npm test` **1976/1970/0/6**,
+  `test:static` **129/129**, and CI green on all six runs of the day. Next unit: **B-129** (implement the per-window
+  ring budget — the choice is taken); then the **silent-false-health** class (B-82 + the rest of B-85).
+- **Owed, never declared**: **T6/B-114**, the ring's first real firing with a roster peer, and the **Engram mirror**
+  of this day's ODD task files — the server cannot bind 7437 because it falls inside this machine's reserved TCP
+  range 7364-7463 (`netsh interface ipv4 show excludedportrange protocol=tcp`).
+- **How it knows**: the six commits and their messages; the CI runs; the review envelopes, their forecasts and
+  their acknowledgement burns; the two independent verifier reports; and the production-side mutations the parent
+  ran to falsify two of the writers' claims.
+
 ## 2026-10-07 (fourth unit) — B-119: the ring is best-effort, and the bound is a test
 
 - **Date**: 2026-10-07 local. The second of the two ADR confirmations the Director delegated with full authority;
