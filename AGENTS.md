@@ -34,11 +34,9 @@ unedited, in
 **Keep this field a pointer.** Current state, open traps and next steps live in
 [`docs/08-sessions/HANDOFF.md`](./docs/08-sessions/HANDOFF.md); full per-session history (every PR,
 audit and correction since session 1) lives in
-[`docs/08-sessions/LOG.md`](./docs/08-sessions/LOG.md). The audit-routing rule (DN-09: Arena/Alpha
-first, Judgment Day only if Arena is confirmed unreachable at session start via a real tool call,
-never `curl` alone) is durable and lives in
-[`docs/01-constitution/GOVERNANCE.md`](./docs/01-constitution/GOVERNANCE.md) §3 and
-[`docs/05-tribunal/INDEX.md`](./docs/05-tribunal/INDEX.md).
+[`docs/08-sessions/LOG.md`](./docs/08-sessions/LOG.md). **Sessions 73–77, in one line each, superseding the narrative above:** 73 merged F7c (**PR #106** → `925c10d`) after auditing it; 74 amended **ADR-0036** and closed **B-124** (the doorbell arms only in a session a person is sitting in, **PR #110**); 75 closed **B-85 (1)** and measured that **B-126**'s pointer is unrecoverable; 76 merged **#111**/**#112** and measured **B-112**'s three `null` harnesses; **77 (2026-10-07) implemented and merged the ring's per-window budget (B-129), replaced the offline doctor's vacuous assertions with import-closure facts and restored its report split (B-82, partly), closed B-85 (2) and (4), decided B-85 (3) as documented-not-fixed, and merged all of it as PR #114 → `03c7c61` after a Judgment Day audit that found two ADR-12 violations in its own guarantees.** Still open: B-82's B2, T6/B-114 (needs a roster peer), B-112's last credential, and the three decisions that gate **F6**. **The ordered path to culmination is `HANDOFF.md` §3.0; the per-session detail is `LOG.md`.**
+
+**The audit-routing rule (DN-09: Arena/Alpha first, Judgment Day only if Arena is confirmed unreachable at session start by a real tool call, never `curl` alone) is durable and lives in [`docs/01-constitution/GOVERNANCE.md`](./docs/01-constitution/GOVERNANCE.md) §3 and [`docs/05-tribunal/INDEX.md`](./docs/05-tribunal/INDEX.md).** A session that instead finds the bridge **reachable but the seated collaborator unable to answer** (the gap filed as **B-101**) runs the substitute **only on the Director's explicit instruction for that candidate**, recorded as a **DN-05 waiver** — which is what session 77 did when Arena began answering **401** to this clone's stored credential.
 
 ## 1. Reading order
 
