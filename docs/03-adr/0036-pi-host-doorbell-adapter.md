@@ -250,3 +250,43 @@ budget or for `saturated`. This amendment records that, so no later session read
 it does not choose the fix and it changes no decision this ADR took. The two dispositions, the full evidence
 and the deliberate deferral to B-114's first real firing are filed as [B-129](../06-backlog/CHECKLIST.md), and
 decision 6 stands as written until the Director picks one.
+
+### Amendment (2026-10-07) — the ring can name a tool the session does not have
+
+**What this corrects.** Decision 5 above says the turn the ring starts "can read the inbox and it can
+reply", and "Not promised" says it is not promised "that a session with no conmuta tools loaded can answer
+a ring it can act on", with the reason attached since 2026-10-06 that the case is "structurally out of
+reach … a non-interactive session is not rung at all". Measured 2026-10-07, **the wording covered the case
+and the reason did not.** An interactive session a person was sitting in — the shape this adapter is
+*supposed* to ring, and the only shape it arms for — was rung at start and carried no `conmuta_*` tool at
+all: the ring read *"1 new conmuta envelope is waiting. Call conmuta_fetch to read them."* and the session
+had no `conmuta_fetch`, because the machine's user-level registration (`~/.pi/agent/mcp.json`) had
+`conmuta.enabled: false` and the tree's only other registration (`FRISCO\.pi\mcp.json`) is cwd-relative and
+never reaches a subfolder session. The 2026-10-06 amendment's reason answers B-124's shape, not this one:
+the session here **was** interactive, **was** correctly armed, and the read path was absent for a reason
+outside the adapter's reach. That registration defect was fixed at its cause and the duplicate retired the
+same day (B-107's machine-state half), so what this amendment records is the ring's half.
+
+**Why the adapter cannot close it, and why a gate was rejected.** The adapter holds its own daemon link and
+resolves its own binding; it never reads the host's MCP state. The measurement that shaped the 2026-10-06
+amendment is the same one that settles this: `getActiveTools()` at `session_start` lists no
+`mcp__conmuta__*` for about four seconds even in a healthy interactive session, because MCP connects
+asynchronously. A delivery-time gate therefore has only two shapes and both are worse than the boundary.
+Suppressing the ring inside that window drops the legitimate startup ring — the one case this ADR was built
+for — and deferring it adds a retry/state machine to the component whose failure mode is *silence*. Either
+one replaces a configuration error the operator can see (`pi mcp list` reports `connected` or `failed`) with
+a suppression the operator cannot see.
+
+**What is decided.** The boundary stands as a boundary: **the ring is fired on doorbell traffic, never on the
+read path's availability**, and a session whose bus MCP is absent or disabled cannot act on a ring it
+receives. Nothing in the adapter changes and no new guarantee is claimed here — ADR-0012 is not engaged,
+because this amendment promises nothing that a test would have to pin. The message is not lost either: the
+doorbell cursor is not the session's client cursor, so the row is still delivered when `conmuta_fetch` is
+called once the session has the tools.
+
+**The operator's half, which is the actionable one.** The registration that prevents the most common cause
+is **one id-free entry at the user level** ([ADR-0033](./0033-project-flag-as-assertion.md),
+[ADR-0034](./0034-id-free-installer-entry.md)); a project-level entry of the same name **replaces** it and is
+invisible to a subfolder session and to a headless run, which is filed as
+[B-131](../06-backlog/CHECKLIST.md). The runbook gained the precondition and the symptom and names the check,
+`pi mcp list`; [B-130](../06-backlog/CHECKLIST.md) carries the measurement and this disposition.
