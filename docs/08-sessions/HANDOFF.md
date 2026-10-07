@@ -70,7 +70,7 @@
 
 ```text
 Lee desde la raíz de este repositorio `docs/08-sessions/HANDOFF.md` (§0, §1, §3) y sigue §3 sin reabrir §6.
-`main == origin/main` en `d2a3080` (toma el SHA de `git log`, no de aquí). **La sesión 77 está mergeada**: PR #114 → `03c7c61`,
+`main == origin/main` con el árbol limpio (el SHA sale de `git log`, nunca de aquí: este archivo no puede nombrar el commit que él mismo acaba de crear). **La sesión 77 está mergeada**: PR #114 → `03c7c61`,
 auditada por el sustituto **Judgment Day** `bus-v2-s77-units-audit-001` (dos jueces ciegos, dos rondas, más un verificador
 independiente) porque **Arena escucha pero responde 401** a la credencial de este clon — DN-05 queda formalmente insatisfecho y
 así está divulgado. Se cerraron **B-129**, **B-82** (en parte) y **B-85 (2) y (4)**; **B-85 (3)** quedó decidido como documentado-no-parcheado.
@@ -107,7 +107,7 @@ expected to print, precisely so the reader can compare, and their values are che
 | 4 | `git status --short` | **empty** |
 | 5 | `gentle-ai review mode status` | `receipt-driven development: on (decided by global)`; read it, do not assume it |
 | 6 | `gentle-ai --version` | `4.0.0` or later — check fresh each session |
-| 7 | `npm run build && npm test` | exit 0. **Take the counts from `git log`'s tip; never trust this row's prose.** On `main` (`d2a3080`, after PR #114) they are **1987 tests, 1981 pass, 0 fail, 6 skip** with `test:static` **129/129**; the pre-merge `main` (`9124510`) measured **1976/1970/0/6**. Row 2's clean build is what makes either number mean anything |
+| 7 | `npm run build && npm test` | exit 0. **Take the counts from `git log`'s tip; never trust this row's prose.** On `main` at or after the #114 merge they are **1987 tests, 1981 pass, 0 fail, 6 skip** with `test:static` **129/129**; the pre-merge `main` (`9124510`) measured **1976/1970/0/6**. Row 2's clean build is what makes either number mean anything |
 | 8 | `ls -d "$TEMP"/conmuta-* \| wc -l` before and after one `npm test` | the count must NOT grow. Since session 63 it is 0 and stays 0 |
 | 9 | **Subagent health** | run one tiny tool-using subagent task (e.g. "read this file and report its line count"). Verified working in sessions 69 and 70, and working again in session 73 after the model-profile fix below. See §5 |
 
