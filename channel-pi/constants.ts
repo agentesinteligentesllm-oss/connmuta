@@ -84,3 +84,9 @@ export const PI_INTERACTIVE_MODE = "tui";
  * the adapter declines to arm (fail-safe) rather than ring a session it cannot classify.
  */
 export const PI_INTERACTIVE_HOST_ENV = "GENTLE_SHELL_INTERACTIVE_HOST";
+
+/**
+ * Milliseconds in a minute, named so the budget message's own conversion cannot be read as a magic number
+ * (CONSTITUTION §5, mirroring `runner/constants.ts`'s `MILLISECONDS_PER_SECOND`).
+ */
+export const MILLISECONDS_PER_MINUTE = 60_000;

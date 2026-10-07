@@ -318,15 +318,17 @@ The instruction file is written once as `AGENTS.md` (read natively by 13 of 15 s
 2026-10-07).** The daemon awaits each check sequentially — `getMe`, `getChat`, one `getChatMember` per roster
 entry, one DM per peer, per binding — and each Telegram call carries a 20 s budget
 (`src/daemon/telegram.ts:244-247`), while the client applies a single ~70 s budget to the whole `POST /doctor`
-(`src/doctor/online-client.ts:144`, a value built for the long-polling `fetch` route). So **one binding with a
-two-peer roster can legally take 120 s** and the client may report `error` while the daemon is still running
+(`src/doctor/online-client.ts:144`, a value built for the long-polling `fetch` route). So **a three-entry roster
+(the bot itself plus two peers) is `getMe` + `getChat` + one `getChatMember` per entry + one DM per peer =
+7 calls × 20 s = 140 s** — the membership loop covers every entry including the bot's own, and only the DM list
+filters the self entry out — and the client may report `error` while the daemon is still running
 checks and sending probes. **A client-side constant cannot fix this:** `roster_snapshot` has no upper bound
 (`src/registry/schema.ts:189`), so no single number is an upper bound of the daemon's work. The decision is to
 accept the long tail and document it: the probe is opt-in, an operator asked for it, and the `audit_log`
 `DOCTOR_PROBE` rows are the durable record of what was actually sent. The alternative — a per-request deadline —
 needs an abort signal threaded into the Telegram client, because a deadline that only stops *awaiting* would
 leave the probe DMs going out anyway, which is the harm it is supposed to remove. That plumbing is a change of
-its own and is not smuggled in here. |
+its own and is not smuggled in here.
 
 ## 11. Arena-light (D7)
 

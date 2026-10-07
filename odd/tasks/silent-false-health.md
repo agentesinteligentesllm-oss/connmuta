@@ -66,8 +66,13 @@ hard-coded list beside it — the comparison pins composition, the list pins con
   **The second half of B3 is false at HEAD** and is recorded, not "fixed": `checkLock`'s `readLockFile` cannot
   throw — `src/daemon/lifecycle/lock.ts:83-89` wraps `readFileSync` + `JSON.parse` in a try/catch returning `null`,
   and `isProcessAlive` is guarded too.
-- **B4.** The read-only ledger connection sets no `busy_timeout`, so a database mid-checkpoint reports a
-  false-alarm `fail`. Fix: the codebase's own precedent, `installer/ledger-access.ts`'s named constant.
+- **B4 — corrected, not fixed, and the class document must not claim otherwise.** The read-only ledger connection
+  sets no `busy_timeout`, so the row's premise was "a database mid-checkpoint reports a false-alarm `fail`". **It
+  was falsified by measurement before any change was made:** the ledger is WAL, and a read-only
+  `PRAGMA quick_check` succeeds even while another connection holds `BEGIN EXCLUSIVE`, so adding the pragma would
+  change nothing observable. No code was written for this item; the row records the correction. (An earlier draft
+  of this bullet called it "Fix: the codebase's own precedent", which described a fix that never shipped — the
+  honest false-health class includes its own paperwork.)
 - **B5.** The POSIX "home not writable" test is skipped only on win32; under a root CI container
   `accessSync`/mode bits do not fail and the test silently stops testing. Fix: extend the skip predicate.
 
@@ -86,7 +91,7 @@ hard-coded list beside it — the comparison pins composition, the list pins con
 The client applies one `IPC_REQUEST_TIMEOUT_MS` (~70 s) abort to the whole `POST /doctor`, while the daemon
 awaits every binding's checks sequentially. **Measured, and the finding is real:** each Telegram call carries
 `requestTimeoutMs()` = 20 s (`telegram.ts:244-247`), so one binding with a two-peer roster can legally take
-`20*(2+2*2)` = 120 s against a 70 s client budget. **A client constant cannot bound it**, because
+`20*(2r+1)` = 140 s for a three-entry roster against a 70 s client budget. **A client constant cannot bound it**, because
 `roster_snapshot` is uncapped (`registry/schema.ts:189`, `z.array(...).min(1)`), so no single number is an upper
 bound of the daemon's work.
 
@@ -115,7 +120,7 @@ takes that plumbing. Nothing was shipped that claims to bound the long tail.
 | 1 | B-82 A1/A2/A3 | closure = 28 files, no secret-store, no network module; two mutations, each failing only the new pin while the old spy passes |
 | 2 | B-82 B1/B3/B4/B5 | see the unit's commit and its tests |
 | 3 | B-85 (2)/(4) | **(2)** pinned by dropping `audit_log`: the handler answers `HTTP 200`, the probe is `warn` with the audit note, and the earlier findings survive; RED observed first (the test failed while the handler still rejected). **(4)** a real `RoomGuardClient` is now in the probe's path — emptying its roster fails four tests, and the cross-project test asserts A's guard refuses B's peer (`WrongRoomError`) instead of inferring the boundary |
-| 4 | B-85 (3) | **DECIDED as (b): documented, not fixed.** Measured 20 s per Telegram call × `(2 + 2r)` per binding against a 70 s client budget, with an **uncapped roster**, so no client constant is an upper bound. The bound is now documented where the operator reads it (`docs/02-architecture/OVERVIEW.md` §10.4) and the row carries the decision, the measurement and the reason shape (a) was rejected for now (a deadline that only stops awaiting leaves the DMs going out; it needs abort plumbing in `src/daemon/telegram.ts`) |
+| 4 | B-85 (3) | **DECIDED as (b): documented, not fixed.** Measured 20 s per Telegram call x **2r+1** calls per binding (the membership loop covers every roster entry including the bot's own; only the DM list drops it), so a three-entry roster is 140 s against a 70 s client budget, with an **uncapped roster**, so no client constant is an upper bound. The bound is now documented where the operator reads it (`docs/02-architecture/OVERVIEW.md` §10.4) and the row carries the decision, the measurement and the reason shape (a) was rejected for now (a deadline that only stops awaiting leaves the DMs going out; it needs abort plumbing in `src/daemon/telegram.ts`) |
 
 ## Evidence to record at close
 

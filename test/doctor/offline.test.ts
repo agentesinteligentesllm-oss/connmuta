@@ -35,9 +35,19 @@ const FIXTURE_TOKEN = `${BOT_ID}:${"A".repeat(35)}`;
 const DIST_DIR = fileURLToPath(new URL("../../", import.meta.url));
 const OFFLINE_ENTRY = "src/doctor/offline.js";
 
-/** Module specifiers whose presence anywhere in the closure would make a call out possible from any binding shape. */
+/**
+ * Module specifiers whose presence anywhere in the closure would make a call out possible from any binding shape.
+ *
+ * Judgment Day round 1 (PR #114) added `node:http2`: a six-name list is a denylist, and a denylist whose own
+ * failure mode is exactly what B-82 was raised for (a check that cannot see a whole class) should at least name
+ * every protocol module the runtime ships. `node:child_process` is deliberately **not** here and is not a gap the
+ * assertion below can close: `src/installer/exec.js` is in the closure and does spawn the `icacls` runner, which
+ * is why the assertion's own message claims only what it pins — no module that speaks HTTP or the network
+ * protocols directly — instead of "no binding shape can make it call out".
+ */
 const NETWORK_MODULES: ReadonlySet<string> = new Set([
 	"node:http",
+	"node:http2",
 	"node:https",
 	"node:net",
 	"node:dgram",
@@ -124,7 +134,7 @@ test("the offline doctor's closure reaches no secret-store module, so the stored
 	);
 });
 
-test("the offline doctor's closure reaches no network module, so no binding shape can make it call out (B-82)", () => {
+test("the offline doctor's closure reaches no network-protocol module, so no import shape can hand it one (B-82)", () => {
 	const reached = new Set<string>();
 	for (const file of offlineClosure()) {
 		for (const specifier of bareSpecifiers(readFileSync(join(DIST_DIR, file), "utf8"))) {
@@ -137,7 +147,7 @@ test("the offline doctor's closure reaches no network module, so no binding shap
 	assert.deepEqual(
 		[...reached].sort(),
 		[],
-		"the closure must reach no network module: a named `import { request } from \"node:http\"` binding is invisible to the runtime spies above, but it cannot exist without its module appearing here",
+		"the closure must reach no module that speaks HTTP or the network protocols directly: a named `import { request } from \"node:http\"` binding is invisible to the runtime spies above, but it cannot exist without its module appearing here. This pins the protocol modules it names, not the absence of every possible egress — `src/installer/exec.js` is in this same closure and spawns a child process",
 	);
 });
 

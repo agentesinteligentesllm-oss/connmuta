@@ -1,5 +1,5 @@
 import type { ChannelNotification } from "../channel/notify.js";
-import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_BUDGET_PER_WINDOW, PI_RING_BUDGET_WINDOW_MS, PI_RING_COOLDOWN_MS } from "./constants.js";
+import { MILLISECONDS_PER_MINUTE, PI_DOORBELL_CUSTOM_TYPE, PI_RING_BUDGET_PER_WINDOW, PI_RING_BUDGET_WINDOW_MS, PI_RING_COOLDOWN_MS } from "./constants.js";
 
 /**
  * The Pi host adapter's ring (`channel-pi/host.ts`, ADR-0036): the one function this adapter hands to
@@ -78,8 +78,15 @@ export interface PiRingerDeps {
 	 * session, and the module doc's rule is that this adapter reports health it does not have to nobody. The
 	 * caller owns the frequency — `channel-pi/main.ts` passes its per-session, message-keyed `warnOnce` gate
 	 * (B-127), which is why the message below is byte-stable.
+	 *
+	 * **Required, not optional (Judgment Day round 1, PR #114).** Two blind judges independently showed that an
+	 * optional `warn` makes the adapter's own "reported once per session" guarantee deletable in silence: removing
+	 * `warn: warnOnce` from `channel-pi/main.ts` left the whole suite green, so the guarantee could become "never
+	 * reported" while every document still claimed it shipped. Requiring the field turns that deletion into a
+	 * compile error — the same move ADR-0037 made when it stopped enumerating bad arguments and made the bad shape
+	 * unrepresentable. Every instantiation must now name the surface it reports on.
 	 */
-	readonly warn?: (message: string) => void;
+	readonly warn: (message: string) => void;
 }
 
 /**
@@ -90,7 +97,7 @@ export interface PiRingerDeps {
  * from the constant.
  */
 const RING_BUDGET_SPENT_MESSAGE =
-	`the ring budget is spent (${PI_RING_BUDGET_PER_WINDOW} rings per ${PI_RING_BUDGET_WINDOW_MS / 60_000} minutes); ` +
+	`the ring budget is spent (${PI_RING_BUDGET_PER_WINDOW} rings per ${PI_RING_BUDGET_WINDOW_MS / MILLISECONDS_PER_MINUTE} minutes); ` +
 	"rings resume as the window refills, and `conmuta_fetch` still returns every row";
 
 /** Builds the watcher's `deliver`: at most one ring per {@link PI_RING_COOLDOWN_MS}, and at most
@@ -118,7 +125,7 @@ export function createPiRinger(deps: PiRingerDeps): (notification: ChannelNotifi
 		if (rings.length >= PI_RING_BUDGET_PER_WINDOW) {
 			// Resolve, do not reject: like a cooldown merge, this is a handled announcement, not a delivery failure —
 			// rejecting would make the watcher back off and re-read a window whose row it already accounted for.
-			warn?.(RING_BUDGET_SPENT_MESSAGE);
+			warn(RING_BUDGET_SPENT_MESSAGE);
 			return;
 		}
 		deps.pi.sendMessage(

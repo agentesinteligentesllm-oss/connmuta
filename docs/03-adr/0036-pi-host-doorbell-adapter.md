@@ -347,11 +347,18 @@ otherwise look identical, from inside the session, to a quiet bus.
 **Why the third row of the test table is now true, and what changed to make it so.** The row — "One read in
 flight, cooldown and per-window budget hold under a burst and under `saturated`" — was satisfied for the
 cooldown only. It is now pinned by six tests in `test/channel-pi/host.test.ts` (the cap under a burst past the
-cooldown; the sliding refill; a `saturated` burst still capped; a cooldown-merged ring consuming no budget; the
-once-per-session report and its stable message) plus the constants' own invariants in
+cooldown; the sliding refill; the **sliding-versus-bucketing discriminator**; a `saturated` burst still capped; a
+cooldown-merged ring consuming no budget; the once-per-session report and its stable message) plus the
+constants' own invariants in
 `test/channel-pi/constants.test.ts`, including that the budget must be tighter than the cooldown's implied
 ceiling or it could never fire. Three of those pins were shown non-vacuous by mutation — disabling the cap,
-charging a merged ring, and suppressing the report each fail exactly the test that claims them. Decision 6 and
+charging a merged ring, and suppressing the report each fail exactly the test that claims them. **Judgment Day
+round 1 (PR #114) then hardened two of them**, and both findings were confirmed by a judge's own mutation: a
+**fixed-bucket** window passed every other budget test, so the sliding property this table now rests on was
+unpinned until the boundary-straddling discriminator was added; and `PiRingerDeps.warn` was optional, so deleting
+`warn: warnOnce` from `channel-pi/main.ts` left the whole suite green and the "reported once per session" claim
+below could silently become "never reported" — the field is now **required**, which turns that deletion into a
+compile error. Decision 6 and
 the test table stand as originally written; the second amendment's finding is resolved, not rewritten.
 
 The number is a **ceiling, not a target**, and it is the tunable one: B-114's first real firing is where rings
