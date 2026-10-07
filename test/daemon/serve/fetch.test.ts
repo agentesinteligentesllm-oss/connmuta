@@ -425,10 +425,13 @@ test("a resolved-but-undelivered ring consumes nothing: advancing the doorbell c
 			body: "the ring never reached the session, and this row is still its to read",
 		});
 
-		// The two cursor roles, side by side. `RING_CLIENT_ID` is the host adapter's own daemon session
-		// (`channel-pi/constants.ts`, `PI_DOORBELL_HOST_LABEL`), whose cursor `DoorbellWatcher` commits through
-		// `POST /channel/cursor` -> `commitClientCursor` after a resolved ring (`channel/doorbell-loop.ts`). The
-		// session's own `conmuta_fetch` reads the other row, through `serveFetch`, and its client_id is arbitrary.
+		// The two cursor roles, side by side. `RING_CLIENT_ID` is the host adapter's **host label**
+		// (`channel-pi/constants.ts`, `PI_DOORBELL_HOST_LABEL`), used as a stand-in for the daemon session whose
+		// cursor `DoorbellWatcher` commits through `POST /channel/cursor` -> `commitClientCursor` after a resolved
+		// ring (`channel/doorbell-loop.ts`); the daemon mints the real `client_id` as a UUID, so this literal is a
+		// label and not that id. The property under test is id-agnostic: committing client A's cursor must not move
+		// client B's row nor consume B's fetch. The session's own `conmuta_fetch` reads the other row, through
+		// `serveFetch`, and its client_id is arbitrary.
 		const SESSION_CLIENT_ID = "client-session";
 		ensureClientCursor(db, { client_id: RING_CLIENT_ID, project_id: PROJECT_ID, host: RING_CLIENT_ID, started_at: NOW, now: NOW });
 		ensureClientCursor(db, { client_id: SESSION_CLIENT_ID, project_id: PROJECT_ID, started_at: NOW, now: NOW });

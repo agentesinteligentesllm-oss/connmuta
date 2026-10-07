@@ -43,3 +43,27 @@ is still there on the session's next `conmuta_fetch`.
 - **Residual**: pin 4 is a static text guard — it detects the three artifacts drifting apart, not whether the
   prose is semantically strong. Pin 1/2's watcher halves live in `test/channel/doorbell-loop.test.ts`, outside
   the writer's surfaces; the parent confirmed they pass but did not mutate them.
+
+## Independent verification (2026-10-07, after `399d788`)
+
+The native review of that candidate was **declined by the host** (`consent-declined-this-candidate`,
+`lineage_created: false`, nothing mutated and no lineage to repair), so `399d788` has no native review and the
+RDD-off path's separate verifier is what covers it. `gentle-ai-verify` reproduced `npm test` 1976/1970/0/6,
+`test:static` 129/129, `test:wrong-room` 5/5, the focused 79/79 and `%TEMP%` 0 -> 0; confirmed pin 3's
+assertions line by line; reproduced pin 3's failure by rewriting the compiled `commitClientCursor` to advance
+every row (45/46 -> 46/46); confirmed `channel/doorbell-loop.test.ts` is untouched and no assertion weakened;
+and re-measured the host source the decision rests on (`types.d.ts`'s `sendMessage(...): void`, the loader's
+`assertActive` call and throw, and the swallowing `.catch` in `agent-session.js`). It also found two things,
+both acted on in the follow-up commit rather than filed:
+
+1. **Pin 4 could be fooled.** It rewrote the runbook body to "The message is NOT guaranteed at all." and the
+   phrase-only guard still matched all five regexes. Closed by adding a `forbidden` set of contradiction shapes
+   to the pin; the parent reproduced the verifier's own negation as the RED (pin 4 fails, 6/7) and GREEN after
+   (7/7). The guard's limit is now stated in the test itself, not implied.
+2. **The pin-3 comment conflated two identities.** `RING_CLIENT_ID = "pi-host-doorbell"` is the adapter's host
+   *label*, not the UUID the daemon mints as the session's `client_id`; the property is id-agnostic so the pin
+   stands, but the comment and ADR-0036's parenthetical said otherwise. Both now name the label as a label.
+
+Left unverified by the verifier and disclosed here: the pushed/remote state (it ran no `git fetch`), the live
+end-to-end ring firing (B-114, owed), and the dependency's line numbers in ADR-0038's now symbol-anchored
+citation (line numbers move with a dependency's version; the claim was re-measured and holds).

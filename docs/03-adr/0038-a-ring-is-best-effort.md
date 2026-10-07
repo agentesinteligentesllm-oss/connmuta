@@ -34,8 +34,10 @@ This was measured in Pi's own source, and the measurement is two-layered — the
   behaves correctly and needs no decision.
 - **A live session's rejected delivery is swallowed.** One layer down, the runtime binds
   `sendMessage: (message, options) => { this.sendCustomMessage(message, options).catch(err => runner.emitError({ event: "send_message", … })) }`,
-  and the extension-facing declaration is `void`
-  (`@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts:1221`). A rejection from there is reported to
+  and the extension-facing declaration is `void` — the `sendMessage(...): void` signature in
+  `@earendil-works/pi-coding-agent`'s `dist/core/extensions/types.d.ts`, cited by symbol rather than by line
+  because a dependency's line numbers move with its version and the claim is about the declaration, not a
+  location. A rejection from there is reported to
   the **host's own** error surface and never reaches `host.ts`, so the ring resolves, the cursor commits, that
   window is not re-read, and the live session is not told.
 

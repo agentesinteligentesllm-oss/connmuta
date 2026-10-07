@@ -148,28 +148,42 @@ test("a failed ring does not start the cooldown, so the retry can still ring", a
 });
 
 /**
- * ADR-0038 pin 4 (2026-10-07): the module doc and the runbook say the same thing as these tests — best-effort
- * for the ring, guaranteed for the message — so the three cannot drift apart silently. A static text check is
- * the smallest honest shape: the guarantee is prose for an operator, and no behaviour asserts it.
+ * ADR-0038 pin 4 (2026-10-07). This is a **text guard, and it is honest about what it cannot do**: it proves
+ * the claims are present and that the known contradiction shapes are absent. It cannot prove the prose is
+ * semantically right — a sentence rewritten with the same words still passes — so it is a drift alarm, not a
+ * proof. The independent verifier of this unit demonstrated that limit by rewriting the runbook body to "The
+ * message is NOT guaranteed at all." and watching a phrase-only guard pass: the `forbidden` set is what closes
+ * exactly that shape, and the residual is stated here rather than papered over.
  */
-const GUARANTEE_DOCS: ReadonlyArray<{ readonly label: string; readonly path: string; readonly phrases: readonly RegExp[] }> = [
+const GUARANTEE_DOCS: ReadonlyArray<{
+	readonly label: string;
+	readonly path: string;
+	readonly phrases: readonly RegExp[];
+	/** The contradiction shapes this guard can catch: a sentence that negates the message guarantee. */
+	readonly forbidden: readonly RegExp[];
+}> = [
 	{
 		label: "`channel-pi/host.ts`'s module doc",
 		path: "channel-pi/host.ts",
 		phrases: [/best-effort/i, /message[*_]* (?:is not lost|stays guaranteed)/i, /ADR-0038/],
+		forbidden: [/\bnot guaranteed\b/i, /\bno guarantee\b/i, /\bnot a guarantee\b/i],
 	},
 	{
 		label: "the runbook",
 		path: "docs/runbooks/host-doorbell-pi.md",
 		phrases: [/best-effort/i, /message is guaranteed/i, /ADR-0038/, /retried/i, /pinned by a test/i],
+		forbidden: [/\bnot guaranteed\b/i, /\bno guarantee\b/i, /\bnot a guarantee\b/i],
 	},
 ];
 
 test("the module doc and the runbook state the same guarantee as these tests: the ring is best-effort, the message is guaranteed (ADR-0038 pin 4)", () => {
-	for (const { label, path, phrases } of GUARANTEE_DOCS) {
+	for (const { label, path, phrases, forbidden } of GUARANTEE_DOCS) {
 		const text = readFileSync(join(REPO_ROOT, path), "utf8");
 		for (const phrase of phrases) {
 			assert.match(text, phrase, `${label} must state ${phrase}`);
+		}
+		for (const contradiction of forbidden) {
+			assert.doesNotMatch(text, contradiction, `${label} must not contradict the guarantee (${contradiction})`);
 		}
 	}
 });

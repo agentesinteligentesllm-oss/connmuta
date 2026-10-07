@@ -308,8 +308,9 @@ delivered from swallowed, so that half resolves, the cursor advances, and no ret
 surface for it and this amendment invents none; the runbook carries the operator-facing half.
 
 **Why best-effort is acceptable, and what makes it a bound rather than a hope.** The doorbell cursor this
-adapter advances belongs to its own daemon session (`pi-host-doorbell`), not to the session's own client
-cursor, so a swallowed ring consumes nothing: the row is still there on the session's next `conmuta_fetch`.
+adapter advances belongs to its own daemon session — the row whose host label is `pi-host-doorbell`, not the
+UUID the daemon mints as its `client_id` — and not to the session's own client cursor, so a swallowed ring
+consumes nothing: the row is still there on the session's next `conmuta_fetch`.
 That property is **pinned directly** over the two `client_cursors` rows by a test
 (`test/daemon/serve/fetch.test.ts`, ADR-0038's pin 3), which is what this amendment rests on — the same rule
 ADR-0012 states, applied to a statement that would otherwise be narration. ADR-0038 lists the three companion
