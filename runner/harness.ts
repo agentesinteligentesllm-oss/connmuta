@@ -77,12 +77,18 @@ export function isRefusedArgument(arg: string): boolean {
 }
 
 /**
- * Whether one **record** argument has an accepted shape (ADR-0037). A token containing `=` is
- * self-contained — `--name=value` cannot consume the next argv element — so it is accepted. A bare token
- * beginning with `-` is accepted only when it is on {@link VALUE_LESS_ARGUMENTS}, the named allow-list of
- * flags documented as taking no value. Everything else is refused: a bare value-consuming flag swallows the
- * first token of the appended send-proof profile, and a positional (a bare token, `@file` included) is
- * exactly the token whose meaning depends on the host's parse.
+ * Whether one **record** argument has an accepted shape (ADR-0037). A **flag** carrying its value —
+ * `--name=value`, or a short form like `-m=value` — is self-contained and cannot consume the next argv
+ * element, so it is accepted. A bare flag beginning with `-` is accepted only when it is on
+ * {@link VALUE_LESS_ARGUMENTS}, the named allow-list of flags documented as taking no value. Everything else
+ * is refused: a bare value-consuming flag swallows the first token of the appended send-proof profile, and a
+ * positional is the token whose meaning depends on the host's parse.
+ *
+ * **A positional is refused whether or not it contains `=`,** and the `-` prefix is checked first for exactly
+ * that reason. The first cut tested `arg.includes("=")` alone, which accepted `x=y` and `=` — tokens that are
+ * positionals by every other measure — because the ADR's rule 1 describes the accepted form as "a single token
+ * containing `=`". Measured 2026-10-07 by the independent verifier of this change, and tightened here: rule 3
+ * refuses positionals, `@file` included, so the flag prefix is required for both accepted shapes.
  *
  * This is orthogonal to {@link isRefusedArgument}: the deny-list refuses tokens by name and stays live, the
  * shape rule refuses a *form* the deny-list could never enumerate. It applies to a record's `harness_args`
@@ -90,8 +96,9 @@ export function isRefusedArgument(arg: string): boolean {
  * executable contract, not operator input.
  */
 export function isAcceptedRecordArgumentShape(arg: string): boolean {
+	if (!arg.startsWith("-")) return false;
 	if (arg.includes("=")) return true;
-	return arg.startsWith("-") && VALUE_LESS_ARGUMENTS.includes(arg);
+	return VALUE_LESS_ARGUMENTS.includes(arg);
 }
 
 /**

@@ -56,7 +56,24 @@ the runner never reasons about argument *shape* at all: it compares tokens again
   argv, so a named refusal always wins and the four harnesses stay startable.
 - **Allow-list**: `VALUE_LESS_ARGUMENTS` ships **empty** on purpose (no verified profile needs a bare value-less
   record flag), documented as a reviewed-decision surface.
-- **Native review**: pending at the time of writing; the candidate is executable, so lenses are expected.
+- **Native review**: the host resolved this candidate's consent envelope as **`consent-declined-this-candidate`**
+  (`lineage_created: false`, `mutation_performed: false`, no lineage), so no native review exists for `b077d76`.
+  A decline is candidate-scoped and is not the kill switch; START was not re-driven, and the documented substitute
+  ran instead.
+- **Independent verification** (`gentle-ai-verify`, read-only, on the frozen `b077d76`): reproduced `npm test`
+  1974/1968/0/6, `test:static` 129/129, `test:wrong-room` 5/5 and the focused 52/52; confirmed the deny-list loop
+  still runs first over the combined argv while the shape loop reads only `entry.harness_args`, that
+  `REFUSED_ARGUMENTS` and `SEND_PROOF_PROFILES` are byte-identical to the parent commit, and that all five pins can
+  fail (mutations A-F). Two findings, both acted on:
+  1. **A real hole, tightened.** The first cut tested `arg.includes("=")` alone, so the positionals `x=y` and `=`
+     resolved to a spec. The `-` prefix is now required for both accepted shapes; RED observed by mutating the
+     compiled prefix check (pin 2 fails, 24/25) and GREEN after (25/25), and ADR-0037 carries a clarification.
+  2. **A pin that pins less than it looks.** Pin 4 iterates `REFUSED_ARGUMENTS`, so it pins the refusal *reason*
+     but cannot detect the removal of an entry; membership is pinned by the pre-existing hardcoded list at
+     `test/runner/harness.test.ts:225`, which mutation D confirmed. No change made.
+- The verifier honestly left unverified the ADR's own disclosed residual (whether a host reads `--name=value` as a
+  value-less flag plus junk) and stated that its mutations ran against the compiled pin file only. Its scratch
+  directory was removed; `%TEMP%/conmuta-*` is 0.
 
 ## Verification
 

@@ -114,6 +114,16 @@ The operator-facing cost is real and accepted: a record that today says `--arg=-
   any of the four harnesses, and it is the one residual this decision does not close; it belongs to the same
   class of host-parser dependence that option (b) tried to fix, and it is bounded by the floor.
 
+### Clarification (2026-10-07) — "a positional is refused" is checked before "a token containing `=`"
+
+Rule 1 above describes the accepted form as "a single token containing `=`", and the first implementation read
+that literally, so a positional that happened to contain `=` (`x=y`, or a bare `=`) was accepted. The independent
+verifier of this change measured it, and the implementation was tightened: the `-` prefix is now required for
+**both** accepted shapes, so rule 3 governs every token that is not a flag. The accepted set is unchanged for
+flags — `--name=value` and a short `-m=value` form both still resolve — and nothing else about this decision
+moves. A record argument is therefore exactly one of: a flag carrying its value, or a bare flag on
+`VALUE_LESS_ARGUMENTS`; everything else is refused.
+
 ## Supersedes
 
 Nothing. It narrows and hardens the **mechanism** of ADR-0032's R5/R7 profile without changing the decision

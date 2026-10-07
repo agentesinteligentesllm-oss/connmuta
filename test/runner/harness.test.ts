@@ -162,8 +162,11 @@ test("harness: a bare value-consuming flag is refused by shape, and its `--name=
 	}
 });
 
-test("harness: the positional shape is refused — `@file` and a bare token, by the same rule (ADR-0037 pin 2)", () => {
-	for (const arg of ["@x", "x"]) {
+test("harness: the positional shape is refused — `@file`, a bare token and an `=`-bearing positional (ADR-0037 pin 2)", () => {
+	// `x=y` and `=` are positionals that happen to contain `=`: the first cut accepted them because rule 1
+	// describes the accepted form as "a single token containing `=`", and the independent verifier of this
+	// change measured that hole. Rule 3 refuses positionals, so the flag prefix is required for both shapes.
+	for (const arg of ["@x", "x", "x=y", "="]) {
 		assert.deepEqual(
 			resolveHarnessSpec(entry({ harness_args: [arg] }), PROMPT),
 			{ kind: "refused", reason: "argument_shape_invalid" },

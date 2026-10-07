@@ -10,6 +10,47 @@
 > log and `HANDOFF.md` seem to attribute that closure differently. Both `CHECKLIST.md`'s B-110 row and the handoff
 > say **session 64**, and both are right. Nothing is invented here to fill the gap.
 
+## 2026-10-07 (third unit) — B-117: a record argument is refused by shape, and its review was declined
+
+- **Date**: 2026-10-07 local. After the Director delegated four decisions with full authority — the two ADR
+  confirmations, B-129, and which backlog class to schedule next — the choices taken were **ADR-0037 (c)**,
+  **ADR-0038 (b)**, **implement the absolute ring budget**, and **the silent-false-health class**.
+- **What closed**: **B-117** — ADR-0037 `accepted` and implemented in `runner/constants.ts` (`VALUE_LESS_ARGUMENTS`)
+  and `runner/harness.ts` (`isAcceptedRecordArgumentShape`, the distinct `argument_shape_invalid` reason), with the
+  operator-facing argument form changed in the same commit, **`b077d76`**.
+- **The change**: a record's `harness_args` are classified by **shape** before the send-proof profile is appended —
+  a flag carrying its value (`--name=value`) is accepted, a bare flag only when it is on the named value-less
+  allow-list (empty on purpose), and any positional (`@file` included) is refused. The swallow the PR #106 audit
+  found in both blind judges independently is now **unrepresentable** instead of merely unenumerated;
+  `REFUSED_ARGUMENTS` and the appended-last position are untouched, and the shape loop reads only
+  `entry.harness_args`, so `HARNESS_DEFAULT_ARGS` (`-p`, `exec`, `run`) stays exempt.
+- **Delegation, and the boundary the writer respected**: `gentle-ai-worker` on five surfaces implemented it and
+  observed RED (pins 1 and 2 failing while pins 3-5 stayed green), then **stopped at the `RefusalReason` type
+  boundary in `runner/loop.ts` rather than editing outside its surfaces**, and flagged that the
+  `SEND_PROOF_PROFILES` doc still described the closed swallow as an open residual. The parent extended the union
+  and corrected that paragraph, then **reproduced the writer's RED by mutation** (disabling the compiled shape
+  check fails exactly pins 1 and 2) instead of quoting it.
+- **The review was declined by the host, and the substitute ran instead.** `gentle_review` inspect -> START on
+  `b077d76` returned `consent-declined-this-candidate` with `lineage_created: false` and `mutation_performed:
+  false` — no lineage, nothing to acknowledge, repair or reset. A decline is candidate-scoped and is not the kill
+  switch, and the standing rule is not to re-drive START against a candidate the host already disposed of, so
+  `b077d76` has **no native review**; the RDD-off path's separate verification is what covers it.
+- **The independent verifier found a real hole, and it is closed.** It reproduced 1974/1968/0/6, 129/129, 5/5 and
+  52/52, confirmed `REFUSED_ARGUMENTS`/`SEND_PROOF_PROFILES` byte-identical to the parent commit, and tried to
+  negate the change. The negation that landed: the first cut tested `arg.includes("=")` alone, so the positionals
+  `x=y` and `=` resolved to a spec, because ADR-0037's rule 1 describes the accepted form as "a single token
+  containing `=`". The `-` prefix is now required for both accepted shapes (rule 3 governs every non-flag), with
+  RED observed by mutating the compiled prefix check (pin 2 fails, 24/25 -> 25/25 restored) and a clarification
+  appended to ADR-0037. The verifier also found that **pin 4 pins the deny-list's reason, not its membership**
+  (removal is caught by the pre-existing hardcoded test at `test/runner/harness.test.ts:225`, proven by mutation),
+  and honestly left unverified the ADR's own disclosed host-parser residual.
+- **Verification**: `npm test` 1974/1968/0/6, `test:static` 129/129, `test:wrong-room` 5/5, `%TEMP%` 0 -> 0, and the
+  independent verifier above. `git status` clean at `b077d76` before the tightening commit.
+- **How it knows**: `git log` / `git diff 25ec239`; the focused RED/GREEN runs and the two parent mutations
+  (compiled shape check, compiled prefix check); the START envelope's `consent-declined-this-candidate`;
+  `runner/constants.ts`, `runner/harness.ts`, `runner/loop.ts` and the two pin files read at their declarations;
+  and the verifier's report, re-verified by the parent.
+
 ## 2026-10-07 (second unit) — B-132: the board gate's region handling, hardened
 
 - **Date**: 2026-10-07 local. The second bounded unit of the day, ordered by the Director, who named **B-132** as the
