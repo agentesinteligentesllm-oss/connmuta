@@ -10,6 +10,39 @@
 > log and `HANDOFF.md` seem to attribute that closure differently. Both `CHECKLIST.md`'s B-110 row and the handoff
 > say **session 64**, and both are right. Nothing is invented here to fill the gap.
 
+## 2026-10-07 — the board gate unit: five commits, three native reviews, and two corrections of my own
+
+- **Date**: 2026-10-07 local. Not a numbered session: one bounded unit, ordered by the Director who asked for
+  three recommended items and then everything I judged necessary (**"tienes toda mi autorización, confío
+  plenamente en tu criterio y hazlo con maestría"**).
+- **What closed**: **B-107's machine-state half** — the last project-level Pi registration, `FRISCO\.pi\mcp.json`,
+  retired to `~/.pi/agent/retired/frisco-project-mcp-json-20261007/` (README included). Verified with `pi mcp list`
+  before and after: the FRISCO root resolved `(direct, project)` and `frisco-erp` resolved `(direct, global)`
+  before, and **both** resolve `(direct, global)` after, with an unbound cwd failing explicitly rather than
+  silently. Also closed: **B-130** as **(b)**, recorded in ADR-0036's third amendment, and **the board's row
+  shape**, now gated.
+- **What opened**: **B-131** (nothing detects a project-level Pi registration that masks the user-level one) and
+  **B-132** (eight advisory findings from the two reviews below).
+- **Five commits, all pushed; `main` == `origin/main` == `8b920c4`**: `0da1283` (file B-130/B-131, close B-107's
+  machine-state half), `372eaf3` (B-130 → (b), ADR-0036 amended), `753060c` (the gate and the rows it caught),
+  `99adfea` (repair B-31, file the first review's advisories), `8b920c4` (the second review's advisories).
+- **Two corrections, both mine, both disclosed in their commits.** First, the gate shipped counting every pipe, so
+  it flagged six rows; two (**B-05** `\|`, **B-104** `\|\|`) were already correct, and the repair that followed
+  added a second backslash and turned an escaped pipe into a real split. A codepoint read — the parity of the
+  backslashes before each pipe — falsified the fix, and both rows were restored byte-for-byte: **the count of
+  genuinely broken rows is four, not six.** Second, the escape chosen for **B-31** glued a real cell boundary — the
+  row carried eight separators for six columns, and reaching six that way shifted `Origin` to `F1` and `Phase` to
+  `done`. The reliability lens of review 2 named that row (`R3-1`), the finding was verified rather than deferred,
+  and the row was rebuilt from its pre-commit cells and re-verified by reading its six **rendered** cells.
+- **The reviews, and what they cost** (detail in `HANDOFF.md` §5.2b): two candidates were graded `high` because the
+  base diff against `origin/main` still contained the gate's test file, and each ran **four reviewer runs of about
+  110 kB of prompt**. The candidate that closed after the push inspected as a single path and ran **zero**
+  reviewers. The practical rule that comes out of it: **push each unit before starting the next one.**
+- **How it knows**: the five commits and their messages; `test:static` **124/124** and `npm test`
+  **1964/1958/0/6**; `pi mcp list` before and after the retirement; the four review lineages
+  (`review-b1764a0746612ea1`, `review-af395029a84852b1`, `review-139c7dd8da1f1f53`, `review-b3911018f3e135a4`) and
+  their `gentle-ai.review-acknowledged/v1` burns; `docs/06-backlog/CHECKLIST.md` rows B-130, B-131 and B-132.
+
 ## Session 76 — the two open PRs landed, and the first fix was invisible until the conflict was resolved (`b-112-measured-send-proof-negatives`)
 
 - **Date**: 2026-10-06 local.
