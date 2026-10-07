@@ -2,9 +2,10 @@
 
 ## Status
 
-`proposed` — pending Director confirmation. Written by session 76 on 2026-10-06 to close the open design
-question of **B-119**; the row reserved the choice to the Director ("two shapes and the Director picks one"), so
-`channel-pi/host.ts` and ADR-0036 change only when this ADR is confirmed.
+`accepted` — confirmed by the Director on 2026-10-07, who delegated the choice among the options below with full
+authority and left it to the maintainer's judgement; option (b) was taken. The one further amendment to ADR-0036
+and the four pins below land in the same unit as the code. Written by session 76 on 2026-10-06 to close the open
+design question of **B-119**, whose row had reserved the choice to the Director.
 
 ## Date
 
