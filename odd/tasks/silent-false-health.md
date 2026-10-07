@@ -81,17 +81,23 @@ hard-coded list beside it — the comparison pins composition, the list pins con
   confinement is asserted by design, not proven. Fix: a real `RoomGuardClient` over a fake Telegram client, with a
   non-vacuity assertion that the guard's `assertTarget` really refuses a foreign target.
 
-### Unit 4 — B-85 (3), stopped and handed over with a measurement
+### Unit 4 — B-85 (3), decided as documented-not-fixed
 
 The client applies one `IPC_REQUEST_TIMEOUT_MS` (~70 s) abort to the whole `POST /doctor`, while the daemon
 awaits every binding's checks sequentially. **Measured, and the finding is real:** each Telegram call carries
 `requestTimeoutMs()` = 20 s (`telegram.ts:244-247`), so one binding with a two-peer roster can legally take
-`20*(2+2*2)` = 120 s against a 70 s client budget. **But a client constant cannot bound it**, because
+`20*(2+2*2)` = 120 s against a 70 s client budget. **A client constant cannot bound it**, because
 `roster_snapshot` is uncapped (`registry/schema.ts:189`, `z.array(...).min(1)`), so no single number is an upper
-bound of the daemon's work. The durable fix is a daemon-side deadline that also caps how many probe DMs one
-request may send — a design change with a rate-limit interaction (`GROUP_MESSAGES_PER_MINUTE = 20`). Rather than
-ship a guessed number that pins nothing (the ADR-0012 anti-pattern this whole class is about), the measurement and
-two shapes are recorded on the B-85 row for the Director. **(3) stays open.**
+bound of the daemon's work.
+
+**The decision, taken in session 77 under the Director's delegation, is shape (b): accept the long tail and
+document it** — `docs/02-architecture/OVERVIEW.md` §10.4, where the DM probe's tier is described — on the reasoning
+that the probe is **opt-in**, an operator asked for it, and the `audit_log` `DOCTOR_PROBE` rows are the durable
+record of what was actually sent. **Shape (a) was rejected for now on a technical ground, not a preference:** a
+per-request deadline that only stops *awaiting* leaves the probe DMs going out anyway, which is the exact harm it
+is meant to remove, so a correct deadline needs an abort signal threaded into `src/daemon/telegram.ts` — a change
+of its own, with a rate-limit interaction (`GROUP_MESSAGES_PER_MINUTE = 20`). The row says to reopen it if someone
+takes that plumbing. Nothing was shipped that claims to bound the long tail.
 
 ## Non-goals
 
@@ -109,7 +115,7 @@ two shapes are recorded on the B-85 row for the Director. **(3) stays open.**
 | 1 | B-82 A1/A2/A3 | closure = 28 files, no secret-store, no network module; two mutations, each failing only the new pin while the old spy passes |
 | 2 | B-82 B1/B3/B4/B5 | see the unit's commit and its tests |
 | 3 | B-85 (2)/(4) | **(2)** pinned by dropping `audit_log`: the handler answers `HTTP 200`, the probe is `warn` with the audit note, and the earlier findings survive; RED observed first (the test failed while the handler still rejected). **(4)** a real `RoomGuardClient` is now in the probe's path — emptying its roster fails four tests, and the cross-project test asserts A's guard refuses B's peer (`WrongRoomError`) instead of inferring the boundary |
-| 4 | B-85 (3) | **not implemented, deliberately.** Measured: 20 s per Telegram call × `(2 + 2r)` per binding against a 70 s client budget, and the roster is uncapped, so no client constant is an upper bound. Measurement and two Director shapes recorded on the B-85 row |
+| 4 | B-85 (3) | **DECIDED as (b): documented, not fixed.** Measured 20 s per Telegram call × `(2 + 2r)` per binding against a 70 s client budget, with an **uncapped roster**, so no client constant is an upper bound. The bound is now documented where the operator reads it (`docs/02-architecture/OVERVIEW.md` §10.4) and the row carries the decision, the measurement and the reason shape (a) was rejected for now (a deadline that only stops awaiting leaves the DMs going out; it needs abort plumbing in `src/daemon/telegram.ts`) |
 
 ## Evidence to record at close
 
