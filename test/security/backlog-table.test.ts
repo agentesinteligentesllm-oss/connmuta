@@ -73,18 +73,78 @@ export interface RowViolation {
    * because a table cell cannot contain an unescaped pipe (`\|` is the escape).
    * `row-not-own-line` — a line that continues the row above it, which renders as a paragraph and
    * silently drops that row's trailing cells.
+   * `table-header` — the table opener (the header row or the delimiter row above the first body
+   * row) is absent or carries a different column count than the rows, which shifts every cell
+   * beneath it.
    */
-  readonly kind: "cell-count" | "row-not-own-line";
+  readonly kind: "cell-count" | "row-not-own-line" | "table-header";
   readonly detail: string;
+}
+
+/** A GFM table delimiter row: pipes, dashes and optional colons, and nothing else. */
+const DELIMITER_RE = /^\|[\s:|-]+\|$/;
+
+/**
+ * Validates the two lines that open the table the first row belongs to: the `| # | Item | … |`
+ * header row and the `|---|…|` delimiter directly above the first body row.
+ *
+ * An opener whose column count differs from its rows shifts every cell beneath it, which is the same
+ * class of damage as a raw pipe inside a cell — and it was invisible to this gate while the scan
+ * began *at* the first row and therefore never looked above it.
+ */
+function headerViolations(lines: readonly string[], firstRow: number): RowViolation[] {
+  const delimiterIndex = firstRow - 1;
+  const headerIndex = firstRow - 2;
+  const delimiter = lines[delimiterIndex];
+  const header = lines[headerIndex];
+
+  if (delimiter === undefined || !DELIMITER_RE.test(delimiter)) {
+    return [
+      {
+        line: firstRow + 1,
+        kind: "table-header",
+        detail:
+          'the first row is not preceded by a table delimiter row ("|---|…|"), so nothing above it is a table header and the rows below it render as paragraphs',
+      },
+    ];
+  }
+  if (header === undefined || !header.startsWith("|")) {
+    return [
+      {
+        line: firstRow + 1,
+        kind: "table-header",
+        detail: `the table delimiter on line ${delimiterIndex + 1} has no header row above it, so its columns are unnamed`,
+      },
+    ];
+  }
+
+  const violations: RowViolation[] = [];
+  for (const [index, role] of [
+    [headerIndex, "header row"],
+    [delimiterIndex, "delimiter row"],
+  ] as const) {
+    const line = lines[index] ?? "";
+    const pipes = separatorCount(line);
+    if (pipes !== EXPECTED_PIPES) {
+      violations.push({
+        line: index + 1,
+        kind: "table-header",
+        detail: `the table's ${role} carries ${pipes} cell separator(s), expected ${EXPECTED_PIPES} — an opener whose column count differs from its rows renders them misaligned`,
+      });
+    }
+  }
+  return violations;
 }
 
 /**
  * Scans one board document for rows that cannot render as rows.
  *
- * The scan starts at the first row and runs to the end of the file, because that is where the board
- * keeps its table: the legend and the column header sit above the first row, and everything after it
- * is rows. Blank lines and Markdown headings are allowed inside that region so the file can gain a
- * section later; anything else there is prose, and inside a table prose means a row was wrapped.
+ * The scan begins at the table the first row belongs to — its opener is validated by
+ * `headerViolations` first — and runs to the end of the file, because that is where the board keeps
+ * its table: the legend and the column header sit above the first row, and everything after it is
+ * rows. Blank lines are allowed inside that region, and a Markdown heading is allowed **only** when
+ * the line above it is blank: a heading glued to a row cannot be told apart from a wrapped
+ * continuation, and this gate exists to report that continuation rather than to explain it away.
  */
 export function scanRowShape(content: string): RowViolation[] {
   const lines = content.split(/\r?\n/);
@@ -93,10 +153,21 @@ export function scanRowShape(content: string): RowViolation[] {
     return [];
   }
 
-  const violations: RowViolation[] = [];
+  const violations: RowViolation[] = headerViolations(lines, firstRow);
   for (let index = firstRow; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
-    if (line.trim() === "" || line.startsWith("#")) {
+    if (line.trim() === "") {
+      continue;
+    }
+    if (line.startsWith("#")) {
+      if ((lines[index - 1] ?? "").trim() === "") {
+        continue;
+      }
+      violations.push({
+        line: index + 1,
+        kind: "row-not-own-line",
+        detail: `a heading glued to the row above it is reported rather than allowed, because a wrapped continuation and a heading are indistinguishable here: ${line.slice(0, 60)}…`,
+      });
       continue;
     }
     if (!ROW_RE.test(line)) {
@@ -119,6 +190,20 @@ export function scanRowShape(content: string): RowViolation[] {
   return violations;
 }
 
+/**
+ * The live board's row floor, as a function rather than an inline assertion, so a test can show the
+ * floor is load-bearing instead of trusting the live file to happen to be large.
+ *
+ * Returns the failure message, or `undefined` when the floor holds.
+ */
+export function rowFloorFailure(content: string): string | undefined {
+  const rows = content.split(/\r?\n/).filter((line) => ROW_RE.test(line)).length;
+  if (rows >= MINIMUM_EXPECTED_ROWS) {
+    return undefined;
+  }
+  return `expected the board to carry at least ${MINIMUM_EXPECTED_ROWS} rows, found ${rows} — the scan cannot be proven on a file it did not read`;
+}
+
 function read(relativePath: string): string {
   return readFileSync(join(REPO_ROOT, relativePath), "utf8");
 }
@@ -130,11 +215,8 @@ function describe(violations: readonly RowViolation[]): string {
 test("every row of the live board renders as a row (statically checked)", () => {
   const content = read(BACKLOG_RELATIVE_PATH);
 
-  const rowCount = content.split(/\r?\n/).filter((line) => ROW_RE.test(line)).length;
-  assert.ok(
-    rowCount >= MINIMUM_EXPECTED_ROWS,
-    `expected the board to carry at least ${MINIMUM_EXPECTED_ROWS} rows, found ${rowCount} — the scan cannot be proven on a file it did not read`,
-  );
+  const floorFailure = rowFloorFailure(content);
+  assert.ok(floorFailure === undefined, floorFailure);
 
   const violations = scanRowShape(content);
   assert.deepEqual(
@@ -147,18 +229,21 @@ test("every row of the live board renders as a row (statically checked)", () => 
 test("the seeded negative fixture fails the check (non-vacuous), and its escaped-pipe control passes", () => {
   const violations = scanRowShape(read(FIXTURE_RELATIVE_PATH));
 
-  assert.ok(
-    violations.some((violation) => violation.kind === "cell-count"),
-    `expected a raw pipe to be reported, got: ${JSON.stringify(violations)}`,
+  // Naming the exact set, not "some cell-count violation": dropping any one seeded defect must fail
+  // this test, and each line number is the row's identity in the fixture.
+  assert.deepEqual(
+    violations.map((violation) => ({ line: violation.line, kind: violation.kind })),
+    [
+      { line: 14, kind: "cell-count" }, // B-01: a raw pipe inside a cell → 8 separators
+      { line: 15, kind: "cell-count" }, // B-02's own first line, before its wrap → 2 separators
+      { line: 16, kind: "row-not-own-line" }, // B-02's wrap
+      { line: 17, kind: "cell-count" }, // B-03: `\\|` escapes the backslash → 8 separators
+    ],
+    `expected exactly the seeded defects of ${FIXTURE_RELATIVE_PATH}, got: ${JSON.stringify(violations)}`,
   );
-  assert.ok(
-    violations.some((violation) => violation.kind === "row-not-own-line"),
-    `expected a wrapped row to be reported, got: ${JSON.stringify(violations)}`,
-  );
-  assert.ok(
-    violations.some((violation) => violation.detail.startsWith("| B-03")),
-    `expected the backslash-pair (\\\\|) row to be reported, got: ${JSON.stringify(violations)}`,
-  );
+  assert.match(violations[0]?.detail ?? "", /B-01 carries 8 cell separator/);
+  assert.match(violations[1]?.detail ?? "", /B-02 carries 2 cell separator/);
+  assert.match(violations[3]?.detail ?? "", /B-03 carries 8 cell separator/);
   assert.ok(
     !violations.some((violation) => violation.detail.startsWith("| B-04")),
     `expected the correctly escaped row (\\|) to pass, got: ${JSON.stringify(violations)}`,
@@ -182,6 +267,75 @@ test("a well-formed board passes, including a legend and a heading above and ins
   assert.deepEqual(scanRowShape(content), []);
 });
 
-test("a file with no rows at all reports nothing, and the live file's floor is what rejects it", () => {
+test("a heading glued to the row above is reported, because a wrapped continuation and a heading are indistinguishable there", () => {
+  const content = [
+    "| # | Item | Origin | Phase | Status | Pointer |",
+    "|---|------|--------|-------|--------|---------|",
+    "| B-01 | **An item** | fixture | F1 | open | `x` |",
+    "# a continuation with no blank line above it",
+    "",
+  ].join("\n");
+
+  assert.deepEqual(
+    scanRowShape(content).map((violation) => ({ line: violation.line, kind: violation.kind })),
+    [{ line: 4, kind: "row-not-own-line" }],
+  );
+});
+
+test("a heading separated from the table by a blank line is still allowed inside the region", () => {
+  const content = [
+    "| # | Item | Origin | Phase | Status | Pointer |",
+    "|---|------|--------|-------|--------|---------|",
+    "| B-01 | **An item** | fixture | F1 | open | `x` |",
+    "",
+    "## A section heading",
+    "",
+  ].join("\n");
+
+  assert.deepEqual(scanRowShape(content), []);
+});
+
+test("a table header that does not carry the board's seven separators is reported, not skipped as being above the first row", () => {
+  const content = [
+    "| # | Item | Origin | Phase | Status |",
+    "|---|------|--------|-------|--------|---------|",
+    "| B-01 | **An item** | fixture | F1 | open | `x` |",
+  ].join("\n");
+
+  assert.deepEqual(
+    scanRowShape(content).map((violation) => ({ line: violation.line, kind: violation.kind })),
+    [{ line: 1, kind: "table-header" }],
+  );
+});
+
+test("a delimiter row whose column count differs from the board's is reported", () => {
+  const content = [
+    "| # | Item | Origin | Phase | Status | Pointer |",
+    "|---|------|--------|-------|--------|",
+    "| B-01 | **An item** | fixture | F1 | open | `x` |",
+  ].join("\n");
+
+  assert.deepEqual(
+    scanRowShape(content).map((violation) => ({ line: violation.line, kind: violation.kind })),
+    [{ line: 2, kind: "table-header" }],
+  );
+});
+
+test("a first row with no table opener above it is reported", () => {
+  const content = ["| B-01 | **An item** | fixture | F1 | open | `x` |", ""].join("\n");
+
+  assert.deepEqual(
+    scanRowShape(content).map((violation) => ({ line: violation.line, kind: violation.kind })),
+    [{ line: 1, kind: "table-header" }],
+  );
+});
+
+test("a file with no rows at all reports nothing, and the row floor is what rejects it", () => {
   assert.deepEqual(scanRowShape("no table here\n"), []);
+
+  const floorFailure = rowFloorFailure("no table here\n");
+  assert.ok(
+    floorFailure !== undefined && floorFailure.includes(`at least ${MINIMUM_EXPECTED_ROWS} rows`),
+    `expected the row floor to reject a document with no rows, got: ${String(floorFailure)}`,
+  );
 });
