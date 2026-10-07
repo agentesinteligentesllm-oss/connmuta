@@ -10,7 +10,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { openLedger } from "../../../src/ledger/open.js";
 import { commitInboxBatch, type InboxApplyOutcome, type InboxBatchEntry, type InboxUpdateInput } from "../../../src/ledger/inbox.js";
 import { writeThreadRecord } from "../../../src/ledger/threads.js";
-import { readClientCursor, readSurfacedThreads } from "../../../src/ledger/cursors.js";
+import { commitClientCursor, ensureClientCursor, readClientCursor, readSurfacedThreads } from "../../../src/ledger/cursors.js";
 import type { AuditRow } from "../../../src/ledger/audit.js";
 import type { ThreadRecord } from "../../../src/shared/thread-record.js";
 import type { RejectionReason } from "../../../src/shared/protocol-apply.js";
@@ -399,6 +399,59 @@ test("two clients each see the full batch once, and advancing one leaves the oth
 		await serveFetch({}, { db, binding, session: sampleSession("client-a"), now: () => new Date(LATER) });
 		const afterB = readClientCursor(db, "client-b");
 		assert.deepEqual(afterB, beforeB, "advancing client-a must leave client-b's cursor untouched");
+	});
+});
+
+/**
+ * ADR-0038 pin 3 — the pin that carries the decision. A ring that resolved without being delivered is accepted
+ * as best-effort **only because** the message row survives it, and the reason is a cursor split: the cursor the
+ * host adapter's watcher advances is its own daemon session's row, never the one `conmuta_fetch` reads. This
+ * asserts that directly over the two `client_cursors` rows — the doorbell's and the session's — instead of
+ * inferring it from `src/daemon/serve/fetch.ts` or from the doorbell route.
+ *
+ * Pin 1 (a rejected deliver is `deliver_failed` and the cursor is not advanced) and pin 2 (a cooldown merge
+ * resolves and the cursor is) are pinned where they live: `test/channel/doorbell-loop.test.ts` for the watcher
+ * half and `test/channel-pi/host.test.ts` for the adapter half.
+ */
+const RING_CLIENT_ID = "pi-host-doorbell";
+test("a resolved-but-undelivered ring consumes nothing: advancing the doorbell cursor leaves the session's own cursor and its fetch untouched (ADR-0038 pin 3)", async () => {
+	await withLedger(async (db) => {
+		const seq = seedUpdateRow(db, {
+			update_id: 1,
+			eid: "eid-best-effort-1",
+			thread: "thread-best-effort-1",
+			to: AGENT_ID,
+			received_at: NOW,
+			body: "the ring never reached the session, and this row is still its to read",
+		});
+
+		// The two cursor roles, side by side. `RING_CLIENT_ID` is the host adapter's own daemon session
+		// (`channel-pi/constants.ts`, `PI_DOORBELL_HOST_LABEL`), whose cursor `DoorbellWatcher` commits through
+		// `POST /channel/cursor` -> `commitClientCursor` after a resolved ring (`channel/doorbell-loop.ts`). The
+		// session's own `conmuta_fetch` reads the other row, through `serveFetch`, and its client_id is arbitrary.
+		const SESSION_CLIENT_ID = "client-session";
+		ensureClientCursor(db, { client_id: RING_CLIENT_ID, project_id: PROJECT_ID, host: RING_CLIENT_ID, started_at: NOW, now: NOW });
+		ensureClientCursor(db, { client_id: SESSION_CLIENT_ID, project_id: PROJECT_ID, started_at: NOW, now: NOW });
+		assert.equal(readClientCursor(db, SESSION_CLIENT_ID)?.inbox_seq, 0, "sanity: the session starts before the row");
+
+		// The ring resolved and was never delivered, so the watcher commits the doorbell cursor.
+		commitClientCursor(db, RING_CLIENT_ID, seq, LATER);
+		assert.equal(readClientCursor(db, RING_CLIENT_ID)?.inbox_seq, seq, "sanity: the doorbell cursor really advanced");
+		assert.equal(
+			readClientCursor(db, SESSION_CLIENT_ID)?.inbox_seq,
+			0,
+			"advancing the doorbell cursor must not move the session's own cursor",
+		);
+
+		const result = await serveFetch(
+			{},
+			{ db, binding: sampleBinding(), session: sampleSession(SESSION_CLIENT_ID), now: () => new Date(LATER) },
+		);
+		assert.deepEqual(
+			result.log.map((entry) => entry.eid),
+			["eid-best-effort-1"],
+			"the message the ring failed to announce is still the session's to read",
+		);
 	});
 });
 

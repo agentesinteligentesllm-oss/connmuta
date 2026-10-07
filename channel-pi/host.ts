@@ -31,7 +31,12 @@ import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "./constants.js";
  *    reported to the host's own error surface and never reaches this function, so the ring resolves, the watcher
  *    commits the cursor, and that window is not re-read. The *message* is not lost — the doorbell cursor is not
  *    the session's own client cursor, so the session still sees the row when it fetches — but the ring is not
- *    retried and the session is not told. Making that half verifiable is the design decision filed as its own row.
+ *    retried and the session is not told. That half is **accepted, not open**: the ring is best-effort and that is
+ *    decided (ADR-0038, option (b), confirmed 2026-10-07), and the bound is pinned by a test rather than narrated
+ *    here — a ring that resolved without being delivered leaves the *message* visible to the session's own client
+ *    cursor, which is the property that makes best-effort acceptable (`test/daemon/serve/fetch.test.ts`). The
+ *    *message* stays guaranteed while the nudge does not; the half this function *can* see, the stale-context
+ *    throw just above, keeps being retried.
  *
  * The PR #106 audit read only the lower layer, concluded the API “cannot throw”, and the writer corrected this
  * file on that report; the follow-up audit read the upper layer and found the correction itself wrong. What

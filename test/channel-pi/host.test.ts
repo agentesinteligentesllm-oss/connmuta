@@ -1,9 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { ChannelNotification } from "../../channel/notify.js";
 import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "../../channel-pi/constants.js";
 import { createPiRinger, type PiMessenger } from "../../channel-pi/host.js";
+
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 /**
  * `channel-pi/host.ts` (ADR-0036, ODD task `odd/tasks/f7c-pi-host-doorbell.md` T1). What this file
@@ -76,14 +81,18 @@ test("the ring is attributable, so it can never be read as the human's own messa
 	assert.notEqual(sent[0].message.customType, "", "an empty custom type would make the ring unattributable");
 });
 
-test("a second ring inside the cooldown is merged, not queued, and it resolves so the watcher can advance its cursor", async () => {
+test("a second ring inside the cooldown is merged, not queued, and it resolves so the watcher can advance its cursor (ADR-0038 pin 2)", async () => {
 	let clock = 0;
 	const { sent, pi } = recordingPi();
 	const ring = createPiRinger({ pi, now: () => clock });
 
 	await ring(notification());
 	clock = PI_RING_COOLDOWN_MS - 1;
-	await ring(notification());
+	// The merged call must RESOLVE, not reject. The watcher commits its cursor only after `deliver` settles, so a
+	// rejection here would look like a delivery failure and make it back off and re-read a window it just handled.
+	// This is the adapter half of ADR-0038 pin 2; the watcher half (a resolved `deliver` is followed by the cursor
+	// commit) is pinned in `test/channel/doorbell-loop.test.ts`.
+	await assert.doesNotReject(ring(notification()));
 
 	assert.equal(sent.length, 1, "a ring inside the cooldown must not start another turn");
 });
@@ -108,7 +117,9 @@ test("a host failure propagates instead of being swallowed, so the watcher repor
 	// what `throwingPi` fabricates, and what session 72 measured live. An earlier correction in this PR renamed
 	// this test on the belief that the host cannot throw; that belief came from reading only the runtime layer
 	// beneath this one, and it was wrong. The half the host really does swallow is the *asynchronous* rejection,
-	// which is the design decision filed as B-119 and documented in the module.
+	// which is the disposition ADR-0038 accepts (best-effort) and the module documents. The watcher's half of
+	// ADR-0038 pin 1 — a rejected `deliver` is `deliver_failed`, the cursor is NOT advanced, and the same window
+	// is read again — is pinned in `test/channel/doorbell-loop.test.ts`.
 	const ring = createPiRinger({ pi: throwingPi() });
 
 	await assert.rejects(() => ring(notification()), /stale after session replacement or reload/);
@@ -134,4 +145,31 @@ test("a failed ring does not start the cooldown, so the retry can still ring", a
 	await ring(notification());
 
 	assert.equal(sent.length, 1, "a ring that never landed must not suppress the next one");
+});
+
+/**
+ * ADR-0038 pin 4 (2026-10-07): the module doc and the runbook say the same thing as these tests — best-effort
+ * for the ring, guaranteed for the message — so the three cannot drift apart silently. A static text check is
+ * the smallest honest shape: the guarantee is prose for an operator, and no behaviour asserts it.
+ */
+const GUARANTEE_DOCS: ReadonlyArray<{ readonly label: string; readonly path: string; readonly phrases: readonly RegExp[] }> = [
+	{
+		label: "`channel-pi/host.ts`'s module doc",
+		path: "channel-pi/host.ts",
+		phrases: [/best-effort/i, /message[*_]* (?:is not lost|stays guaranteed)/i, /ADR-0038/],
+	},
+	{
+		label: "the runbook",
+		path: "docs/runbooks/host-doorbell-pi.md",
+		phrases: [/best-effort/i, /message is guaranteed/i, /ADR-0038/, /retried/i, /pinned by a test/i],
+	},
+];
+
+test("the module doc and the runbook state the same guarantee as these tests: the ring is best-effort, the message is guaranteed (ADR-0038 pin 4)", () => {
+	for (const { label, path, phrases } of GUARANTEE_DOCS) {
+		const text = readFileSync(join(REPO_ROOT, path), "utf8");
+		for (const phrase of phrases) {
+			assert.match(text, phrase, `${label} must state ${phrase}`);
+		}
+	}
 });

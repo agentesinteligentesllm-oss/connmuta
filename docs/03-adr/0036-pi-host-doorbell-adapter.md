@@ -290,3 +290,33 @@ is **one id-free entry at the user level** ([ADR-0033](./0033-project-flag-as-as
 invisible to a subfolder session and to a headless run, which is filed as
 [B-131](../06-backlog/CHECKLIST.md). The runbook gained the precondition and the symptom and names the check,
 `pi mcp list`; [B-130](../06-backlog/CHECKLIST.md) carries the measurement and this disposition.
+
+### Amendment (2026-10-07, second) — the host-push plane's guarantee, stated exactly
+
+**What this adds.** Decision 5 above says the ring "can read the inbox and it can reply", and the "Not
+promised" bullet already declines to promise delivery. This amendment states the guarantee in the form the
+tests pin, because [ADR-0038](./0038-a-ring-is-best-effort.md) decided it — option (b), confirmed by the
+Director on 2026-10-07 — rather than leaving it as prose: **the message is guaranteed, the nudge is
+best-effort.**
+
+**The two layers, restated because the tests assert them separately.** A ring attempted against a stale
+context throws synchronously (`assertActive`), the throw reaches the `DoorbellWatcher`, which records
+`deliver_failed` and does **not** advance its cursor, so that window is read again — the detectable half is
+retried. A *live* session's failed delivery is swallowed one layer down, where the runtime binds a `.catch`
+and the extension-facing declaration is `void`: there is no value at the call site that distinguishes
+delivered from swallowed, so that half resolves, the cursor advances, and no retry happens. There is no UI
+surface for it and this amendment invents none; the runbook carries the operator-facing half.
+
+**Why best-effort is acceptable, and what makes it a bound rather than a hope.** The doorbell cursor this
+adapter advances belongs to its own daemon session (`pi-host-doorbell`), not to the session's own client
+cursor, so a swallowed ring consumes nothing: the row is still there on the session's next `conmuta_fetch`.
+That property is **pinned directly** over the two `client_cursors` rows by a test
+(`test/daemon/serve/fetch.test.ts`, ADR-0038's pin 3), which is what this amendment rests on — the same rule
+ADR-0012 states, applied to a statement that would otherwise be narration. ADR-0038 lists the three companion
+pins: the retried throw, the cooldown merge that is not a failure, and the documentation consistency that
+keeps this amendment, `channel-pi/host.ts`'s module doc and the runbook from drifting apart silently.
+
+**What this does not change.** No behaviour, no layer rule, no wire behaviour, and nothing in
+`channel/doorbell-loop.ts`, which must not branch on the link's error code. Option (a) — making delivery
+verifiable and refusing to advance the cursor — stays open if a future host exposes a delivery result; today
+the signal does not exist, and the runbook says so.

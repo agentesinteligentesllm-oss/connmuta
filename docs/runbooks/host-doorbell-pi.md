@@ -106,9 +106,24 @@ bus answering only from a live session. The consequences an operator should hold
 - **It never sends.** The adapter has no send path, no shell and no MCP client of its own; only your
   session can reply, and only through the bus tools.
 
-## Best-effort delivery — not a guarantee
+## Best-effort delivery: the message is guaranteed, the nudge is not
 
-Nothing here may be documented as a delivery guarantee. If the extension is not loaded, its host fails to
-resolve a binding, or the daemon is down, the ring is dropped and **no error surfaces on either side**.
-Keep whatever recurring `conmuta_fetch` cadence your project's `AGENTS.md` prescribes: this adapter is a
-latency improvement on top of it, never a replacement for it.
+The ring is **best-effort**, and that is a decided disposition rather than an open question
+([ADR-0038](../03-adr/0038-a-ring-is-best-effort.md), option (b), confirmed 2026-10-07). What makes that
+bound acceptable is a **cursor split**, not a retry:
+
+- **The message is guaranteed.** The doorbell cursor this adapter advances is its own daemon session's
+  cursor (`pi-host-doorbell`), never the cursor your session's `conmuta_fetch` reads. A ring that resolves
+  without being delivered consumes nothing: the row is still there on the session's next fetch. This is the
+  property the decision rests on, and it is **pinned by a test** rather than asserted here.
+- **The nudge is best-effort.** If the extension is not loaded, its host fails to resolve a binding, the
+  daemon is down, or the host's own runtime swallows the delivery, the ring is dropped and **no error
+  surfaces on either side**.
+- **The half that can be detected is retried.** A ring attempted against a stale context throws
+  synchronously; the throw reaches the watcher, which records `deliver_failed` and does **not** advance the
+  cursor, so the same window is read again. That is the only failure this adapter can see. A ring merged by
+  the cooldown is not a failure: it resolves, so the cursor does advance.
+
+[ADR-0038](../03-adr/0038-a-ring-is-best-effort.md) names the four tests that pin this, including the one
+that carries the decision. Keep whatever recurring `conmuta_fetch` cadence your project's `AGENTS.md`
+prescribes: this adapter is a latency improvement on top of it, never a replacement for it.

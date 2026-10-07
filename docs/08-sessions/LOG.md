@@ -10,6 +10,36 @@
 > log and `HANDOFF.md` seem to attribute that closure differently. Both `CHECKLIST.md`'s B-110 row and the handoff
 > say **session 64**, and both are right. Nothing is invented here to fill the gap.
 
+## 2026-10-07 (fourth unit) — B-119: the ring is best-effort, and the bound is a test
+
+- **Date**: 2026-10-07 local. The second of the two ADR confirmations the Director delegated with full authority;
+  option (b) taken, matching ADR-0038's recommendation.
+- **What closed**: **B-119** — ADR-0038 `accepted` and implemented, and ADR-0036 gained its **fourth amendment**
+  stating the same guarantee: **the message is guaranteed, the nudge is best-effort.**
+- **The reasoning, in one line**: the extension-facing `sendMessage` is declared `void`, so no value at the call
+  site distinguishes delivered from swallowed; refusing an undecidable outcome would turn every cooldown-merged
+  ring into a back-off loop; and best-effort is acceptable because the cursor the watcher advances is its own
+  daemon session's (`pi-host-doorbell`), never the session's own, so a swallowed ring consumes nothing.
+- **The pins, and where each lives.** Pin 3 — the one that carries the decision — is asserted **directly** over
+  the two `client_cursors` rows in `test/daemon/serve/fetch.test.ts`: the doorbell cursor really advances, the
+  session cursor does not move, and `serveFetch` still returns the row. Pins 1 and 2 were verified where they
+  already live (`test/channel-pi/host.test.ts` for the adapter halves, `test/channel/doorbell-loop.test.ts` for
+  the watcher halves) and extended rather than duplicated; pin 4 is a static consistency check over
+  `channel-pi/host.ts`'s module doc and the runbook.
+- **Delegation**: `gentle-ai-worker` on five surfaces. It chose the fetch fixture for pin 3 and explained why the
+  doorbell test could not carry it — that file snapshots `client_cursors` but never exercises the session-side
+  read — and reported its own mutation evidence for all four pins.
+- **The parent falsified the report instead of quoting it.** Pin 3 was mutated from the **production** side
+  (patching the compiled cursor commit so it advances every row), which fails exactly pin 3 (45/46), and passes
+  once restored (46/46); every diff was read, and the focused suites (106/106) and the full suites were re-run by
+  the parent.
+- **Verification**: `npm test` **1976/1970/0/6**, `test:static` **129/129**, `%TEMP%` 0 -> 0.
+- **Residual, disclosed**: pin 4 detects the three artifacts drifting apart, not whether the prose is strong, and
+  pins 1/2's watcher halves are outside the writer's surfaces (confirmed passing, not mutated by the parent).
+- **How it knows**: `git diff` over the five surfaces; the focused and full suite runs; the production-side
+  mutation of the compiled cursor commit; `docs/03-adr/0036-pi-host-doorbell-adapter.md`, `channel-pi/host.ts` and
+  the runbook read at their declarations.
+
 ## 2026-10-07 (third unit) — B-117: a record argument is refused by shape, and its review was declined
 
 - **Date**: 2026-10-07 local. After the Director delegated four decisions with full authority — the two ADR
