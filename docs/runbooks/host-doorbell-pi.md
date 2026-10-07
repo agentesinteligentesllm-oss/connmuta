@@ -25,6 +25,13 @@ Pi the doorbell is held by a **host extension** instead, which is why arming loo
    directory ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md)).
 3. **Know where the built extension is.** In this repository it is `dist/channel-pi/main.js` after
    `npm run build`. Published, it arrives with the package under the same relative path.
+4. **Have the bus MCP tools in the session you want rung.** The ring starts a turn *in your session*, and
+   that turn can only fetch if `conmuta_*` is there: `pi mcp list` in that cwd must show
+   `conmuta: connected, 4 tools`. The recommended registration is **one id-free entry at the user level**
+   ([ADR-0033](../03-adr/0033-project-flag-as-assertion.md), [ADR-0034](../03-adr/0034-id-free-installer-entry.md));
+   a project-level entry of the same name **replaces** it, which is how a session in a subfolder, or a
+   headless run with nobody to answer a trust prompt, loses the tools while another cwd keeps them
+   (**B-131**).
 
 ## Step 1: load the extension
 
@@ -66,14 +73,20 @@ host's notification surface when something is wrong:
 - `pi-host-doorbell: no live daemon run file` (or a handshake failure) — the daemon is not running, or the
   run file is stale. The loop backs off and retries; it does not exit.
 - Nothing at all is the healthy case: a quiet bus rings nothing.
+- **A ring arrives and the session carries no `conmuta_*` tools** — the ring is fired on doorbell traffic,
+  never on the read path's availability, so a session without the bus MCP cannot act on it: check
+  `pi mcp list` in that cwd before suspecting the adapter. Filed as **B-130**.
 
 To see it work, have a roster peer send a directed message or a broadcast. The session shows a
 `custom_message` entry of type `conmuta-doorbell` and **starts a turn** on it; the text names the count,
 the senders and the threads, and tells the session to fetch. Bodies are not in the ring — they arrive when
 the session calls `conmuta_fetch`.
 
-Identify the adapter's own session on the daemon side by its host label, `pi-host-doorbell`
-(`conmuta status`, `conmuta doctor`).
+Identify the adapter's own session on the daemon side by its host label, `pi-host-doorbell` — the label it
+mints its daemon session with (`channel-pi/constants.ts`). **No CLI verb prints the session list in this
+build**: `conmuta status` and `conmuta doctor` are named in earlier drafts of this page but neither is wired
+(`doctor`'s verb dispatch is a disclosed deferral, `src/cli/main.ts`), so the followable location is the row
+itself — the daemon ledger's `client_cursors` table, column `host`.
 
 ## What the ring does, and how to stop it
 
