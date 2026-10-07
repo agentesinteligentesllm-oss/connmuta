@@ -182,7 +182,18 @@ function checkAcl(dirPath: string, id: string, execImpl: ExecFileImpl | undefine
 	}
 
 	if (process.platform !== "win32") {
-		const mode = statSync(dirPath).mode & 0o777;
+		// Guarded exactly like the win32 branch below (B-82). An `EACCES` — or any other stat failure that
+		// `existsSync` above did not predict — would otherwise escape `runSystemChecks` and destroy every other
+		// finding in the report, which is the opposite of this module's "every check is independently fail-safe"
+		// discipline. **Disclosed: no test can fail on this guard here.** The branch runs only where
+		// `process.platform !== "win32"`, this repository has no POSIX CI leg (B-24), and the failure cannot be
+		// fabricated portably — so the guard is carried by the type-checker and this comment, not by a pin.
+		let mode: number;
+		try {
+			mode = statSync(dirPath).mode & 0o777;
+		} catch (error) {
+			return { id, status: "fail", detail: `could not stat ${dirPath}: ${describeError(error)}` };
+		}
 		const ok = mode === POSIX_PRIVATE_DIR_MODE;
 		return {
 			id,
