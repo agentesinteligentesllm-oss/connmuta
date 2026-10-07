@@ -40,8 +40,8 @@ around. `test/security/closure.ts` already exports `computeClosure`/`bareSpecifi
 promised this half ("design.md §9.1's static half is Unit 11's job") — it had never been written. Two new pins:
 
 1. the offline entry's relative-import closure reaches **no `src/secret-store/**` module**; and
-2. that closure's bare specifiers include **no network module** (`node:http`, `node:https`, `node:net`,
-   `node:dgram`, `node:tls`, `undici`).
+2. that closure's bare specifiers include **no network-protocol module** (`node:http`, `node:http2`, `node:https`,
+   `node:net`, `node:dgram`, `node:tls`, `undici`).
 
 **Measured at HEAD: the closure is 28 files** (`src/doctor/2`, `src/installer/10`, `src/ledger/4`, `src/registry/4`,
 `src/shared/7`, `src/daemon/1`), with no `secret-store` and no network module. The runtime spies stay, extended to
@@ -90,8 +90,9 @@ hard-coded list beside it — the comparison pins composition, the list pins con
 
 The client applies one `IPC_REQUEST_TIMEOUT_MS` (~70 s) abort to the whole `POST /doctor`, while the daemon
 awaits every binding's checks sequentially. **Measured, and the finding is real:** each Telegram call carries
-`requestTimeoutMs()` = 20 s (`telegram.ts:244-247`), so one binding with a two-peer roster can legally take
-`20*(2r+1)` = 140 s for a three-entry roster against a 70 s client budget. **A client constant cannot bound it**, because
+`requestTimeoutMs()` = 20 s (`telegram.ts:244-247`), so a roster of `r` entries (the bot itself plus `r-1` peers)
+costs `2r+1` Telegram calls — `getMe` + `getChat` + one `getChatMember` per entry + one DM per non-self peer — and a
+three-entry roster is therefore **7 calls x 20 s = 140 s** against a 70 s client budget. **A client constant cannot bound it**, because
 `roster_snapshot` is uncapped (`registry/schema.ts:189`, `z.array(...).min(1)`), so no single number is an upper
 bound of the daemon's work.
 
