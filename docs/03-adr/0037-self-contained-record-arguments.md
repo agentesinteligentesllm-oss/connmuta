@@ -2,9 +2,11 @@
 
 ## Status
 
-`proposed` — pending Director confirmation. Written by session 76 on 2026-10-06 to close the open design
-question of **B-117**; the row explicitly reserved the choice to the Director, so nothing in
-`runner/harness.ts` or `runner/constants.ts` changes until this ADR is confirmed.
+`accepted` — confirmed by the Director on 2026-10-07, who delegated the choice among the options below with full
+authority and left it to the maintainer's judgement; option (c) was taken. Implemented the same day in
+`runner/constants.ts` (`VALUE_LESS_ARGUMENTS`) and `runner/harness.ts` (`isAcceptedRecordArgumentShape` and the
+distinct `argument_shape_invalid` reason), with the five pins below. Written by session 76 on 2026-10-06 to close
+the open design question of **B-117**, whose row had reserved the choice to the Director.
 
 ## Date
 

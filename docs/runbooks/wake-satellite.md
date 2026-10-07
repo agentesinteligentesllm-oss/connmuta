@@ -88,9 +88,12 @@ agree. `ladder get|set|disable` do not need it: they are machine-local and never
 
 `--harness` is mandatory for `wake` and `autopilot` because it decides **which program gets executed**; the
 four names the runner will ever run are `pi`, `claude`, `codex` and `opencode`. Additional literal arguments
-are allowed (`--arg=--model --arg=placeholder-model`); a value beginning with `--` must use the `=` form.
-Arguments that would defeat the closed-executable rule (`-c`, `eval`, `--dangerously-skip-permissions`, …) are
-refused when the record is used.
+are allowed (`--arg=--model=placeholder-model`), and a record flag that **takes a value must be written
+`--name=value`** as one token — `--arg=--model` followed by `--arg=placeholder-model` is two bare tokens and is
+refused, because a bare flag could swallow the first token of the appended send-proof profile. A bare flag is
+accepted only when it is on the named value-less allow-list (`VALUE_LESS_ARGUMENTS` in `runner/constants.ts`,
+empty today), and a positional — `@file` included — is refused. Arguments that would defeat the
+closed-executable rule (`-c`, `eval`, `--dangerously-skip-permissions`, …) are refused when the record is used.
 
 > **On Windows, none of the four can be started as they are installed** — npm ships them as `.cmd` shims and a
 > shell-free spawn refuses them (`EINVAL`). The failure is **silent**: the message stays pending and the ledger
@@ -195,10 +198,13 @@ the built-in MCP extension, so there is no `conmuta_*` tool to call; `--tools re
   replace it, because a later `--tools` wins and the record's own `--tools` is refused. `--no-extensions` is
   depth, not the floor: a record argument that *consumes the next argv element* and is placed last — `--model`,
   `--provider`, `--system-prompt`, `--api-key`, `--session`, `--thinking`, … none of which is a widening flag
-  and none of which a deny-list names — swallows it, so extensions load again, the built-in MCP extension
-  included. The bus tools stay out of reach because `--tools` still holds, and that is the measured bound. It
-  is disclosed rather than argued away: a deny-list can only refuse the tokens it names, and the structural
-  alternative (parse the resolved argv and refuse on mismatch) is filed as its own backlog row.
+  and none of which a deny-list names — would swallow it, so extensions would load again, the built-in MCP
+  extension included. The bus tools stay out of reach because `--tools` still holds, and that is the measured
+  bound. What closes the swallow is the **shape rule** (ADR-0037), not the deny-list: a record argument that
+  takes a value must be written self-contained as `--name=value`, a bare flag is accepted only when it is on the
+  named value-less allow-list, and anything else — a positional, `@file` included — is refused. A `--name=value`
+  token cannot consume the next element, so the swallow is **unrepresentable** rather than enumerated, and a new
+  host flag is refused by shape until it is written that way.
 - A level or harness with **no verified send-proof profile is refused, never started with its full toolset**:
   `autopilot`, and `wake` on `claude`, `codex` and `opencode`. The refusal is recorded in the wake ledger as
   `refused (profile_unavailable)` — not a silent drop.
@@ -301,6 +307,7 @@ despertador at all, `conmuta-runner ladder set --project "<id>" --level notify -
 | `off (unknown_level)` | A typo in the level. Re-arm. |
 | `refused (cooldown)` / `(budget_exhausted)` | Working as designed; the message stays pending. |
 | `refused (arguments_refused)` | The record's `--arg` list contains an interpreter, a permission-bypass flag, the option terminator `--`, or a flag that would replace the send-proof profile (`--tools`, `--no-extensions`, `-e`, …). Note that `ladder set` does **not** pre-validate the list, so a record carrying one of these is written successfully and only refuses at the first tick — the message stays pending. |
+| `refused (argument_shape_invalid)` | The record's `--arg` list has an entry that is not **self-contained**: a flag that takes a value must be written `--name=value` (`--arg=--model=placeholder-model`, not `--arg=--model --arg=placeholder-model`), a bare flag is accepted only when it is on the named value-less allow-list (`VALUE_LESS_ARGUMENTS` in `runner/constants.ts`, empty today), and a positional — `@file` included — is always refused. `ladder set` does **not** pre-validate the list, so the record is written successfully and only refuses at the first tick — the message stays pending. |
 | `refused (profile_unavailable)` | The level or harness has no verified send-proof profile — `autopilot`, or `wake` on `claude`/`codex`/`opencode`. Nothing was started; the message stays pending. |
 | `refused (in_flight)` | A turn is still running. It is bounded by the ten-minute turn timeout. |
 | `link_failed` | No live daemon for this user, or the run file's daemon died. Start the daemon and run again. |

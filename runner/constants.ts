@@ -105,6 +105,24 @@ export const REFUSED_ARGUMENTS = [
 ] as const;
 
 /**
+ * The short, named allow-list of record arguments accepted **bare**, because the host documents them as
+ * taking no value (ADR-0037's shape rule, enforced in `runner/harness.ts`). Every other bare token beginning
+ * with `-` is refused (`argument_shape_invalid`): a flag that can consume the next argv element is exactly
+ * the shape that swallows the first token of the appended send-proof profile, so `--name=value` is the only
+ * accepted form for a flag that takes a value.
+ *
+ * It starts **empty** on purpose. No verified send-proof profile needs a bare value-less record flag today:
+ * the only live profile is `wake` on `pi`, and the flags a `pi` turn usefully takes either accept a value —
+ * so they are written self-contained as `--name=value` — or are already refused by name in
+ * {@link REFUSED_ARGUMENTS}. An empty allow-list is the fail-closed default, and it costs an operator
+ * nothing until a legitimate bare flag actually appears.
+ *
+ * Adding an entry is a **reviewed decision**, not a convenience: every entry is a claim that the named flag
+ * takes no value, and a wrong claim re-opens the swallow this allow-list exists to keep unrepresentable.
+ */
+export const VALUE_LESS_ARGUMENTS: readonly string[] = [];
+
+/**
  * The **send-proof capability profile** a woken turn is started under, per harness (ADR-0032 R5/R7; the
  * Director's order of 2026-10-05: *no woken turn may send anything, directly or indirectly*). The runner
  * appends these arguments **after** the record's own `harness_args`, so nothing an operator records can
@@ -142,14 +160,18 @@ export const REFUSED_ARGUMENTS = [
  * is wrong *opens* a send path. So an unmeasured `null` is not the defect to fix first; a `null` replaced by an
  * unmeasured profile would be.
  *
- * **What this profile does and does not guarantee — measured by the audit of 2026-10-05.** It is appended
- * after the record's own arguments, so a record cannot replace the tool list: a later `--tools` wins, and the
- * record's own `--tools` is refused. That tool allowlist is the floor — it is what removes `bash` and every
- * `conmuta_*` tool. `--no-extensions` is depth on top of it: a record argument that consumes the next argv
- * element and is placed last (`--model`, `--provider`, `--system-prompt`, `--api-key`, `--session`, …) swallows
- * it, so extensions load again. That is a deny-list's real limit — it can only refuse the tokens it names — so
- * it is disclosed here rather than claimed away, and the structural alternative (parse the resolved argv and
- * refuse on mismatch, which would couple this module to the host's parser) is filed as its own backlog row.
+ * **What this profile guarantees, and the shape rule that keeps it** (measured by the audit of 2026-10-05;
+ * closed by ADR-0037 on 2026-10-07). It is appended after the record's own arguments, so a record cannot
+ * replace the tool list: a later `--tools` wins, and the record's own `--tools` is refused. That tool allowlist
+ * is the floor — it is what removes `bash` and every `conmuta_*` tool. `--no-extensions` is depth on top of it,
+ * and that depth used to be bypassable: a record argument that consumes the next argv element and is placed
+ * last (`--model`, `--provider`, `--system-prompt`, `--api-key`, `--session`, …) swallowed it, so extensions
+ * loaded again. That is a deny-list's real limit — it can only refuse the tokens it names — so the runner now
+ * also classifies a record argument by **shape** before this profile is appended
+ * (`isAcceptedRecordArgumentShape`, ADR-0037): a flag that takes a value must be self-contained
+ * (`--name=value`), and a bare flag is refused unless it is on {@link VALUE_LESS_ARGUMENTS}. The swallow is
+ * therefore **unrepresentable** rather than enumerated, and it stays closed for a host flag nobody has seen
+ * yet. The floor is untouched: `--tools` still wins and the record's own copy is still refused.
  */
 export const SEND_PROOF_PROFILES: Readonly<Record<HarnessName, readonly string[] | null>> = {
   pi: ["--no-extensions", "--tools", "read,grep,find,ls"],

@@ -54,6 +54,10 @@ export type RefusalReason =
 	| "budget_exhausted"
 	| "harness_unknown"
 	| "arguments_refused"
+	/** ADR-0037's shape rule: a record argument is not self-contained (`--name=value`) and is not a bare
+	 * flag on the named value-less allow-list. Distinct from `arguments_refused` on purpose, so an operator
+	 * can tell "this flag is forbidden" from "this flag must be written `--name=value`". */
+	| "argument_shape_invalid"
 	/** No verified send-proof profile covers this level/harness pair, so no turn was started (2026-10-05). */
 	| "profile_unavailable";
 

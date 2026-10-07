@@ -120,21 +120,91 @@ test("harness: a level/harness pair with no verified send-proof profile is refus
 
 test("harness: the send-proof profile is appended last, after the record's own arguments", () => {
 	const resolved = resolveHarnessSpec(
-		entry({ harness: "pi", level: "wake", harness_args: ["--model", "placeholder-model"] }),
+		entry({ harness: "pi", level: "wake", harness_args: ["--model=placeholder-model"] }),
 		PROMPT,
 	);
 	assert.equal(resolved.kind, "spec");
 	if (resolved.kind === "spec") {
 		assert.deepEqual(resolved.spec.argv, [
 			"-p",
-			"--model",
-			"placeholder-model",
+			"--model=placeholder-model",
 			"--no-extensions",
 			"--tools",
 			"read,grep,find,ls",
 			PROMPT,
 		]);
 	}
+});
+
+test("harness: a bare value-consuming flag is refused by shape, and its `--name=value` form resolves (ADR-0037 pin 1)", () => {
+	// A record ending in a bare value-consuming flag swallows the profile's first token in the host's parse:
+	// `--no-extensions` becomes that flag's value, so extension discovery returns. The shape rule makes the
+	// swallow unrepresentable, and `--name=value` — the same flag, self-contained — is the accepted form.
+	for (const flag of ["--model", "--provider", "--system-prompt", "--api-key", "--session", "--thinking"]) {
+		assert.deepEqual(
+			resolveHarnessSpec(entry({ harness_args: ["--model=placeholder-model", flag] }), PROMPT),
+			{ kind: "refused", reason: "argument_shape_invalid" },
+			`expected a bare ${flag} (placed last) to be refused by shape`,
+		);
+	}
+
+	const accepted = resolveHarnessSpec(entry({ harness_args: ["--model=placeholder-model"] }), PROMPT);
+	assert.equal(accepted.kind, "spec");
+	if (accepted.kind === "spec") {
+		assert.deepEqual(accepted.spec.argv, [
+			"-p",
+			"--model=placeholder-model",
+			"--no-extensions",
+			"--tools",
+			"read,grep,find,ls",
+			PROMPT,
+		]);
+	}
+});
+
+test("harness: the positional shape is refused — `@file` and a bare token, by the same rule (ADR-0037 pin 2)", () => {
+	for (const arg of ["@x", "x"]) {
+		assert.deepEqual(
+			resolveHarnessSpec(entry({ harness_args: [arg] }), PROMPT),
+			{ kind: "refused", reason: "argument_shape_invalid" },
+			`expected the positional ${arg} to be refused by shape, not by name`,
+		);
+	}
+});
+
+test("harness: the floor survives an accepted record — no `bash`, asserted on the tool list (ADR-0037 pin 3)", () => {
+	const resolved = resolveHarnessSpec(entry({ harness_args: ["--model=placeholder-model"] }), PROMPT);
+	assert.equal(resolved.kind, "spec");
+	if (resolved.kind !== "spec") return;
+
+	const argv = [...resolved.spec.argv];
+	const toolsAt = argv.indexOf("--tools");
+	assert.ok(toolsAt >= 0, "the profile's `--tools` must be in the resolved argv");
+	// Contiguity: `--tools` and its list are adjacent, so no token can sit between them.
+	assert.deepEqual(argv.slice(toolsAt, toolsAt + 2), ["--tools", "read,grep,find,ls"]);
+	// The list itself, never the string: a token that merely CONTAINS "bash" as a substring cannot pass here.
+	const toolList = argv[toolsAt + 1].split(",");
+	assert.ok(!toolList.includes("bash"), `the applied tool list must not contain bash: ${toolList.join(",")}`);
+});
+
+test("harness: the named deny-list still refuses every one of its entries (ADR-0037 pin 4)", () => {
+	for (const token of REFUSED_ARGUMENTS) {
+		const resolved = resolveHarnessSpec(entry({ harness_args: [token] }), PROMPT);
+		assert.equal(resolved.kind, "refused", `expected ${token} to be refused`);
+		if (resolved.kind === "refused") {
+			assert.equal(resolved.reason, "arguments_refused", `expected ${token} to be refused by name, not by shape`);
+		}
+	}
+});
+
+test("harness: the profile still comes last, with the prompt after it (ADR-0037 pin 5)", () => {
+	const resolved = resolveHarnessSpec(entry({ harness_args: ["--model=placeholder-model"] }), PROMPT);
+	assert.equal(resolved.kind, "spec");
+	if (resolved.kind !== "spec") return;
+
+	const argv = [...resolved.spec.argv];
+	assert.equal(argv[argv.length - 1], PROMPT, "the prompt is the last argv element");
+	assert.deepEqual(argv.slice(-4, -1), ["--no-extensions", "--tools", "read,grep,find,ls"]);
 });
 
 test("harness: the argv barrier `--` is refused, because it would make the appended profile positional", () => {

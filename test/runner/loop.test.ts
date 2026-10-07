@@ -243,12 +243,12 @@ test("loop: `wake` starts exactly one turn, records exactly one accepted wake, t
 });
 
 test("loop: the turn's own environment is not the runner's — the spec carries the prompt last, after the send-proof profile", async () => {
-	const fix = fixture({ ladder: entry("wake", "pi", ["--model", "placeholder-model"]) });
+	const fix = fixture({ ladder: entry("wake", "pi", ["--model=placeholder-model"]) });
 	try {
 		const loop = new WakeLoop(fix.deps);
 		assert.equal(await loop.tick(new AbortController().signal), "woke");
 		const argv = fix.turns[0].spec.argv;
-		assert.deepEqual(argv.slice(0, -1), ["-p", "--model", "placeholder-model", "--no-extensions", "--tools", "read,grep,find,ls"]);
+		assert.deepEqual(argv.slice(0, -1), ["-p", "--model=placeholder-model", "--no-extensions", "--tools", "read,grep,find,ls"]);
 		const prompt = argv[argv.length - 1];
 		assert.ok(prompt.includes(PROJECT));
 		assert.ok(prompt.includes("wake"));

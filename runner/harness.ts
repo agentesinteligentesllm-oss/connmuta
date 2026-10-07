@@ -7,6 +7,7 @@ import {
 	MAX_TURN_OUTPUT_CHARS,
 	REFUSED_ARGUMENTS,
 	SEND_PROOF_PROFILES,
+	VALUE_LESS_ARGUMENTS,
 	WAKE_KILL_GRACE_MS,
 	WAKE_TURN_TIMEOUT_MS,
 	type HarnessName,
@@ -20,7 +21,12 @@ import type { LadderEntry } from "./ladder.js";
  *
  *  - **a closed executable set.** The executable is always one of {@link HARNESS_NAMES}; no field of the
  *    ladder record, no peer message and no CLI flag can name a different binary. The record may add
- *    *arguments* (`harness_args`), never an executable, an interpreter or a shell.
+ *    *arguments* (`harness_args`), never an executable, an interpreter or a shell. And those arguments are
+ *    classified by **shape** before the profile is appended (ADR-0037): a flag that takes a value must be
+ *    written `--name=value`, a bare flag is accepted only when it is on {@link VALUE_LESS_ARGUMENTS}, and
+ *    anything else — a positional, `@file` included — is refused. A `--name=value` token is self-contained,
+ *    so it cannot consume the profile's first element; the shape rule makes the swallow unrepresentable
+ *    instead of trying to enumerate every host flag that could cause it.
  *  - **no shell, ever.** `spawn(bin, argv, { shell: false })` with the prompt as the LAST argv element. There
  *    is no string concatenation and no parsing step, so a peer-controlled thread id or agent name is inert
  *    data rather than syntax. A harness that cannot be started without a shell (a Windows `.cmd` shim, for
@@ -48,7 +54,11 @@ export interface HarnessSpec {
 	readonly argv: readonly string[];
 }
 
-export type HarnessRefusalReason = "harness_unknown" | "arguments_refused" | "profile_unavailable";
+export type HarnessRefusalReason =
+	| "harness_unknown"
+	| "arguments_refused"
+	| "argument_shape_invalid"
+	| "profile_unavailable";
 
 export type HarnessResolution =
 	| { readonly kind: "spec"; readonly spec: HarnessSpec }
@@ -67,6 +77,24 @@ export function isRefusedArgument(arg: string): boolean {
 }
 
 /**
+ * Whether one **record** argument has an accepted shape (ADR-0037). A token containing `=` is
+ * self-contained — `--name=value` cannot consume the next argv element — so it is accepted. A bare token
+ * beginning with `-` is accepted only when it is on {@link VALUE_LESS_ARGUMENTS}, the named allow-list of
+ * flags documented as taking no value. Everything else is refused: a bare value-consuming flag swallows the
+ * first token of the appended send-proof profile, and a positional (a bare token, `@file` included) is
+ * exactly the token whose meaning depends on the host's parse.
+ *
+ * This is orthogonal to {@link isRefusedArgument}: the deny-list refuses tokens by name and stays live, the
+ * shape rule refuses a *form* the deny-list could never enumerate. It applies to a record's `harness_args`
+ * only — {@link HARNESS_DEFAULT_ARGS} carries bare tokens (`-p`, `exec`, `run`) that are part of the closed
+ * executable contract, not operator input.
+ */
+export function isAcceptedRecordArgumentShape(arg: string): boolean {
+	if (arg.includes("=")) return true;
+	return arg.startsWith("-") && VALUE_LESS_ARGUMENTS.includes(arg);
+}
+
+/**
  * The arguments that make a woken turn **send-proof**, or `null` when no verified profile covers this
  * (level, harness) pair. Only `wake` has one: `autopilot` exists to run a shell, and a shell can always
  * send, so it has none and is refused (see {@link SEND_PROOF_PROFILES}, `runner/constants.ts`).
@@ -79,8 +107,13 @@ function sendProofProfile(level: LadderEntry["level"], bin: HarnessName): readon
  * Resolves a ladder entry into an executable argv, or refuses. `arguments_refused` is the interpreter escape
  * hatch: an argument that would hand the harness a command string of its own (`-c`, `eval`, …), that would
  * turn its own permission system off, or that would widen the send-proof profile this function appends is
- * refused outright, because any of them makes the closed-executable rule meaningless. `profile_unavailable`
- * is the fail-closed answer for a level or harness with no verified send-proof profile: no turn starts.
+ * refused outright, because any of them makes the closed-executable rule meaningless. It is checked first,
+ * over the record's own arguments and the harness defaults alike, so a named refusal always wins.
+ * `argument_shape_invalid` is ADR-0037's second, orthogonal check, applied to the **record's**
+ * `harness_args` only: every entry must be self-contained (`--name=value`) or a bare flag on the named
+ * value-less allow-list, so a record cannot end in a value-consuming flag that swallows the profile's first
+ * token, and a positional (`@file` included) is refused by the same rule. `profile_unavailable` is the
+ * fail-closed answer for a level or harness with no verified send-proof profile: no turn starts.
  */
 export function resolveHarnessSpec(entry: LadderEntry, prompt: string): HarnessResolution {
 	if (!(HARNESS_NAMES as readonly string[]).includes(entry.harness)) {
@@ -91,6 +124,14 @@ export function resolveHarnessSpec(entry: LadderEntry, prompt: string): HarnessR
 	for (const arg of operatorArgs) {
 		if (isRefusedArgument(arg)) {
 			return { kind: "refused", reason: "arguments_refused" };
+		}
+	}
+	// The shape rule is a property of the RECORD, not of `HARNESS_DEFAULT_ARGS`: the defaults carry bare
+	// tokens (`-p`, `exec`, `run`) that the closed-executable contract defines, so exempting them here is what
+	// keeps every harness startable instead of refusing all four.
+	for (const arg of entry.harness_args ?? []) {
+		if (!isAcceptedRecordArgumentShape(arg)) {
+			return { kind: "refused", reason: "argument_shape_invalid" };
 		}
 	}
 	const profile = sendProofProfile(entry.level, bin);
