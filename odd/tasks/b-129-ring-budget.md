@@ -1,6 +1,7 @@
 # B-129 — an absolute per-window ring budget for the host adapter
 
-> **Status:** open — in progress.
+> **Status:** **CLOSED** — implementation, gates and commit done; reviewed natively and acknowledged. Superseded by
+> the two units under `fix/b-129-ring-budget`, the last of which is `de1e56e`.
 > **Branch:** `fix/b-129-ring-budget` (off `main` at `9124510`).
 > **Authority:** the Director delegated the decision with full authority on 2026-10-07 ("el tope de anillos",
 > recorded in `26d3ce2`) and this session's opening prompt re-states it ("implementar el tope absoluto de anillos
@@ -85,9 +86,20 @@ a ring that actually reaches `pi.sendMessage` is recorded.
 
 ## Evidence to record at close
 
-- RED observed before GREEN, with the failing assertion named.
-- The full gate counts of this tip.
-- The commit identity on the feature branch.
+- RED observed before GREEN, with the failing assertion named. **Observed twice:** first as the compile-level
+  error (`has no exported member 'PI_RING_BUDGET_PER_WINDOW'` / `'PI_RING_BUDGET_WINDOW_MS'` / `'warn' does not
+  exist in type 'PiRingerDeps'`), then, once the declarations existed and the behaviour did not, at the assertion
+  level: four failures — the cap (23 rings sent against a cap of 20), the sliding refill, the `saturated` burst,
+  and the once-per-session report.
+- The full gate counts of this tip: `npm test` **1982 / 1976 pass / 0 fail / 6 skip**, `test:static` **129/129**,
+  `test:wrong-room` **5/5**, `%TEMP%` conmuta dirs **0 → 0**.
+- The commit identity on the feature branch: **`de1e56e`** — `feat(channel-pi): cap the ring at an absolute
+  per-window budget (B-129)`.
+- Native review: lineage **`review-1260155c41b03eb5`**, tier `medium`, one lens (`review-reliability`), **approved**, 
+  authority burned (`gentle-ai.review-acknowledged/v1`). Two informational findings, filed as **B-134**.
+- Non-vacuity by mutation, three mutations: disabling the cap failed the cap/refill/saturated/report tests;
+  charging a cooldown-merged ring failed the merge test (the one that passed *before* the implementation, which is
+  exactly why it needed the check); suppressing the report failed the report test.
 
 ## Engram mirror
 
