@@ -53,10 +53,23 @@ rule and not a hole in the file it guards.
 
 | # | Task | Evidence |
 |---|---|---|
-| 1 | RED: add the two behavioural tests — a heading glued to the row above (no blank line) must be reported, a heading behind a blank line must still pass — against the unchanged `scanRowShape`. Observe the first failing. | observed RED (assertion failure, not a compile error) |
-| 2 | GREEN: validate the table opener (delimiter directly above the first row, header row above that, both carrying the board's seven separators) under a new `table-header` kind; allow a `#` line only when the line above it is blank. | observed GREEN |
-| 3 | Precision: assert the fixture's exact violation set (line + kind) and the separator count its detail names; extract `rowFloorFailure` so the last test can exercise the floor it names; rewrite the last test to state only what it asserts. | observed GREEN; `test:static` 129/129 |
-| 4 | Close: mark B-132 `done` in `docs/06-backlog/CHECKLIST.md`, record the unit in `docs/08-sessions/HANDOFF.md` §1/§3 and `docs/08-sessions/LOG.md`. | `docs/06-backlog/CHECKLIST.md`; `docs/08-sessions/HANDOFF.md`; `docs/08-sessions/LOG.md` |
+| 1 | RED: add the two behavioural tests — a heading glued to the row above (no blank line) must be reported, a heading behind a blank line must still pass — against the unchanged `scanRowShape`. Observe the first failing. | observed RED: 4 failures / 5 passes in `dist/test/security/backlog-table.test.js` — the glued heading, the short header, the short delimiter and the missing opener — with every control green; assertion-level, not a compile error |
+| 2 | GREEN: validate the table opener (delimiter directly above the first row, header row above that, both carrying the board's seven separators) under a new `table-header` kind; allow a `#` line only when the line above it is blank. | observed GREEN: 9/9 in the focused file; commit `ac1cd24` |
+| 3 | Precision: assert the fixture's exact violation set (line + kind) and the separator count its detail names; extract `rowFloorFailure` so the last test can exercise the floor it names; rewrite the last test to state only what it asserts. | observed GREEN: `npm test` 1969/1963/0/6; `test:static` 129/129; `%TEMP%` 0 -> 0; commit `ac1cd24` |
+| 4 | Close: mark B-132 `done` in `docs/06-backlog/CHECKLIST.md`, record the unit in `docs/08-sessions/HANDOFF.md` §1/§3 and `docs/08-sessions/LOG.md`, and file this unit's review advisories as B-133. | `docs/06-backlog/CHECKLIST.md`; `docs/08-sessions/HANDOFF.md`; `docs/08-sessions/LOG.md`; this unit's `docs(session)` commit |
+
+## Verification record
+
+- **Native review**: lineage `review-1872a30c548e8a95`, tier `high`, four lenses (`review-risk`,
+  `review-resilience`, `review-readability`, `review-reliability`), forecast relayed (4 model runs, `pi_host_relay`),
+  closed **approved**, authority burned (`gentle-ai.review-acknowledged/v1`). Five advisories, all informational and
+  non-blocking, filed as **B-133**.
+- **Independent verification** (`gentle-ai-verify`, read-only): reproduced `npm test` 1969/1963/0/6, `test:static`
+  129/129 and the focused 9/9; non-vacuity by mutation in a scratch copy outside the repository (EXPECTED_PIPES
+  widened to 8 -> 8 failures; opener check removed -> the three opener tests fail; board header loses a separator ->
+  only the live-board test fails); reported what it could not verify (the historical RED claim, and that the mutations
+  were applied to the compiled output rather than recompiled from TypeScript). The parent re-checked the tree at
+  `ac1cd24` (`git status` empty), the cited lines, and removed the scratch directory.
 
 ## Verification
 

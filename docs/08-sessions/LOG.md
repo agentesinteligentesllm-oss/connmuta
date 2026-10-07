@@ -10,6 +10,60 @@
 > log and `HANDOFF.md` seem to attribute that closure differently. Both `CHECKLIST.md`'s B-110 row and the handoff
 > say **session 64**, and both are right. Nothing is invented here to fill the gap.
 
+## 2026-10-07 (second unit) — B-132: the board gate's region handling, hardened
+
+- **Date**: 2026-10-07 local. The second bounded unit of the day, ordered by the Director, who named **B-132** as the
+  only row that depends on nobody: review and harden the region handling of `test/security/backlog-table.test.ts`,
+  test-first with observed RED, one push per unit, and one native review per unit. B-130 stays closed as (b) and
+  B-131 stays deferred to F2.
+- **Preflight, measured**: clean tree at `29881e2` == `origin/main`; RDD on (`gentle-ai review mode status`);
+  `gentle-ai` **4.0.0**. Arena unreachable by two real probes — `pi mcp list` registers no `arena` server, and a TCP
+  connect to `127.0.0.1:8765` is refused — so DN-09's substitute condition holds. Subagent health confirmed with a
+  real tool-using `gentle-ai-verify` run, not assumed.
+- **Memory was unavailable, and the reason is measured rather than assumed.** Engram's provider exits before
+  readiness; `engram serve` answers *"listen 127.0.0.1:7437: bind: An attempt was made to access a socket in a way
+  forbidden by its access permissions"*, because 7437 falls inside this machine's reserved TCP range **7364-7463**
+  (`netsh interface ipv4 show excludedportrange protocol=tcp`). The repository copy of the ODD task file is this
+  session's durable record; the Engram mirror is owed when the server can bind again.
+- **The three weaknesses, and the fix.** Two independent lineages (`review-af395029a84852b1`'s `R4-gate-region` and
+  `review-139c7dd8da1f1f53`'s `R4-001`) had named the same location. (1) The scan began **at** the first row, so the
+  table opener was never read: `headerViolations` now requires the delimiter row directly above the first body row
+  and the header row above that, both carrying the board's seven separators, reported under a new `table-header` kind.
+  (2) A line starting with `#` was skipped wherever it appeared, so a wrapped continuation beginning with `#` passed
+  silently: a heading is now accepted only when the line above it is blank, and glued to a row it is reported as
+  `row-not-own-line`. (3) The fixture assertion accepted *some* cell-count violation: it now names the exact seeded
+  set (lines 14, 15, 16 and 17 with their kinds) and the separator count each detail carries, and the row floor
+  became `rowFloorFailure`, exercised by the last test instead of only implied by the live file's size.
+- **RED observed before GREEN, at the assertion level.** Four of the five new tests failed against the unchanged
+  implementation (the three opener cases and the glued heading), while every control stayed green — the live board,
+  the fixture, the well-formed board, the blank-line heading and the row floor. GREEN after: 9/9 in the file,
+  `test:static` **129/129**, `npm test` **1969/1963/0/6**, `%TEMP%` 0 -> 0.
+- **One residual, disclosed rather than implied**: a heading inside the region still breaks the table for a GFM
+  renderer, so a row placed after such a heading without a fresh opener would not render as a row. The gate tolerates
+  the heading because the board keeps one table and carries no in-region heading — its only `#` is line 1, above the
+  region — and recognising a *re-opened* table is a design decision no review asked for. It is written into
+  `odd/tasks/b-132-board-gate-region.md`.
+- **The native review, and the START shape it needed.** The unit was pushed first, so `inspect` saw a clean workspace
+  and the controller asked for an explicit base. Lineage **`review-1872a30c548e8a95`**, tier **high** (one executable
+  test file, reason `hot_path`/security), four lenses, the forecast relayed (4 model runs, `pi_host_relay`), closed
+  **approved**, authority burned (`gentle-ai.review-acknowledged/v1`). Its five advisories are filed as **B-133**.
+  Two usage facts cost attempts and are now recorded: the ordinary START for a committed candidate needs
+  `{"mode":"ordinary","baseRef":"<full sha>","committedOnly":true}` — omitting `mode` routes to the graph-v1 path
+  and refuses with *"Judgment Day graph-v1 START requires lineageId"* — and the facade's group capture wants the
+  decoded `collectBinding` strings that STATUS wraps in objects.
+- **Independent verification.** `gentle-ai-verify` reproduced `npm test` 1969/1963/0/6, `test:static` 129/129 and the
+  focused 9/9; proved non-vacuity by three mutations in a scratch copy **outside** the repository (EXPECTED_PIPES
+  widened to 8 -> 8 failures; the opener check removed -> exactly the three opener tests fail; the board's header
+  loses a separator -> only the live-board test fails, naming line 13); and honestly reported what it could not
+  verify. The parent re-checked the tree (`git status` empty at `ac1cd24`), the cited lines, and removed the scratch
+  its own child-safety filter had refused to delete.
+- **Landed**: `ac1cd24` (the code unit, pushed before the documentation close) and this entry's own `docs(session)`
+  commit for the close.
+- **How it knows**: `git fetch` / `git status -sb` / `git log`; the RED and GREEN runs of
+  `dist/test/security/backlog-table.test.js`; `npm test`, `npm run test:static` and the `%TEMP%` counts; the two real
+  Arena probes; `engram serve` and `netsh interface ipv4 show excludedportrange protocol=tcp`; the review envelopes
+  for `review-1872a30c548e8a95` and its acknowledgement burn; and the verifier's report, re-verified by the parent.
+
 ## 2026-10-07 — the board gate unit: five commits, three native reviews, and two corrections of my own
 
 - **Date**: 2026-10-07 local. Not a numbered session: one bounded unit, ordered by the Director who asked for
