@@ -120,7 +120,10 @@ test("home-writable check passes for a real, writable temp home", () => {
 
 test(
 	"home-writable check fails for a home directory with no write permission (POSIX)",
-	{ skip: process.platform === "win32" },
+	// B-82: under a root-owned CI container `accessSync`/mode bits do not deny the write, so the `fail`
+	// assertion below silently stops testing anything. Skipping when the effective uid is root keeps the
+	// test honest instead of green-but-vacuous.
+	{ skip: process.platform === "win32" || process.getuid?.() === 0 },
 	() => {
 		withTempHome((homeDir) => {
 			statSync(homeDir); // sanity: directory exists before we lock it down

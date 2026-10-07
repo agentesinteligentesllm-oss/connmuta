@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { ChannelNotification } from "../../channel/notify.js";
-import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "../../channel-pi/constants.js";
+import {
+	PI_DOORBELL_CUSTOM_TYPE,
+	PI_RING_BUDGET_PER_WINDOW,
+	PI_RING_BUDGET_WINDOW_MS,
+	PI_RING_COOLDOWN_MS,
+} from "../../channel-pi/constants.js";
 import { createPiRinger, type PiMessenger } from "../../channel-pi/host.js";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -24,6 +29,10 @@ interface Sent {
 	readonly message: { customType: string; content: string; display: boolean };
 	readonly options: { triggerTurn: boolean; deliverAs: "steer" | "followUp" };
 }
+
+/** A sink for the ringers whose subject is not the report surface; `warn` is now required, so every
+ * instantiation names one. The surface itself is pinned by the budget tests and by `channel-pi/main.test.ts`. */
+const noopWarn = (): void => {};
 
 function recordingPi(): { sent: Sent[]; pi: PiMessenger } {
 	const sent: Sent[] = [];
@@ -52,7 +61,7 @@ function notification(content = "3 new conmuta envelopes are waiting. Call conmu
 
 test("the ring sends exactly one attributable message that triggers a turn, and reassembles nothing", async () => {
 	const { sent, pi } = recordingPi();
-	const ring = createPiRinger({ pi });
+	const ring = createPiRinger({ pi, warn: noopWarn });
 
 	await ring(notification());
 
@@ -75,7 +84,7 @@ test("the ring sends exactly one attributable message that triggers a turn, and 
 
 test("the ring is attributable, so it can never be read as the human's own message", async () => {
 	const { sent, pi } = recordingPi();
-	await createPiRinger({ pi })(notification());
+	await createPiRinger({ pi, warn: noopWarn })(notification());
 
 	assert.equal(sent[0].message.customType, "conmuta-doorbell");
 	assert.notEqual(sent[0].message.customType, "", "an empty custom type would make the ring unattributable");
@@ -84,7 +93,7 @@ test("the ring is attributable, so it can never be read as the human's own messa
 test("a second ring inside the cooldown is merged, not queued, and it resolves so the watcher can advance its cursor (ADR-0038 pin 2)", async () => {
 	let clock = 0;
 	const { sent, pi } = recordingPi();
-	const ring = createPiRinger({ pi, now: () => clock });
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
 
 	await ring(notification());
 	clock = PI_RING_COOLDOWN_MS - 1;
@@ -100,7 +109,7 @@ test("a second ring inside the cooldown is merged, not queued, and it resolves s
 test("a ring after the cooldown goes through", async () => {
 	let clock = 0;
 	const { sent, pi } = recordingPi();
-	const ring = createPiRinger({ pi, now: () => clock });
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
 
 	await ring(notification());
 	clock = PI_RING_COOLDOWN_MS;
@@ -120,7 +129,7 @@ test("a host failure propagates instead of being swallowed, so the watcher repor
 	// which is the disposition ADR-0038 accepts (best-effort) and the module documents. The watcher's half of
 	// ADR-0038 pin 1 — a rejected `deliver` is `deliver_failed`, the cursor is NOT advanced, and the same window
 	// is read again — is pinned in `test/channel/doorbell-loop.test.ts`.
-	const ring = createPiRinger({ pi: throwingPi() });
+	const ring = createPiRinger({ pi: throwingPi(), warn: noopWarn });
 
 	await assert.rejects(() => ring(notification()), /stale after session replacement or reload/);
 });
@@ -137,7 +146,7 @@ test("a failed ring does not start the cooldown, so the retry can still ring", a
 			pi.sendMessage(message, options);
 		},
 	};
-	const ring = createPiRinger({ pi: flaky, now: () => clock });
+	const ring = createPiRinger({ pi: flaky, now: () => clock, warn: noopWarn });
 
 	await assert.rejects(() => ring(notification()));
 	fail = false;
@@ -145,6 +154,164 @@ test("a failed ring does not start the cooldown, so the retry can still ring", a
 	await ring(notification());
 
 	assert.equal(sent.length, 1, "a ring that never landed must not suppress the next one");
+});
+
+/**
+ * B-129 / ADR-0036 decision 6. The cooldown alone is a *rate* limit, not a cap: at one ring per
+ * {@link PI_RING_COOLDOWN_MS} an attended session can ring 240 times an hour, and every ring is a model turn.
+ * These tests pin the absolute bound the ADR's own test table claims — the third row, "One read in flight,
+ * cooldown and per-window budget hold under a burst and under `saturated`" — and that the table declared pinned
+ * while the shipped adapter had no budget at all. Before this unit the whole row was false for its second half.
+ *
+ * The window is exercised on the injected clock, so a test spends a modelled hour in microseconds. Every clock
+ * step here is `PI_RING_COOLDOWN_MS + 1`, i.e. the cheapest path that can actually ring: these tests are about
+ * the budget, not the cooldown, so the cooldown is never the thing doing the suppressing.
+ */
+
+/** How far the clock moves for one ring that is past the cooldown: the cheapest ring the budget must count. */
+const PAST_COOLDOWN_MS = PI_RING_COOLDOWN_MS + 1;
+
+test("the per-window budget caps rings even when the cooldown has long expired (B-129, ADR-0036 decision 6)", async () => {
+	let clock = 0;
+	const { sent, pi } = recordingPi();
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
+
+	// Three more than the cap, each one past the cooldown and all of them inside a single window.
+	for (let i = 0; i < PI_RING_BUDGET_PER_WINDOW + 3; i += 1) {
+		await ring(notification());
+		clock += PAST_COOLDOWN_MS;
+	}
+
+	assert.equal(
+		sent.length,
+		PI_RING_BUDGET_PER_WINDOW,
+		"the cooldown bounds how often a ring fires, not how many: without this cap the same burst would ring unbounded within the window",
+	);
+	assert.ok(
+		(PI_RING_BUDGET_PER_WINDOW + 3) * PAST_COOLDOWN_MS <= PI_RING_BUDGET_WINDOW_MS,
+		"the test itself is only meaningful while the whole burst fits inside one window (a larger burst would refill the window instead of testing the cap)",
+	);
+});
+
+test("the budget is a sliding window: a ring goes through again once the oldest leaves it (B-129)", async () => {
+	let clock = 0;
+	const { sent, pi } = recordingPi();
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
+
+	for (let i = 0; i < PI_RING_BUDGET_PER_WINDOW; i += 1) {
+		await ring(notification());
+		clock += PAST_COOLDOWN_MS;
+	}
+	assert.equal(sent.length, PI_RING_BUDGET_PER_WINDOW, "the budget must be spendable in full first");
+
+	await ring(notification());
+	assert.equal(sent.length, PI_RING_BUDGET_PER_WINDOW, "still inside the window, the cap holds");
+
+	// Move the clock far enough that the first ring (and, at this step, every ring) is now older than the window.
+	clock += PI_RING_BUDGET_WINDOW_MS;
+	await ring(notification());
+	assert.equal(
+		sent.length,
+		PI_RING_BUDGET_PER_WINDOW + 1,
+		"an exhausted budget must refill, or one busy hour would silence the ring for the life of the session",
+	);
+});
+
+test("the window slides rather than bucketing: a burst straddling a window boundary is still one window's budget (B-129)", async () => {
+	let clock = 0;
+	const { sent, pi } = recordingPi();
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
+
+	// Judgment Day round 1 (PR #114) proved by mutation that a **fixed-bucket** window passed every other budget
+	// test in this file, leaving ADR-0036's "the window slides … rather than a fixed bucket" unpinned. This
+	// schedule is the discriminator and nothing else here can tell the two apart: spend the whole budget so the
+	// LAST ring lands one cooldown before a window boundary, then ring twice just past it. A sliding window still
+	// holds all twenty recent rings and suppresses both (20 sent); a fixed bucket resets at the boundary and lets
+	// both through (22 sent).
+	clock = PI_RING_BUDGET_WINDOW_MS - PI_RING_BUDGET_PER_WINDOW * PAST_COOLDOWN_MS;
+	for (let i = 0; i < PI_RING_BUDGET_PER_WINDOW; i += 1) {
+		await ring(notification());
+		clock += PAST_COOLDOWN_MS;
+	}
+	assert.equal(sent.length, PI_RING_BUDGET_PER_WINDOW, "the budget must be spent in full before the boundary is crossed");
+
+	assert.ok(clock >= PI_RING_BUDGET_WINDOW_MS, "the schedule must actually cross a window boundary");
+	await ring(notification());
+	clock += PAST_COOLDOWN_MS;
+	await ring(notification());
+
+	assert.equal(
+		sent.length,
+		PI_RING_BUDGET_PER_WINDOW,
+		"crossing a boundary must not refill the budget: the window slides over the last hour, it does not bucket into whole hours",
+	);
+});
+
+test("a saturated doorbell burst is bounded too: the cap counts rings, and `saturated` grants none (B-129)", async () => {
+	let clock = 0;
+	const { sent, pi } = recordingPi();
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
+	// `buildNotification` sets this meta key when the peek window is full. The cap must not depend on it: a
+	// saturated doorbell is the *most* likely storm, so it is exactly where the budget has to hold.
+	const saturated: ChannelNotification = {
+		content: notification().content,
+		meta: { ...notification().meta, saturated: "true" },
+	};
+
+	for (let i = 0; i < PI_RING_BUDGET_PER_WINDOW * 2; i += 1) {
+		await ring(saturated);
+		clock += PAST_COOLDOWN_MS;
+	}
+
+	assert.equal(sent.length, PI_RING_BUDGET_PER_WINDOW, "a saturated announcement is one more ring, never a licence to ring twice as often");
+	assert.ok(
+		PI_RING_BUDGET_PER_WINDOW * 2 * PAST_COOLDOWN_MS <= PI_RING_BUDGET_WINDOW_MS,
+		"the doubled burst must still fit one window, or the assertion above would be measuring a refill",
+	);
+});
+
+test("a ring merged by the cooldown consumes no budget, because it started no turn (B-129)", async () => {
+	let clock = 0;
+	const { sent, pi } = recordingPi();
+	const ring = createPiRinger({ pi, now: () => clock, warn: noopWarn });
+
+	// Each iteration is one real ring plus one merged ring: if a merge were charged to the budget, the cap would
+	// be reached in half the iterations and fewer than the full budget of turns would ever fire.
+	for (let i = 0; i < PI_RING_BUDGET_PER_WINDOW; i += 1) {
+		await ring(notification());
+		clock += 1; // inside the cooldown of the ring just sent → merged
+		await ring(notification());
+		clock += PAST_COOLDOWN_MS; // past the cooldown → the next iteration rings
+	}
+
+	assert.equal(
+		sent.length,
+		PI_RING_BUDGET_PER_WINDOW,
+		"only a ring that reaches sendMessage may be counted; a merged announcement is not a turn",
+	);
+});
+
+test("a budget-suppressed ring says so through the adapter's own surface, with a message stable enough to be said once (B-129)", async () => {
+	let clock = 0;
+	const { pi } = recordingPi();
+	const warnings: string[] = [];
+	const ring = createPiRinger({ pi, now: () => clock, warn: (message) => warnings.push(message) });
+
+	for (let i = 0; i < PI_RING_BUDGET_PER_WINDOW; i += 1) {
+		await ring(notification());
+		clock += PAST_COOLDOWN_MS;
+	}
+	assert.deepEqual(warnings, [], "a ring that fires is not a warning");
+
+	await ring(notification());
+	await ring(notification());
+	assert.equal(warnings.length, 2, "each suppressed ring reaches the surface; the adapter's `warnOnce` is what makes it once per session");
+	assert.match(warnings[0], /budget/i, "the operator has to be able to tell an exhausted budget from a quiet bus");
+	assert.equal(
+		warnings[0],
+		warnings[1],
+		"the message must be byte-stable, or `warnOnce`'s keyed gate could never dedupe it and the report would repeat every tick",
+	);
 });
 
 /**

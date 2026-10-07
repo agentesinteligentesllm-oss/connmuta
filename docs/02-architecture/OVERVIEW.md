@@ -314,6 +314,22 @@ The instruction file is written once as `AGENTS.md` (read natively by 13 of 15 s
 | Online | Yes (inside the daemon) | Per binding | The six v1 checks re-scoped (v1 `src/doctor.ts:100-143`) plus a `getChatMember` check that every roster bot is a member of the bound group and is not an admin (new in v2; [THREAT-MODEL.md](THREAT-MODEL.md) T07, T21, PT-32); prints `bot_id` only, never a token |
 | DM probe | Yes | Per binding, **opt-in** | v1 DM'd every roster peer unconditionally (v1 `src/doctor.ts:132-137`); validating project A must never ping project B's bots |
 
+**The DM probe has no server-side deadline, and that is a decided bound rather than an oversight (B-85 (3),
+2026-10-07).** The daemon awaits each check sequentially — `getMe`, `getChat`, one `getChatMember` per roster
+entry, one DM per peer, per binding — and each Telegram call carries a 20 s budget
+(`src/daemon/telegram.ts:244-247`), while the client applies a single ~70 s budget to the whole `POST /doctor`
+(`src/doctor/online-client.ts:144`, a value built for the long-polling `fetch` route). So **a three-entry roster
+(the bot itself plus two peers) is `getMe` + `getChat` + one `getChatMember` per entry + one DM per peer =
+7 calls × 20 s = 140 s** — the membership loop covers every entry including the bot's own, and only the DM list
+filters the self entry out — and the client may report `error` while the daemon is still running
+checks and sending probes. **A client-side constant cannot fix this:** `roster_snapshot` has no upper bound
+(`src/registry/schema.ts:189`), so no single number is an upper bound of the daemon's work. The decision is to
+accept the long tail and document it: the probe is opt-in, an operator asked for it, and the `audit_log`
+`DOCTOR_PROBE` rows are the durable record of what was actually sent. The alternative — a per-request deadline —
+needs an abort signal threaded into the Telegram client, because a deadline that only stops *awaiting* would
+leave the probe DMs going out anyway, which is the harm it is supposed to remove. That plumbing is a change of
+its own and is not smuggled in here.
+
 ## 11. Arena-light (D7)
 
 Two-party debates ride the existing thread model with **no wire change**: `PROPOSAL` = `REQUEST` with a body marker; `AUDIT` / `COUNTER` = `REPLY` with marker + verdict token; `CONSENSUS` = `RESOLVED` with an existing basis; `ESCALATE` = `RESOLVED` with basis `abandoned` plus marker. Precedent: the `[CHECKPOINT-ESTADO]` body marker recognised by the v1 bridge (v1 `src/config.ts:116`, `src/tools/fetch.ts:458-460`). The daemon enforces a round cap (named constant, value in the F5 spec), keeps a side journal in SQLite ([DATA-MODEL.md §3.7](DATA-MODEL.md#37-debate_journal--arena-light-side-journal-d7-f5)), and sends each debate turn (`AUDIT`/`COUNTER`) with `disable_notification` — one turn, one silent send, never coalesced with another (a composed-body design was found structurally unbuildable during implementation, since `AUDIT` and `COUNTER` are accepted only from different roles, and was dropped; `bus-v2-f5-pr-04-coalescing-contradiction-001`). Payloads are pointer-only (effective ceiling 1,921 chars, v1 ADR-23). `CONSENSUS` is a message, never an authorization (Invariant 5). N-party tribunals are deferred (B-10: `AGENTBUS/3` or Arena Orion).

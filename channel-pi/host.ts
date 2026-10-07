@@ -1,5 +1,5 @@
 import type { ChannelNotification } from "../channel/notify.js";
-import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "./constants.js";
+import { MILLISECONDS_PER_MINUTE, PI_DOORBELL_CUSTOM_TYPE, PI_RING_BUDGET_PER_WINDOW, PI_RING_BUDGET_WINDOW_MS, PI_RING_COOLDOWN_MS } from "./constants.js";
 
 /**
  * The Pi host adapter's ring (`channel-pi/host.ts`, ADR-0036): the one function this adapter hands to
@@ -14,6 +14,16 @@ import { PI_DOORBELL_CUSTOM_TYPE, PI_RING_COOLDOWN_MS } from "./constants.js";
  * is already awake from a previous ring is merged into the next one. Merging is expressed by resolving
  * normally, so the watcher commits its cursor and moves on; rejecting would instead look like a
  * delivery failure and make the watcher back off and re-read the same window.
+ *
+ * **The cooldown is a rate limit; the budget is the cap (B-129, ADR-0036 decision 6).** The cooldown alone
+ * bounds how *often* a ring fires, not how many — at one ring per fifteen seconds a busy session can ring 240
+ * times an hour, and every ring is a model turn. {@link PI_RING_BUDGET_PER_WINDOW} per
+ * {@link PI_RING_BUDGET_WINDOW_MS} is the absolute bound, spent on the same currency the satellite's wake
+ * budget spends. A ring the budget suppresses resolves without ringing, exactly like a cooldown merge — the row
+ * is not lost (the doorbell cursor is not the client cursor, ADR-0038) — and it is reported once per session,
+ * because a session that has quietly stopped ringing and a bus with nothing on it are indistinguishable from
+ * inside the session. The two bounds are checked in a deliberate order: **cooldown first**, because a merged
+ * ring starts no turn and must not be charged to the budget.
  *
  * **What a host failure actually does — two layers, measured, and an earlier note in this file got it wrong.**
  * The failure story has two halves, and they behave oppositely:
@@ -59,14 +69,47 @@ export interface PiMessenger {
 
 export interface PiRingerDeps {
 	readonly pi: PiMessenger;
-	/** Injected so the cooldown is asserted without a real clock; production uses `Date.now`. */
+	/** Injected so the cooldown and the budget window are asserted without a real clock; production uses `Date.now`. */
 	readonly now?: () => number;
+	/**
+	 * Where a ring the adapter declined to send is reported. The one condition that reaches this surface is an
+	 * exhausted budget ({@link PI_RING_BUDGET_PER_WINDOW}), which is not a failure but must not be a silence
+	 * either: a session that has stopped ringing and a bus with nothing on it look identical from inside the
+	 * session, and the module doc's rule is that this adapter reports health it does not have to nobody. The
+	 * caller owns the frequency — `channel-pi/main.ts` passes its per-session, message-keyed `warnOnce` gate
+	 * (B-127), which is why the message below is byte-stable.
+	 *
+	 * **Required, not optional (Judgment Day round 1, PR #114).** Two blind judges independently showed that an
+	 * optional `warn` makes the adapter's own "reported once per session" guarantee deletable in silence: removing
+	 * `warn: warnOnce` from `channel-pi/main.ts` left the whole suite green, so the guarantee could become "never
+	 * reported" while every document still claimed it shipped. Requiring the field turns that deletion into a
+	 * compile error — the same move ADR-0037 made when it stopped enumerating bad arguments and made the bad shape
+	 * unrepresentable. Every instantiation must now name the surface it reports on.
+	 */
+	readonly warn: (message: string) => void;
 }
 
-/** Builds the watcher's `deliver`: at most one ring per {@link PI_RING_COOLDOWN_MS}. */
+/**
+ * The one line an exhausted budget produces, and it is **byte-stable on purpose**: `channel-pi/main.ts` owns the
+ * "each condition is said once" promise with a `warnOnce` gate keyed by the message (B-127), so a message that
+ * varied — with a count, an age or a timestamp — could never be deduped and would repeat on every suppressed
+ * ring. It names the bound and the remedy without inventing a number: the caller reads the window in minutes
+ * from the constant.
+ */
+const RING_BUDGET_SPENT_MESSAGE =
+	`the ring budget is spent (${PI_RING_BUDGET_PER_WINDOW} rings per ${PI_RING_BUDGET_WINDOW_MS / MILLISECONDS_PER_MINUTE} minutes); ` +
+	"rings resume as the window refills, and `conmuta_fetch` still returns every row";
+
+/** Builds the watcher's `deliver`: at most one ring per {@link PI_RING_COOLDOWN_MS}, and at most
+ * {@link PI_RING_BUDGET_PER_WINDOW} per {@link PI_RING_BUDGET_WINDOW_MS}. */
 export function createPiRinger(deps: PiRingerDeps): (notification: ChannelNotification) => Promise<void> {
 	const now = deps.now ?? Date.now;
+	const warn = deps.warn;
 	let lastRingAt: number | undefined;
+	/** Ring timestamps inside the current window, pruned on use — the sliding shape `runner/loop.ts` uses, and
+	 * deliberately not a fixed bucket: a bucket lets one burst straddle a boundary and spend two windows' worth
+	 * back to back, which is the opposite of an absolute cap. */
+	let rings: number[] = [];
 
 	return async (notification) => {
 		const at = now();
@@ -74,13 +117,25 @@ export function createPiRinger(deps: PiRingerDeps): (notification: ChannelNotifi
 		if (previous !== undefined && at - previous < PI_RING_COOLDOWN_MS) {
 			return;
 		}
+		// Second, and that order is the point: the branch above started no turn, so charging it here would spend the
+		// cap on rings that never happened and would silence the session early. Only a call that reaches
+		// `sendMessage` — below — is recorded.
+		const windowStart = at - PI_RING_BUDGET_WINDOW_MS;
+		rings = rings.filter((ringedAt) => ringedAt > windowStart);
+		if (rings.length >= PI_RING_BUDGET_PER_WINDOW) {
+			// Resolve, do not reject: like a cooldown merge, this is a handled announcement, not a delivery failure —
+			// rejecting would make the watcher back off and re-read a window whose row it already accounted for.
+			warn(RING_BUDGET_SPENT_MESSAGE);
+			return;
+		}
 		deps.pi.sendMessage(
 			{ customType: PI_DOORBELL_CUSTOM_TYPE, content: notification.content, display: true },
 			{ triggerTurn: true, deliverAs: "followUp" },
 		);
 		// Only after the call returned: a stale context throws from that call (see the module doc), and a throw is a
-		// non-delivery that must not start the next ring's cooldown. The host's *asynchronous* failures are the other
-		// half of that doc — they never reach this guard because they never reach this call at all.
+		// non-delivery that must not start the next ring's cooldown or spend a budget slot. The host's *asynchronous*
+		// failures are the other half of that doc — they never reach this guard because they never reach this call.
 		lastRingAt = at;
+		rings.push(at);
 	};
 }

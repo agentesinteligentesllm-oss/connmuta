@@ -24,9 +24,15 @@ export interface RunDoctorMainOptions {
 	readonly homeDir?: string;
 	/** Overridable for tests; defaults to the real `installer/exec.ts` icacls runner (Windows only). */
 	readonly execImpl?: ExecFileImpl;
-	/** Where each formatted line is printed. */
+	/**
+	 * Where each formatted line is printed. Two sinks, not one: `report.ts` splits `pass`/`warn` from `fail`
+	 * precisely so a caller can route them differently (its own doc says so), and merging them here discarded
+	 * that split and reordered every `fail` line after every `pass`/`warn` line, contradicting the fixed order
+	 * `runSystemChecks` documents (B-82).
+	 */
 	readonly io: {
 		readonly out: (line: string) => void;
+		readonly err: (line: string) => void;
 	};
 }
 
@@ -35,14 +41,18 @@ export interface RunDoctorMainResult {
 	readonly exitCode: number;
 }
 
-/** Runs the offline doctor, prints every finding through `io.out`, and returns the exit code. */
+/** Runs the offline doctor, prints `out` lines through `io.out` and `err` lines through `io.err`, and returns
+ * the exit code. Each stream keeps `report.ts`'s own order (B-82). */
 export async function runDoctorMain(options: RunDoctorMainOptions): Promise<RunDoctorMainResult> {
 	const homeDir = resolveHomeDir(options.homeDir);
 	const findings = runOfflineDoctor({ homeDir, execImpl: options.execImpl });
 	const report = formatFindings(findings);
 
-	for (const line of [...report.out, ...report.err]) {
+	for (const line of report.out) {
 		options.io.out(line);
+	}
+	for (const line of report.err) {
+		options.io.err(line);
 	}
 
 	return { exitCode: report.exitCode };
