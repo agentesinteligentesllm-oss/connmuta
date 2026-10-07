@@ -185,7 +185,10 @@ export function createConmutaDoorbellRegistration(pi: PiExtensionHost, deps: Con
 
 		const watcher = new DoorbellWatcher({
 			link: { readDoorbell: created.readDoorbell, commitCursor: created.commitCursor },
-			deliver: createPiRinger({ pi }),
+			// `warnOnce` is the same per-session, message-keyed gate the loop's own failures use: a budget-suppressed
+			// ring is not a failure, but it must not be a silence either — and the ringer's message is byte-stable so
+			// that gate can actually dedupe it (B-129, B-127).
+			deliver: createPiRinger({ pi, warn: warnOnce }),
 			warn: warnOnce,
 			sleep: deps.sleep,
 		});

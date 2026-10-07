@@ -321,3 +321,38 @@ keeps this amendment, `channel-pi/host.ts`'s module doc and the runbook from dri
 `channel/doorbell-loop.ts`, which must not branch on the link's error code. Option (a) — making delivery
 verifiable and refusing to advance the cursor — stays open if a future host exposes a delivery result; today
 the signal does not exist, and the runbook says so.
+
+### Amendment (2026-10-07, third) — the named bound the second amendment found missing is implemented
+
+**What this closes.** The second 2026-10-06 amendment recorded that decision 6 named "a per-window ring budget"
+and the shipped adapter had none — only the cooldown — while the third row of the test table already declared
+that bound pinned. The Director took the disposition on 2026-10-07 (option (a) of
+[B-129](../06-backlog/CHECKLIST.md): implement it, rather than correcting the decision), delegated with full authority.
+It is implemented.
+
+**The bound, as shipped.** `PI_RING_BUDGET_PER_WINDOW = 20` per `PI_RING_BUDGET_WINDOW_MS = 60 * 60 * 1000`,
+both named constants beside the cooldown in `channel-pi/constants.ts` — deliberately the same window and cap,
+for the same reason, as the wake satellite's `WAKE_BUDGET_WINDOW_MS`/`WAKE_BUDGET_PER_WINDOW`, because both
+count the same thing: **one model turn**. The window **slides** (ring timestamps pruned on use against
+`now - windowMs`), mirroring `runner/loop.ts`, rather than a fixed bucket a burst could straddle. The cooldown
+is checked **first**, because a merged ring starts no turn and must not be charged to the budget; only a call
+that reaches `sendMessage` is recorded.
+
+**What a spent budget does.** It resolves without ringing, exactly as a cooldown merge does: the watcher
+commits its cursor, no row is lost (the cursor split above), and the condition is reported **once per session**
+through the adapter's own `warnOnce` gate, whose keying is why the message is byte-stable. That is the same
+"report health you actually have" rule the adapter's module doc already states, applied to a bound that would
+otherwise look identical, from inside the session, to a quiet bus.
+
+**Why the third row of the test table is now true, and what changed to make it so.** The row — "One read in
+flight, cooldown and per-window budget hold under a burst and under `saturated`" — was satisfied for the
+cooldown only. It is now pinned by six tests in `test/channel-pi/host.test.ts` (the cap under a burst past the
+cooldown; the sliding refill; a `saturated` burst still capped; a cooldown-merged ring consuming no budget; the
+once-per-session report and its stable message) plus the constants' own invariants in
+`test/channel-pi/constants.test.ts`, including that the budget must be tighter than the cooldown's implied
+ceiling or it could never fire. Three of those pins were shown non-vacuous by mutation — disabling the cap,
+charging a merged ring, and suppressing the report each fail exactly the test that claims them. Decision 6 and
+the test table stand as originally written; the second amendment's finding is resolved, not rewritten.
+
+The number is a **ceiling, not a target**, and it is the tunable one: B-114's first real firing is where rings
+per burst can be counted, and the constant's own comment says so rather than presenting 20 as measured.

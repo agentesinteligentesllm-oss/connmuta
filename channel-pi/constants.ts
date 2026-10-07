@@ -36,6 +36,34 @@ export const PI_DOORBELL_CUSTOM_TYPE = "conmuta-doorbell";
 export const PI_RING_COOLDOWN_MS = 15_000;
 
 /**
+ * The ring budget's window, in milliseconds: one hour.
+ *
+ * Deliberately the same period as the wake satellite's `WAKE_BUDGET_WINDOW_MS` (`runner/constants.ts`). The
+ * two bounds count the same thing — one model turn — and a window long enough to be an hour is what makes the
+ * cap a cost bound rather than a burst dampener: a peer storm that lasts minutes is a different problem from a
+ * group that is busy all afternoon (`PI_RING_BUDGET_PER_WINDOW` is the cap; this is the period it is measured
+ * over).
+ */
+export const PI_RING_BUDGET_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * How many rings one window may carry, absolute — the cap the cooldown cannot be.
+ *
+ * {@link PI_RING_COOLDOWN_MS} bounds how *often* a ring may fire, not how many: at one ring per fifteen seconds
+ * a session under steady traffic can ring **240 times an hour**, and every ring is a model turn taken in the
+ * session a person is sitting in. Twenty is the same cap, for the same reason, as the satellite's
+ * `WAKE_BUDGET_PER_WINDOW`: twenty turns an hour is already more than a person will read, and the cap is what
+ * turns a peer's storm — or a loop — into a bounded cost instead of an unbounded one.
+ *
+ * A ring suppressed by the budget resolves without ringing, like one merged by the cooldown, so the watcher
+ * commits its cursor and no *row* is lost: the doorbell cursor this adapter advances is not the cursor the
+ * session's own `fetch` reads (ADR-0038). This is a **ceiling, not a target**, and it is the number to revisit
+ * with measurements rather than keep as a belief — B-114's first real firing is where rings per burst can be
+ * counted.
+ */
+export const PI_RING_BUDGET_PER_WINDOW = 20;
+
+/**
  * The interactive terminal mode.
  *
  * Pi reports the current run mode on the session context. `"tui"` is the terminal session a person is

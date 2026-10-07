@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { RUNNER_NAME } from "../../runner/constants.js";
 import { CHANNEL_HOST_LABEL } from "../../src/shared/constants.js";
-import { PI_DOORBELL_CUSTOM_TYPE, PI_DOORBELL_HOST_LABEL, PI_INTERACTIVE_HOST_ENV, PI_INTERACTIVE_MODE, PI_RING_COOLDOWN_MS } from "../../channel-pi/constants.js";
+import { PI_DOORBELL_CUSTOM_TYPE, PI_DOORBELL_HOST_LABEL, PI_INTERACTIVE_HOST_ENV, PI_INTERACTIVE_MODE, PI_RING_BUDGET_PER_WINDOW, PI_RING_BUDGET_WINDOW_MS, PI_RING_COOLDOWN_MS } from "../../channel-pi/constants.js";
 
 /**
  * `channel-pi/constants.ts` (ADR-0036). Three values look trivial and are not, which is why they get a
@@ -43,4 +43,21 @@ test("the ring cooldown is a positive whole number of milliseconds", () => {
 	assert.ok(Number.isInteger(PI_RING_COOLDOWN_MS), "a fractional cooldown would be a unit mistake, not a preference");
 	assert.ok(PI_RING_COOLDOWN_MS > 0, "a non-positive cooldown would ring on every announcement, which is the cost this bound exists to avoid");
 	assert.ok(Number.isFinite(PI_RING_COOLDOWN_MS));
+});
+
+test("the ring budget is a positive whole number of rings in a window that actually binds (B-129)", () => {
+	assert.ok(Number.isInteger(PI_RING_BUDGET_PER_WINDOW), "a fractional budget is a unit mistake, not a preference");
+	assert.ok(PI_RING_BUDGET_PER_WINDOW >= 1, "a zero budget would silence the ring entirely, which is not a bound but a switch");
+	assert.ok(Number.isInteger(PI_RING_BUDGET_WINDOW_MS) && PI_RING_BUDGET_WINDOW_MS > 0);
+	assert.ok(
+		PI_RING_BUDGET_WINDOW_MS > PI_RING_COOLDOWN_MS,
+		"a window no longer than the cooldown could never allow the budget to be spent, so the two bounds would be one",
+	);
+	// The point of the budget is to be the binding constraint. The cooldown alone permits one ring per cooldown, i.e.
+	// `window / cooldown` rings in a window; a budget at or above that ceiling would never suppress anything and
+	// would read as a bound while being dead code (the ADR-0012 shape this row already is).
+	assert.ok(
+		PI_RING_BUDGET_PER_WINDOW < PI_RING_BUDGET_WINDOW_MS / PI_RING_COOLDOWN_MS,
+		"the budget must be tighter than the cooldown's own implied ceiling, or it can never fire and pins nothing",
+	);
 });

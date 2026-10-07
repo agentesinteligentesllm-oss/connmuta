@@ -96,13 +96,19 @@ bus answering only from a live session. The consequences an operator should hold
 
 - **You can stop it.** Declining or interrupting the turn, or removing the extension, ends it; nothing is
   armed outside the session, and the adapter holds no state that outlives it.
-- **One ring per 15 seconds.** A burst that arrives while the session is already awake from a previous
-  ring is merged into the next ring rather than queueing another turn. No row is lost: the doorbell's own
-  cursor is not the cursor the session's `fetch` uses.
-- **The cooldown is a rate limit, not a budget.** It bounds how *often* a ring may fire, not how many fire
-  in an hour, so an attended session under steady traffic can ring up to four times a minute. The
-  per-window budget ADR-0036 decision 6 names is **not implemented** in the shipped adapter; that gap is
-  filed as **B-129**, and this line is written to be corrected when it is settled.
+- **One ring per 15 seconds, and no more than 20 rings an hour.** A burst that arrives while the session is
+  already awake from a previous ring is merged into the next ring rather than queueing another turn. No row is
+  lost: the doorbell's own cursor is not the cursor the session's `fetch` uses.
+- **The cooldown is a rate limit; the budget is the cap.** The cooldown bounds how *often* a ring may fire —
+  up to four times a minute under steady traffic — while `PI_RING_BUDGET_PER_WINDOW` (20) per
+  `PI_RING_BUDGET_WINDOW_MS` (one hour) bounds how *many* fire. Every ring is a model turn, so the cap is what
+  turns a busy afternoon, a peer storm or a loop into a bounded cost; twenty an hour is a **ceiling, not a
+  target**, and it is the number to revisit with measurements.
+- **A budget-suppressed ring is quiet, not broken — and it says so once.** When the window's cap is spent, the
+  ring resolves without starting a turn, exactly as a cooldown merge does: it is not a delivery failure, it is
+  not retried, and no row is lost (the same cursor split below). Because a session that has quietly stopped
+  ringing and a bus with nothing on it look identical from inside the session, the adapter reports the spent
+  budget **once per session** through the session's own UI, and rings resume as the window refills.
 - **It never sends.** The adapter has no send path, no shell and no MCP client of its own; only your
   session can reply, and only through the bus tools.
 
@@ -122,7 +128,8 @@ bound acceptable is a **cursor split**, not a retry:
 - **The half that can be detected is retried.** A ring attempted against a stale context throws
   synchronously; the throw reaches the watcher, which records `deliver_failed` and does **not** advance the
   cursor, so the same window is read again. That is the only failure this adapter can see. A ring merged by
-  the cooldown is not a failure: it resolves, so the cursor does advance.
+  the cooldown is not a failure: it resolves, so the cursor does advance — and a ring the **budget** suppresses
+  behaves the same way, resolving without a turn and reporting the spent budget once.
 
 [ADR-0038](../03-adr/0038-a-ring-is-best-effort.md) names the four tests that pin this, including the one
 that carries the decision. Keep whatever recurring `conmuta_fetch` cadence your project's `AGENTS.md`
